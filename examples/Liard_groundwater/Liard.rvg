@@ -35,7 +35,7 @@
 # :Wells
 #   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT
 #   1, PW_1, 59.27310, -124.73460, 1199.7, 1188.7
-# :EndWells                                        # rates: :WellRate 1 m3/d ... in Liard.rvt
+# :EndWells                                        # rates: :WellFlowRate 1 m3/d ... in Liard.rvt
 # :ObservationWells
 #   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_ELEV
 #   101, OW_NEAR, 59.27310, -124.73060, 1192.7

@@ -525,7 +525,7 @@ the seepage as a loss.
 \section{Wells and boundaries}\label{ch:wells}
 \subsection{Pumping and injection wells}
 Wells are listed in \cmd{:Wells} with their location and screen (top and bottom elevation); pumping rates come from a
-time series \cmd{:WellRate} in the \cmd{.rvt} file (m$^3$/d, negative for pumping). A screen that crosses several layers
+time series \cmd{:WellFlowRate} in the \cmd{.rvt} file (m$^3$/d, negative for pumping, positive for injection). A screen that crosses several layers
 is split among them by transmissivity, so more water comes from the more permeable layers:
 \begin{equation}
 Q_{w,\ell}=Q_w\,\frac{T_\ell}{\sum_mT_m},\qquad
@@ -581,12 +581,12 @@ head. Monitoring wells move no water.\par\smallskip
 :GeneralHeadBoundary   G1  edge.geojson  HEAD 1146.9 CONDUCTANCE 5000 LAYERS TOP
 :SpecifiedHeadBoundary L1  lake.geojson  HEAD 1226.5 LAYERS TOP
 # .rvt
-:WellRate 1 m3/d                 # negative = pumping
+:WellFlowRate 1 m3/d                 # negative = pumping
   1985-10-01 00:00:00 1.0 3
   -1000.0
   -1000.0
   -1200.0
-:EndWellRate
+:EndWellFlowRate
 :ObservationData GW_HEAD 101 m   # observed heads
   ...
 :EndObservationData
@@ -594,7 +594,7 @@ head. Monitoring wells move no water.\par\smallskip
 \end{minipage}\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr \hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
-$Q_w$ & \cmd{:WellRate} & time series (\cmd{.rvt}) & m$^3$/d & Sec.~\ref{app:commands}\\
+$Q_w$ & \cmd{:WellFlowRate} & time series (\cmd{.rvt}) & m$^3$/d & Sec.~\ref{app:commands}\\
 $z_{\mathrm{st}}$, $z_{\mathrm{sb}}$ & \cmd{SCREEN\_TOP}, \cmd{SCREEN\_BOT} & \cmd{:Wells} table (\cmd{.rvg}) & m & Sec.~\ref{app:commands}\\
 $K_\ell$ & \cmd{K\_HORIZ} & aquifer class of layer $\ell$ & m/d & Sec.~\ref{app:class}\\
 $C_g$ & \cmd{CONDUCTANCE} & \cmd{:GeneralHeadBoundary} (\cmd{.rvg}) & m$^2$/d & Sec.~\ref{app:commands}\\

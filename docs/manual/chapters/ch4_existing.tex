@@ -39,8 +39,23 @@ found through MODFLOW's own memory. Regular (DIS) and polygon (DISV) grids are s
 :StreamPackage    RIV_STREAMS AUX SUBBASIN         # river cells linked to Raven's reaches
 :SeepageToRaven   ON                               # groundwater seeping out returns to Raven
 \end{lstlisting}
-HRUs with an \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh} file are coupled, as in the generated mode; with an existing model
-the profile's layers are not used, only its seepage parameters (\cmd{SEEPAGE\_LEAKANCE}, \cmd{SEEPAGE\_SMOOTHING\_DEPTH}).
+HRUs with an \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh} file are coupled, as in the generated mode. The layer geometry and
+hydraulic properties come from the model's own files, so a profile needs no layers and no \cmd{:AquiferClasses} are
+needed: give it as \cmd{name, 0} in \cmd{:AquiferProfiles}. The profile then only marks the coupled HRUs and carries the
+exchange settings in \cmd{:AquiferProfileParameters} (\cmd{SEEPAGE\_LEAKANCE}, \cmd{SEEPAGE\_SMOOTHING\_DEPTH},
+\cmd{RECHARGE\_DELAY}); its other parameters are not used. Layers listed in a profile are ignored, with a warning.
+\begin{lstlisting}
+:AquiferProfiles
+  VALLEY_ALLUVIUM, 0                 # no layers: the model's own are used
+  UPLAND_TILL,     0
+:EndAquiferProfiles
+:AquiferProfileParameters
+  :Attributes,     SEEPAGE_LEAKANCE
+  :Units,          1/d
+  VALLEY_ALLUVIUM, 1.0
+  UPLAND_TILL,     1.0
+:EndAquiferProfileParameters
+\end{lstlisting}
 Raven's recharge must reach the \cmd{GROUNDWATER} store, exactly as in Section~\ref{sec:buildparams}.
 
 \section{Linking HRUs to the model's cells}

@@ -84,8 +84,8 @@ def setup(name,cfg,days,start='1985-10-01'):
         else: add+=f":GridRefinement LAKES {cs*0.25}\n"
     open(f'{d}/Liard.rvg','w').write(g+add)
     if cfg['wells']:
-        n=int(days/cfg['dt'])+2; t=f"\n:WellRate 1 m3/d\n  {start} 00:00:00 {cfg['dt']} {n}\n"+''.join(f"  {cfg['wells'][0][1]}\n" for _ in range(n))+":EndWellRate\n"
-        for i,(h,q) in enumerate(cfg['wells'][1:],start=2): t+=f":WellRate {i} m3/d\n  {start} 00:00:00 {cfg['dt']} {n}\n"+''.join(f"  {q}\n" for _ in range(n))+":EndWellRate\n"
+        n=int(days/cfg['dt'])+2; t=f"\n:WellFlowRate 1 m3/d\n  {start} 00:00:00 {cfg['dt']} {n}\n"+''.join(f"  {cfg['wells'][0][1]}\n" for _ in range(n))+":EndWellFlowRate\n"
+        for i,(h,q) in enumerate(cfg['wells'][1:],start=2): t+=f":WellFlowRate {i} m3/d\n  {start} 00:00:00 {cfg['dt']} {n}\n"+''.join(f"  {q}\n" for _ in range(n))+":EndWellFlowRate\n"
         open(f'{d}/Liard.rvt','a').write(t)
     if cfg['res']:
         h=cfg['res']; zc=land_at_lake(h[0])

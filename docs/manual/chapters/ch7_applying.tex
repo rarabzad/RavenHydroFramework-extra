@@ -106,7 +106,7 @@ aquifer--river exchange goes directly to the reaches.
 # :Wells
 #   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT
 #   1, PW_1, 59.27310, -124.73460, 1199.7, 1188.7
-# :EndWells                                        # rates: :WellRate 1 m3/d ... in Liard.rvt
+# :EndWells                                        # rates: :WellFlowRate 1 m3/d ... in Liard.rvt
 # :ObservationWells
 #   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_ELEV
 #   101, OW_NEAR, 59.27310, -124.73060, 1192.7
@@ -302,7 +302,7 @@ Raven stops during initialization without a Raven message & MODFLOW rejected its
 ``process \dots\ removes water from GROUNDWATER'' & a Raven process drains \cmd{GROUNDWATER} in a coupled HRU; restrict it with \cmd{:-->Conditional}\\
 ``process \dots\ sends water to GROUNDWATER in HRU \dots\ which has no AQUIFER\_PROFILE'' & that water would leave the model; restrict the process\\
 ``MODFLOW 6 did not converge'' & start from a steady state or realistic heads; raise \cmd{:SolverMax\allowbreak OuterIterations}; increase \cmd{SEEPAGE\_SMOOTHING\_DEPTH}; check for extreme parameter contrasts\\
-Well rate is zero (``no :WellRate time series'') & the \cmd{:WellRate} block is missing, or its ID does not match an ID in \cmd{:Wells}\\
+Well rate is zero (``no :WellFlowRate time series'') & the \cmd{:WellFlowRate} block is missing, or its ID does not match an ID in \cmd{:Wells}\\
 ``reservoir \dots\ has no :SeepageParameters'' / ``no coupled lake HRU'' & add \cmd{:SeepageParameters}; give the lake HRU an \cmd{AQUIFER\_PROFILE}\\
 ``running more time steps than the MODFLOW 6 simulation holds'' & \cmd{:Duration} or \cmd{:TimeStep} is inconsistent; rerun\\
 Water table far above the land surface & \cmd{SEEPAGE\_LEAKANCE} too small, or $K$ too low for the recharge\\

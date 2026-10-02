@@ -40,7 +40,7 @@ def setup(d):
         '  1, PW_1, %.5f, %.5f, %.1f, %.1f\n:EndWells\n:ObservationWells\n  :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_ELEV\n'
         '  101, OW_NEAR, %.5f, %.5f, %.1f\n:EndObservationWells\n' % (pt.y, pt.x, wel - 5, wel - 25, pt.y, pt.x + 0.0044, wel - 15))
     n = 7306
-    open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:WellRate 1 m3/d\n  1985-10-01 00:00:00 1.0 %d\n' % n + '  -20000.0\n' * n + ':EndWellRate\n')
+    open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:WellFlowRate 1 m3/d\n  1985-10-01 00:00:00 1.0 %d\n' % n + '  -20000.0\n' * n + ':EndWellFlowRate\n')
     return lid
 
 

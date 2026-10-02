@@ -104,7 +104,7 @@ The groundwater file is `<model>.rvg` by default; `:rvg_Filename file` in the `.
 | --- | --- | --- |
 | AQUIFER (UNCONFINED_AQUIFER) | ICELLTYPE 1, ICONVERT 1 | convertible: Sy and saturated-thickness transmissivity when unconfined |
 | CONFINED_AQUIFER | ICELLTYPE 0, ICONVERT 0 | constant transmissivity, Ss only |
-| AQUITARD (CONFINING_LAYER) | convertible, low K from class | explicit leaky layer |
+| AQUITARD | convertible, low K from class | explicit leaky layer |
 | AQUICLUDE | IDOMAIN 0 | no-flow barrier; not allowed as the top layer |
 
 Layers thinner than 0.5 m after clipping at bedrock become vertical pass-through cells. Layer k of one
@@ -199,6 +199,16 @@ attached to the nearest active cell. `RAVEN_GW_PROFILE=1` prints the time of eac
 Raven links its coupled HRUs (those with an `AQUIFER_PROFILE`) to the top active layer of the user's model and leaves the
 model intact (it works on a copy in `<output>/mf6/`).
 
+The model's files hold the layers and hydraulic properties, so profiles need no layers and no `:AquiferClasses` are
+needed: write each profile as `name, 0`. A profile then only marks the coupled HRUs and carries the exchange settings
+(`SEEPAGE_LEAKANCE`, `SEEPAGE_SMOOTHING_DEPTH`, `RECHARGE_DELAY`). Layers listed in a profile are ignored, with a warning.
+
+```
+:AquiferProfiles
+  VALLEY_ALLUVIUM, 0
+:EndAquiferProfiles
+```
+
 | Command | Meaning |
 |---|---|
 | `:MF6Simulation model/mfsim.nam` | the existing simulation (DIS or DISV) |
@@ -228,11 +238,11 @@ existing MODFLOW 6 model".
 ### 4.4 `.rvt`
 
 ```
-:WellRate 1 m3/d                 # well ID; negative = withdrawal
+:WellFlowRate 1 m3/d             # well ID; negative = pumping, positive = injection
   1985-10-01 00:00:00 1.0 1826
   0.0
   ...
-:EndWellRate
+:EndWellFlowRate
 :BoundaryHead GHB1 m             # overrides HEAD of the named boundary
   ...
 :EndBoundaryHead
@@ -299,7 +309,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | Warnings "polygon area ... differs from .rvh AREA" | informational; fluxes are mapped mass-conservatively regardless |
 | "MODFLOW 6 did not converge" | start from `:GWInitialization STEADY_STATE` or realistic `:InitialGWHeads`; raise `:SolverMaxOuterIterations`; increase `SEEPAGE_SMOOTHING_DEPTH` |
 | "process ... sends water to GROUNDWATER in HRU ... which has no AQUIFER_PROFILE" | that water leaves the model; restrict the process with :-->Conditional |
-| well rate is zero ("has no :WellRate time series") | the `:WellRate` block is missing or its well ID does not match an ID in `:Wells` |
+| well rate is zero ("has no :WellFlowRate time series") | the `:WellFlowRate` block is missing or its well ID does not match an ID in `:Wells` |
 | "running more time steps than the MODFLOW 6 simulation holds" | `:Duration` or `:TimeStep` changed after the model files were built; rerun |
 
 ## 9. Limitations

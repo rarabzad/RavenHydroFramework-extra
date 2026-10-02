@@ -156,25 +156,19 @@ SHRUBLAND,     2.124607E+00  ,       2.012541E+00,          _DEFAULT    ,       
 
 
 #-----------------------------------------------------------------
-# Groundwater (Raven-MODFLOW 6): hypothetical aquifer for testing
+# Groundwater (Raven-MODFLOW 6), coupled to the existing model in model/
+#   The model's own files hold the layers and hydraulic properties, so the profiles have no layers (nLayers = 0)
+#   and no :AquiferClasses are needed. A profile only marks the coupled HRUs (AQUIFER_PROFILE in the .rvh) and
+#   carries the exchange settings: SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH, RECHARGE_DELAY.
 #-----------------------------------------------------------------
-:AquiferClasses
-  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY
-  :Units,      m/d,     m/d,    1/m,          none,       none
-  GRAVEL,      50.0,    5.0,    1.0E-5,       0.25,       0.30
-  CLAY_TILL,   0.001,   0.0001, 1.0E-4,       0.03,       0.40
-  SAND,        10.0,    1.0,    1.0E-5,       0.20,       0.35
-  UPLAND_TILL, 0.2,     0.02,   1.0E-4,       0.08,       0.30
-:EndAquiferClasses
-
 :AquiferProfiles
-  VALLEY_ALLUVIUM, 3, GRAVEL, 15.0, AQUIFER, CLAY_TILL, 5.0, AQUITARD, SAND, TO_BEDROCK, CONFINED_AQUIFER
-  UPLAND_TILL,     1, UPLAND_TILL, TO_BEDROCK, AQUIFER
+  VALLEY_ALLUVIUM, 0
+  UPLAND_TILL,     0
 :EndAquiferProfiles
 
 :AquiferProfileParameters
-  :Attributes,     INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SOIL_ZONE_DEPTH
-  :Units,          m,                  m,                     1/d,              m
-  VALLEY_ALLUVIUM, 3.0,                60.0,                  1.0,              0.0
-  UPLAND_TILL,     8.0,                15.0,                  1.0,              0.0
+  :Attributes,     SEEPAGE_LEAKANCE
+  :Units,          1/d
+  VALLEY_ALLUVIUM, 1.0
+  UPLAND_TILL,     1.0
 :EndAquiferProfileParameters

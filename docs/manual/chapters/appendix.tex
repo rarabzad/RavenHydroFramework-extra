@@ -22,7 +22,7 @@ HRU & \cmd{.rvh} & one HRU & \cmd{AQUIFER\_PROFILE}, \cmd{AREA}, \cmd{ELEVATION}
 Subbasin, channel & \cmd{.rvh}, \cmd{.rvp} & a subbasin's reach & channel profile, \cmd{Q\_REFERENCE}\\
 Reservoir & \cmd{.rvh} & one reservoir & \cmd{:SeepageParameters}, \cmd{:AbsoluteCrest\allowbreak Height}\\
 Groundwater option & \cmd{.rvg} & the whole groundwater model & \cmd{:GridCellSize}, \cmd{:SolverHead\allowbreak Tolerance}\\
-Stress or observation & \cmd{.rvg}, \cmd{.rvt} & a well, boundary or monitoring well & \cmd{:Wells}, \cmd{:WellRate}, \cmd{:BoundaryHead}\\
+Stress or observation & \cmd{.rvg}, \cmd{.rvt} & a well, boundary or monitoring well & \cmd{:Wells}, \cmd{:WellFlowRate}, \cmd{:BoundaryHead}\\
 Initial condition & \cmd{.rvc} & the start of a run & \cmd{:InitialGWHeads}, hotstart blocks\\
 Raven state variable & (computed) & an HRU store or flux & \cmd{GROUNDWATER}, \cmd{AET}, \cmd{DEPRESSION}\\\bottomrule
 \end{longtable}
@@ -82,7 +82,7 @@ Fractured crystalline rock & $10^{-3}$--$10^{1}$ & 0.001--0.05 & $10^{-6}$ & 0.0
 \toprule\hdr Keyword & MODFLOW 6 setting & Behaviour\\\midrule\endhead
 \cmd{AQUIFER}, \cmd{UNCONFINED\_AQUIFER} & \cmd{ICELLTYPE} 1, \cmd{ICONVERT} 1 & convertible: $S_y$ when unconfined, $S_s$ when full; transmissivity from saturated thickness\\
 \cmd{CONFINED\_AQUIFER} & \cmd{ICELLTYPE} 0, \cmd{ICONVERT} 0 & always full: constant transmissivity, storage by $S_s$\\
-\cmd{AQUITARD}, \cmd{CONFINING\_LAYER} & as \cmd{AQUIFER} & leaky layer with the (low) $K$ of its class\\
+\cmd{AQUITARD} & as \cmd{AQUIFER} & leaky layer with the (low) $K$ of its class\\
 \cmd{AQUICLUDE} & \cmd{IDOMAIN} 0 & no flow; not allowed as top layer\\
 thickness \cmd{TO\_BEDROCK} & layer bottom = bedrock & layers below it become pass-through cells\\
 (automatic) pass-through & \cmd{IDOMAIN} $-1$ & layer thinner than 0.5 m or missing in the profile: connects the cells above and below\\\bottomrule
@@ -138,7 +138,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:HeadSaveFrequency n} & steps between saved head fields, $\ge1$ (30)\\
 \cmd{.rvg} & \cmd{:WriteNetCDFHeads} & write \cmd{GWHeads.nc} (off; needs a NetCDF build)\\
 \cmd{.rvg} & \cmd{:LinkageCache file} & linkage cache (\cmd{<output>/mf6/linkage.cache})\\
-\cmd{.rvt} & \cmd{:WellRate id units} \dots\ \cmd{:EndWellRate} & well rate series, m$^3$/d, negative = pumping\\
+\cmd{.rvt} & \cmd{:WellFlowRate id units} \dots\ \cmd{:EndWellFlowRate} & well rate series, m$^3$/d, negative = pumping\\
 \cmd{.rvt} & \cmd{:BoundaryHead name units} \dots & time-varying boundary head\\
 \cmd{.rvt} & \cmd{:ObservationData GW\_HEAD id units} \dots & observed heads for diagnostics\\
 \cmd{.rvc} & \cmd{:InitialGWHeads FROM\_PROFILE|DEPTH\_BELOW\_SURFACE d|ELEVATION z} & initial heads (\cmd{FROM\_PROFILE})\\
@@ -313,7 +313,7 @@ layers, thickness, type & aquifer profile & layer construction (Sec.~\ref{ch:lay
 \cmd{:SeepageParameters} & reservoir & reservoir seepage (Sec.~\ref{ch:reservoirs})\\
 \cmd{LEAKANCE} & \cmd{:SurfaceWater\allowbreak Exchange} & wetland and lake exchange (Sec.~\ref{ch:stores})\\
 \cmd{CONDUCTANCE}, \cmd{HEAD} & boundary & GHB and CHD (Sec.~\ref{ch:wells})\\
-\cmd{SCREEN\_TOP}, \cmd{SCREEN\_BOT}, \cmd{:WellRate} & well & pumping (Sec.~\ref{ch:wells})\\
+\cmd{SCREEN\_TOP}, \cmd{SCREEN\_BOT}, \cmd{:WellFlowRate} & well & pumping (Sec.~\ref{ch:wells})\\
 \cmd{SCREEN\_ELEV}, \cmd{GW\_HEAD} & monitoring well & heads and diagnostics (Sec.~\ref{ch:wells})\\
 \cmd{:GridCellSize}, \cmd{:MinCellCoverage} & groundwater option & grid and active cells (Sec.~\ref{ch:grid})\\
 \cmd{:GridType}, \cmd{:GridRotation}, \cmd{:GridRefinement}, \cmd{:GridFile}, \cmd{:QuadtreeMaxLevel} & groundwater option & grid types (Sec.~\ref{sec:gridtypes})\\

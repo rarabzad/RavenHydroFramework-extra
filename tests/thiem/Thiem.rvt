@@ -21,9 +21,9 @@
     10
   :EndData
 :EndGauge
-:WellRate 1 m3/d
+:WellFlowRate 1 m3/d
   2000-01-01 00:00:00 1.0 3
   -5000
   -5000
   -5000
-:EndWellRate
+:EndWellFlowRate

@@ -179,6 +179,6 @@ def grid_base():
     t = re.sub(r':TimeStep\s+\S+', ':TimeStep           12:00:00', t)
     open(os.path.join(d, 'Liard.rvi'), 'w').write(t)
     n = 7306   # daily values for the whole 20-year example (Raven time-series intervals must divide a day)
-    open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:WellRate 1 m3/d\n  1985-10-01 00:00:00 1.0 %d\n' % n + '  -5000.0\n' * n + ':EndWellRate\n')
+    open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:WellFlowRate 1 m3/d\n  1985-10-01 00:00:00 1.0 %d\n' % n + '  -5000.0\n' * n + ':EndWellFlowRate\n')
     open(os.path.join(d, 'ready'), 'w').write('')
     return d
