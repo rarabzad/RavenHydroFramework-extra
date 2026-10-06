@@ -102,8 +102,8 @@ lives in a separate repository.
 \item \textbf{RavenHydroFramework} (\cmd{src/}): the coupling's source files and the small changes to existing Raven files
       (Section~\ref{sec:coreflix}). Until the pull requests are merged, the branch \cmd{mf6-coupling} of
       \url{https://github.com/rarabzad/RavenHydroFramework} holds them all.
-\item \textbf{Raven-MF6} (\url{https://github.com/rarabzad/Raven-MF6}): this manual, the user guide, the Liard examples,
-      the tests (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}.
+\item \textbf{RavenHydroFramework-extra}: this manual, the user guide, the Liard examples, the tests
+      (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}, at\\ \url{https://github.com/rarabzad/RavenHydroFramework-extra}.
 \end{itemize}
 Clone the two side by side in one folder; the tests and \cmd{get\_mf6.py} then find Raven without any setting.
 
@@ -116,7 +116,7 @@ when a model uses \cmd{:GroundwaterModel MODFLOW6}.
 
 \section{Getting MODFLOW 6}\label{sec:getmf6}
 The MODFLOW~6 shared library (\cmd{libmf6.so}, \cmd{libmf6.dll} or \cmd{libmf6.dylib}, about 15--55~MB) is not part of
-either repository. One command in Raven-MF6 downloads it:
+either repository. One command in RavenHydroFramework-extra downloads it:
 \begin{lstlisting}
 python tools/get_mf6.py                   # MODFLOW 6.8.1, the tested version, for this computer
 python tools/get_mf6.py --latest          # the newest release instead (or --version 6.x.y)
@@ -127,7 +127,7 @@ The script (standard Python only) picks the release zip for the computer from
 \url{https://github.com/MODFLOW-ORG/modflow6/releases} (\cmd{mf6.8.1\_linux.zip}, \cmd{mf6.8.1\_win64.zip},
 \cmd{mf6.8.1\_macarm.zip}; \cmd{\_mac.zip} for Intel Macs where one is released), keeps only the library, and records its
 version, source and SHA-256 in \cmd{libmf6\_version.txt} beside it. It puts the library in \cmd{lib/mf6/} of the Raven
-checkout beside Raven-MF6 (or the one named by \cmd{--raven} or \cmd{RAVEN\_SRC}), where Raven finds it. It does nothing
+checkout beside RavenHydroFramework-extra (or the one named by \cmd{--raven} or \cmd{RAVEN\_SRC}), where Raven finds it. It does nothing
 when the library is already there (\cmd{--force} replaces it). The default is the tested version rather than the newest
 release, so that a new MODFLOW release cannot change a model's results unnoticed; with MODFLOW~6.6, for example, the
 Newton option behaved differently.

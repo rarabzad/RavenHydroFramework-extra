@@ -17,7 +17,7 @@ about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as be
 \begin{enumerate}
 \item Build Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch of \url{https://github.com/rarabzad/RavenHydroFramework}): CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}), or \cmd{make} in \cmd{src/}; on Windows also \cmd{src/Raven.sln}.
 \item Get the MODFLOW~6 library (6.5 or newer; tested with 6.8.1 and 6.6.3; 6.8 or newer recommended): run
-\cmd{python tools/get\_mf6.py} in the Raven-MF6 repository (Section~\ref{sec:getmf6}).
+\cmd{python tools/get\_mf6.py} in the RavenHydroFramework-extra repository (Section~\ref{sec:getmf6}).
 Raven then finds it without any setting.
 \item The original Liard package was made for Raven 2.9.1; for Raven 4.x its Windows paths use \texttt{/} and the parameter
 \cmd{DEP\_THRESHHOLD} is spelled \cmd{DEP\_THRESHOLD}. The example files already include these changes.
@@ -294,7 +294,7 @@ Check the row and column of each response in your own \cmd{Diagnostics.csv}; the
 \caption{Messages and symptoms, with their causes and remedies.}
 \begin{tabular}{P{0.36\linewidth}P{0.588\linewidth}}\toprule\hdr
 Message or symptom & Cause and remedy\\\midrule
-``cannot load MODFLOW 6 library'' & run \cmd{python tools/get\_mf6.py} of Raven-MF6, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB} to the full path of \cmd{libmf6}; the message lists the places searched\\
+``cannot load MODFLOW 6 library'' & run \cmd{python tools/get\_mf6.py} of RavenHydroFramework-extra, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB} to the full path of \cmd{libmf6}; the message lists the places searched\\
 Raven stops during initialization without a Raven message & MODFLOW rejected its input; read \cmd{<output>/mf6/mfsim.lst}\\
 ``HRU \dots\ has an AQUIFER\_PROFILE but no polygon'' & HRU IDs in the GeoJSON do not match the \cmd{.rvh}; check the ID field name\\
 ``does not overlap any active groundwater cell'' & the HRU is too small for the grid or sits where bedrock is at the surface; reduce \cmd{:GridCellSize} or \cmd{:MinCellCoverage}, or check the bedrock map\\

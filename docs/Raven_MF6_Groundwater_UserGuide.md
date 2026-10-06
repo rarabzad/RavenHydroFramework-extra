@@ -26,7 +26,7 @@ counts it as leaving Raven. Groundwater storage itself is reported by the files 
 ## 2. Requirements and building
 
 - The MODFLOW 6 shared library: `libmf6.so` (Linux), `libmf6.dll` (Windows) or `libmf6.dylib` (macOS); 6.5 or later,
-  tested with 6.8.1 and 6.6.3, 6.8 or newer recommended. Get it with one command in this repository (Raven-MF6):
+  tested with 6.8.1 and 6.6.3, 6.8 or newer recommended. Get it with one command in this repository (RavenHydroFramework-extra):
 
       python tools/get_mf6.py            # MODFLOW 6.8.1 for this computer, into lib/mf6 of your Raven checkout
 
@@ -302,7 +302,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 
 | Symptom | Cause and fix |
 | --- | --- |
-| "cannot load MODFLOW 6 library" | run `python tools/get_mf6.py` in Raven-MF6, or set `:MF6Library` or `RAVEN_MF6_LIB` to the full path of libmf6; the message lists the places searched |
+| "cannot load MODFLOW 6 library" | run `python tools/get_mf6.py` in RavenHydroFramework-extra, or set `:MF6Library` or `RAVEN_MF6_LIB` to the full path of libmf6; the message lists the places searched |
 | Raven stops with no Raven message during initialization | MODFLOW rejected its input: read `<output>/mf6/mfsim.lst` |
 | "HRU ... has an AQUIFER_PROFILE but no polygon" | HRU IDs in the GeoJSON do not match the `.rvh`; check the ID field name |
 | "does not overlap any active groundwater cell" | reduce `:GridCellSize` or `:MinCellCoverage`, or check bedrock depth |

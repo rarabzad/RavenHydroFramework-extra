@@ -1,11 +1,11 @@
 """Shared settings for the test scripts: where Raven, its source, the MODFLOW 6 library, the examples and the scratch
 folder are.
 
-Every test script imports this module. The tests live in the Raven-MF6 repository; Raven itself (with the MODFLOW 6
+Every test script imports this module. The tests live in the RavenHydroFramework-extra repository; Raven itself (with the MODFLOW 6
 coupling) is a separate checkout of RavenHydroFramework. By default the two sit side by side:
 
-    <folder>/RavenHydroFramework     Raven source, built with CMake (build/) or make (src/)
-    <folder>/Raven-MF6               this repository
+    <folder>/RavenHydroFramework         Raven source, built with CMake (build/) or make (src/)
+    <folder>/RavenHydroFramework-extra   this repository
 
 Otherwise set:
 
@@ -19,7 +19,7 @@ The Liard examples in examples/ are the base cases; each test copies them into t
 import os, sys, shutil, subprocess, re
 
 TESTS = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(TESTS)                                        # the Raven-MF6 repository
+REPO = os.path.dirname(TESTS)                                        # the RavenHydroFramework-extra repository
 RAVEN_ROOT = os.path.abspath(os.environ.get('RAVEN_SRC', os.path.join(os.path.dirname(REPO), 'RavenHydroFramework')))
 if os.path.basename(RAVEN_ROOT) == 'src' and os.path.exists(os.path.join(RAVEN_ROOT, 'RavenMain.cpp')):
     RAVEN_ROOT = os.path.dirname(RAVEN_ROOT)                         # RAVEN_SRC may also point at src/ itself
@@ -58,7 +58,7 @@ import tools_audit as audit   # noqa: E402  (the audit tool shipped with the exa
 def need_mf6():
     """stop with a clear message when the MODFLOW 6 library is not configured"""
     if not MF6LIB or not os.path.exists(MF6LIB):
-        sys.exit('MODFLOW 6 library not found: run  python tools/get_mf6.py  in Raven-MF6, or set RAVEN_MF6_LIB to libmf6.so / libmf6.dll / libmf6.dylib')
+        sys.exit('MODFLOW 6 library not found: run  python tools/get_mf6.py  in RavenHydroFramework-extra, or set RAVEN_MF6_LIB to libmf6.so / libmf6.dll / libmf6.dylib')
     if not os.path.exists(RAVEN):
         sys.exit('Raven not found at %s: build RavenHydroFramework beside this repository, or set RAVEN_SRC or RAVEN_EXE' % RAVEN)
 

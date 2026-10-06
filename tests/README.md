@@ -8,8 +8,8 @@ reads its settings from `testconfig.py`, which finds the repository from its own
 The tests run Raven from a separate RavenHydroFramework checkout (with the MODFLOW 6 coupling). Put the two side by
 side, build Raven, and get the MODFLOW 6 library:
 
-    <folder>/RavenHydroFramework      cmake -S . -B build && cmake --build build   (or make in src/)
-    <folder>/Raven-MF6                this repository
+    <folder>/RavenHydroFramework         cmake -S . -B build && cmake --build build   (or make in src/)
+    <folder>/RavenHydroFramework-extra   this repository
     python3 tools/get_mf6.py          # MODFLOW 6 library into RavenHydroFramework/lib/mf6
     pip install numpy pandas shapely pyproj flopy
 

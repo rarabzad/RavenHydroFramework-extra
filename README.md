@@ -1,6 +1,6 @@
-# Raven-MF6: groundwater for Raven with MODFLOW 6
+# RavenHydroFramework-extra: groundwater for Raven with MODFLOW 6
 
-Raven-MF6 adds groundwater to the [Raven hydrological modelling framework](https://raven.uwaterloo.ca) with
+RavenHydroFramework-extra adds groundwater to the [Raven hydrological modelling framework](https://raven.uwaterloo.ca) with
 [MODFLOW 6](https://github.com/MODFLOW-ORG/modflow6). Raven either **builds a MODFLOW 6 model** from its HRUs
 (`:GroundwaterModel MODFLOW6`) or **couples an existing one** (`:MF6Simulation`), and exchanges recharge, seepage,
 river leakage, water-table ET, wells, boundaries and reservoir seepage with it every time step.
@@ -20,13 +20,13 @@ Put Raven and this repository side by side, build Raven, get MODFLOW 6, and run 
 
 ```
 git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
-git clone https://github.com/rarabzad/Raven-MF6.git
+git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 
 cd RavenHydroFramework
 cmake -S . -B build
 cmake --build build --config Release
 
-cd ../Raven-MF6
+cd ../RavenHydroFramework-extra
 python tools/get_mf6.py                      # MODFLOW 6.8.1 into ../RavenHydroFramework/lib/mf6, where Raven finds it
 
 cd examples/Liard_existing_model

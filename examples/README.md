@@ -25,13 +25,13 @@ The commands below are for **Windows (Command Prompt)**. Linux and macOS command
 
 ### Step 2. Get the two repositories, side by side
 
-Raven itself (with the MODFLOW 6 coupling) and this repository (Raven-MF6: examples, manual, tests, download script)
+Raven itself (with the MODFLOW 6 coupling) and this repository (RavenHydroFramework-extra: examples, manual, tests, download script)
 are separate. Put both in the same folder:
 
 ```
 cd %USERPROFILE%
 git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
-git clone https://github.com/rarabzad/Raven-MF6.git
+git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 ```
 
 (After the coupling is merged into Raven, clone https://github.com/CSHS-CWRA/RavenHydroFramework without `-b mf6-coupling`.)
@@ -53,7 +53,7 @@ A warning that NetCDF was not found is normal; the examples do not need it.
 ### Step 4. Get the MODFLOW 6 library
 
 ```
-cd %USERPROFILE%\Raven-MF6
+cd %USERPROFILE%\RavenHydroFramework-extra
 python tools\get_mf6.py
 ```
 
@@ -61,7 +61,7 @@ It downloads MODFLOW 6.8.1 for your computer (about 130 MB, once) and ends with
 `MODFLOW 6.8.1 library: ...\RavenHydroFramework\lib\mf6\libmf6.dll (48.1 MB)`. Running it again does nothing if the
 library is already there. Linux and macOS: `python3 tools/get_mf6.py`.
 
-Raven finds the library there by itself; nothing needs to be set. (If your Raven checkout is not beside Raven-MF6, add
+Raven finds the library there by itself; nothing needs to be set. (If your Raven checkout is not beside RavenHydroFramework-extra, add
 `--raven C:\path\to\RavenHydroFramework`.)
 
 ### Step 5. Tell the Command Prompt where Raven is
@@ -86,7 +86,7 @@ subbasins 52, 48 and 43, and runs MODFLOW 6 alongside Raven every day. The other
 ### Step A1. Go to the example
 
 ```
-cd %USERPROFILE%\Raven-MF6\examples\Liard_groundwater
+cd %USERPROFILE%\RavenHydroFramework-extra\examples\Liard_groundwater
 ```
 
 ### Step A2. Look at what makes it a groundwater model (optional)
@@ -144,7 +144,7 @@ replaces the model's recharge and ET with its own, and sends the river exchange 
 ### Step B1. Go to the example
 
 ```
-cd %USERPROFILE%\Raven-MF6\examples\Liard_existing_model
+cd %USERPROFILE%\RavenHydroFramework-extra\examples\Liard_existing_model
 ```
 
 ### Step B2. Look at the coupling file (optional)
@@ -202,7 +202,7 @@ Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gros
 | Message or problem | What to do |
 |---|---|
 | `'...Raven.exe' is not recognized` | The path in `%RAVEN%` is wrong; check with `dir %RAVEN%` and repeat Step 5 in the same window |
-| `cannot load MODFLOW 6 library ...` | Run `python tools\get_mf6.py` in Raven-MF6 (Step 4). The message lists every place Raven looked |
+| `cannot load MODFLOW 6 library ...` | Run `python tools\get_mf6.py` in RavenHydroFramework-extra (Step 4). The message lists every place Raven looked |
 | `MODFLOW 6.8.1 has no release zip for this system` | On an Intel Mac, use `python3 tools/get_mf6.py --version 6.6.3` |
 | `ExitGracefully: ... Cannot find file` | Run from inside the example folder (Steps A1 / B1); Example B also needs `..\Liard_groundwater` |
 | Some days say `MODFLOW 6 did not converge` | They are flagged in `GWBudget.csv`; see the manual, section "How MODFLOW solves each time step" |

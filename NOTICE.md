@@ -3,7 +3,7 @@
 ## Raven–MODFLOW 6 groundwater coupling
 Copyright (c) 2026 Rezgar Arabzadeh. All rights not granted by the licenses below are reserved.
 
-This repository (Raven-MF6) holds the documentation, examples, tests and tools of the coupling. Its source code is
+This repository (RavenHydroFramework-extra) holds the documentation, examples, tests and tools of the coupling. Its source code is
 part of Raven (RavenHydroFramework), offered to the Raven Development Team as pull requests.
 
 | Part | Copyright | License |
