@@ -275,3 +275,28 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   which otherwise makes a one-off jump in Raven's balance (behaviour test: 349 mm; the test now gives the stage). A
   reservoir whose :HRUID lies in another subbasin crashes Raven itself (CReservoir::SetPrecip, also without
   groundwater); the coupled model now stops with a message (edge N32 expects the error).
+- **Audit round 4.**
+  (B1) While the water table is below the base the exchange is a rate; a head that rose past the base during MODFLOW's
+  solve went into the elastic storage above the cell top (heads up to 352 m above the base, MODFLOW's relaxed
+  tolerance, unconverged interfaces; the root of the explicit-mode spikes and of most interface non-convergence). Such
+  links get a drain in SZD_RAVEN at the lowest base point, smoothed over ds, conductance max(C, Q_in/D) with Q_in the
+  link's rate plus its share of the cell's recharge: no flow below the base; above it the water returns to the soil.
+  (B2) Sy below the drainable porosity of the column material: a rising water table released more from the column at
+  each step (gain eps/Sy > 1). The start-up warning the plan promised (§1.5) is written, and a rising water table
+  releases at most Sy dh per step (the column's bottom follows more slowly). With inconsistent Sy a wet column still
+  drains into an aquifer that cannot store it: a one-step overshoot remains (warned twice); with consistent Sy none.
+  (B3) Upward flows (rise, column upflow, debt repayment) came only out of the top cell, so a water table below a thin
+  top layer fed nothing. They now come out of the cell holding the water table through a new WEL package SZW_RAVEN (one
+  entry per active cell below each link's top cell); near drying they fade out smoothly (s²(3−2s) over the margin),
+  the part of the column's upflow MODFLOW does not supply is taken back out of its bottom node.
+  (B4) With columns on, the rise without a column (water table < 5 cm below the base) ignored the aquifer material
+  between the water table and the base; it is capped by that material's rise to a dry top over the gap.
+  Also: the rise's caps use the lowest layer above the source whether or not it is below field capacity (they jumped
+  when it reached field capacity: X3 round trip 0.29 → 2.6e-4); the drawdown root keeps the best lower bound (T(Qw) for
+  trials above the root), stops at 0.2 %, and the inner Brent search starts from Gardner's estimate (rise-active runs
+  1.7× faster than in round 3); reservoir checks skip disabled HRUs. Pre-existing, documented: the saturated fraction
+  that rejects recharge is fixed for the step, so on a slowly permeable aquifer a storm that lifts the water table
+  through the base in one step can overshoot for that step.
+- **Found on the way (Raven itself).** Raven's ensembles do not reset routing and reservoir outflow between members (also
+  without groundwater): the behaviour test now requires the first member to equal the single run and the second to
+  start from the same groundwater state with exact accounts.

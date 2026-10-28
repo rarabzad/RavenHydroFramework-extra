@@ -30,7 +30,7 @@ def roundtrip(name, extra='', feet=False, **over):
     for f in ('gwf.rch', 'gwf.drn', 'gwf.szx', 'gwf.szq', 'gwf.szd', 'linkage.cache', 'mfsim.lst', 'gwf.lst', 'gwf.hds', 'gwf.cbc'):
         if os.path.exists(os.path.join(m, f)): os.remove(os.path.join(m, f))
     nam = open(os.path.join(m, 'gwf.nam')).read()
-    open(os.path.join(m, 'gwf.nam'), 'w').write('\n'.join(l for l in nam.split('\n') if not re.search('RCH_RAVEN|DRN_RAVEN|SZX_RAVEN|SZQ_RAVEN|SZD_RAVEN', l)))
+    open(os.path.join(m, 'gwf.nam'), 'w').write('\n'.join(l for l in nam.split('\n') if not re.search('RCH_RAVEN|DRN_RAVEN|SZX_RAVEN|SZQ_RAVEN|SZD_RAVEN|SZW_RAVEN', l)))
     if feet:
         subprocess.run([sys.executable, os.path.join(HERE, 'mf6_to_feet.py'), m, m + '_ft'], check=True, capture_output=True); m = m + '_ft'
     e = os.path.join(W, name + '_ext'); shutil.rmtree(e, ignore_errors=True); sz_models.make_case(e, **cfg)
