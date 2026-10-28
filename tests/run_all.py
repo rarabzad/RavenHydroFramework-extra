@@ -134,7 +134,10 @@ STEPS = [
     ('crs', False, 'cd existing && %s crstest.cpp %s/GWGeometry.cpp -o crstest && %s crs_check.py'
      % (cxx, ROOT, PY), small_numbers(r'worst ([0-9.e+-]+) m', 1e-3, 'worst position difference [m]'), 600),
     ('mf6files', False, [PY, 'mf6files_check.py'], zero_failed, 3600),
+    ('mf6lib_unit', False, [PY, 'mf6lib_check.py', '--unit'], last_line(r'library unit checks: ALL PASSED'), 600),
     ('mf6lib', True, [PY, 'mf6lib_check.py'], last_line(r'library checks: ALL PASSED'), 1800),
+    ('mf6version', False, [PY, 'mf6version_check.py'], last_line(r'version guard checks: ALL PASSED'), 1800),
+    ('cmake', False, [PY, 'cmake_checks.py', '--src', tc.RAVEN_ROOT], last_line(r'cmake checks: ALL PASSED.*'), 1800),
     ('edge_nolib', False, [PY, 'edge.py', '--nolib'], n_of_n(r'(\d+) of (\d+) cases pass'), 3600),
     ('edge', True, [PY, 'edge.py'], n_of_n(r'(\d+) of (\d+) cases pass'), 4 * 3600),
     ('thiem', True, '%s thiem/run_thiem.py && %s thiem/fit_thiem.py' % (PY, PY), thiem_judge, 6 * 3600),

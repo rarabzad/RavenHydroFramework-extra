@@ -15,7 +15,9 @@ environment variable RAVEN_SRC, or of a RavenHydroFramework folder beside this r
 this repository. Raven finds the library next to its executable or in lib/mf6 of its checkout without any setting.
 
 The release zips come from https://github.com/MODFLOW-ORG/modflow6/releases (for 6.8.1: mf6.8.1_linux.zip, mf6.8.1_win64.zip,
-mf6.8.1_macarm.zip; mf6.X.Y_mac.zip for Intel Macs where released). Only the library is kept (libmf6.so, libmf6.dll or libmf6.dylib), with a
+mf6.8.1_macarm.zip; mf6.X.Y_mac.zip for Intel Macs up to MODFLOW 6.7, e.g. --version 6.6.3). MODFLOW releases no library
+for Linux other than x86_64 (e.g. aarch64), Windows on ARM, or Intel Macs from 6.8 on: there, build it with Raven
+(cmake -DRAVEN_MF6=SOURCE) or give one you have (cmake -DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=...). Only the library is kept (libmf6.so, libmf6.dll or libmf6.dylib), with a
 small text file naming its version and source (see the manual, "Getting MODFLOW 6").
 
 Standard Python 3 only; no other packages. MODFLOW 6 is public-domain software of the U.S. Geological Survey.
@@ -62,21 +64,39 @@ def default_dest():
     return DEST
 
 
-def platform_info():
-    """(release zip suffixes to try, library file name) for this computer"""
+def vtuple(v):
+    return tuple(int(x) for x in re.findall(r'[0-9]+', v or '')[:3]) or (0,)
+
+
+BUILD_HINT = ('build the library from source when building Raven (cmake -DRAVEN_MF6=SOURCE: needs a Fortran compiler, '
+              'meson >= 1.7, ninja and git), or give one you have (cmake -DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=/path/to/%s); '
+              'see the manual, "Building" and "Getting MODFLOW 6"')
+
+
+def platform_info(version=TESTED, zip_given=False):
+    """(release zip suffixes to try, library file name) for this computer; stops with advice where MODFLOW releases no
+    library (Linux other than x86_64, Windows on ARM, Intel Macs from MODFLOW 6.8 on)"""
     s, m = platform.system(), platform.machine().lower()
     if s == 'Windows':
+        if m in ('arm64', 'aarch64') or m.startswith('arm'):
+            if zip_given:   # a win64 zip given by hand: an x64 Raven runs under emulation on Windows on ARM
+                print('note: MODFLOW 6 releases no Windows ARM64 library; the library of this zip (x64) works only with an '
+                      'x64 build of Raven (x64 emulation)')
+                return ['win64'], 'libmf6.dll'
+            sys.exit('MODFLOW 6 releases no library for Windows ARM64 (this computer): ' + BUILD_HINT % 'libmf6.dll')
         if not (sys.maxsize > 2 ** 32 or m.endswith('64')):
             sys.exit('MODFLOW 6 is released for 64-bit Windows only')
         return ['win64'], 'libmf6.dll'
     if s == 'Darwin':
         if m in ('arm64', 'aarch64'):
             return ['macarm'], 'libmf6.dylib'
-        return ['mac'], 'libmf6.dylib'   # Intel Macs: not built for every release
+        if not zip_given and vtuple(version) >= (6, 8):
+            sys.exit('MODFLOW %s releases no library for Intel Macs (x86_64; from MODFLOW 6.8 on): use an earlier '
+                     'release (--version 6.6.3), or %s' % (version, BUILD_HINT % 'libmf6.dylib'))
+        return ['mac'], 'libmf6.dylib'   # Intel Macs: release zips up to MODFLOW 6.7
     if s == 'Linux':
         if m not in ('x86_64', 'amd64'):
-            sys.exit('MODFLOW 6 releases a Linux library for x86_64 only (this is %s); build libmf6 from source: '
-                     'https://github.com/MODFLOW-ORG/modflow6' % m)
+            sys.exit('MODFLOW 6 releases a Linux library for x86_64 only (this is %s): %s' % (m, BUILD_HINT % 'libmf6.so'))
         return ['linux'], 'libmf6.so'
     sys.exit('unsupported system %s: download libmf6 from https://github.com/%s/releases' % (s, REPO))
 
@@ -144,15 +164,15 @@ def main():
     ap.add_argument('--force', action='store_true', help='replace a library that is already there')
     a = ap.parse_args()
 
-    suffixes, libname = platform_info()
-    a.dest = a.dest or (raven_dest(a.raven) if a.raven else default_dest())
-    os.makedirs(a.dest, exist_ok=True)
-    target = os.path.join(a.dest, libname)
-    info = os.path.join(a.dest, 'libmf6_version.txt')
     if a.zip:
         version = (re.search(r'mf([0-9]+\.[0-9]+\.[0-9]+)', os.path.basename(a.zip)) or [None, 'unknown'])[1]
     else:
         version = latest_version() if a.latest else (a.version or TESTED)
+    suffixes, libname = platform_info(version, bool(a.zip))
+    a.dest = a.dest or (raven_dest(a.raven) if a.raven else default_dest())
+    os.makedirs(a.dest, exist_ok=True)
+    target = os.path.join(a.dest, libname)
+    info = os.path.join(a.dest, 'libmf6_version.txt')
 
     if os.path.exists(target) and not a.force:
         have = open(info).read().split('\n')[0].strip() if os.path.exists(info) else 'unknown version'
@@ -175,8 +195,8 @@ def main():
                 if download(url, p):
                     zpath = p; break
             if zpath is None:
-                extra = (' MODFLOW 6.8 and later are not built for Intel Macs; use an Apple Silicon Mac, an earlier '
-                         'release (--version 6.6.3) or build libmf6 from source.' if suffixes == ['mac'] else '')
+                extra = (' Intel Macs: use an earlier release (--version 6.6.3), or ' + BUILD_HINT % libname + '.'
+                         if suffixes == ['mac'] else '')
                 sys.exit('MODFLOW %s has no release zip for this system (%s).%s See https://github.com/%s/releases'
                          % (version, ', '.join(suffixes), extra, REPO))
         member, data = extract_library(zpath, libname)
