@@ -157,6 +157,13 @@ columns as the processes would have made them in each column, in Raven's order:
    column, and what its top layer cannot hold overflows to the HRU's `SURFACE_WATER` (saturation excess on the full
    columns) and is counted in the soil-zone overflow.
 
+Where the columns that hold an upper layer's water have a full layer below and the columns with room below have no
+water above, the percolation Raven computed on the HRU mean cannot happen in any column; it stays in the upper layer
+(moved back up), and Raven's layers are then set to the column means. That volume is reported per step in
+`GWBudget.csv` (*soil-zone layer redistribution*). Mixed percolation types: the sharing rule (by area for
+`PERC_CONSTANT`, else free water first) follows the process from `SOIL[M-1]` to `GROUNDWATER` and is used for the
+percolation between the soil-zone layers as well.
+
 (Taking the recharge before the percolation that fed it, the previous build drove columns below zero; unit test
 "Raven's process order".)
 
@@ -321,10 +328,11 @@ budget (`:SoilZoneIteration` max, default 100); when it is used up the values ar
 only. MODFLOW's tolerance relaxation for hard steps counts only iterations MODFLOW did not converge on. The last
 $\max(2,\ \text{max outer}/10)$ outer iterations are left to MODFLOW on the boundary it has: an update just before the
 limit left MODFLOW's final solve unconverged, and its residual was water created or lost (robustness test R5). Iteration
-1 updates if at least two solves follow it; with fewer outer iterations (`:SolverMaxOuterIterations` 2) only the
-predictor runs, supply-limited as in explicit mode, and the step is reported as not converged. When the interface
-freezes unconverged (the iteration reserve or the update budget reached), the boundary it keeps is made supply-limited
-once (one more update, on which MODFLOW then solves) unless the last update's already was.
+1 always updates when there is a second; with `:SolverMaxOuterIterations` 1 only the predictor runs, supply-limited as
+in explicit mode, and the step is reported as not converged. When the interface freezes unconverged (the iteration
+reserve or the update budget reached) while MODFLOW has not converged either and at least two solves follow, the
+boundary it keeps is made supply-limited once (one more update, on which MODFLOW then solves) unless the last update's
+already was; a step on which MODFLOW has converged is never reopened for it.
 In explicit mode (`:SoilZoneIteration 0`) the boundary is also supply-limited: $C_g(H_g-\text{bottom})$ never exceeds the
 column's free water over the step (robustness test R7), while for water rising into the soil $C_g$ stays at least the
 secant to the end of the contact; a linear boundary cannot hold both exactly, so some water can still rise while the
@@ -393,7 +401,8 @@ Per link column: Fill(rejected recharge), then Apply($-q\Delta t/a_c$) with $q$ 
 4. Raven's mass-balance error = change of the pass-through `GROUNDWATER` store (pre-existing Raven reporting).
 
 `GWBudget.csv` columns: soil zone to aquifer, aquifer to soil zone [m³/d], rejected recharge, soil-zone overflow,
-exchange applied to Raven, shortfall [m³], interface updates, interface converged, interface change [m]. `GWSoilExchange.csv` per
+exchange applied to Raven, shortfall [m³], interface updates, interface converged, interface change [m], soil-zone
+layer redistribution [m³]. `GWSoilExchange.csv` per
 step and HRU: base, soil water level, water table, saturated fraction, exchange both ways, rejected, overflow, soil
 water and capacity, interface updates and change. `tools/plot_soilzone.py` draws both.
 
@@ -423,8 +432,9 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
   first-order splitting error against a monolithic model (hillslope: mean 1.5 cm daily, 0.5 cm at 6 h, 0.16 cm at 1 h;
   outflow within 0.03%). Shorter steps reduce it.
 - Raven's processes act on the HRU mean of the soil water; the columns differ through the exchange and the rules of
-  §4. With evaporation from saturated soil on a slope the HRU-mean process differs most from separate HRUs (total
-  outflow 19% lower in a 90-day dry test with 5 mm/d PET).
+  §4. One HRU over ten cells against ten one-cell HRUs (total outflow): within 3% for one or two layers with drainage
+  types, 4–7% with three or four layers, up to 12% with `PERC_CONSTANT`, and up to about 20% with evaporation from
+  saturated soil (the HRU keeps evaporating at the rate of its mean moisture).
 - The rest column (parts of the HRU over specified-head cells or outside the grid) has no exchange: it does not see a
   specified head above its base.
 - Churn with fast drainage: Raven drains a column's free water every step and rejection returns the saturated share,

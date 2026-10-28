@@ -233,7 +233,8 @@ Column & Meaning\\\midrule\endhead
 \cmd{soil zone to aquifer [m3/d]}, \cmd{aquifer to soil zone [m3/d]} & \cmd{:SoilZone PHYSICAL}: soil-zone exchange by direction\\
 \cmd{rejected recharge [m3]}, \cmd{soil-zone overflow [m3]} & recharge kept in the soil on saturated ground; water a full soil zone sent to \cmd{SURFACE\_WATER}\\
 \cmd{soil-zone exchange applied to Raven [m3]}, \cmd{soil-zone shortfall [m3]} & rejected recharge plus net exchange applied to the soil; water MODFLOW took that the soil did not hold (0)\\
-\cmd{interface updates}, \cmd{interface converged}, \cmd{interface change [m]} & soil-zone updates in the step, 1 if the interface converged, last change of the soil level\\\bottomrule
+\cmd{interface updates}, \cmd{interface converged}, \cmd{interface change [m]} & soil-zone updates in the step, 1 if the interface converged, last change of the soil level\\
+\cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
 water level, water table, saturated fraction, exchange both ways, rejected recharge and overflow [mm], soil water and
