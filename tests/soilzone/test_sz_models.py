@@ -49,7 +49,7 @@ def run(name, start=None, rvc=None, **cfg):
     if not ok:
         print('  %s: run FAILED\n%s' % (name, txt[-1500:]))
         return None, None
-    r = sz_check.checks(d)
+    r = sz_check.checks(d, dt=cfg.get('timestep', 1.0))
     lim = {k: v for k, v in LIM.items() if k in r}
     print('  %s:' % name)
     good = sz_check.report(name, r, lim)
@@ -294,7 +294,7 @@ def P9():
         okr, txt = sz_check.run(d)
         if not okr:
             print('  i_%s: run FAILED\n%s' % (tag, txt[-1500:])); return False
-        r = sz_check.checks(d); print('  i_%s:' % tag)
+        r = sz_check.checks(d, dt=cfg2.get('timestep', 1.0)); print('  i_%s:' % tag)
         if not sz_check.report(tag, r, {k: v for k, v in LIM.items() if k in r}):
             return False
         b = budget(d); its[tag] = b['outer iterations'].sum()
@@ -312,7 +312,7 @@ def run_layers(name, layers, **cfg):
     okr, txt = sz_check.run(d)
     if not okr:
         print('  %s: run FAILED\n%s' % (name, txt[-1500:])); return None
-    r = sz_check.checks(d); print('  %s:' % name)
+    r = sz_check.checks(d, dt=cfg.get('timestep', 1.0)); print('  %s:' % name)
     return d if sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r}) else None
 
 def P10():
@@ -337,7 +337,16 @@ def P10():
         b = budget(d); nc = int((b['converged'] == 0).sum()) + int((b['interface converged'] == 0).sum())
         good = nc == 0
         print('    steps not converged (MODFLOW + interface) %d -> %s' % (nc, 'ok' if good else 'FAIL')); ok &= good
-    return ok
+    # a falling water table in a thin lowest cell: the column's new nodes take no more than the cell gives
+    fall = dict(nhru=1, hru_w=200.0, rain=0.0, days=40, perc=0.5, ksat=400.0, Kv=0.5, Sy=0.03, soil_b=5.0, soil_psia=1000.0, aq_b=4.0,
+                aq_psia=0.3, pet=8.0, phi0=(20.0, 20.0), aq_thick=1.0, init_depth=1.9, timestep=0.25)
+    d = run_layers('j_fall_vz', [0.5], extra_rvg=VZ + ':SoilZoneCapillaryRise ON\n', **fall)
+    if not d:
+        return False
+    b = budget(d); nc = int((b['converged'] == 0).sum()) + int((b['interface converged'] == 0).sum())
+    good = (nc == 0) and bool(np.isfinite(b.select_dtypes('number').values).all())
+    print('    falling water table, thin cell: steps not converged %d, all finite -> %s' % (nc, 'ok' if good else 'FAIL'))
+    return ok and good
 
 def main():
     res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)]

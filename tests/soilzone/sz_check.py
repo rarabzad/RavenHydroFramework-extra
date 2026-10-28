@@ -7,7 +7,8 @@ run(d) runs Raven in folder d; checks(d) returns a dict of the identities of pla
                    Raven counts the end-of-step GROUNDWATER pass-through store both as storage and as outflow, so its
                    MB error equals the change of that store (WatershedStorage.csv carries 6 significant digits, hence
                    the relative form)
-  rch_identity     max |Raven recharge - MF6 recharge - rejected - CHD - delay change| / Raven recharge (per step)
+  rch_identity     max |Raven recharge - MF6 recharge - rejected - CHD - delay change (- column inflow + column outflow)|
+                   / (sum of the magnitudes of those terms, at least 1 m3), per step
   sz_identity      max |soil-zone exchange applied to Raven - rejected - (aquifer to soil - soil to aquifer)*dt - shortfall
                    - capillary rise (from the unsaturated columns and from the water table)|
                    / (sum of the magnitudes of those terms, at least 1 m3), per step
@@ -52,7 +53,9 @@ def checks(d, dt=1.0):
         vzs = b['unsaturated zone storage [m3]']
         vzr = (vzs.diff() - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]'])[1:]
         res['vz_identity'] = float((vzr.abs() / (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + vzs.abs() * 1e-9).clip(lower=1.0)[1:]).max()) if len(vzr) else 0.0
-    res['rch_identity'] = float((ident.abs() / rr.abs().clip(lower=1e-9)).max())
+    gross = rr.abs() + (b['MF6 recharge [m3/d]'] * dt).abs() + (rej.abs() if hasattr(rej, 'abs') else 0.0) + (b['recharge onto CHD cells [m3/d]'] * dt).abs() + dl.abs()
+    if 'unsaturated zone inflow [m3]' in b: gross = gross + b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs()
+    res['rch_identity'] = float((ident.abs() / gross.clip(lower=1.0)).max())   # (by the terms' magnitudes, at least 1 m3: dry steps have no recharge)
     if 'soil-zone exchange applied to Raven [m3]' in b:
         sz = b['soil-zone exchange applied to Raven [m3]'] - rej - (b['aquifer to soil zone [m3/d]'] - b['soil zone to aquifer [m3/d]']) * dt - b['soil-zone shortfall [m3]']
         if 'capillary rise to soil zone [m3]' in b: sz = sz - b['capillary rise to soil zone [m3]']

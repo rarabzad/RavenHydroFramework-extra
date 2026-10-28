@@ -314,3 +314,18 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   bound Qw and its upflow are at most ½ Sy a (h − bottom)/dt per step; what the column does not get is taken back over its
   nodes from the bottom up. Also the margin of a cell under an inactive one uses the cell directly above, and a column's
   upflow without a source cell goes to the top cell's recharge (never booked without a package). Test V2j.
+- **Audit round 6.** The water a falling water table's new column nodes take (MoveBottom's negative excess, _vzAbsQ)
+  was neither capped nor routed: it went into the dried top cell's recharge and made MODFLOW diverge (NaN from day 18 in
+  a thin-cell test while Raven reported success). The column's bottom now falls only as far as the source cell can give
+  (bisection), the uptake goes through SZW_RAVEN (or is supplied by a specified head), and one limit per source cell
+  (SZUpCap: ½ f Sy a (h − bottom)/dt) is shared by that uptake, the column's upflow, the rise and the debt repayment
+  (repayment beyond it waits). Raven now stops when MODFLOW's heads are not finite. The test helper's recharge identity
+  is normalised by the terms' magnitudes (it divided by Raven's recharge, zero in dry spells) and receives the step
+  length. Test V2j covers the case. Open, not confirmed as a defect: the lagged-exchange debt of a link whose source is
+  a specified head waits until the source is an aquifer cell again (never seen to accumulate).
+- **Audit round 7.** When the source cell is the top cell, the column's upflow and uptake go through the top cell's
+  recharge (not _vzUp/_vzUpA), and SZRepayRates did not count them: with an open lagged-exchange debt a cell could lose
+  twice the limit in a step (a 1 m cell drained to 1 µm above its bottom). The repayment now subtracts them. Existing
+  models without NEWTON get a start-up warning (a dried top cell leaves MODFLOW's solve with head HDRY; the soil zone
+  over it is then inactive). Not confirmed: unsupplied upflow left after the column's take-back reaches air-dry would
+  still be booked from MODFLOW (never observed). Sweeps of 560 pairs against the previous build: no regression.
