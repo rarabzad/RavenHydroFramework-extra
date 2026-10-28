@@ -446,7 +446,7 @@ water and capacity, interface updates and change. `tools/plot_soilzone.py` draws
 | `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
 | `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
 | `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model |
-| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off); R12 explicit discharge zone with cells dry at the head of linearization converges and matches the iterated outflow |
+| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off); R12 explicit discharge zone with cells dry at the head of linearization converges and matches the iterated outflow; R13 MODFLOW's residual on unconverged steps is not handed to Raven (outflow x1.85 of the iterated run; was x17) |
 | `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
 
 Regression: every existing test without `:SoilZone` gives byte-identical outputs (both Liard examples compared).
@@ -477,14 +477,21 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
   which Raven writes; 6.4.2 would take the `AUXVAR` fallback but gives different explicit-mode results even without
   the drain.
 - With $d_s=0$, perched water joining the water table makes the exchange jump; keep $d_s>0$.
-- **Low outer-iteration limits.** When MODFLOW does not converge within `:SolverMaxOuterIterations` (below about 20,
-  which is warned at setup), the boundary it keeps can be one from an earlier, not supply-limited update, or (below 10
-  solves left: explicit mode with a limit below 10, an update budget of 1–2 with a limit below about 30) a line rather
-  than the one-sided drain, and MODFLOW's head
-  can move far from where it was linearized: it can then take more from a column than it holds. That water is created,
-  like MODFLOW's own residual on such steps; both are reported per step (`soil-zone shortfall [m3]`,
-  `MF6 balance error`) and warned. Seen only with limits of 3–20 on a steep, low-storage hillslope with a thin soil
-  (shortfall 2–20% of the gross exchange); none with the default limits in any test.
+- **Low outer-iteration limits.** When MODFLOW does not converge within `:SolverMaxOuterIterations` (below about 20 it
+  is warned at setup), two things can create water on such steps:
+  - the boundary it keeps can be one from an earlier, not supply-limited update, or (below 10 solves left: explicit
+    mode with a limit below 10, an update budget of 1–2 with a limit below about 30) a line rather than the one-sided
+    drain, and MODFLOW's head can move far from where it was linearized: it can then take more from a column than it
+    holds (`soil-zone shortfall [m3]`; 2–20% of the gross exchange with limits of 3–30 on a steep, low-storage
+    hillslope with a thin soil);
+  - MODFLOW's last iterate can book more outflow than its inflows and storage release supply (its residual, `MF6
+    balance error`). On such steps all discharge given to Raven (seepage, river and surface-store gains, and the
+    exchange into the soil zone) is reduced in proportion by that residual, so it is not handed on as water (audit
+    round 11: an outer-iteration limit of 12 on a stiff hillslope gave 17 times the iterated outflow before, 1.9 times
+    after; a residual of MODFLOW's own storage runaway is not removed by this).
+
+  Both are reported per step and warned. None occurs with the default limits (500 outer iterations, budget 100) in
+  any test; with ordinary parameters and limits of 4–8 both stay below 0.4% of the recharge.
 
 ## 12. Answers to the plan's open questions
 

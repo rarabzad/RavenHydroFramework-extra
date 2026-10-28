@@ -118,8 +118,8 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
             f.write(':SoilZoneIteration %d %g %g\n' % iteration)
         if steady is not None:
             f.write(':GWInitialization STEADY_STATE %g\n' % steady)
-        if chd is not None:  # fixed head along the downslope edge: thin polygon over the last cell column
-            x0 = xs + L - 0.5 * cell
+        if chd is not None:  # fixed head along the downslope edge: polygon over the last cell column (its edge a quarter
+            x0 = xs + L - 0.75 * cell  # cell inside the column: an edge on the cell centres selected no cell)
             ring = [ll(x0, ys - width), ll(xs + L + width, ys - width), ll(xs + L + width, ys + 2 * width), ll(x0, ys + 2 * width), ll(x0, ys - width)]
             json.dump({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "Polygon", "coordinates": [ring]}}]},
                       open(os.path.join(d, 'edge.geojson'), 'w'))

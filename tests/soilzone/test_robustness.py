@@ -26,6 +26,9 @@ R11 explicit mode on the R2 hillslope (ten HRUs) gives the iterated run's total 
 R12 explicit mode with 15 outer iterations where water rises into cells that are dry at the head of linearization
    (steep hillslope draining to a specified head near the surface): MODFLOW converges and the outflow is the iterated
    run's within 3% (a drain inactive at that head let MODFLOW's head run away: 10^7 m3/d booked).
+R13 a stiff, very low-storage hillslope with an update budget of 1 and 12 outer iterations, on which MODFLOW does not
+   converge: MODFLOW's residual is not handed to Raven, so the outflow stays within 3 times the iterated run's (it was
+   17 times).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -229,6 +232,17 @@ def main():
     if len(out) == 2:
         print('  R12: explicit outflow %.0f m3 vs iterated %.0f m3, MODFLOW error %.2g, not converged %d' % (out['R12_x'], out['R12_it'], mf['R12_x'][0], mf['R12_x'][1]))
     res.append(('R12 explicit discharge zone with dry cells converges', g))
+
+    DRY13 = dict(rain=[0.0] * 15 + [150.0] + [0.0] * 4 + [150.0] + [0.0] * 9, days=30, pet=8.0, init_depth=0.0, phi0=(10.0, 10.0))
+    out = {}
+    for name, it, ex in (('R13_it', (100, 1e-4, 1e-6), ''), ('R13_b1', (1, 1e-4, 1e-6), ':SolverMaxOuterIterations 12\n')):
+        c = dict(B10); c.update(Kv=5000.0, Kh=1000.0, Sy=0.001, iteration=it, extra_rvg=ex, **DRY13)
+        d = case(name, **c); ok, _ = sz_check.run(d)
+        if ok: out[name] = outflow(d)
+    g = len(out) == 2 and out['R13_b1'] <= 3.0 * out['R13_it']
+    if len(out) == 2:
+        print('  R13: unconverged steps, outflow %.0f m3 vs iterated %.0f m3 (x%.2f)' % (out['R13_b1'], out['R13_it'], out['R13_b1'] / out['R13_it']))
+    res.append(('R13 MODFLOW residual not handed to Raven', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

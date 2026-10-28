@@ -114,7 +114,7 @@ Algorithm~\ref{alg:step} lists exactly what happens in one Raven time step of a 
 \State MODFLOW \cmd{prepare\_solve}; \textbf{repeat} \cmd{solve} (with \cmd{:SoilZone PHYSICAL}: then update the soil-zone interface) \textbf{until} converged or the iteration limit; \cmd{finalize\_solve}; \cmd{finalize\_time\_step}
 \State Compute every package flow as $\mathrm{HCOF}\cdot h-\mathrm{RHS}$; reservoir local heads for today's routing
 \State Surface-store exchange applied to Raven stores; seepage and river flows computed
-\If{the step did not converge} limit seepage and river gains returned to Raven to the step's total inflow; warn \EndIf
+\If{the step did not converge} with \cmd{:SoilZone PHYSICAL}, reduce all discharge to Raven (seepage, gains, soil-zone inflow) in proportion by MODFLOW's negative residual; limit seepage and river gains returned to Raven to the step's total inflow; warn \EndIf
 \State \cmd{:SoilZone PHYSICAL}: MODFLOW's soil-zone flows and the rejected recharge applied to the columns; overflow to \cmd{SURFACE\_WATER}
 \State Seepage added to Raven stores; balance, heads, connectivity and NetCDF output written
 \State Raven: before routing, river gains added to / losses taken from each subbasin's in-catchment inflow
