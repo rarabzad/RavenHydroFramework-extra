@@ -395,10 +395,11 @@ A step whose interface did not converge is reported (warning, first 10, with the
 MODFLOW's booked flows, so mass is conserved. Water MODFLOW's books do not back is withheld from the discharge to
 Raven instead (§11, low outer-iteration limits): on every step the shortfall a trial of the booking would leave and,
 on a step MODFLOW did not converge, its negative residual, in proportion from seepage, the exchange into the soil zone
-and river and surface-store gains (`GWBudget.csv`: *seepage and soil inflow withheld*, *river and store gains
-withheld*; MODFLOW's own columns, *aquifer discharge to rivers* and *to surface stores* and *MF6 balance error*, stay
-unscaled, so the aquifer balance from the CSV is inflow − outflow + storage release − error = (both withheld
-columns)/dt). The older guard that limited seepage and river gains to the step's inflow is not used with
+and river and surface-store gains (`GWBudget.csv`: *seepage and soil inflow withheld*, *river gains withheld*,
+*surface-store gains withheld*). *Seepage to Raven* and *aquifer to soil zone* are written after the withholding, while
+*aquifer discharge to rivers*, *to surface stores* and *MF6 balance error* stay MODFLOW's, so the aquifer balance from
+the CSV is inflow − outflow + storage release − error = (seepage and soil inflow withheld)/dt, and the river and
+surface-store gains applied to Raven are MODFLOW's less their withheld column (`tools_audit.py` checks all three). The older guard that limited seepage and river gains to the step's inflow is not used with
 `:SoilZone PHYSICAL`. A `:SurfaceWaterExchange` on a soil-zone layer of a soil-zone HRU is refused (that layer
 exchanges with the aquifer through the soil zone already).
 
@@ -495,7 +496,7 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
   Neither is handed to Raven as water: on every step the shortfall the booked exchange would leave (a trial of the
   booking) and, on an unconverged step, a negative residual are withheld from all discharge to Raven (seepage, gains of
   enabled subbasins, surface-store gains, the exchange into the soil zone) in proportion (`seepage and soil inflow
-  withheld [m3]`, `river and store gains withheld [m3]`). Audit rounds 11–12: an outer-iteration limit of 12 on a stiff hillslope gave 17 times the iterated outflow,
+  withheld [m3]`, `river gains withheld [m3]`, `surface-store gains withheld [m3]`). Audit rounds 11–12: an outer-iteration limit of 12 on a stiff hillslope gave 17 times the iterated outflow,
   then 1.85 times with the residual withheld, and 1.00 times with the shortfall withheld as well (R13). What the step's
   discharge cannot cover stays in the aquifer's storage and can leave in later steps; only negative residuals are
   withheld, so positive and negative residuals of consecutive steps no longer cancel in the cumulative balance. None

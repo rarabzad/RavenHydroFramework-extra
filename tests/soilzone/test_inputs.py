@@ -11,9 +11,9 @@ I5 a :GWSoilZoneColumns block that does not match the columns (one column missin
    columns from the water table.
 I6 the same block with its rows in another order is used (columns are matched by their cell).
 I7 groundwater lines and blocks in the .rvc of a run without :GroundwaterModel are skipped (each to its own end line)
-I8 a :SurfaceWaterExchange on a soil-zone layer of a soil-zone HRU is refused (that layer exchanges with the aquifer
-   through the soil zone; the second exchange also escaped the soil-zone guard)
    and Raven's initial conditions after them still apply.
+I8 a :SurfaceWaterExchange on a soil-zone layer of a soil-zone HRU is refused (that layer already exchanges with the
+   aquifer through the soil zone)
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)

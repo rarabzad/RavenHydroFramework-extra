@@ -31,6 +31,8 @@ def audit(run,dt=1.0):
     if 'other model packages [m3/d]' in b: flows=flows+b['other model packages [m3/d]']; gross=gross+b['other model packages [m3/d]'].abs()  #existing-model mode: the model's own packages
     if 'soil zone to aquifer [m3/d]' in b:   #:SoilZone PHYSICAL: soil zone <-> aquifer exchange (SZX_RAVEN)
         flows=flows+b['soil zone to aquifer [m3/d]']-b['aquifer to soil zone [m3/d]']; gross=gross+b['soil zone to aquifer [m3/d]']+b['aquifer to soil zone [m3/d]']
+        if 'seepage and soil inflow withheld [m3]' in b:   #seepage and soil inflow are reported after the withholding: MODFLOW took the withheld part too
+            flows=flows-b['seepage and soil inflow withheld [m3]']/dt
         szn=(b['aquifer to soil zone [m3/d]']-b['soil zone to aquifer [m3/d]'])*dt
         R['soil zone: applied - rejected - net exchange - shortfall (rel)']=float((b['soil-zone exchange applied to Raven [m3]']-b['rejected recharge [m3]']-szn-b['soil-zone shortfall [m3]']).abs().sum()
             /max((b['soil-zone exchange applied to Raven [m3]'].abs()+b['rejected recharge [m3]']+szn.abs()).sum(),1))
@@ -40,7 +42,8 @@ def audit(run,dt=1.0):
         R['soil zone: max interface updates']=int(b['interface updates'].max())
     if 'surface-store leakage to aquifer [m3/d]' in b:
         gross=gross+b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']
-        R['surface-store: applied - (discharge-leakage) (rel)']=(b['surface-store exchange applied to Raven [m3]']-(b['aquifer discharge to surface stores [m3/d]']-b['surface-store leakage to aquifer [m3/d]'])*dt).abs().sum()/max((b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']).sum()*dt,1)
+        ws=b['surface-store gains withheld [m3]'] if 'surface-store gains withheld [m3]' in b else 0.0   #:SoilZone PHYSICAL guard
+        R['surface-store: applied - (discharge-leakage) (rel)']=(b['surface-store exchange applied to Raven [m3]']-(b['aquifer discharge to surface stores [m3/d]']-b['surface-store leakage to aquifer [m3/d]'])*dt+ws).abs().sum()/max((b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']).sum()*dt,1)
     R['MF6 cumulative residual / gross flow']=flows.sum()/gross.sum()
     if 'reservoir seepage awaiting delivery [m3]' in b and b['reservoir seepage sent [m3/d]'].abs().sum()>0:
         #reservoir seepage reaches MODFLOW one step later: sent(t)*dt = awaiting(t-1); MODFLOW takes what is sent unless the cell is dry
@@ -60,7 +63,8 @@ def audit(run,dt=1.0):
     if cc.startswith('river loss carried'):
         c=b[cc].fillna(0); cp=c.shift(1).fillna(0); n=(b['aquifer discharge to rivers [m3/d]']-b['river leakage to aquifer [m3/d]'])*dt; ok=b['converged'].astype(int)>=1
         sh=b['reservoir gain not supplied by MODFLOW [m3]'].fillna(0) if 'reservoir gain not supplied by MODFLOW [m3]' in b else 0.0   #taken from the reach in the same step
-        r=(b['river exchange applied to Raven [m3]']-n-c+cp+sh)[ok]; R['river: applied - net MF6 - carry change (rel)']=r.sum()/max(n.abs().sum(),1)
+        wr=b['river gains withheld [m3]'].fillna(0) if 'river gains withheld [m3]' in b else 0.0   #:SoilZone PHYSICAL guard
+        r=(b['river exchange applied to Raven [m3]']-n-c+cp+sh+wr)[ok]; R['river: applied - net MF6 - carry change (rel)']=r.sum()/max(n.abs().sum(),1)
         R['safeguard-limited steps']=int((~ok).sum())
         R['river loss carried at end [m3]']=float(c.iloc[-1]); R['river loss carried max [m3]']=float(c.max())
     else:
