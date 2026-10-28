@@ -23,6 +23,9 @@ R10 water rising into a thin soil on a steep, low-storage hillslope with an upda
    to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns (4100 m3 created with a budget of 1, 7900 m3 in explicit mode).
 R11 explicit mode on the R2 hillslope (ten HRUs) gives the iterated run's total outflow within 3%: the kept boundary
    neither reverses nor lifts water from below the contact (a line there was 30-50% off).
+R12 explicit mode with 15 outer iterations where water rises into cells that are dry at the head of linearization
+   (steep hillslope draining to a specified head near the surface): MODFLOW converges and the outflow is the iterated
+   run's within 3% (a drain inactive at that head let MODFLOW's head run away: 10^7 m3/d booked).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -215,6 +218,17 @@ def main():
     if len(out) == 2:
         print('  R11: explicit outflow %.0f m3 vs iterated %.0f m3 (%.1f%%)' % (out['R11_x'], out['R11_it'], 100 * (out['R11_x'] - out['R11_it']) / out['R11_it']))
     res.append(('R11 explicit mode close to the iterated run', g))
+
+    out = {}; mf = {}
+    for name, it, ex in (('R12_it', (100, 1e-4, 1e-6), ''), ('R12_x', (0, 1e-4, 1e-6), ':SolverMaxOuterIterations 15\n')):
+        c = dict(B10); c.update(slope=0.1, chd=59.9, iteration=it, extra_rvg=ex)
+        d = case(name, **c); ok, _ = sz_check.run(d)
+        if ok:
+            r = sz_check.checks(d); out[name] = outflow(d); mf[name] = (r['mf6_err_rel'], r['mf6_not_conv'], r['shortfall'])
+    g = len(out) == 2 and abs(out['R12_x'] - out['R12_it']) <= 0.03 * out['R12_it'] and mf['R12_x'][0] < 1e-5 and mf['R12_x'][1] == 0 and mf['R12_x'][2] < 1e-6
+    if len(out) == 2:
+        print('  R12: explicit outflow %.0f m3 vs iterated %.0f m3, MODFLOW error %.2g, not converged %d' % (out['R12_x'], out['R12_it'], mf['R12_x'][0], mf['R12_x'][1]))
+    res.append(('R12 explicit discharge zone with dry cells converges', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

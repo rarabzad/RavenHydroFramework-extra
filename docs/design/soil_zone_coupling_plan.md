@@ -344,20 +344,22 @@ than it holds, whatever the head does:
 
 - where the soil drains to the aquifer ($q\ge0$) the slope is limited so that $C_g(H_g-\text{bottom})$ never exceeds
   the column's free water over the step (robustness test R7);
-- where water rises into the soil ($q<0$) and the line could take more than the column holds (its slope above that
-  limit), the line is given to MODFLOW as a drain, `SZD_RAVEN`: $q=-C_g(h-H_g)$ above $H_g$, nothing below, with the
+- where water rises into the soil ($q<0$), the line could take more than the column holds (its slope above that
+  limit) and the cell is not dry at the head of linearization, the line is given to MODFLOW as a drain, `SZD_RAVEN`: $q=-C_g(h-H_g)$ above $H_g$, nothing below, with the
   onset smoothed by MODFLOW's `DDRN` over half the distance to $H_g$ (at most $d_s$, at least $d_s/4$). The secant
   floor keeps $H_g$ at or above the end of the contact, so it neither reverses into flow from the soil nor lifts water
   from below the contact. A drain level below the cell bottom is raised to the bottom by steepening the line (at most
-  to the link conductance), not continued by a fixed rate that would pump a dried cell (robustness test R10).
+  to the link conductance), not continued by a fixed rate that would pump a dried cell (robustness test R10). In a cell
+  dry at the head of linearization the line stays: a drain there is inactive at that head, MODFLOW's first Newton
+  iterate saw no boundary and its head ran away (audit round 10: heads 70 m above the cell top, MODFLOW unconverged,
+  10⁷ m³/d booked in explicit discharge-zone runs; overflow 28–420% too high even where MODFLOW converged).
 
 A linear boundary cannot hold both limits for rising water. With the secant floor winning, a head falling below $H_g$
 reversed the boundary and drained columns without free water (water created; audit round 8: 4100 m³ with an update
 budget of 1, 7900 m³ in explicit mode on a steep low-storage hillslope); with the supply limit winning, the boundary
 kept lifting water when the head fell below every base (audit round 9: explicit outflows 44–164% off, a restart chain
 diverging). The drain does neither: the explicit runs of the audit batch now give the iterated runs' outflow within
-0.1–2% (they were 30–50% off), and the budget and explicit shortfall cases are 0. It costs MODFLOW iterations where much
-water rises into dry columns (up to about 20 per step instead of 2 with an update budget of 1). With fewer than 10
+0.1–2% (they were 30–50% off), and the budget and explicit shortfall cases are 0 with 30 or more outer iterations. With fewer than 10
 MODFLOW solves left (low outer-iteration limits) the line stays, limited as far as the secant floor allows, because
 MODFLOW did not settle on the changed boundary in so few iterations; a reversal can then still overdraw (§11). Dropped
 remedies: an unsmoothed drain everywhere (MODFLOW failed to converge where much water rises), limiting the slopes of
@@ -444,7 +446,7 @@ water and capacity, interface updates and change. `tools/plot_soilzone.py` draws
 | `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
 | `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
 | `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model |
-| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off) |
+| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off); R12 explicit discharge zone with cells dry at the head of linearization converges and matches the iterated outflow |
 | `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
 
 Regression: every existing test without `:SoilZone` gives byte-identical outputs (both Liard examples compared).
@@ -471,10 +473,14 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
 - `GWSoilExchange.csv`: the interface columns (updates, change) are model-wide values repeated on every HRU row; with
   sub-grid samples the HRU's soil water level is an area-weighted mean and can stand above its mean water table.
 - Not available with an existing MODFLOW model (`:MF6Simulation`).
+- MODFLOW 6.5 or later (user guide): from 6.4.3 on the drain's `DDRN` is read from the input context (`AUXVAR_IDM`),
+  which Raven writes; 6.4.2 would take the `AUXVAR` fallback but gives different explicit-mode results even without
+  the drain.
 - With $d_s=0$, perched water joining the water table makes the exchange jump; keep $d_s>0$.
 - **Low outer-iteration limits.** When MODFLOW does not converge within `:SolverMaxOuterIterations` (below about 20,
   which is warned at setup), the boundary it keeps can be one from an earlier, not supply-limited update, or (below 10
-  solves left, and in explicit mode with a limit below 10) a line rather than the one-sided drain, and MODFLOW's head
+  solves left: explicit mode with a limit below 10, an update budget of 1–2 with a limit below about 30) a line rather
+  than the one-sided drain, and MODFLOW's head
   can move far from where it was linearized: it can then take more from a column than it holds. That water is created,
   like MODFLOW's own residual on such steps; both are reported per step (`soil-zone shortfall [m3]`,
   `MF6 balance error`) and warned. Seen only with limits of 3–20 on a steep, low-storage hillslope with a thin soil
