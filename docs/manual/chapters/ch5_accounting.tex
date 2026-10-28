@@ -47,8 +47,26 @@ zone coupled, the volume applied to the soil layers in each step also satisfies
 \begin{equation}
 V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}},
 \end{equation}
-with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests). The audit tool
-checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
+with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests).
+
+\paragraph{Soil zone.}\label{sec:accsz2} With the unsaturated columns the recharge passes through them: the first identity
+becomes
+\begin{equation}
+\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}}
++\sum\big(V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}\big),
+\end{equation}
+and the columns themselves close as
+$\Delta S^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}-V^{\mathrm{uz}}_{\mathrm{cap}}$ (storage relative to the
+hydrostatic profile, Section~\ref{sec:szvadose}). The water applied to the soil zone gains the capillary rise (from the columns
+and from the water table), the exchange with specified heads and the lagged-exchange debt:
+\begin{equation}
+V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}}
++V^{\mathrm{uz}}_{\mathrm{cap}}+V^{\mathrm{wt}}_{\mathrm{cap}}+\left(Q^{\mathrm{chd}}_{\mathrm{out}}-Q^{\mathrm{chd}}_{\mathrm{in}}\right)\dt+V^{\mathrm{debt}},
+\end{equation}
+and MODFLOW's balance includes the rise from the water table and the debt repayment as outflows through
+\cmd{SZQ\_RAVEN}. Each of these is a column of \cmd{GWBudget.csv}; the test suite checks all of them on every run.
+
+The audit tool checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
 
 \section{A real day of water accounts}
 \begin{example}[: 15 June 1996 in the Liard run]

@@ -16,9 +16,11 @@ def audit(run,dt=1.0):
     s0=(st if False else 0.0)
     rejv=b['rejected recharge [m3]'] if 'rejected recharge [m3]' in b else 0*b['MF6 recharge [m3/d]']   #:SoilZone PHYSICAL: recharge on saturated ground goes back to the soil (also subtracted)
     rej=rejv.sum()
+    uzs=(b['unsaturated zone inflow [m3]']-b['unsaturated zone to aquifer [m3]']) if 'unsaturated zone inflow [m3]' in b else 0*b['MF6 recharge [m3/d]']   #soil zone: recharge crosses the unsaturated columns
+    uz=uzs.sum()
     if 'recharge delay storage [m3]' in b:
-        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]
-    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej)/max(rr,1)
+        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]+uzs.iloc[0]
+    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej-uz)/max(rr,1)
     R['recharge delay store at end [m3]']=st
     flows=b['MF6 recharge [m3/d]']+b['storage release [m3/d]']-b['seepage to Raven [m3/d]']+b['river leakage to aquifer [m3/d]']\
           -b['aquifer discharge to rivers [m3/d]']-b['water-table ET [m3/d]']+b['wells actual [m3/d]']+b['GHB [m3/d]']+b['CHD [m3/d]']
@@ -33,7 +35,12 @@ def audit(run,dt=1.0):
         flows=flows+b['soil zone to aquifer [m3/d]']-b['aquifer to soil zone [m3/d]']; gross=gross+b['soil zone to aquifer [m3/d]']+b['aquifer to soil zone [m3/d]']
         if 'seepage and soil inflow withheld [m3]' in b:   #seepage and soil inflow are reported after the withholding: MODFLOW took the withheld part too
             flows=flows-b['seepage and soil inflow withheld [m3]']/dt
+        for c in ('capillary rise from the water table [m3]','lagged-exchange repayment [m3]'):   #soil zone: fixed rates out of the aquifer (SZQ_RAVEN)
+            if c in b: flows=flows-b[c]/dt; gross=gross+b[c].abs()/dt
         szn=(b['aquifer to soil zone [m3/d]']-b['soil zone to aquifer [m3/d]'])*dt
+        for c in ('capillary rise to soil zone [m3]','capillary rise from the water table [m3]','lagged-exchange debt [m3]'):
+            if c in b: szn=szn+b[c]
+        if 'specified heads to soil zone [m3/d]' in b: szn=szn+(b['specified heads to soil zone [m3/d]']-b['soil zone to specified heads [m3/d]'])*dt
         R['soil zone: applied - rejected - net exchange - shortfall (rel)']=float((b['soil-zone exchange applied to Raven [m3]']-b['rejected recharge [m3]']-szn-b['soil-zone shortfall [m3]']).abs().sum()
             /max((b['soil-zone exchange applied to Raven [m3]'].abs()+b['rejected recharge [m3]']+szn.abs()).sum(),1))
         R['soil zone: shortfall [m3]']=float(b['soil-zone shortfall [m3]'].sum())

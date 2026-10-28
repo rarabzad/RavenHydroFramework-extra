@@ -88,7 +88,7 @@ case('N20_unknown_rvg_cmd', 'ok', lambda d: app(d, 'Liard.rvg', ':NotACommand 1 
 case('N22_no_rasters', 'ok', lambda d: (edit(d, 'Liard.rvg', ':LandSurface', '#:LandSurface'), edit(d, 'Liard.rvg', ':BedrockSurface', '#:BedrockSurface')))
 case('N30_reservoir_absolute_stages', 'ok', lambda d: (lambda h: app(d, 'Liard.rvh', RES.format(hru=h[0], crest='  :AbsoluteCrestHeight %.2f\n' % h[1], seep=h[1] - 5)))(lake_hru(d)) or app(d, 'Liard.rvg', ':ReservoirExchange\n:GridType HRU_MESH\n:GridRefinement LAKES 500\n'))
 case('N31_mesh_obswell_outside_refined', 'ok', lambda d: app(d, 'Liard.rvg', ':GridType HRU_MESH\n:GridRefinement WELLS 400\n:ObservationWells\n  :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_ELEV\n  9, OW, 58.2, -127.9, 10\n:EndObservationWells\n'))
-case('N32_reservoir_hru_of_other_subbasin', 'error', lambda d: app(d, 'Liard.rvh', RES.format(hru=2745, crest='  :AbsoluteCrestHeight 1115.0\n', seep=1110.0)))   # HRU 2745 lies in subbasin 43 (crashed Raven 4.1.1)
+case('N32_reservoir_hru_of_other_subbasin', 'ok', lambda d: app(d, 'Liard.rvh', RES.format(hru=2745, crest='  :AbsoluteCrestHeight 1115.0\n', seep=1110.0)))   # HRU 2745 lies in subbasin 43 (crashed Raven 4.1.1; Raven 4.15 runs it, the reservoir is not coupled)
 case('P01_cell1000', 'ok', lambda d: edit(d, 'Liard.rvg', r':GridCellSize\s+\S+', ':GridCellSize 1000.0', regex=True), days=365)
 case('P02_cell2000', 'ok', lambda d: None, days=365)
 case('P03_cell4000', 'ok', lambda d: edit(d, 'Liard.rvg', r':GridCellSize\s+\S+', ':GridCellSize 4000.0', regex=True), days=365)
