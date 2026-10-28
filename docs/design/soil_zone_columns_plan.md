@@ -300,3 +300,17 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
 - **Found on the way (Raven itself).** Raven's ensembles do not reset routing and reservoir outflow between members (also
   without groundwater): the behaviour test now requires the first member to equal the single run and the second to
   start from the same groundwater state with exact accounts.
+- **After round 4.** Liard with :SoilZone PHYSICAL, one year, O2 builds: v1 126 s / 4 809 outer iterations; v2 defaults
+  77 s / 6 163; columns, rise and three classes 105 s / 6 536; identities below 1e-10. Full suite, CONCEPTUAL Liard and
+  existing-model examples (byte for byte but for paths and timings) and the Raven benchmark set (13 models, identical)
+  pass.
+- **Audit round 5.** (1) A cell below a dried top cell that holds the water table can be a specified head (a generated
+  model puts the CHD in the first layer whose bottom is below the head; existing models' IBOUND < 0): MODFLOW ignores a
+  well there, but the rise was booked as taken through SZW_RAVEN — water created (half the rise in the test). Now
+  NodeCHD (MODFLOW's IBOUND) flags it: the rise is computed without drawdown and booked as specified heads to soil zone,
+  the column's upflow as negative recharge onto CHD cells, no repayment is drawn there; the two budget columns are
+  written whenever the model has specified heads. (2) Upward rates were not limited by the water of the source cell: a
+  thin lowest wet cell was pumped dry within a step and MODFLOW diverged (to NaN with columns). The rise, the column's
+  bound Qw and its upflow are at most ½ Sy a (h − bottom)/dt per step; what the column does not get is taken back over its
+  nodes from the bottom up. Also the margin of a cell under an inactive one uses the cell directly above, and a column's
+  upflow without a source cell goes to the top cell's recharge (never booked without a package). Test V2j.

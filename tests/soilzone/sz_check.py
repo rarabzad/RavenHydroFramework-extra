@@ -38,7 +38,7 @@ def outputs(d):
 def checks(d, dt=1.0):
     b, s, w = outputs(d)
     res = {}
-    res['mf6_err_rel'] = float(b['MF6 balance error [m3/d]'].abs().max() / max(b['Raven recharge [m3/d]'].abs().max(), 1e-9))
+    res['mf6_err_rel'] = float(b['MF6 balance error [m3/d]'].abs().max() / max(b['Raven recharge [m3/d]'].abs().max(), 1.0))   # (1 m3/d floor: dry spells)
     mb = [c for c in w.columns if 'MB Error' in c]
     gw = [c for c in w.columns if 'Deep Groundwater' in c]
     g = (w[gw[0]] - w[gw[0]].iloc[0]) if gw else 0.0

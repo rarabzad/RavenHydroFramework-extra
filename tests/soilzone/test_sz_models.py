@@ -19,6 +19,9 @@ P8  restart with column classes on a steep slope (round-off decided whether the 
 P9  capillary rise across the shortest column (5 cm): the rise from a column just longer than 5 cm equals
      the rise from the water table just below it and the rise without columns (within 10 %); it is implicit in the
      drawdown it causes, so a water table near the soil base with a thin top layer that dries does not oscillate.
+P10  upward flows out of a lower cell: a specified head in layer 2 under a dried thin top layer supplies
+     the rise (booked as specified head to soil zone, MODFLOW's balance closes); a thin lowest wet cell under strong rise
+     is not pumped dry (no MODFLOW non-convergence), with and without unsaturated columns.
 P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
      HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
      than with the HRU mean (1 class).
@@ -303,8 +306,41 @@ def P9():
           % (jump, its['osc_vz'], its['osc_off'], 'ok' if ok2 else 'FAIL'))
     return ok1 and ok2
 
+def run_layers(name, layers, **cfg):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, **cfg); thin_top(d, layers)
+    okr, txt = sz_check.run(d)
+    if not okr:
+        print('  %s: run FAILED\n%s' % (name, txt[-1500:])); return None
+    r = sz_check.checks(d); print('  %s:' % name)
+    return d if sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r}) else None
+
+def P10():
+    print('P10 upward flows out of a lower cell')
+    ok = True
+    base = dict(nhru=1, hru_w=200.0, rain=0.0, days=20, perc=1.0, ksat=400.0, Kv=0.5, Sy=0.15, soil_b=5.0, soil_psia=200.0, aq_b=4.0,
+                aq_psia=0.3, init_depth=2.0, pet=4.0, phi0=(60.0, 60.0))
+    for vz in ('', VZ):
+        d = run_layers('j_chd%s' % ('_vz' if vz else ''), [0.5], chd=98.0, extra_rvg=vz + ':SoilZoneCapillaryRise ON\n', **base)
+        if not d:
+            ok = False; continue
+        b = budget(d); sup = b['specified heads to soil zone [m3/d]'].sum() if 'specified heads to soil zone [m3/d]' in b else 0.0
+        sup += -b['recharge onto CHD cells [m3/d]'].clip(upper=0.0).sum()       # (with a column: its upflow out of the head)
+        good = sup > 0.0
+        print('    rise supplied by the specified head %.0f m3/d-days -> %s' % (sup, 'ok' if good else 'FAIL')); ok &= good
+    thin = dict(nhru=1, hru_w=200.0, rain=0.0, days=20, perc=1.0, ksat=400.0, Kv=0.5, Sy=0.1, soil_b=5.0, soil_psia=300.0, aq_b=4.0,
+                aq_psia=0.3, pet=5.0, phi0=(40.0, 40.0), aq_thick=1.0, init_depth=1.9)
+    for vz in ('', VZ):
+        d = run_layers('j_thin%s' % ('_vz' if vz else ''), [0.5], extra_rvg=vz + ':SoilZoneCapillaryRise ON\n', **thin)
+        if not d:
+            ok = False; continue
+        b = budget(d); nc = int((b['converged'] == 0).sum()) + int((b['interface converged'] == 0).sum())
+        good = nc == 0
+        print('    steps not converged (MODFLOW + interface) %d -> %s' % (nc, 'ok' if good else 'FAIL')); ok &= good
+    return ok
+
 def main():
-    res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9)]
+    res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)]
     print('soil-zone model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 

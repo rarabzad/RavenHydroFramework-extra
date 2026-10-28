@@ -453,8 +453,13 @@ package \cmd{SZW\_RAVEN} with one entry per active cell below each link's top ce
 cell's head and specific yield: a water table below a thin top layer still feeds the soil (with a 0.5~m
 top layer the rise had been zero; now it equals that of a thick top layer, 4\,565~m$^3$ in the test). When no cell holds
 the water table clear of its bottom, the highest cell with water supplies them, scaled down smoothly to zero as it dries
-($s^2(3-2s)$ of its saturated part over the margin; what the column's upflow does not get from MODFLOW is taken back out
-of its bottom node), so nothing switches on or off abruptly.
+($s^2(3-2s)$ of its saturated part over the margin), so nothing switches on or off abruptly. Out of an aquifer cell they
+are moreover at most half the water it holds above its bottom under the link, $\tfrac12S_ya_c(h-z_{\mathrm{bot}})/\dt$, per
+step, so a thin cell is never pumped dry within a step (MODFLOW diverged otherwise); what the column's
+upflow does not get from MODFLOW is taken back out of the column, bottom node first, down to air-dry. A specified head
+below a dried top cell supplies the rise and the column's upflow itself, without drawdown or limit; MODFLOW ignores a
+well in such a cell, so these flows are booked as \emph{specified heads to soil zone} and (the column's) as negative
+\emph{recharge onto CHD cells} (booked as a well they had created water).
 
 \paragraph{Implicit in the drawdown.} The rise lowers the water table it comes from, and the rate falls steeply with the
 depth. A rate from the head at the start of the step overshoots: on dry, conductive soil 5~cm above the water table it
@@ -556,8 +561,8 @@ within the interface tolerances, also in feet and seconds (tests X1--X4).
 The unsaturated columns cost about 40~$\mu$s per column and day in a wet spell and much less when nothing moves;
 capillary rise costs a few table lookups per column and step (a few more for the drawdown root), the specified-head columns one local solve per column and step; classes
 cost $K$ evaluations of the HRU's processes. On the Liard example with \cmd{:SoilZone PHYSICAL} (85 HRUs, 4\,286 links,
-one year, optimized build) the basic soil zone took 122~s; the column soil zone with its defaults takes 78~s, and with unsaturated columns, capillary rise
-and three classes 100~s (6\,675 outer iterations against 4\,809): Brent's method in the local solve more than pays for
+one year, optimized build) the basic soil zone took 126~s; the column soil zone with its defaults takes 77~s, and with unsaturated columns, capillary rise
+and three classes 105~s (6\,536 outer iterations against 4\,809): Brent's method in the local solve more than pays for
 the new physics, and MODFLOW's solve remains the larger part.
 
 \begin{refcard}{soil zone}
