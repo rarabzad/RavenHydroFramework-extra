@@ -160,8 +160,10 @@ columns as the processes would have made them in each column, in Raven's order:
 Where the columns that hold an upper layer's water have a full layer below and the columns with room below have no
 water above, the percolation Raven computed on the HRU mean cannot happen in any column; it stays in the upper layer
 (moved back up), and Raven's layers are then set to the column means. That volume is reported per step in
-`GWBudget.csv` (*soil-zone layer redistribution*). Mixed percolation types: the sharing rule (by area for
-`PERC_CONSTANT`, else free water first) follows the process from `SOIL[M-1]` to `GROUNDWATER` and is used for the
+`GWBudget.csv` (*soil-zone layer redistribution*; always 0 with a single soil-zone layer, and the sync of hotstart
+columns with the `.rvc` soil water counts in the first step). Mixed percolation types: the sharing rule (by area for
+`PERC_CONSTANT`, else free water first) follows the process from `SOIL[M-1]` to `GROUNDWATER` (also inside a
+`:ProcessGroup`, under the group's conditions as well as its own) and is used for the
 percolation between the soil-zone layers as well.
 
 (Taking the recharge before the percolation that fed it, the previous build drove columns below zero; unit test
@@ -329,10 +331,12 @@ only. MODFLOW's tolerance relaxation for hard steps counts only iterations MODFL
 $\max(2,\ \text{max outer}/10)$ outer iterations are left to MODFLOW on the boundary it has: an update just before the
 limit left MODFLOW's final solve unconverged, and its residual was water created or lost (robustness test R5). Iteration
 1 always updates when there is a second; with `:SolverMaxOuterIterations` 1 only the predictor runs, supply-limited as
-in explicit mode, and the step is reported as not converged. When the interface freezes unconverged (the iteration
-reserve or the update budget reached) while MODFLOW has not converged either and at least two solves follow, the
-boundary it keeps is made supply-limited once (one more update, on which MODFLOW then solves) unless the last update's
-already was; a step on which MODFLOW has converged is never reopened for it.
+in explicit mode, and the step is reported as not converged. The update after outer iteration
+$\text{max outer}-\max(2,\ \text{max outer}/10)$, the last one possible, makes its boundary supply-limited as in
+explicit mode. Once the interface is frozen nothing changes any more: a further supply-limited update after the freeze
+(tried in round 6) left too few solves for MODFLOW to absorb it on steps MODFLOW could not converge, and its residual
+was water created or lost (relative MODFLOW error up to 6e-3 with 30 outer iterations, against 1e-12 without it;
+audit round 7), while no case showed a shortfall it prevented.
 In explicit mode (`:SoilZoneIteration 0`) the boundary is also supply-limited: $C_g(H_g-\text{bottom})$ never exceeds the
 column's free water over the step (robustness test R7), while for water rising into the soil $C_g$ stays at least the
 secant to the end of the contact; a linear boundary cannot hold both exactly, so some water can still rise while the

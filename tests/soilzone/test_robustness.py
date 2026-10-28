@@ -15,6 +15,9 @@ R5 hourly steps with a 0.001 m smoothing depth: the interface is frozen for MODF
 R6 a steep hillslope (slope 0.1) with 5x5 DEM samples per cell converges on every step.
 R7 explicit mode (:SoilZoneIteration 0): the boundary never drains more than a column holds (no shortfall).
 R8 a column 1e-6 mm wetter than the others does not attract the HRU's recharge (the heads stay uniform).
+R9 hotstart columns that cannot hold the .rvc layer split (wet columns with a full lower layer, Raven's lower layer 50 mm
+   wetter): the percolation no column can take stays in the upper layer and is reported in step 1 (layer
+   redistribution 50 mm over the HRU).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -157,6 +160,32 @@ def main():
             g = (h.max() - h.min()) < 0.001
             print('  R8: head spread after 20 days of rain with one column 1e-6 mm wetter: %.2e m' % (h.max() - h.min()))
     res.append(('R8 recharge shares insensitive to round-off', g))
+
+    # R9: hotstart redistribution is reported in the first step
+    g = False
+    if ok0:
+        rvc = open(os.path.join(d0, 'out', 'solution.rvc')).read()
+        blk = re.search(r'(:GWSoilZoneColumns[^\n]*\n)(.*?)(:EndGWSoilZoneColumns)', rvc, re.S)
+        new = []
+        for l in blk.group(2).split('\n'):
+            if not l.strip(): continue
+            p = [x.strip() for x in l.split(',')]
+            v = 200.0 if p[1] in ('6', '7', '8', '9') else (100.0 if p[1] == '0' else 0.0)
+            p[2] = p[3] = '%g' % v; new.append('  ' + ', '.join(p))
+        rvc = rvc.replace(blk.group(2), '\n'.join(new) + '\n')
+        rvc = re.sub(r'(\n  1,(?:[0-9.]+,){5})[0-9.]+,[0-9.]+,', r'\g<1>50.0,150.0,', rvc)
+        c9 = dict(c8); c9.update(rain=[0.0] * 3, days=3)
+        d = case('R9', **c9)
+        open(os.path.join(d, 'm.rvc'), 'w').write(rvc)
+        for f in ('m.rvi', 'm.rvt'):
+            t = open(os.path.join(d, f)).read(); open(os.path.join(d, f), 'w').write(t.replace('2000-01-01 00:00:00', '2000-01-03 00:00:00'))
+        ok, _ = sz_check.run(d)
+        if ok:
+            b = sz_check.outputs(d)[0]; mv = b['soil-zone layer redistribution [m3]'].values
+            A = 400.0 * 200.0
+            g = abs(mv[0] - 0.05 * A) < 1e-6 * A and abs(mv[1:]).max() < 1e-9 and sz_check.checks(d)['sz_identity'] < 1e-8
+            print('  R9: hotstart layer redistribution in step 1: %.1f m3 (expected %.1f), later steps %.2g m3' % (mv[0], 0.05 * A, abs(mv[1:]).max()))
+    res.append(('R9 hotstart redistribution reported in step 1', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))
