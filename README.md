@@ -12,26 +12,36 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 | `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`), verification reports |
 | `examples/` | the Liard River model with a groundwater model built by Raven, and coupled to an existing MODFLOW 6 model; step-by-step guide in `examples/README.md` |
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
-| `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer |
+| `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
 
 ## Quick start
 
-Put Raven and this repository side by side, build Raven, get MODFLOW 6, and run an example:
+Put Raven and this repository side by side, build Raven (with MODFLOW 6), and run an example:
 
 ```
 git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
 git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 
 cd RavenHydroFramework
-cmake -S . -B build
-cmake --build build --config Release
+cmake -S . -B build                          # also gets MODFLOW 6.8.1 (see below)
+cmake --build build --config Release         # Raven and libmf6 side by side in build/ (Windows: build\Release\)
 
-cd ../RavenHydroFramework-extra
-python tools/get_mf6.py                      # MODFLOW 6.8.1 into ../RavenHydroFramework/lib/mf6, where Raven finds it
-
-cd examples/Liard_existing_model
+cd ../RavenHydroFramework-extra/examples/Liard_existing_model
 ../../../RavenHydroFramework/build/Raven Liard -o output/            # Windows: ..\..\..\RavenHydroFramework\build\Release\Raven.exe
 ```
+
+CMake gets the MODFLOW 6 library by itself (option `RAVEN_MF6`): with a Fortran compiler (gfortran or ifx),
+meson >= 1.7, ninja and git (`pip install meson ninja`) it builds it from the MODFLOW 6.8.1 source; without them it
+downloads the official release library (Linux x86_64, Windows x64, Apple Silicon Macs; checked against pinned SHA-256);
+`-DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=/path/to/libmf6.so` uses one you have, `-DRAVEN_MF6_ZIP=mf6.8.1_linux.zip` a release
+zip on disk, and `-DRAVEN_MF6=OFF` builds Raven alone. On Linux other than x86_64 (e.g. aarch64), Windows on ARM64 and
+Intel Macs MODFLOW releases no library: there, install the source tools (`-DRAVEN_MF6=SOURCE`) or use `PATH`; without
+either the configure warns and builds Raven alone. `cmake --install build` and `cpack` give one folder (package) with
+Raven, the library and the Fortran runtime it needs. Details: manual, chapter 9, "Building".
+
+For a Raven built without the library (GNU make, Visual Studio solution, `-DRAVEN_MF6=OFF`):
+`python tools/get_mf6.py` puts MODFLOW 6.8.1 into `../RavenHydroFramework/lib/mf6`, where Raven finds it (Linux x86_64,
+Windows x64, Apple Silicon Macs; Intel Macs only with `--version 6.6.3`).
 
 Until the coupling is merged into the Raven repository (https://github.com/CSHS-CWRA/RavenHydroFramework), use the
 `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework, which holds the coupling with the related Raven
@@ -39,7 +49,8 @@ fixes. Windows, Linux and macOS step by step: `examples/README.md`.
 
 ## Requirements
 
-- A C++ compiler and CMake 3.20 or newer (or GNU make) to build Raven.
+- A C++ compiler and CMake 3.20 or newer (or GNU make) to build Raven; for the MODFLOW 6 library built from source also
+  a Fortran compiler, meson >= 1.7, ninja and git (optional: otherwise the release library is downloaded).
 - Python 3 for `tools/get_mf6.py` (standard library only); the tests also need numpy, pandas, shapely, pyproj and flopy.
 - MODFLOW 6.5 or newer as a shared library (tested with 6.8.1 and 6.6.3). It is loaded at run time; Raven builds and runs
   without it when groundwater is not used.

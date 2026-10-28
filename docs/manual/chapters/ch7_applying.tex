@@ -15,10 +15,17 @@ about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as be
 
 \subsection{Step 0: prepare}
 \begin{enumerate}
-\item Build Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch of \url{https://github.com/rarabzad/RavenHydroFramework}): CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}), or \cmd{make} in \cmd{src/}; on Windows also \cmd{src/Raven.sln}.
-\item Get the MODFLOW~6 library (6.5 or newer; tested with 6.8.1 and 6.6.3; 6.8 or newer recommended): run
-\cmd{python tools/get\_mf6.py} in the RavenHydroFramework-extra repository (Section~\ref{sec:getmf6}).
-Raven then finds it without any setting.
+\item Build Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch
+of \url{https://github.com/rarabzad/RavenHydroFramework}) with CMake: \cmd{cmake -S . -B build}, \cmd{cmake --build build
+--config Release}. With a Fortran compiler, meson~$\geq$~1.7, ninja and git this also builds the MODFLOW~6 library from
+source; without them it downloads the official release library (Linux x86\_64, Windows x64, Apple Silicon Macs); either
+way the library ends up next to Raven, which finds it without any setting (Section~\ref{sec:building}).
+\item If Raven was built without the library (\cmd{make} in \cmd{src/}, \cmd{src/Raven.sln}, \cmd{-DRAVEN\_MF6=OFF}, or
+the configure warned that it found no way to get it), get it (6.5 or newer; tested with 6.8.1 and 6.6.3; 6.8 or newer
+recommended) with \cmd{python tools/get\_mf6.py} in the RavenHydroFramework-extra repository
+(Section~\ref{sec:getmf6}). \cmd{get\_mf6.py} has no library for Linux other than x86\_64 (e.g.\ aarch64), for Windows on
+ARM64, or for Intel Macs (only with \cmd{--version 6.6.3}); there, build it with Raven: \cmd{cmake -S . -B build
+-DRAVEN\_MF6=SOURCE}, or give a library you have with \cmd{-DRAVEN\_MF6=PATH -DRAVEN\_MF6\_PATH=/path/to/libmf6.so}.
 \item The original Liard package was made for Raven 2.9.1; for Raven 4.x its Windows paths use \texttt{/} and the parameter
 \cmd{DEP\_THRESHHOLD} is spelled \cmd{DEP\_THRESHOLD}. The example files already include these changes.
 \end{enumerate}
