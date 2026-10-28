@@ -27,7 +27,7 @@ R12 explicit mode with 15 outer iterations where water rises into cells that are
    (steep hillslope draining to a specified head near the surface): MODFLOW converges and the outflow is the iterated
    run's within 3% (a drain inactive at that head let MODFLOW's head run away: 10^7 m3/d booked).
 R13 a stiff, very low-storage hillslope with an update budget of 1 and 12 outer iterations, on which MODFLOW does not
-   converge: MODFLOW's residual is not handed to Raven, so the outflow stays within 3 times the iterated run's (it was
+   converge: neither MODFLOW's residual nor the soil-zone shortfall is handed to Raven, so the outflow stays within 1.5 times the iterated run's (it was
    17 times).
 """
 import os, sys, shutil
@@ -239,7 +239,7 @@ def main():
         c = dict(B10); c.update(Kv=5000.0, Kh=1000.0, Sy=0.001, iteration=it, extra_rvg=ex, **DRY13)
         d = case(name, **c); ok, _ = sz_check.run(d)
         if ok: out[name] = outflow(d)
-    g = len(out) == 2 and out['R13_b1'] <= 3.0 * out['R13_it']
+    g = len(out) == 2 and out['R13_b1'] <= 1.5 * out['R13_it']
     if len(out) == 2:
         print('  R13: unconverged steps, outflow %.0f m3 vs iterated %.0f m3 (x%.2f)' % (out['R13_b1'], out['R13_it'], out['R13_b1'] / out['R13_it']))
     res.append(('R13 MODFLOW residual not handed to Raven', g))
