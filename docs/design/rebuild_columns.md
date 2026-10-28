@@ -70,7 +70,8 @@ driver (copied and adjusted: /mnt/attach/outputs/rebuild/agents/v2_replay/, raw 
   GWModelSummary.txt and the end time / elapsed time in mfsim.lst and mfsim.stdout.
 - Manual: pdflatex, bibtex, pdflatex x2: 0 errors, 0 undefined references, 0 overfull boxes, 130 pages (the original
   had 124 + the sloping-land subsection before the Phase 0 merge).
-- Full suite in quick mode (RAVEN_TEST_QUICK=1): see the commit message of the commit that adds this note.
+- Full suite in quick mode (RAVEN_TEST_QUICK=1, after the notation merge): 34 of 34 steps PASS (gridtest ... ext_fuzz,
+  cmake checks, all soil-zone steps; the USGS examples step is not run without RAVEN_USGS_EXAMPLES), about 30 minutes.
 
 ## Uncertain / to check
 
