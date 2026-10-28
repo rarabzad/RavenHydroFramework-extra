@@ -16,7 +16,8 @@ def audit(run,dt=1.0):
     s0=(st if False else 0.0)
     if 'recharge delay storage [m3]' in b:
         s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt
-    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt)/max(rr,1)
+    rej=b['rejected recharge [m3]'].sum() if 'rejected recharge [m3]' in b else 0.0   #:SoilZone PHYSICAL: recharge on saturated ground goes back to the soil (also subtracted)
+    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej)/max(rr,1)
     R['recharge delay store at end [m3]']=st
     flows=b['MF6 recharge [m3/d]']+b['storage release [m3/d]']-b['seepage to Raven [m3/d]']+b['river leakage to aquifer [m3/d]']\
           -b['aquifer discharge to rivers [m3/d]']-b['water-table ET [m3/d]']+b['wells actual [m3/d]']+b['GHB [m3/d]']+b['CHD [m3/d]']
@@ -27,6 +28,15 @@ def audit(run,dt=1.0):
            +b['water-table ET [m3/d]']+b['wells actual [m3/d]'].abs()+b['GHB [m3/d]'].abs()+b['CHD [m3/d]'].abs()+b['storage release [m3/d]'].abs())
     gross=gross+gross_res
     if 'other model packages [m3/d]' in b: flows=flows+b['other model packages [m3/d]']; gross=gross+b['other model packages [m3/d]'].abs()  #existing-model mode: the model's own packages
+    if 'soil zone to aquifer [m3/d]' in b:   #:SoilZone PHYSICAL: soil zone <-> aquifer exchange (SZX_RAVEN)
+        flows=flows+b['soil zone to aquifer [m3/d]']-b['aquifer to soil zone [m3/d]']; gross=gross+b['soil zone to aquifer [m3/d]']+b['aquifer to soil zone [m3/d]']
+        szn=(b['aquifer to soil zone [m3/d]']-b['soil zone to aquifer [m3/d]'])*dt
+        R['soil zone: applied - rejected - net exchange - shortfall (rel)']=float((b['soil-zone exchange applied to Raven [m3]']-b['rejected recharge [m3]']-szn-b['soil-zone shortfall [m3]']).abs().sum()
+            /max((b['soil-zone exchange applied to Raven [m3]'].abs()+b['rejected recharge [m3]']+szn.abs()).sum(),1))
+        R['soil zone: shortfall [m3]']=float(b['soil-zone shortfall [m3]'].sum())
+        R['soil zone: overflow [m3]']=float(b['soil-zone overflow [m3]'].sum())
+        R['soil zone: interface not converged (steps)']=int((b['interface converged']==0).sum())
+        R['soil zone: max interface updates']=int(b['interface updates'].max())
     if 'surface-store leakage to aquifer [m3/d]' in b:
         gross=gross+b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']
         R['surface-store: applied - (discharge-leakage) (rel)']=(b['surface-store exchange applied to Raven [m3]']-(b['aquifer discharge to surface stores [m3/d]']-b['surface-store leakage to aquifer [m3/d]'])*dt).abs().sum()/max((b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']).sum()*dt,1)
