@@ -329,3 +329,16 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   models without NEWTON get a start-up warning (a dried top cell leaves MODFLOW's solve with head HDRY; the soil zone
   over it is then inactive). Not confirmed: unsupplied upflow left after the column's take-back reaches air-dry would
   still be booked from MODFLOW (never observed). Sweeps of 560 pairs against the previous build: no regression.
+- **Audit round 8.** (A) A rising water table took the deficit of a column dried by capillary rise (MoveBottom's negative
+  excess) whole, into the top cell's recharge: up to 20 times the source cell's limit; MODFLOW unconverged with a balance
+  error 26 times the recharge, NaN in the previous build, in thin low-Sy aquifers. The rising branch now limits a
+  deficit like the falling one (the bottom follows more slowly), routes it through SZW_RAVEN for a lower source, and
+  the water table reaching the base is handled in the same branch. (B) In existing models without NEWTON the dry head
+  HDRY (−1e30) was taken as the water table (a column bottom at −1e30 m, 2e32 m³ booked): such columns are now left as they
+  are until the cell rewets, and a column read at start-up uses the water table below a dry top cell. (C, open,
+  pre-existing) without NEWTON, recharge MODFLOW moves from a dry top cell to the active cell below is not read back
+  (Raven's recharge package has no FIXED_CELL): the start-up warning asks for NEWTON. Restarts: heads, starting heads
+  and the soil-zone hotstart blocks are written with 17 digits (12 or 10 before: a head 3e-10 m above a cell bottom was
+  rounded away, and with it the upward limits); in near-dry cases with columns at air-dry, a restart still departs
+  from the continuous run as Raven's own state file keeps 5 decimals (one LAGGED case: 11 % after 50 days; 1e-6 in the
+  others). Test V2j extended.

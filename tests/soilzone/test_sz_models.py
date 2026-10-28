@@ -346,7 +346,18 @@ def P10():
     b = budget(d); nc = int((b['converged'] == 0).sum()) + int((b['interface converged'] == 0).sum())
     good = (nc == 0) and bool(np.isfinite(b.select_dtypes('number').values).all())
     print('    falling water table, thin cell: steps not converged %d, all finite -> %s' % (nc, 'ok' if good else 'FAIL'))
-    return ok and good
+    # a water table rising under a column dried by capillary rise in a thin aquifer: the deficit is filled
+    # out of the cell at most as fast as it can give
+    rise = dict(nhru=2, hru_w=200.0, rain=[0.0] * 10 + [120.0] * 2 + [0.0] * 18, days=30, perc=2.0, ksat=5000.0, Kv=0.5, Sy=0.02,
+                soil_b=9.0, soil_psia=1000.0, aq_b=4.0, aq_psia=0.3, pet=8.0, phi0=(60.0, 60.0), timestep=0.25, aq_thick=0.5,
+                init_depth=1.39, slope=0.02)
+    d2, _ = run('j_rise_vz', extra_rvg=VZ + ':SoilZoneCapillaryRise ON\n:SoilZoneExchangeTiming LAGGED\n', **rise)
+    if not d2:
+        return False
+    b = budget(d2); nc2 = int((b['converged'] == 0).sum())
+    good2 = (nc2 == 0) and bool(np.isfinite(b.select_dtypes('number').values).all())
+    print('    rising water table under a dried column, thin aquifer: MODFLOW steps not converged %d -> %s' % (nc2, 'ok' if good2 else 'FAIL'))
+    return ok and good and good2
 
 def main():
     res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)]

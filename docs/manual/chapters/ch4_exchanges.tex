@@ -398,7 +398,8 @@ $=\sum_i(\theta_i-\theta_{\mathrm{eq},i})\Delta z_i$). At the start of every ste
 water table: the excess keeps its elevation, the equilibrium follows the water table, and where the water table has
 risen the excess below it joins the aquifer as recharge this step (\emph{unsaturated zone to aquifer} includes it);
 where it has fallen, the new cells start at equilibrium, and the water they take comes out of the cell holding the
-water table, at most what that cell can give in the step (above; the column's bottom then follows more slowly). (Opening them at $\theta_s-S_y$, what MODFLOW's specific yield
+water table, at most what that cell can give in the step (above; the column's bottom then follows more slowly). The
+same limit applies to the deficit below a risen water table in a column dried by evaporation or capillary rise. (Opening them at $\theta_s-S_y$, what MODFLOW's specific yield
 leaves behind, would leave a dry band next to the water table that refills from the aquifer at once, a feedback that
 diverges with explicit coupling wherever $S_y$ exceeds the drainable porosity the retention curve implies near the
 water table.) A node that the move leaves above its porosity, or drier than air-dry, is clipped and the difference
