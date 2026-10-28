@@ -141,18 +141,24 @@ area, an HRU whose polygon is larger than its `AREA` exchanged its soil water th
 
 Each column keeps its own layer water $\phi_{c,j}$. Raven's `SOIL[m]` of the HRU is the area-weighted mean of its
 columns. Raven's processes change the HRU totals between exchanges; `gwsz::Distribute` shares the changes among the
-columns as the processes would have made them in each column:
+columns as the processes would have made them in each column, in Raven's order:
 
-1. the step's recharge (end-of-step `GROUNDWATER`, which only `SOIL[M-1]` fills) leaves the bottom layers first, as the
-   percolation takes it: by area for a constant rate (`PERC_CONSTANT`: each column alike, where it has the water), from
-   free water first for a drainage (the other types: in proportion to each column's water above field capacity);
-2. where a layer lost water and the layer below gained, the matched part percolates within each column: it leaves the
-   upper layer the same way (by area or free water first) and enters the same column's lower layer;
+1. the percolation between the layers is reconstructed from the bottom up: the flux $P_l$ from layer $l+1$ into layer
+   $l$ explains layer $l$'s change together with what it passed down ($P_l=\max(0,\ \Delta_l+P_{l-1})$, the bottom
+   layer's change counted before the recharge $R$, end-of-step `GROUNDWATER`, which only `SOIL[M-1]` fills); what
+   remains of each layer's change are its other gains (rain) and losses (evaporation);
+2. the percolation is applied from the top down within each column: each layer receives what its own column's layer
+   above passed down and gives up its own share to the same column's layer below, by area for a constant rate
+   (`PERC_CONSTANT`: each column alike, where it has the water) or from free water first for a drainage (the other
+   types: in proportion to each column's water above field capacity); then the bottom layer gives up the recharge the
+   same way;
 3. the other losses (evaporation) are taken alike on every column, limited to its water;
-4. gains (rain) fall on every column alike, together with the water percolating into the column from above; what a
-   full layer of a column cannot take stays in the layer above in the same column, and what its top layer cannot take
-   overflows to the HRU's `SURFACE_WATER` (saturation excess on the full columns) and is counted in the soil-zone
-   overflow.
+4. the other gains (rain) fall on every column alike; what a full layer of a column cannot hold moves up in the same
+   column, and what its top layer cannot hold overflows to the HRU's `SURFACE_WATER` (saturation excess on the full
+   columns) and is counted in the soil-zone overflow.
+
+(Taking the recharge before the percolation that fed it, the previous build drove columns below zero; unit test
+"Raven's process order".)
 
 `SZSyncColumns` does this at the start of every exchange, after which Raven's `SOIL[m]` is set to the column means.
 (The first builds shared gains by room and all losses from free water first: rain on the saturated toe of a slope moved
@@ -315,8 +321,10 @@ budget (`:SoilZoneIteration` max, default 100); when it is used up the values ar
 only. MODFLOW's tolerance relaxation for hard steps counts only iterations MODFLOW did not converge on. The last
 $\max(2,\ \text{max outer}/10)$ outer iterations are left to MODFLOW on the boundary it has: an update just before the
 limit left MODFLOW's final solve unconverged, and its residual was water created or lost (robustness test R5). Iteration
-1 always updates when the limit allows a second; a step with no update at all is reported as not converged. The
-boundary of the last update before the freeze is supply-limited as in explicit mode (below), as no update follows it.
+1 updates if at least two solves follow it; with fewer outer iterations (`:SolverMaxOuterIterations` 2) only the
+predictor runs, supply-limited as in explicit mode, and the step is reported as not converged. When the interface
+freezes unconverged (the iteration reserve or the update budget reached), the boundary it keeps is made supply-limited
+once (one more update, on which MODFLOW then solves) unless the last update's already was.
 In explicit mode (`:SoilZoneIteration 0`) the boundary is also supply-limited: $C_g(H_g-\text{bottom})$ never exceeds the
 column's free water over the step (robustness test R7), while for water rising into the soil $C_g$ stays at least the
 secant to the end of the contact; a linear boundary cannot hold both exactly, so some water can still rise while the

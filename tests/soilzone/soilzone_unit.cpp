@@ -227,6 +227,29 @@ int main()
     check(bad_loss==0,"Distribute: other losses (evaporation) alike on every column",bad_loss,0);
     check(bad_gain==0,"Distribute: a gain falls alike on every column",bad_gain,0);
     check(bad_vert==0,"Distribute: percolation stays in its column",bad_vert,0); }
+  { //Raven applies its processes in order on the HRU mean: rain into the top layer, percolation down the layers, then
+    //recharge out of the bottom one (it can exceed what the bottom layer held at the start) and evaporation
+    std::mt19937 rng(23); std::uniform_real_distribution<double> U(0.0,1.0); int bad_neg=0,bad_m=0,bad_r=0;
+    for (int it=0;it<200000;it++){
+      int n=1+(int)(U(rng)*3),nc=1+(int)(U(rng)*6); vector<sz_layer> Lr(n);
+      for (int j=0;j<n;j++){Lr[j].H=0.5; Lr[j].phimax=50+200*U(rng); Lr[j].phifc=Lr[j].phimax*(0.2+0.6*U(rng));}
+      vector<vector<double> > c(nc,vector<double>(n)); vector<double> w(nc); double sw=0;
+      for (int k=0;k<nc;k++){w[k]=0.05+U(rng); sw+=w[k];} for (int k=0;k<nc;k++){w[k]/=sw;}
+      for (int k=0;k<nc;k++){for (int j=0;j<n;j++){double r=U(rng); c[k][j]=(r<0.2)?0.0:((r<0.4)?Lr[j].phimax:Lr[j].phimax*U(rng));}}
+      vector<double> m(n,0.0); for (int j=0;j<n;j++){for (int k=0;k<nc;k++){m[j]+=w[k]*c[k][j];}}
+      m[n-1]=std::min(m[n-1]+30.0*U(rng),Lr[n-1].phimax);                      //rain
+      for (int j=n-1;j>=1;j--){double p=U(rng)*m[j]; p=std::min(p,Lr[j-1].phimax-m[j-1]); m[j]-=p; m[j-1]+=p;} //percolation
+      double R=U(rng)*m[0]; m[0]-=R;                                             //recharge
+      m[n-1]-=U(rng)*0.5*m[n-1];                                                 //evaporation
+      bool byA=(U(rng)<0.5); vector<double> lr; vector<vector<double> > c0=c;
+      double o=Distribute(Lr,c,w,m,0,R,byA,&lr);
+      double sa=0,st=0,sl=0; for (int j=0;j<n;j++){st+=m[j]; for (int k=0;k<nc;k++){sa+=w[k]*c[k][j]; if (c[k][j]<-1e-9){bad_neg++;}}}
+      for (int k=0;k<nc;k++){sl+=w[k]*lr[k];}
+      if (std::fabs(sa+o-st)>1e-9*(1+st)){bad_m++;} if (std::fabs(sl-R)>1e-9*(1+R)){bad_r++;}
+    }
+    check(bad_neg==0,"Distribute (Raven's process order): no column goes below 0",bad_neg,0);
+    check(bad_m==0,"Distribute (Raven's process order): mass",bad_m,0);
+    check(bad_r==0,"Distribute (Raven's process order): recharge parts add up",bad_r,0); }
   { vector<sz_layer> L2=TwoLayers(); vector<vector<double> > c(2,vector<double>(2)); vector<double> w={0.5,0.5};
     c[0][0]=L2[0].phimax; c[0][1]=L2[1].phimax; c[1][0]=L2[0].phifc; c[1][1]=L2[1].phifc;   //a full and a dry column
     vector<double> tg={0.5*(c[0][0]+c[1][0]),0.5*(c[0][1]+c[1][1])+20.0};                   //20 mm of rain on the top layer
