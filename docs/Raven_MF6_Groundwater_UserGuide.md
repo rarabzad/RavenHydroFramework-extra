@@ -257,7 +257,7 @@ thickness), and the water table can rise into them, as in GSFLOW:
 - The soil zone of each HRU is kept per overlapping cell (columns, saved in `solution.rvc` as `:GWSoilZoneColumns`);
   Raven's `SOIL[m]` holds their mean. Where the water table is in the soil, recharge is rejected (stays in the soil),
   saturated soil drains to the aquifer, groundwater rises into the soil, and a full soil zone overflows to
-  `SURFACE_WATER`. An HRU's recharge leaves the columns that hold free water (not shared by area). Water-table ET is
+  `SURFACE_WATER`. Rain falls alike on every column (overflowing where full) and an HRU's recharge leaves the columns that gave it up (not shared by area). Water-table ET is
   reduced on saturated ground; the seepage drain serves only HRUs without soil.
 - The soil zone and MODFLOW are iterated within each step until they agree; the flows Raven applies are always those
   MODFLOW booked, so water is conserved even on a step that did not converge (reported in `Raven_errors.txt`).

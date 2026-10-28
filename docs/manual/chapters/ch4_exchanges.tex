@@ -237,8 +237,9 @@ An HRU usually spans several cells, and the water table differs between them. Th
 as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), plus one column for the rest of the
 HRU (over fixed-head cells or outside the grid). Each column has its own soil water $\phi_{c,j}$ [mm] in every layer;
 Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before. Between
-exchanges Raven changes the HRU totals; a gain is shared among the columns in proportion to their room, a loss first in
-proportion to their free water (above field capacity) and then to their water. The columns are saved in
+exchanges Raven changes the HRU totals: a gain falls on every column alike, and what a full column cannot take
+overflows to \cmd{SURFACE\_WATER}; a loss is taken first in proportion to the columns' free water (above field
+capacity) and then to their water (with \cmd{PERC\_CONSTANT} the recharge leaves every column alike). The columns are saved in
 \cmd{solution.rvc} (\cmd{:GWSoilZoneColumns}). At the start (no hotstart) every column is filled up to the initial water
 table of its cell.
 
@@ -276,9 +277,9 @@ GHB rather than RIV or DRN because the exchange runs both ways and must stop whe
 (through $F$) without adding a second drainage path next to Raven's percolation.
 
 \subsection{Rejected recharge, overflow and evaporation}
-The HRU's recharge is shared among its columns in proportion to the free water in their bottom soil-zone layer (the
-water Raven's drainage takes), not by area, so drainage from saturated columns at the foot of a slope is not sent up the
-slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
+The HRU's recharge is shared among its columns as they gave it up --- the free water their bottom soil-zone layer lost
+(or, with \cmd{PERC\_CONSTANT}, alike) --- not by area, so drainage from saturated columns at the foot of a slope is not
+sent up the slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
 water table has risen into the soil --- is \emph{rejected}: it stays in the column instead of reaching MODFLOW, which
 receives $(1-F)$ (Section~\ref{ch:recharge}). \emph{Raven recharge} in \cmd{GWBudget.csv} therefore includes water that is
 rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does not fit into a full
@@ -297,8 +298,9 @@ increases strictly with $\Delta V$, so there is exactly one solution (found by b
 column fills and the rest overflows. MODFLOW receives each column as a linear boundary that reproduces this exchange at
 the current head and its slope, including the column's own response (a Robin interface condition). After MODFLOW's
 outer iterations the columns are solved again with the new heads --- after every one of the first five, and afterwards
-after every iteration on which MODFLOW has converged --- until the soil levels change by less than the head tolerance
-and the total exchange by less than the flow tolerance (\cmd{:SoilZoneIteration}). The flows Raven applies are always
+after every iteration on which MODFLOW has converged, but not in MODFLOW's last tenth of its iteration limit --- until
+the soil levels change by less than the head tolerance and the total exchange by less than the flow tolerance
+(\cmd{:SoilZoneIteration}). The flows Raven applies are always
 the ones MODFLOW booked, so no water is created or lost even on a step whose interface did not converge (reported in
 \cmd{Raven\_errors.txt}).
 

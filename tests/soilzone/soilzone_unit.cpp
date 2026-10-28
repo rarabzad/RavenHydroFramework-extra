@@ -177,8 +177,8 @@ int main()
     SubgridFlux(c1,0.0,0.0,0.0,F,qh,qc,ql); double F0=F; SubgridFlux(c1,0.0,-0.25,-0.25,F,qh,qc,ql); double Fm=F; SubgridFlux(c1,0.0,-0.6,-0.6,F,qh,qc,ql);
     check(F0==1.0 && close(Fm,0.5) && F==0.0,"contact weights: through ds below the base, full at it",Fm,0.5); }
   { vector<double> z={0.0,1.0}; check(close(SatFraction(0.5,z,0.0),0.5),"SatFraction sub-grid sharp"); }
-  //-- column distribution: totals exact, bounds kept, gains never lower and losses never raise a column
-  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_tot=0,bad_bnd=0,bad_dir=0,bad_fw=0;
+  //-- column distribution: mass (totals + overflow), bounds, gains alike on every column, losses from free water first
+  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_mass=0,bad_bnd=0,bad_uni=0,bad_fw=0,bad_tot=0;
     for (int it=0;it<20000;it++){
       int n=1+(int)(U(rng)*3),nc=1+(int)(U(rng)*6); vector<sz_layer> Lr(n);
       for (int j=0;j<n;j++){Lr[j].H=0.5; Lr[j].phimax=50+200*U(rng); Lr[j].phifc=0.5*Lr[j].phimax;}
@@ -186,24 +186,38 @@ int main()
       for (int k=0;k<nc;k++){w[k]=(U(rng)<0.1)?0.0:U(rng); sw+=w[k];} if (sw<=0){w[0]=1; sw=1;} for (int k=0;k<nc;k++){w[k]/=sw;}
       for (int k=0;k<nc;k++){for (int j=0;j<n;j++){double r=U(rng); c[k][j]=(r<0.15)?0.0:((r<0.3)?Lr[j].phimax:Lr[j].phimax*U(rng));}}
       for (int j=0;j<n;j++){tg[j]=Lr[j].phimax*U(rng);}
-      vector<vector<double> > c0=c; Distribute(Lr,c,w,tg);
+      vector<vector<double> > c0=c; double ovf=Distribute(Lr,c,w,tg);
+      double sumT=0,sumA=0; for (int j=0;j<n;j++){sumT+=tg[j]; for (int k=0;k<nc;k++){sumA+=w[k]*c[k][j];}}
+      if (std::fabs(sumA+ovf-sumT)>1e-9*(1+sumT) || ovf<-1e-12){bad_mass++;}
+      bool spill=(ovf>1e-12);
       for (int j=0;j<n;j++){
-        double m=0,m0=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j]; m0+=w[k]*c0[k][j];}
-        if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}
-        for (int k=0;k<nc;k++){
-          if (c[k][j]<-1e-9 || c[k][j]>Lr[j].phimax*(1+1e-12)+1e-9){bad_bnd++;}
-          if ((tg[j]>m0 && c[k][j]<c0[k][j]-1e-12) || (tg[j]<m0 && c[k][j]>c0[k][j]+1e-12)){bad_dir++;}
+        double m0=0; for (int k=0;k<nc;k++){m0+=w[k]*c0[k][j];}
+        for (int k=0;k<nc;k++){if (c[k][j]<-1e-9 || c[k][j]>Lr[j].phimax*(1+1e-12)+1e-9){bad_bnd++;}}
+        //a gain that every column has room for (and nothing spilled from below) falls alike on every column
+        bool room=true; for (int k=0;k<nc;k++){if (c0[k][j]+(tg[j]-m0)>Lr[j].phimax){room=false;}}
+        bool below=false; for (int jj=0;jj<j;jj++){double mm=0; for (int k=0;k<nc;k++){mm+=w[k]*c0[k][jj];} for (int k=0;k<nc;k++){if (tg[jj]>mm && c0[k][jj]+(tg[jj]-mm)>Lr[jj].phimax){below=true;}}}
+        if (tg[j]>m0 && room && !below){
+          for (int k=0;k<nc;k++){if (w[k]>0 && std::fabs((c[k][j]-c0[k][j])-(tg[j]-m0))>1e-9*Lr[j].phimax){bad_uni++;}}
+          double m=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j];} if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}
         }
-        double fw=0; for (int k=0;k<nc;k++){fw+=w[k]*std::max(c0[k][j]-Lr[j].phifc,0.0);}
-        if ((tg[j]<m0) && (m0-tg[j]<=fw)){ //a loss that free water covers leaves columns at or below field capacity alone
-          for (int k=0;k<nc;k++){if ((c0[k][j]<=Lr[j].phifc && std::fabs(c[k][j]-c0[k][j])>1e-9*Lr[j].phimax) || (c[k][j]<std::min(c0[k][j],Lr[j].phifc)-1e-9)){bad_fw++;}}
+        if (n==1 && tg[j]<m0){ //a loss that free water covers leaves columns at or below field capacity alone
+          double fw=0; for (int k=0;k<nc;k++){fw+=w[k]*std::max(c0[k][j]-Lr[j].phifc,0.0);}
+          if (m0-tg[j]<=fw){for (int k=0;k<nc;k++){if ((c0[k][j]<=Lr[j].phifc && std::fabs(c[k][j]-c0[k][j])>1e-9*Lr[j].phimax) || (c[k][j]<std::min(c0[k][j],Lr[j].phifc)-1e-9)){bad_fw++;}}}
+          double m=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j];} if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}
         }
       }
+      (void)spill;
     }
-    check(bad_tot==0,"Distribute: area-weighted totals equal the targets",bad_tot,0);
+    check(bad_mass==0,"Distribute: column totals plus overflow equal the targets",bad_mass,0);
     check(bad_bnd==0,"Distribute: every column stays within [0, phimax]",bad_bnd,0);
-    check(bad_dir==0,"Distribute: gains never lower, losses never raise a column",bad_dir,0);
+    check(bad_uni==0,"Distribute: a gain falls alike on every column",bad_uni,0);
+    check(bad_tot==0,"Distribute: layer totals exact where nothing overflows or spills",bad_tot,0);
     check(bad_fw==0,"Distribute: a loss comes from free water first (columns at field capacity keep their water)",bad_fw,0); }
+  { vector<sz_layer> L2=TwoLayers(); vector<vector<double> > c(2,vector<double>(2)); vector<double> w={0.5,0.5};
+    c[0][0]=L2[0].phimax; c[0][1]=L2[1].phimax; c[1][0]=L2[0].phifc; c[1][1]=L2[1].phifc;   //a full and a dry column
+    vector<double> tg={0.5*(c[0][0]+c[1][0]),0.5*(c[0][1]+c[1][1])+20.0};                   //20 mm of rain on the top layer
+    double o=Distribute(L2,c,w,tg);
+    check(close(o,10.0) && close(c[1][1],L2[1].phifc+20.0) && c[0][1]==L2[1].phimax,"Distribute: rain on a full column overflows, not moved to the dry one",o,10.0); }
   //-- edge cases found by the checks
   { vector<sz_layer> L2=TwoLayers(); vector<double> p={L2[0].phimax+10.0,0.0}; double tot0=p[0]+p[1];
     double o=Fill(L2,p,10.0); check(close(p[0]+p[1]+o,tot0+10.0),"Fill keeps water above capacity in an overfull layer",p[0]+p[1]+o,tot0+10.0); }
@@ -213,8 +227,8 @@ int main()
   { sz_cell cb; cb.zbs={0.0,0.2}; cb.D=1.0; cb.ds=0.0; cb.C=10.0; double F,qh,qc,ql;
     SubgridFlux(cb,0.1,2.0,2.0,F,qh,qc,ql); check(close(ql,10.0),"q_lam at a breakpoint of the soil water level",ql,10.0); }
   { vector<sz_layer> L2=TwoLayers(); vector<vector<double> > c(2,vector<double>(2,50.0)); vector<double> w={0.45,0.45},tg={L2[0].phimax*1.1,10.0};
-    Distribute(L2,c,w,tg); double m0=w[0]*c[0][0]+w[1]*c[1][0],m1=w[0]*c[0][1]+w[1]*c[1][1];
-    check(close(m0,tg[0]) && close(m1,tg[1]),"Distribute: totals exact for weights not summing to 1 (remainder branch)",m0,tg[0]); }
+    double o=Distribute(L2,c,w,tg); double tot=w[0]*(c[0][0]+c[0][1])+w[1]*(c[1][0]+c[1][1]);
+    check(close(tot+o,tg[0]+tg[1]),"Distribute: mass kept for weights not summing to 1",tot+o,tg[0]+tg[1]); }
   { // connection head above the water table (secant/regula falsi steps): never drains more than the column holds, q_hc
     // matches finite differences, and the local balance holds
     std::mt19937 rg(777); std::uniform_real_distribution<double> V(0,1); int bshort=0,broot=0,bqc=0,nqc=0;

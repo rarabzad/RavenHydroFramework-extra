@@ -4,11 +4,16 @@ R1 stiff flat column: drainable porosity 0.02 against S_y = 0.25 and a high cond
    base and the soil zone fills. The interface and MODFLOW converge on every step in few updates (a connection that
    opened only above the base left MODFLOW's top cell confined there and the iteration cycled).
 R2 one HRU over ten cells against ten one-cell HRUs (same hillslope and forcing): the HRU's recharge leaves the columns
-   that hold the free water, so the soil-zone overflow (the hillslope's outflow) agrees within 3% and MODFLOW's recharge
-   within a factor 1.6 (sharing recharge by area pumped drainage of the saturated toe up the slope: outflow -36%,
-   recharge x2.3).
+   that give up free water and rain falls alike on every column (overflowing where full), so the soil-zone overflow
+   (the hillslope's outflow) agrees within 3% and MODFLOW's recharge within a factor 1.6 (sharing recharge by area
+   pumped drainage of the saturated toe up the slope: outflow -36%, recharge x2.3); also with constant-rate
+   percolation (within 10%).
 R3 RECHARGE_DELAY with :SoilZone PHYSICAL is refused with a clear message.
-R4 a smoothing depth below 0.05 m is reported.
+R4 a smoothing depth below 0.1 m is reported.
+R5 hourly steps with a 0.001 m smoothing depth: the interface is frozen for MODFLOW's last outer iterations, so no step
+   ends with a MODFLOW residual.
+R6 a steep hillslope (slope 0.1) with 5x5 DEM samples per cell converges on every step.
+R7 explicit mode (:SoilZoneIteration 0): the boundary never drains more than a column holds (no shortfall).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -54,6 +59,20 @@ def main():
         print('  R2: overflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3 (ratio %.2f)'
               % (o1, o2, 100 * (o1 - o2) / o2, m1, m2, m1 / m2))
     res.append(('R2 one HRU over ten cells = ten HRUs', g))
+    out = {}
+    for name, kw in (('R2c_one', dict(nhru=1, hru_w=1000.0)), ('R2c_ten', dict(nhru=10, hru_w=100.0))):
+        c = dict(hill); c.update(kw); c.update(perc_type='PERC_CONSTANT', perc=5.0); d = case(name, **c)
+        ok, _ = sz_check.run(d)
+        if ok:
+            b = sz_check.outputs(d)[0]
+            out[name] = (b['soil-zone overflow [m3]'].sum(), b['MF6 recharge [m3/d]'].sum())
+    g = False
+    if len(out) == 2:
+        (o1, m1), (o2, m2) = out['R2c_one'], out['R2c_ten']
+        g = abs(o1 - o2) <= 0.10 * o2
+        print('  R2c (constant percolation 5 mm/d): overflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3'
+              % (o1, o2, 100 * (o1 - o2) / o2, m1, m2))
+    res.append(('R2c same with constant-rate percolation', g))
 
     d = case('R3', days=3)
     p = os.path.join(d, 'm.rvp'); t = open(p).read()
@@ -66,7 +85,40 @@ def main():
 
     d = case('R4', days=3, smooth=0.01)
     ok, _ = sz_check.run(d)
-    res.append(('R4 small smoothing depth reported', ok and 'SEEPAGE_SMOOTHING_DEPTH' in errors(d) and 'below 0.05 m' in errors(d)))
+    res.append(('R4 small smoothing depth reported', ok and 'SEEPAGE_SMOOTHING_DEPTH' in errors(d) and 'almost abruptly' in errors(d)))
+
+    WET = [10.0] * 60 + [0.0] * 60
+    hill2 = dict(nhru=10, hru_w=100.0, width=200.0, cell=100.0, Kh=50.0, Kv=1.0, ksat=1000.0, perc=1000.0,
+                 perc_type='PERC_GAWSER_CONSTRAIN', slope=0.01, subgrid=3, smooth=0.2)
+    c = dict(hill2); c.update(timestep=1 / 24.0, smooth=0.001, subgrid=5, init_depth=0.5, rain=[10.0] * 15 + [0] * 15, days=30)
+    d = case('R5', **c); ok, _ = sz_check.run(d)
+    g = False
+    if ok:
+        r = sz_check.checks(d, dt=1 / 24.0)
+        g = r['mf6_not_conv'] == 0 and r['mf6_err_rel'] < 1e-5 and r['sz_identity'] < 1e-8 and r['rch_identity'] < 5e-9 and r['shortfall'] < 1e-6
+        print('  R5: hourly, smoothing 0.001 m: MODFLOW not converged %d, interface not converged %d, MF6 error %.2g'
+              % (r['mf6_not_conv'], r['iface_not_conv'], r['mf6_err_rel']))
+    res.append(('R5 no MODFLOW residual left by late updates', g))
+
+    c = dict(hill2); c.update(rain=WET, days=len(WET), subgrid=5, slope=0.1, init_depth=1.0, Kh=5.0)
+    d = case('R6', **c); ok, _ = sz_check.run(d)
+    g = False
+    if ok:
+        r = sz_check.checks(d)
+        g = r['iface_not_conv'] == 0 and r['mf6_not_conv'] == 0 and r['sz_identity'] < 1e-8
+        print('  R6: slope 0.1, 5x5 samples: interface not converged %d, max updates %d' % (r['iface_not_conv'], r['max_updates']))
+    res.append(('R6 steep sub-grid hillslope converges', g))
+
+    d = case('R7', nhru=4, hru_w=100.0, n=0.1, Sy=0.2, smooth=0.2, subgrid=3, rain=([20.0] * 10 + [0.0] * 10) * 2, days=40,
+             perc=20, ksat=1e4, Kv=10, slope=0.02, init_depth=1.1, chd=100 - 0.02 * 400 - 1.0, iteration=(0, 1e-4, 1e-6),
+             extra_rvg=':SolverMaxOuterIterations 20\n')
+    ok, _ = sz_check.run(d)
+    g = False
+    if ok:
+        r = sz_check.checks(d)
+        g = r['shortfall'] < 1e-6 and r['sz_identity'] < 1e-8
+        print('  R7: explicit predictor: shortfall %.3g m3' % r['shortfall'])
+    res.append(('R7 explicit mode never drains more than the column holds', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

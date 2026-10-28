@@ -52,8 +52,8 @@ def main(days=365):
     for k in keys:
         print('  %-62s %s' % (k, A.get(k)))
     up = s['soil zone to aquifer [m3/d]'].sum(); dn = s['aquifer to soil zone [m3/d]'].sum()
-    rej = b['rejected recharge [m3]'].sum(); hrus = s.loc[s['saturated fraction [-]'] > 0.5, 'HRU_ID'].nunique()
-    print('  soil zone -> aquifer %.3g m3, aquifer -> soil zone %.3g m3, rejected recharge %.3g m3, HRUs ever >50%% saturated: %d of %d'
+    rej = b['rejected recharge [m3]'].sum(); hrus = s.loc[s['saturated fraction [-]'] > 0.2, 'HRU_ID'].nunique()
+    print('  soil zone -> aquifer %.3g m3, aquifer -> soil zone %.3g m3, rejected recharge %.3g m3, HRUs ever >20%% saturated: %d of %d'
           % (up, dn, rej, hrus, s['HRU_ID'].nunique()))
     print('  storage-consistency warning: %s' % ('drainable porosity' in err))
     good = abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']) < 1e-9 and abs(A['MF6 cumulative residual / gross flow']) < 1e-7 \
