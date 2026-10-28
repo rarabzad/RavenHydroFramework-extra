@@ -573,8 +573,8 @@ MODFLOW computes from the input (for instance recharge into a confined cell unde
 The unsaturated columns cost about 40~$\mu$s per column and day in a wet spell and much less when nothing moves;
 capillary rise costs a few table lookups per column and step (a few more for the drawdown root), the specified-head columns one local solve per column and step; classes
 cost $K$ evaluations of the HRU's processes. On the Liard example with \cmd{:SoilZone PHYSICAL} (85 HRUs, 4\,286 links,
-one year, optimized build) the basic soil zone took 126~s; the column soil zone with its defaults takes 77~s, and with unsaturated columns, capillary rise
-and three classes 105~s (6\,536 outer iterations against 4\,809): Brent's method in the local solve more than pays for
+one year, optimized build) the basic soil zone took 106~s; the column soil zone with its defaults takes 69~s, and with unsaturated columns, capillary rise
+and three classes 91~s (6\,378 outer iterations against 4\,809): Brent's method in the local solve more than pays for
 the new physics, and MODFLOW's solve remains the larger part.
 
 \begin{refcard}{soil zone}

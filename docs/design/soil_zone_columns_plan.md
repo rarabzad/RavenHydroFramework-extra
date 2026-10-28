@@ -358,3 +358,7 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   fall below the aquifer's bottom (a dry column's head can be lower). Sweeps of 768 randomised runs with per-step
   invariants (contents within air-dry and porosity, bottom at or below the base, no unexplained lag, every cap held)
   found nothing else.
+- **After round 10.** Liard with :SoilZone PHYSICAL, one year, O2 builds: v1 106 s / 4 809 outer iterations; v2 defaults
+  69 s / 6 183; columns, rise and three classes 91 s / 6 378; identities below 1e-10. Full suite (33 groups), CONCEPTUAL
+  Liard and existing-model examples (byte for byte but for paths and timings) and the Raven benchmark set (13 models)
+  pass.
