@@ -235,7 +235,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{soil-zone exchange applied to Raven [m3]}, \cmd{soil-zone shortfall [m3]} & rejected recharge plus net exchange applied to the soil; water MODFLOW took that the soil did not hold (0)\\
 \cmd{interface updates}, \cmd{interface converged}, \cmd{interface change [m]} & soil-zone updates in the step, 1 if the interface converged, last change of the soil level\\
 \cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\
-\cmd{discharge to Raven withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\\bottomrule
+\cmd{seepage and soil inflow withheld [m3]}, \cmd{river and store gains withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
 water level, water table, saturated fraction, exchange both ways, rejected recharge and overflow [mm], soil water and

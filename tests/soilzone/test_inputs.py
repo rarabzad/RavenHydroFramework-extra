@@ -11,6 +11,8 @@ I5 a :GWSoilZoneColumns block that does not match the columns (one column missin
    columns from the water table.
 I6 the same block with its rows in another order is used (columns are matched by their cell).
 I7 groundwater lines and blocks in the .rvc of a run without :GroundwaterModel are skipped (each to its own end line)
+I8 a :SurfaceWaterExchange on a soil-zone layer of a soil-zone HRU is refused (that layer exchanges with the aquifer
+   through the soil zone; the second exchange also escaped the soil-zone guard)
    and Raven's initial conditions after them still apply.
 """
 import os, sys, shutil, re
@@ -106,6 +108,13 @@ def main():
         if not good:
             print('  I7: columns %s, first row %s' % (cs, w.iloc[0].to_dict() if len(w) else None))
     res.append(('I7 .rvc groundwater blocks skipped without :GroundwaterModel', good))
+
+    d = case('I8', extra_rvg=':SurfaceWaterExchange SOIL[0] ALLH LEAKANCE 1.0\n')
+    p = os.path.join(d, 'm.rvh'); h = open(p).read()
+    ids = [l.split(',')[0].strip() for l in h.split(':HRUs')[1].split(':EndHRUs')[0].split('\n') if l.strip() and not l.strip().startswith(':')]
+    open(p, 'a').write('\n:HRUGroup ALLH\n  %s\n:EndHRUGroup\n' % ', '.join(ids))
+    ok, txt = sz_check.run(d)
+    res.append(('I8 surface exchange on a soil-zone layer refused', (not ok) and 'exchanges with the aquifer through the soil zone already' in (txt + errors(d))))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

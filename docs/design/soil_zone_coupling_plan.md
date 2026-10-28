@@ -392,9 +392,15 @@ allowed outer iteration (no solve follows), the state MODFLOW last solved with i
 $C_g$, rejection) and the arrays are not rewritten, so MODFLOW's budget and the flows Raven books agree exactly.
 
 A step whose interface did not converge is reported (warning, first 10, with the HRU and cell); Raven still applies
-MODFLOW's booked flows, so mass is conserved. The guard for steps on which MODFLOW did not converge (seepage and river
-gains returned to Raven limited to the step's inflow) does not limit the soil-zone exchange: the soil zone takes any
-flow MODFLOW booked, and what does not fit overflows.
+MODFLOW's booked flows, so mass is conserved. Water MODFLOW's books do not back is withheld from the discharge to
+Raven instead (§11, low outer-iteration limits): on every step the shortfall a trial of the booking would leave and,
+on a step MODFLOW did not converge, its negative residual, in proportion from seepage, the exchange into the soil zone
+and river and surface-store gains (`GWBudget.csv`: *seepage and soil inflow withheld*, *river and store gains
+withheld*; MODFLOW's own columns, *aquifer discharge to rivers* and *to surface stores* and *MF6 balance error*, stay
+unscaled, so the aquifer balance from the CSV is inflow − outflow + storage release − error = (both withheld
+columns)/dt). The older guard that limited seepage and river gains to the step's inflow is not used with
+`:SoilZone PHYSICAL`. A `:SurfaceWaterExchange` on a soil-zone layer of a soil-zone HRU is refused (that layer
+exchanges with the aquifer through the soil zone already).
 
 ### 7.6 Applying the step (`SZApply`)
 
@@ -445,7 +451,7 @@ water and capacity, interface updates and change. `tools/plot_soilzone.py` draws
 | `soilzone_hillslope` | T2/T3 hillslope vs a monolithic MODFLOW reference (soil as top layer, DRN at the land surface): heads, soil water, outflow |
 | `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
 | `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
-| `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model |
+| `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model, surface exchange on a soil-zone layer refused |
 | `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off); R12 explicit discharge zone with cells dry at the head of linearization converges and matches the iterated outflow; R13 neither MODFLOW's residual nor the soil-zone shortfall is handed to Raven (outflow x1.00 of the iterated run; was x17) |
 | `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
 
@@ -488,8 +494,8 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
 
   Neither is handed to Raven as water: on every step the shortfall the booked exchange would leave (a trial of the
   booking) and, on an unconverged step, a negative residual are withheld from all discharge to Raven (seepage, gains of
-  enabled subbasins, surface-store gains, the exchange into the soil zone) in proportion (`discharge to Raven withheld
-  [m3]`). Audit rounds 11–12: an outer-iteration limit of 12 on a stiff hillslope gave 17 times the iterated outflow,
+  enabled subbasins, surface-store gains, the exchange into the soil zone) in proportion (`seepage and soil inflow
+  withheld [m3]`, `river and store gains withheld [m3]`). Audit rounds 11–12: an outer-iteration limit of 12 on a stiff hillslope gave 17 times the iterated outflow,
   then 1.85 times with the residual withheld, and 1.00 times with the shortfall withheld as well (R13). What the step's
   discharge cannot cover stays in the aquifer's storage and can leave in later steps; only negative residuals are
   withheld, so positive and negative residuals of consecutive steps no longer cancel in the cumulative balance. None
