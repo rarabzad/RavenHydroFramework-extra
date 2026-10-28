@@ -1,4 +1,4 @@
-"""Figures of the soil zone's sub-grid treatment (manual Section 'Soil water level' / 'Exchange'):
+"""Figures of the soil zone's sub-grid treatment (manual Section 'Sloping and irregular land'; symbols as in the manual's notation table):
   fig_sz_subgrid.png    one cell with irregular land: DEM points, soil-zone bases, the flat water table and soil water
                         level, the saturated part of every point, the contact weights and the saturated fraction F
                         (computed with the model's own formulas, gwsz SatFraction / contact weight / level)
@@ -54,7 +54,7 @@ for i, (h, Lv, lab) in enumerate(cases):
     ax.axhline(h, color=C[0], lw=1.4); ax.plot([1.5], [h], marker='v', color=C[0], ms=6, clip_on=False)
     if Lv is not None:
         ax.axhline(Lv, color=C[4], lw=1.2, ls=(0, (4, 2)))
-        ax.text(101.5, Lv, '$L_v$', color=C[4], ha='left', va='center', fontsize=8, clip_on=False)
+        ax.text(101.5, Lv, '$h^{\\mathrm{sz}}$', color=C[4], ha='left', va='center', fontsize=8, clip_on=False)
     ax.text(101.5, h, '$h$', color=C[0], ha='left', va='center', fontsize=8, clip_on=False)
     for x, z, ww, q in zip(xs, zb, w, qs):
         ax.plot([x], [z], marker='o', ms=4.5, mec=INK2, mfc=plt.cm.Blues(0.15 + 0.8 * ww), mew=0.6, zorder=5)
@@ -65,7 +65,7 @@ for i, (h, Lv, lab) in enumerate(cases):
     if ov.any(): ax.plot(xs[ov], land[ov], ls='none', marker='^', color=C[1], ms=6, zorder=6)
     ax.set_xlim(0, 100); ax.set_ylim(ylo, land.max() + 0.35)
     qn = qs.mean()
-    ax.set_title('(%s) %s\nF = %.2f,  $\\lambda$ = %.2f m,  q/C = %+.2f m%s' % ('abcd'[i], lab, F, lam, qn, ' (down)' if qn > 0.01 else ' (up)' if qn < -0.01 else ''), fontsize=8, loc='left')
+    ax.set_title('(%s) %s\nF = %.2f,  $b^{\\mathrm{sz}}$ = %.2f m,  q/C = %+.2f m%s' % ('abcd'[i], lab, F, lam, qn, ' (down)' if qn > 0.01 else ' (up)' if qn < -0.01 else ''), fontsize=8, loc='left')
     if i >= 2: ax.set_xlabel('across the cell [m]')
     else: ax.set_xticklabels([])
     if i % 2 == 0: ax.set_ylabel('elevation [m]')
@@ -74,8 +74,8 @@ for i, (h, Lv, lab) in enumerate(cases):
         from matplotlib.lines import Line2D
         from matplotlib.patches import Patch
         hd = [Line2D([], [], color='#5b4a33', lw=1.2, label='land surface'),
-              Line2D([], [], color='#5b4a33', lw=0.8, ls='--', label='soil-zone base $z_{b,s}$'),
-              Line2D([], [], ls='none', marker='o', mec=INK2, mfc=plt.cm.Blues(0.6), label='DEM point (shade: contact $w_s$)'),
+              Line2D([], [], color='#5b4a33', lw=0.8, ls='--', label='soil-zone base $z_{b,g}$'),
+              Line2D([], [], ls='none', marker='o', mec=INK2, mfc=plt.cm.Blues(0.6), label='DEM point (shade: contact $w_g$)'),
               Patch(color=SAT, label='free water in the soil'), Patch(color=AQ, label='aquifer below $h$')]
         ax.legend(handles=hd, fontsize=6.3, loc='lower center', ncol=2, columnspacing=1.0, handlelength=1.6)
     if i == 3:
@@ -89,7 +89,7 @@ hh = np.linspace(zb.min() - 0.6, land.max() + 0.2, 400)
 Fs = [state(h)[0] for h in hh]; Ls = [state(h)[3] / D for h in hh]; Cs = [state(h)[1].mean() for h in hh]
 ax.plot(hh, Fs, color=C[0], lw=2, label='saturated fraction $F$ (recharge rejected; saturated soil evaporates in Raven)')
 ax.plot(hh, Cs, color=C[2], lw=1.6, ls='--', label='mean contact $\\bar w$ (from $d_s$ below each base)')
-ax.plot(hh, Ls, color=C[1], lw=1.6, label='saturated thickness at rest $\\lambda/D$')
+ax.plot(hh, Ls, color=C[1], lw=1.6, label='saturated thickness at rest $b^{\\mathrm{sz}}/d_{\\mathrm{sz}}$')
 for i, (h, Lv, lab) in enumerate(cases):
     if i == 2: continue
     ax.axvline(h, color=INK2, lw=0.8, ls=':')

@@ -58,13 +58,13 @@ releases $4\times10^6\times20\times10^{-5}\times0.1=80$ m$^3$ --- over a thousan
 
 \section{The groundwater flow equation}
 Combining Darcy's law with conservation of water (what flows in, minus what flows out, equals the change in storage)
-gives the equation MODFLOW solves. For one cell $n$ with neighbours $m$:
+gives the equation MODFLOW solves. For one cell $i$ with neighbours $j$:
 \begin{equation}
-\sum_{m}C_{nm}\left(h_m-h_n\right) + \sum_{b}q_{b,n} = S_n\,\frac{h_n^{\,t+\dt}-h_n^{\,t}}{\dt},
+\sum_{j}C_{ij}\left(h_j-h_i\right) + \sum_{\beta}q_{\beta,i} = \mathcal{S}_i\,\frac{h_i^{\,t+\dt}-h_i^{\,t}}{\dt},
 \end{equation}
 where all heads are those at the end of the step, $t+\dt$ (MODFLOW's implicit scheme, which is stable for any step
-length), the first sum is flow from the neighbours, $q_{b,n}$ are the boundary flows of the cell (recharge, rivers,
-drains, wells, \dots; positive into the aquifer), and $S_n$ is the storage capacity of the cell ($S_y$ times area when
+length), the first sum is flow from the neighbours, $q_{\beta,i}$ are the boundary flows of the cell (recharge, rivers,
+drains, wells, \dots; positive into the aquifer), and $\mathcal{S}_i$ [m$^2$] is the storage capacity of the cell ($S_y$ times area when
 unconfined, $S_s$ times volume when confined). Writing this for every cell gives a large set of equations for the
 unknown heads, which MODFLOW solves every time step.
 
@@ -77,13 +77,13 @@ stored. MODFLOW finds the heads that make every cell's account balance at the sa
 Many exchanges depend on the head: a river gives water to the aquifer when the river is higher than the water table,
 and receives water when it is lower. MODFLOW writes such a boundary as
 \begin{equation}
-q_b = C_b\left(h_b-h_n\right),
+q_b = C_b\left(h_b-h_i\right),
 \end{equation}
-where $h_b$ is the boundary's water level. Because $q_b$ depends on the unknown head $h_n$, MODFLOW solves for the
+where $h_b$ is the boundary's water level. Because $q_b$ depends on the unknown head $h_i$, MODFLOW solves for the
 boundary flow together with the heads; this keeps the solution stable even with large conductances. In MODFLOW's
 internal notation each boundary contributes two numbers per cell, HCOF and RHS, and its flow is
 \begin{equation}
-q_b = \mathrm{HCOF}\cdot h_n-\mathrm{RHS}.
+q_b = \mathrm{HCOF}\cdot h_i-\mathrm{RHS}.
 \end{equation}
 The coupling uses exactly this formula, with MODFLOW's own HCOF and RHS, to compute every exchanged flow. It is the same
 formula MODFLOW uses for its own budget, so the numbers exchanged with Raven are exactly the numbers MODFLOW accounts for.
@@ -157,6 +157,6 @@ depth of water in an HRU to volume & $V\,[\mathrm{m}^3]=x\,[\mathrm{mm}]\times A
 flow & 1 m$^3$/s $=86\,400$ m$^3$/d\\
 recharge rate & 1 mm/d over 1 km$^2$ $=1\,000$ m$^3$/d\\
 hydraulic conductivity & 1 m/d $\approx1.16\times10^{-5}$ m/s\\
-leakance & conductance per area, d$^{-1}$; $C=L\times$area\\\bottomrule
+leakance & conductance per area, d$^{-1}$; $C=\Lambda\times$area\\\bottomrule
 \end{tabular}
 \end{table}

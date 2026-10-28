@@ -23,6 +23,10 @@ The commands below are for **Windows (Command Prompt)**. Linux and macOS command
 
       python -m pip install pandas
 
+- *Optional*, to build the MODFLOW 6 library from source with Raven (otherwise CMake downloads the official one): a
+  Fortran compiler (gfortran from MSYS2 or https://github.com/fortran-lang/setup-fortran on Windows; `gfortran` on Linux;
+  `brew install gcc` on macOS), and `python -m pip install meson ninja`. Git (above) is also needed for it.
+
 ### Step 2. Get the two repositories, side by side
 
 Raven itself (with the MODFLOW 6 coupling) and this repository (RavenHydroFramework-extra: examples, manual, tests, download script)
@@ -47,10 +51,20 @@ cmake --build build --config Release
 This builds `build\Release\Raven.exe`. Linux and macOS: the same commands; the program is `build/Raven`.
 A warning that NetCDF was not found is normal; the examples do not need it.
 
+The same commands also put the MODFLOW 6 library next to Raven (`build\Release\libmf6.dll`; `build/libmf6.so` or
+`build/libmf6.dylib`): CMake builds it from the MODFLOW 6.8.1 source when it finds a Fortran compiler, meson >= 1.7,
+ninja and git, and otherwise downloads the official release library (Windows x64, Linux x86_64, Apple Silicon Macs).
+Then skip Step 4. On Linux other than x86_64 (e.g. aarch64), Windows on ARM64 and Intel Macs MODFLOW releases no library:
+install the tools of Step 1 and add `-DRAVEN_MF6=SOURCE` to the first command (or give a library you have with
+`-DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=...`); otherwise CMake warns and builds Raven alone.
+
 *Other ways to build:* open `src\Raven.sln` in Visual Studio, pick **Release** and **x64**, and build
 (`src\x64\Release\Raven.exe`); or run `make` in `src/` on Linux and macOS (`src/Raven.exe`).
 
-### Step 4. Get the MODFLOW 6 library
+### Step 4. Get the MODFLOW 6 library (only if Step 3 did not)
+
+If `libmf6` is not next to `Raven.exe` (you built with Visual Studio's `src\Raven.sln`, with `make`, or with
+`-DRAVEN_MF6=OFF`):
 
 ```
 cd %USERPROFILE%\RavenHydroFramework-extra
@@ -59,7 +73,8 @@ python tools\get_mf6.py
 
 It downloads MODFLOW 6.8.1 for your computer (about 130 MB, once) and ends with
 `MODFLOW 6.8.1 library: ...\RavenHydroFramework\lib\mf6\libmf6.dll (48.1 MB)`. Running it again does nothing if the
-library is already there. Linux and macOS: `python3 tools/get_mf6.py`.
+library is already there. Linux and macOS: `python3 tools/get_mf6.py`. It has no library for Linux other than x86_64,
+Windows on ARM64, or Intel Macs (there only `--version 6.6.3`): build Raven with `-DRAVEN_MF6=SOURCE` instead (Step 3).
 
 Raven finds the library there by itself; nothing needs to be set. (If your Raven checkout is not beside RavenHydroFramework-extra, add
 `--raven C:\path\to\RavenHydroFramework`.)
@@ -202,8 +217,10 @@ Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gros
 | Message or problem | What to do |
 |---|---|
 | `'...Raven.exe' is not recognized` | The path in `%RAVEN%` is wrong; check with `dir %RAVEN%` and repeat Step 5 in the same window |
-| `cannot load MODFLOW 6 library ...` | Run `python tools\get_mf6.py` in RavenHydroFramework-extra (Step 4). The message lists every place Raven looked |
-| `MODFLOW 6.8.1 has no release zip for this system` | On an Intel Mac, use `python3 tools/get_mf6.py --version 6.6.3` |
+| `cannot load MODFLOW 6 library ...` | Run `python tools\get_mf6.py` in RavenHydroFramework-extra (Step 4), or rebuild Raven with CMake (Step 3). The message lists every place Raven looked |
+| `MODFLOW 6.8.1 releases no library for Intel Macs` (get_mf6.py) | Use `python3 tools/get_mf6.py --version 6.6.3`, or build Raven with `-DRAVEN_MF6=SOURCE` (Step 3) |
+| CMake warning `RAVEN_MF6: no way to get the MODFLOW 6 library ...` | No release library for this computer and no Fortran compiler, meson, ninja or git: install them (Step 1) and configure again with `-DRAVEN_MF6=SOURCE`, or give a library with `-DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=...` |
+| `the MODFLOW 6 library ... is version ...; the coupling needs MODFLOW 6 6.5.0 or newer` | An old library was found first: remove `:MF6Library`/`RAVEN_MF6_LIB` naming it, and get 6.8.1 (Step 3 or 4) |
 | `ExitGracefully: ... Cannot find file` | Run from inside the example folder (Steps A1 / B1); Example B also needs `..\Liard_groundwater` |
 | Some days say `MODFLOW 6 did not converge` | They are flagged in `GWBudget.csv`; see the manual, section "How MODFLOW solves each time step" |
 | Anything else | `output\Raven_errors.txt` has the details |

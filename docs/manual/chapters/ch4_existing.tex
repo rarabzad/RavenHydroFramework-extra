@@ -119,7 +119,7 @@ No HRU polygons are needed. Monitoring wells cannot be located with this option.
 the HRU lies in each cell (Figure~\ref{fig:linking}a). The shares always add up to 100\%, so all the water Raven sends
 arrives in MODFLOW --- even when the HRU polygons or the weights do not quite match the HRU areas in the \cmd{.rvh} file. A
 mismatch changes only \emph{where} inside the HRU the water lands, not \emph{how much} (Figure~\ref{fig:linking}b). In
-formula form, cell $i$ receives $V_{k\to i}=R_k\,A_k\,A_{ki}/\sum_j A_{kj}$ from HRU $k$ (Section~\ref{sec:linkage}).
+formula form, cell $i$ receives $V_{k\to i}=\frac{r_k}{1000}\,10^{6}A_k\,A_{k,i}/\sum_j A_{k,j}$ from HRU $k$ (Section~\ref{sec:linkage}).
 
 \begin{figure}[!htbp]\centering\input{figures/tikz_linking}
 \caption{Sharing an HRU's water among cells. (a) The HRU's share in each cell, computed from the shapes; the shares add up to 100\%. (b) Weights that add up to only 92\% would lose 8\% of the water; Raven's shares always add up to 100\%, so every cubic metre arrives.}\label{fig:linking}

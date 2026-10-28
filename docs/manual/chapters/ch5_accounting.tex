@@ -42,7 +42,7 @@ example, the same as uncoupled).
 The water that leaves Raven as recharge enters MODFLOW (directly or via the delay store); the water MODFLOW sends back
 enters Raven. Reservoir seepage enters MODFLOW one day after leaving Raven. Therefore
 \begin{equation}
-\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta S^{\mathrm{delay}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}},
+\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}},
 \end{equation}
 where $V^{\mathrm{rej}}$ is the recharge rejected on saturated ground (zero unless \cmd{:SoilZone PHYSICAL}). With the soil
 zone coupled, the volume applied to the soil layers in each step also satisfies
@@ -58,7 +58,7 @@ becomes
 +\sum\big(V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}\big),
 \end{equation}
 and the columns themselves close as
-$\Delta S^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}-V^{\mathrm{uz}}_{\mathrm{cap}}$ (storage relative to the
+$\Delta V^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}-V^{\mathrm{uz}}_{\mathrm{cap}}$ (storage relative to the
 hydrostatic profile, Section~\ref{sec:szvadose}). The water applied to the soil zone gains the capillary rise (from the columns
 and from the water table), the exchange with specified heads and the lagged-exchange debt:
 \begin{equation}
@@ -149,7 +149,7 @@ Initial heads are chosen in this order: (1) a hotstart block \cmd{:GWHeads} in t
 \cmd{:InitialGWHeads} in the \cmd{.rvc} file (\cmd{DEPTH\_BELOW\_SURFACE d} or \cmd{ELEVATION z}); (3) each profile's
 \cmd{INITIAL\_HEAD\_DEPTH}. Guessed initial heads can be far from reality; \cmd{:GWInitialization STEADY\_STATE r}
 first solves a steady state before Raven's first day, with recharge $r$ [mm/d] over the area covered by coupled HRUs
-(cell $i$ receives $r\,a_i/1000$ m$^3$/d) and the initial river stages, well rates and boundary heads. This is skipped on a hotstart. A steady state may not
+(cell $i$ receives $r\,A^{\mathrm{cov}}_i/1000$ m$^3$/d, Section~\ref{sec:linkage}) and the initial river stages, well rates and boundary heads. This is skipped on a hotstart. A steady state may not
 exist --- for example when wells pump more than the aquifer can supply --- and then the solve does not converge; Raven
 warns and starts from the initial heads instead, as if \cmd{:GWInitialization} had not been given. The groundwater model is built after \emph{all} input files,
 including the \cmd{.rvc}, have been read.

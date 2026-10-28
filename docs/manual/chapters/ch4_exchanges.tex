@@ -63,15 +63,15 @@ next day.
 
 \subsection{Volume of recharge}
 \begin{equation}
-V_k=\frac{r_k}{1000}\,A_k \quad[\mathrm{m}^3],
+V_k=\frac{r_k}{1000}\,10^{6}A_k \quad[\mathrm{m}^3],
 \end{equation}
-with $A_k$ the HRU area from the \cmd{.rvh} file in m$^2$.
+with $A_k$ the HRU area from the \cmd{.rvh} file in km$^2$ ($10^6A_k$ in m$^2$).
 
 \subsection{Optional recharge delay}
 Where the water table is deep, water takes time to cross the unsaturated zone. With the aquifer profile parameter \cmd{RECHARGE\_DELAY}~$\tau>0$ (Section~\ref{app:profile})
-(days) the recharge passes through a linear reservoir $S_k$ before reaching the water table:
+(days) the recharge passes through a linear reservoir $V^{\mathrm{dl}}_k$ [m$^3$] before reaching the water table:
 \begin{equation}
-S_k^{*}=S_k^{n}+V_k,\qquad V_k^{\mathrm{out}}=S_k^{*}\left(1-e^{-\dt/\tau}\right),\qquad S_k^{n+1}=S_k^{*}-V_k^{\mathrm{out}} .
+V^{\mathrm{dl},*}_k=V^{\mathrm{dl},n}_k+V_k,\qquad V_k^{\mathrm{out}}=V^{\mathrm{dl},*}_k\left(1-e^{-\dt/\tau}\right),\qquad V^{\mathrm{dl},n+1}_k=V^{\mathrm{dl},*}_k-V_k^{\mathrm{out}} .
 \end{equation}
 With $\tau=0$ the delay is off and $V_k^{\mathrm{out}}=V_k$. The delay store is reported in \cmd{GWBudget.csv}, saved in
 \cmd{solution.rvc} (\cmd{:GWRechargeStore}) and read back on hotstart.
@@ -86,9 +86,9 @@ The released volume is shared among the HRU's cells in proportion to overlap. Ce
 (Section~\ref{ch:wells}) are skipped, because MODFLOW ignores recharge there:
 \begin{equation}
 Q^{\mathrm{rch}}_i=\sum_{k\in\mathcal{K}}\frac{V_k^{\mathrm{out}}}{\dt}\,\frac{A_{k,i}}{\sum_{j\notin\mathcal{C}}A_{k,j}}
-\quad[\mathrm{m}^3/\mathrm{d}],\qquad R_i=\frac{Q^{\mathrm{rch}}_i}{\Delta^2}\quad[\mathrm{m/d}],
+\quad[\mathrm{m}^3/\mathrm{d}],\qquad r_i=\frac{Q^{\mathrm{rch}}_i}{|\Omega_i|}\quad[\mathrm{m/d}],
 \end{equation}
-where $\mathcal{C}$ are the fixed-head columns. $R_i$ is the recharge rate given to MODFLOW's RCH package, applied to the top cell of the column
+where $\mathcal{C}$ are the fixed-head columns. $|\Omega_i|$ is the area of cell $i$ [m$^2$] and $r_i$ the recharge rate given to MODFLOW's RCH package, applied to the top cell of the column
 (the top layer of an active column is always active). The fractions for one HRU always add up to one, so exactly $V_k^{\mathrm{out}}$
 enters MODFLOW. If an HRU lies entirely on fixed-head cells, its recharge passes to that boundary and is reported in the
 column \emph{recharge onto CHD cells}.
@@ -128,7 +128,7 @@ $r_k$ & \cmd{GROUNDWATER} & Raven state variable of HRU $k$ (filled by the chose
 $A_k$ & \cmd{AREA} & HRU (\cmd{:HRUs}, \cmd{.rvh}) & km$^2$ & Raven manual\\
 $\tau$ & \cmd{RECHARGE\_DELAY} & aquifer profile (\cmd{:AquiferProfile\allowbreak Parameters}) & d & Sec.~\ref{app:profile}\\
 $A_{k,i}$ & overlap area & computed from \cmd{:HRUGeometry} (\cmd{.rvg}) & m$^2$ & Sec.~\ref{ch:grid}\\
-$\Delta$ & \cmd{:GridCellSize} & \cmd{.rvg} option & m & Sec.~\ref{app:commands}\\
+$|\Omega_i|$ & cell area & computed from the grid ($\Delta^2$ on a regular grid, \cmd{:GridCellSize}) & m$^2$ & Sec.~\ref{ch:grid}\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
 \textbf{Outputs.} \cmd{GWBudget.csv}: \emph{Raven recharge}, \emph{MF6 recharge}, \emph{recharge delay storage}, \emph{recharge onto CHD cells};
 Raven's \cmd{GROUNDWATER} storage shows each day's recharge (mm) of every HRU.
@@ -149,25 +149,27 @@ the top, and hands it back to Raven.
 \subsection{Equation}
 \begin{equation}
 Q^{\mathrm{seep}}_i=C^{\mathrm{drn}}_i\;f\!\left(h_i\right)\left(h_i-z_{\mathrm{top},i}+d_s\right)\ \text{ for } h_i>z_{\mathrm{top},i}-d_s,
-\qquad C^{\mathrm{drn}}_i=L_s\,\Delta^2 ,
+\qquad C^{\mathrm{drn}}_i=\Lambda_s\,|\Omega_i| ,
 \end{equation}
-where $L_s$ [1/d] is the aquifer profile parameter \cmd{SEEPAGE\_LEAKANCE} and $d_s$ [m] the aquifer profile parameter \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (Section~\ref{app:profile}).
+where $\Lambda_s$ [1/d] is the aquifer profile parameter \cmd{SEEPAGE\_LEAKANCE}, $|\Omega_i|$ [m$^2$] the cell area and $d_s$ [m] the aquifer profile parameter \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (Section~\ref{app:profile}).
 The factor $f$ rises smoothly from 0 at $d_s$ below the top to 1 at the top (Figure~\ref{fig:curves}b). Where the top cell is
 thinner than $d_s$, $d_s$ is limited to its thickness (MODFLOW does not accept a smoothing interval below the cell). Without this
 smoothing the drain would switch on abruptly, which makes the Newton iterations harder; with it, seepage starts gently
-as the water table approaches the surface. Under \cmd{:SoilZone PHYSICAL} (Section~\ref{ch:soilzone}) the drain serves only the HRUs without a soil zone (its conductance is scaled by their share of the cell); HRUs with a soil zone exchange through the soil-zone conductance.
+as the water table approaches the surface. With the soil-zone coupling (\cmd{:SoilZone PHYSICAL}, Section~\ref{ch:soilzone})
+\cmd{SEEPAGE\_LEAKANCE} is not used for HRUs with a soil zone: their water exchanges with the aquifer through the soil-zone
+conductance instead, and the drain serves only the HRUs without a soil zone (its conductance is scaled by their share of the cell).
 
 \subsection{Back to Raven}
 Each column's seepage is shared among the HRUs above it by overlap:
 \begin{equation}
-V^{\mathrm{ret}}_k=\sum_i Q^{\mathrm{seep}}_i\,\dt\,\frac{A_{k,i}}{\sum_{m}A_{m,i}},
+V^{\mathrm{ret}}_k=\sum_i Q^{\mathrm{seep}}_i\,\dt\,\frac{A_{k,i}}{\sum_{k'}A_{k',i}},
 \end{equation}
 and added to the Raven store \cmd{:SeepageReturnTo} of HRU $k$ (default: the lowest soil layer) as
-$1000\,V^{\mathrm{ret}}_k/A_k$ mm. HRUs without soil layers (lake, glacier or rock profiles) receive it in
+$1000\,V^{\mathrm{ret}}_k/(10^{6}A_k)$ mm. HRUs without soil layers (lake, glacier or rock profiles) receive it in
 \cmd{SURFACE\_WATER} instead. From there Raven's own processes take it on --- for example, the baseflow process of the
 lowest soil layer carries it to the river.
 \begin{example}[: seepage]
-A 4 km$^2$ cell with $L_s=1$ d$^{-1}$ has $C=4\times10^6$ m$^2$/d. With the water table 0.1 m above the top and the
+A 4 km$^2$ cell with $\Lambda_s=1$ d$^{-1}$ has $C=4\times10^6$ m$^2$/d. With the water table 0.1 m above the top and the
 factor $f=1$, seepage is $4\times10^6\times(0.1+0.5)\approx2.4\times10^6$ m$^3$/d --- a large number, which is why in
 practice the water table settles very close to the surface wherever the aquifer is full: the drain is a strong outlet.
 \end{example}
@@ -192,7 +194,7 @@ does not converge, seepage (with river gains and store discharge) is limited to 
 \end{minipage}\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr \hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
-$L_s$ & \cmd{SEEPAGE\_LEAKANCE} & aquifer profile & 1/d & Sec.~\ref{app:profile}\\
+$\Lambda_s$ & \cmd{SEEPAGE\_LEAKANCE} & aquifer profile & 1/d & Sec.~\ref{app:profile}\\
 $d_s$ & \cmd{SEEPAGE\_SMOOTHING\_DEPTH} & aquifer profile & m & Sec.~\ref{app:profile}\\
 $z_{\mathrm{top}}$ & land surface $-$ \cmd{SOIL\_ZONE\_DEPTH} & \cmd{:LandSurface} (\cmd{.rvg}); aquifer profile & m & Sec.~\ref{app:profile}\\
 -- & \cmd{:SeepageReturnTo} & \cmd{.rvg} option (a Raven storage state variable) & -- & Sec.~\ref{app:commands}\\
@@ -222,12 +224,12 @@ happens first at the bottom of the hill, because Raven checks the ground height 
 
 \subsection{Who owns which depth}
 Raven owns the soil zone \cmd{SOIL[0]}\,\dots\,\cmd{SOIL[$M-1$]} of every coupled HRU with soil; MODFLOW owns everything
-below. The soil-zone thickness is $D_k=\sum_jH_j$ (the thicknesses of those layers in the HRU's soil profile) and the
+below. The soil-zone thickness is $d_{\mathrm{sz},k}=\sum_mH_m$ (the thicknesses $H_m$ of those layers in the HRU's soil profile) and the
 model top of column $i$ is
 \begin{equation}
-z_{\mathrm{top},i}=z_{\mathrm{land},i}-\frac{\sum_kA_{k,i}D_k}{\sum_kA_{k,i}},
+z_{\mathrm{top},i}=z_{\mathrm{land},i}-\frac{\sum_kA_{k,i}\,d_{\mathrm{sz},k}}{\sum_kA_{k,i}},
 \end{equation}
-so the soil pore space is not counted twice. HRUs without soil (lake, water, glacier and rock types) have $D_k=0$ and
+so the soil pore space is not counted twice. HRUs without soil (lake, water, glacier and rock types) have $d_{\mathrm{sz},k}=0$ and
 keep the seepage drain (Section~\ref{ch:seepage}); \cmd{SOIL\_ZONE\_DEPTH} and, for soil-zone HRUs,
 \cmd{SEEPAGE\_LEAKANCE} are not used. Recharge must leave the soil zone from its bottom layer \cmd{SOIL[$M-1$]}
 (start-up check), as in GSFLOW, where gravity drainage leaves the bottom of the soil zone.
@@ -235,7 +237,7 @@ keep the seepage drain (Section~\ref{ch:seepage}); \cmd{SOIL\_ZONE\_DEPTH} and, 
 \subsection{Columns: one soil zone per HRU and cell}
 An HRU usually spans several cells, and the water table differs between them. The soil zone of HRU $k$ is therefore kept
 as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), including cells with a specified
-head (Section~\ref{sec:szchd}), plus one column for the rest of the HRU (outside the grid). Each column has its own soil water $\phi_{c,j}$ [mm] in every layer;
+head (Section~\ref{sec:szchd}), plus one column for the rest of the HRU (outside the grid). The column of HRU $k$ in cell $i$ has its own soil water $\phi_{k,i,m}$ [mm] in every layer $m$;
 Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before (or, with
 \cmd{:SoilZoneClasses}, each class of its columns separately; Section~\ref{sec:szclasses}). Between
 exchanges Raven changes the HRU totals, and the changes are shared among the columns as the processes would have made
@@ -247,32 +249,34 @@ every column, and rain falls alike on every column, what a full column cannot ta
 table of its cell.
 
 \subsection{Soil water level}
-Each layer $j$ (counted from the bottom of the soil zone) holds $\phi_j$ between field capacity
-$\phi_{\mathrm{fc},j}=\phi_{\max,j}S_{\mathrm{fc},j}$ and capacity $\phi_{\max,j}=1000H_jn_j(1-SF_j)$ [mm]. Its saturated share is
-$s_j=\min(\max((\phi_j-\phi_{\mathrm{fc},j})/(\phi_{\max,j}-\phi_{\mathrm{fc},j}),0),1)$ and the saturated thickness of the
+For one column (indices $k,i$ dropped), layer $m$ (\cmd{SOIL[$m$]}, $m=M-1$ at the bottom of the soil zone) holds $\phi_m$
+between field capacity $\phi_{\mathrm{fc},m}=\phi_{\max,m}S_{\mathrm{fc},m}$ and capacity
+$\phi_{\max,m}=1000H_m\eta_m(1-\mathit{SF}_m)$ [mm], with porosity $\eta_m$ and stone fraction $\mathit{SF}_m$
+(\cmd{POROSITY}, \cmd{STONE\_FRAC}). Its saturated share is
+$\chi_m=\min(\max((\phi_m-\phi_{\mathrm{fc},m})/(\phi_{\max,m}-\phi_{\mathrm{fc},m}),0),1)$ and the saturated thickness of the
 column is
 \begin{equation}
-\lambda=\sum_jH_j\,s_j\prod_{i<j}s_i\quad[\mathrm m]:
+b^{\mathrm{sz}}=\sum_{m=0}^{M-1}H_m\,\chi_m\prod_{m'>m}\chi_{m'}\quad[\mathrm m]:
 \end{equation}
 water up to field capacity fills the deficit without raising the level, free water raises it with the drainable porosity
-$S_d=n(1-SF)(1-S_{\mathrm{fc}})$, and the level rises through a layer once the layers below are full. The cell's land
-surface is sampled at $N$ points (\cmd{:SoilZoneSubgrid}; 25 by default) with soil-zone bases
-$z_{b,s}=z_{\mathrm{land},s}-D_k$. The column's free water stands at one flat level $L_v$ over these points (as MODFLOW's
-head is flat over the cell), defined by $\frac1N\sum_s\min(\max(L_v-z_{b,s},0),D_k)=\lambda$. Section~\ref{sec:szslope} shows how this handles sloping and irregular land.
+$S_d=\eta(1-\mathit{SF})(1-S_{\mathrm{fc}})$, and the level rises through a layer once the layers below are full. The cell's land
+surface is sampled at $N_g$ points $g$ (\cmd{:SoilZoneSubgrid}; 25 by default) with soil-zone bases
+$z_{b,g}=z_{\mathrm{land},g}-d_{\mathrm{sz},k}$. The column's free water stands at one flat level $h^{\mathrm{sz}}$ over these points (as MODFLOW's
+head is flat over the cell), defined by $\frac1{N_g}\sum_g\min(\max(h^{\mathrm{sz}}-z_{b,g},0),d_{\mathrm{sz},k})=b^{\mathrm{sz}}$. Section~\ref{sec:szslope} shows how this handles sloping and irregular land.
 
 \subsection{Exchange}
 A point comes into hydraulic contact with the aquifer as the water table rises through the depth $d_s$
 (\cmd{SEEPAGE\_SMOOTHING\_DEPTH}) below its base, the capillary fringe, and is fully in contact at its base:
-$w_s=\sigma((h_i-z_{b,s})/d_s+1)$ with $\sigma(x)=3x^2-2x^3$ on $(0,1)$, 0 below and 1 above. (Full contact at the base,
+$w_g=\sigma((h_i-z_{b,g})/d_s+1)$ with $\sigma(x)=3x^2-2x^3$ on $(0,1)$, 0 below and 1 above. (Full contact at the base,
 because MODFLOW's top cell ends there: above it the soil's storage must take over at once.) The exchange into the
 aquifer is
 \begin{gather}
-q=\frac{C}{N}\sum_sw_s\Big(\min(\max(L_v,z_{b,s}),z_{b,s}+D_k)-\max(h_i,z_{b,s})\Big),\\
-C=\frac{A_{k,i}}{\dfrac{H_1}{2\,k_{\mathrm{sat},1}/1000}+\dfrac{b_i}{2\,K_{v,i}}}\quad[\mathrm{m^2/d}],
+q^{\mathrm{sz}}_{k,i}=\frac{C^{\mathrm{sz}}_{k,i}}{N_g}\sum_gw_g\Big(\min(\max(h^{\mathrm{sz}},z_{b,g}),z_{b,g}+d_{\mathrm{sz},k})-\max(h_i,z_{b,g})\Big),\\
+C^{\mathrm{sz}}_{k,i}=\frac{A_{k,i}}{\dfrac{H_{M-1}}{2\,K_{\mathrm{sat},M-1}/1000}+\dfrac{b_i}{2\,K_{v,i}}}\quad[\mathrm{m^2/d}],
 \end{gather}
-positive into the aquifer: the soil--aquifer conductance $C$ is the series resistance of half the bottom soil-zone layer
-($k_{\mathrm{sat}}$ = \cmd{HYDRAUL\_COND} [mm/d]) and half the top aquifer cell (thickness $b_i$, vertical conductivity
-$K_v$). With a single point and the water table above the base this is simply $q=C(z_b+\lambda-h_i)$: water flows up
+positive into the aquifer: the soil--aquifer conductance $C^{\mathrm{sz}}_{k,i}$ is the series resistance of half the bottom soil-zone layer
+($K_{\mathrm{sat},M-1}$ = \cmd{HYDRAUL\_COND} [mm/d]) and half the top active aquifer cell (thickness $b_i$, vertical conductivity
+$K_{v,i}$). With a single point and the water table above the base this is simply $q^{\mathrm{sz}}=C^{\mathrm{sz}}(z_b+b^{\mathrm{sz}}-h_i)$: water flows up
 when the water table is above the soil water level and down when it is below; a point in contact while the water table
 is still below its base only drains the water standing in its soil. The exchange goes to MODFLOW through a GHB package \cmd{SZX\_RAVEN} (one entry per
 HRU--cell column, plus a WEL package \cmd{SZQ\_RAVEN} for the part of the boundary that would lie below the cell bottom).
@@ -281,7 +285,7 @@ GHB rather than RIV or DRN because the exchange runs both ways and must stop whe
 
 \subsection{Rejected recharge, overflow and evaporation}
 The HRU's recharge goes to the cells of the columns that gave it up, not by area, so drainage from saturated columns at
-the foot of a slope is not sent up the slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
+the foot of a slope is not sent up the slope. Of each column's share, the saturated fraction $F=\frac1{N_g}\sum_g\sigma((h_i-z_{b,g})/d_s)$ --- the points where the
 water table has risen into the soil --- is \emph{rejected}: it stays in the column instead of reaching MODFLOW, which
 receives $(1-F)$ (Section~\ref{ch:recharge}). \emph{Raven recharge} in \cmd{GWBudget.csv} therefore includes water that is
 rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does not fit into a full
@@ -294,31 +298,31 @@ Partial saturation is handled at two scales. \emph{Between cells}, MODFLOW gives
 top and bottom (the layers need not be horizontal: the generated model's top follows the land, one soil-zone thickness below it, and an existing model
 keeps its own geometry), and every HRU--cell link has its own column; so along a slope each column sees its own water
 table, and an HRU can be saturated at its foot and dry at its top. \emph{Within a cell}, MODFLOW's head is one flat
-level, but the land is not. The $N$ DEM points of the cell carry the land's relief into the soil zone: each point has its
-own soil-zone base $z_{b,s}$, so a water table rising into a sloping or bumpy cell saturates the soil first at the low
+level, but the land is not. The $N_g$ DEM points of the cell carry the land's relief into the soil zone: each point has its
+own soil-zone base $z_{b,g}$, so a water table rising into a sloping or bumpy cell saturates the soil first at the low
 points and only later at the high ones. Figure~\ref{fig:szsubgrid} shows one cell with the formulas of this chapter:
 \begin{itemize}
-\item (a) The water table is below every base: no point is in contact ($w_s=0$), $F=0$, and the recharge reaches the
+\item (a) The water table is below every base: no point is in contact ($w_g=0$), $F=0$, and the recharge reaches the
 aquifer in full (through the unsaturated column, Section~\ref{sec:szvadose}, when \cmd{:SoilZoneVadose RICHARDS} is on).
 \item (b) The water table has risen into the soil at the low end of the cell only. There the soil is saturated
 ($F=0.40$: 40\,\% of the recharge is rejected and stays in the soil), while the high end still drains freely. At rest the
 soil water level equals the water table and nothing is exchanged.
-\item (c) After rain the soil water stands above the water table ($L_v>h_i$): the points in contact drain into the aquifer
+\item (c) After rain the soil water stands above the water table ($h^{\mathrm{sz}}>h_i$): the points in contact drain into the aquifer
 (arrows, $q>0$). The point at 45~m holds water above its base but is not yet in contact (the water table is more than
 $d_s$ below it); that water is perched and leaves by percolation, as recharge.
-\item (d) A high water table below a drier soil ($h_i>L_v$) pushes water up into the soil ($q<0$); at the lowest points
-the water table is above the land. All four states use the same $F$, $w_s$ and $q$; nothing is switched.
+\item (d) A high water table below a drier soil ($h_i>h^{\mathrm{sz}}$) pushes water up into the soil ($q<0$); at the lowest points
+the water table is above the land. All four states use the same $F$, $w_g$ and $q$; nothing is switched.
 \end{itemize}
 The bottom panel shows how $F$, the mean contact $\bar w$ and the saturated thickness at rest grow with the water table:
 each point adds a smooth step (width $d_s$), so the curves are continuous and monotone for any relief, which keeps
 MODFLOW's Newton iterations smooth. With \cmd{:SoilZoneSubgrid 1} each cell has a single point and $F$ is one step.
 
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_subgrid.png}
-\caption{One 100~m cell with irregular land ($D=1$~m, $d_s=0.3$~m), seen along a transect of its DEM points (circles at the
-soil-zone base, shaded by their contact weight $w_s$). (a)--(d): four states of the water table $h$ and soil water level
-$L_v$, with the saturated fraction $F$, the saturated thickness $\lambda$ and the exchange $q/C$ (positive into the aquifer);
-arrows show each point's share of the exchange. Bottom: $F$, the mean contact $\bar w$ and $\lambda/D$ at rest
-($L_v=h$) against the water table. Computed with the model's formulas
+\caption{One 100~m cell with irregular land ($d_{\mathrm{sz}}=1$~m, $d_s=0.3$~m), seen along a transect of its DEM points (circles at the
+soil-zone base, shaded by their contact weight $w_g$). (a)--(d): four states of the water table $h$ and soil water level
+$h^{\mathrm{sz}}$, with the saturated fraction $F$, the saturated thickness $b^{\mathrm{sz}}$ and the exchange $q/C$ (positive into the aquifer);
+arrows show each point's share of the exchange. Bottom: $F$, the mean contact $\bar w$ and $b^{\mathrm{sz}}/d_{\mathrm{sz}}$ at rest
+($h^{\mathrm{sz}}=h$) against the water table. Computed with the model's formulas
 (script \texttt{make\_sz\_subgrid\_figures.py} in the manual's figures folder).}\label{fig:szsubgrid}\end{figure}
 
 Figure~\ref{fig:szhillslope} shows a coupled run: the hillslope of test T2/T3 (ten 100~m HRUs on a 0.5\,\% slope) with a hump
@@ -335,18 +339,18 @@ the water table of each cell on four days; shaded, the saturated soil on day 150
 HRU over time (1 = top of the slope), with the days on which the HRU overflows to surface water.}\label{fig:szhillslope}\end{figure}
 
 What the sub-grid closure does not resolve: a column keeps one flat soil water level, so within a cell the soil water is
-spread over the points at once, and the column overflows only when it is full, that is when $L_v$ reaches the highest
+spread over the points at once, and the column overflows only when it is full, that is when $h^{\mathrm{sz}}$ reaches the highest
 land point. A water table above the land at the low points of a partly filled cell (panel (d)) therefore pushes water into the higher parts of the column instead of running off there;
 seepage faces smaller than a cell need smaller cells. Between cells, soil water moves only through the aquifer.
 
 \subsection{Solving soil and aquifer together}
 Within a day the soil column and the aquifer must agree. For given heads each column is solved implicitly
-(backward Euler) for its change $\Delta V$ [mm]:
+(backward Euler) for its change $\Delta\phi$ [mm]:
 \begin{equation}
-\Delta V+\frac{1000\,\dt}{a_c}\,q\big(\lambda(\phi^*+\Delta V),h_i\big)=0,
+\Delta\phi+\frac{1000\,\dt}{A_{k,i}}\,q^{\mathrm{sz}}_{k,i}\big(b^{\mathrm{sz}}(\phi^*+\Delta\phi),h_i\big)=0,
 \end{equation}
-where $a_c$ is the column area and $\phi^*$ its water after Raven's processes plus the rejected recharge. The left side
-increases strictly with $\Delta V$, so there is exactly one solution (found by Brent's method); if it lies beyond full, the
+where $A_{k,i}$ [m$^2$] is the column area and $\phi^*$ its water after Raven's processes plus the rejected recharge. The left side
+increases strictly with $\Delta\phi$, so there is exactly one solution (found by Brent's method); if it lies beyond full, the
 column fills and the rest overflows. MODFLOW receives each column as a linear boundary that reproduces this exchange at
 the current head and its slope, including the column's own response (a Robin interface condition). After MODFLOW's
 outer iterations the columns are solved again with the new heads --- after every one of the first five, and afterwards
@@ -363,19 +367,19 @@ While the water table is below the soil base the exchange does not depend on the
 base), and MODFLOW would have no way to return water to the soil if the head rose past the base during its solve: the
 excess would go into the elastic storage above the cell top, heads metres above ground in one iteration (352~m). Such links therefore also get a drain in \cmd{SZD\_RAVEN} at the lowest base point of the cell, smoothed
 over $d_s$, with the link's conductance $C$ and at least the conductance that carries the link's inflow (its rate and
-its share of the cell's recharge) out over one soil-zone thickness, $\max\big(C,\,Q_{\mathrm{in}}/D_k\big)$. Below the
+its share of the cell's recharge) out over one soil-zone thickness, $\max\big(C,\,Q_{\mathrm{in}}/d_{\mathrm{sz},k}\big)$. Below the
 base it carries nothing, so a converged step that stays below the base is unchanged; above it the water goes back to
 the soil as exchange (aquifer to soil zone), as the next interface update would send it.
 
 \begin{example}[: water table rising into the soil]
-Two soil-zone layers of 0.5 m with $n=0.4$, $S_{\mathrm{fc}}=0.5$: $\phi_{\max}=200$ mm, $\phi_{\mathrm{fc}}=100$ mm and
+Two soil-zone layers of 0.5 m with $\eta=0.4$, $\mathit{SF}=0$, $S_{\mathrm{fc}}=0.5$: $\phi_{\max}=200$ mm, $\phi_{\mathrm{fc}}=100$ mm and
 $S_d=0.2$ in each. The top aquifer layer has $S_y=0.2$ and receives 10 mm/d of recharge. Below the soil the water table
 rises $10/0.2=50$ mm/d. When it reaches the soil base the recharge is rejected and stays in the soil, where it raises
 the soil water level by $10/0.2=50$ mm/d as well; the 400 mm of capacity hold the remaining 200 mm of free water after 20
 more days, after which all recharge overflows (test T1, Chapter~\ref{ch:verification}). Exchange: with
-$k_{\mathrm{sat}}=100$ mm/d, a 10 m top cell with $K_v=1$ m/d and a 100$\times$100 m column,
-$C=10^4/(0.5/0.2+10/2)=1\,333$ m$^2$/d. Soil water 0.2 m and water table 0.1 m above the base ($F=1$) give
-$q=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
+$K_{\mathrm{sat}}=100$ mm/d, a 10 m top cell with $K_v=1$ m/d and a 100$\times$100 m column,
+$C^{\mathrm{sz}}=10^4/(0.5/0.2+10/2)=1\,333$ m$^2$/d. Soil water 0.2 m and water table 0.1 m above the base ($F=1$) give
+$q^{\mathrm{sz}}=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
 \end{example}
 
 \subsection{Every position of the water table}\label{sec:szregimes}
@@ -430,13 +434,13 @@ bottom comes out of the cell holding the water table (Section~\ref{sec:szcaprise
 cell's water, and where no cell has water there is none: even a trace of negative recharge into a dry cell makes
 MODFLOW's Newton iteration oscillate (on Liard it quadrupled the outer iterations). The bottom boundary is
 $\psi=0$ at the water table. The top boundary is the unsaturated share of the column's recharge (Section~\ref{ch:recharge}),
-$q_{\mathrm{top}}=(1-F)R_c/a_c$, less the capillary rise into the soil zone; when the top cell saturates it switches to
+$q_{\mathrm{top}}=(1-F)R_{k,i}/A_{k,i}$, less the capillary rise into the soil zone; when the top cell saturates it switches to
 $\psi=0$ and what it cannot take is \emph{rejected}: it returns to the soil-zone column as rejected recharge, exactly
 like recharge on saturated ground. The flux into MODFLOW is taken from the column's storage change,
 \begin{equation}
 q_{\mathrm{bot}}=q_{\mathrm{top}}-\frac{1}{\dt}\sum_i\big(\theta_i^{n+1}-\theta_i^{n}\big)\Delta z_i,
 \end{equation}
-so the column conserves water to round-off whatever the Newton tolerance; $q_{\mathrm{bot}}a_c$ replaces the column's
+so the column conserves water to round-off whatever the Newton tolerance; $q_{\mathrm{bot}}A_{k,i}$ replaces the column's
 share of the recharge in \cmd{RCH\_RAVEN}. The column is solved once per Raven step, before MODFLOW's solve, with the
 water table of the start of the step.
 
@@ -486,11 +490,11 @@ infinitely dry top and a deep water table (\ref{eq:rise}) tends to Gardner's cla
 up to 70\% when the soil is only moderately dry (Figure~\ref{fig:v2rise}); Raven uses the exact relation.
 
 \paragraph{From the water table.} Where a column has no unsaturated column (no \cmd{:SoilZoneVadose}, or the water
-table within $L_{\min}$ of the base or above it), every soil-zone layer $j$ below field capacity whose middle lies above
+table within $L_{\min}$ of the base or above it), every soil-zone layer $m$ below field capacity whose middle lies above
 the water table receives
 \begin{gather}
-Q_j=\min\Big(a_c(1-F)\,q\big(\Delta z=z_{m,j}-h,\ \psi_1=0,\ \psi_2=\psi_{s,j}\big),\ \frac{(\phi_{\mathrm{fc},j}-\phi_j)a_c}{1000\,\dt}\Big),\\
-\psi_{s,j}=\psi_{a,j}\Big(\frac{\phi_j}{\phi_{\max,j}}\Big)^{-b_j},\nonumber
+Q_m=\min\Big(A_{k,i}(1-F)\,q\big(\Delta z=z_{\mathrm{mid},m}-h,\ \psi_1=0,\ \psi_2=\psi_{s,m}\big),\ \frac{(\phi_{\mathrm{fc},m}-\phi_m)A_{k,i}}{1000\,\dt}\Big),\\
+\psi_{s,m}=\psi_{a,m}\Big(\frac{\phi_m}{\phi_{\max,m}}\Big)^{-b_m},\nonumber
 \end{gather}
 with the layer's own soil (\cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} [mm], \cmd{HYDRAUL\_COND} of its soil class); all
 layers together at most the rise to the lowest of them with an infinitely dry top, since the water reaching the upper
@@ -507,7 +511,7 @@ top layer the rise had been zero; now it equals that of a thick top layer, 4\,56
 the water table clear of its bottom, the highest cell with water supplies them, scaled down smoothly to zero as it dries
 ($s^2(3-2s)$ of its saturated part over the margin), so nothing switches on or off abruptly. Out of an aquifer cell they
 are moreover together at most half the water it holds above its bottom under the link, faded out the same way,
-$\tfrac12 f\,S_ya_c(h-z_{\mathrm{bot}})/\dt$ per step, so a thin cell is never pumped dry within a step (MODFLOW diverged otherwise); the water the new nodes of an unsaturated column take when the water table falls
+$\tfrac12 f\,S_yA_{k,i}(h-z_{\mathrm{bot}})/\dt$ per step, so a thin cell is never pumped dry within a step (MODFLOW diverged otherwise); the water the new nodes of an unsaturated column take when the water table falls
 (below) counts first, then the column's upflow, the rise from the water table and the repayment of the lagged
 exchange's debt (what the cell cannot give is repaid later; the column's draw counts also when it goes through the top
 cell's recharge); what the column's
@@ -521,11 +525,11 @@ depth. A rate from the head at the start of the step overshoots: on dry, conduct
 drew 0.1~m in one day and lowered the water table by 0.67~m, which then swung back and forth from step to step. Raven
 therefore takes the rate at the end-of-step water table of the column itself,
 \begin{equation}\label{eq:riseimpl}
-Q=T\Big(\frac{Q\,\dt}{S_y\,a_c(1-F)}\Big),\qquad T(D)=\min\Big(\sum_j Q_j(\Delta z_j+D),\ Q_{\infty}(\Delta z_{\mathrm{low}}+D)\Big),
+Q=T\Big(\frac{Q\,\dt}{S_y\,A_{k,i}(1-F)}\Big),\qquad T(D)=\min\Big(\sum_m Q_m(\Delta z_m+D),\ Q_{\infty}(\Delta z_{\mathrm{low}}+D)\Big),
 \end{equation}
 the total rate with the water table lowered by the risen volume over the specific yield and the share's area (no
 lateral resupply: the bound of a single column, stable for any step length; $S_y$ at least 0.01). $T$ falls with $D$,
-so (\ref{eq:riseimpl}) has one root between $T(T_0w)$ and $T_0$, $w=\dt/(S_ya_c(1-F))$; Raven finds it with the
+so (\ref{eq:riseimpl}) has one root between $T(T_0w)$ and $T_0$, $w=\dt/(S_yA_{k,i}(1-F))$; Raven finds it with the
 Illinois variant of regula falsi (a geometric bisection after a step that does not halve the bracket), keeping the best
 lower bound ($T(Qw)$ for every trial $Q$ above the root), to 0.2\% of the root --- about four evaluations of $T$ ---
 and the layers keep their shares of $T$. Over specified heads the head does not move and $D=0$. $Q_\infty$ is the rise to
@@ -537,7 +541,7 @@ of the aquifer class), as a column just longer than $L_{\min}$ sees it (on an aq
 the rise had been up to six times larger without the column than with it).
 
 \paragraph{From an unsaturated column.} The same layers receive (\ref{eq:rise}) from the column's top node (its suction
-$\psi_1$, the distance from the node to each layer's middle), on the unsaturated share $a_c(1-F)$ and within the layers'
+$\psi_1$, the distance from the node to each layer's middle), on the unsaturated share $A_{k,i}(1-F)$ and within the layers'
 deficits, and the column's top flux is reduced by the same amount (\emph{capillary rise to soil zone}). In one step the
 column passes on at most the larger of the water its top node holds down to the suction of the lowest layer above it
 and what the water table itself could supply by (\ref{eq:riseimpl}); what the column cannot deliver within the step
@@ -547,7 +551,7 @@ just below it (test P9: 1\,733 against 1\,765~m$^3$ on the first day). \cmd{:Soi
 off without it.
 
 \begin{example}[: a drying soil over a shallow water table]
-Soil zone of 2$\times$0.5~m, $b=5$, $\psi_a=200$~mm, $k_{\mathrm{sat}}=200$~mm/d, PET 4 mm/d and no rain for 60 days
+Soil zone of 2$\times$0.5~m, $b=5$, $\psi_a=200$~mm, $K_{\mathrm{sat}}=200$~mm/d, PET 4 mm/d and no rain for 60 days
 (test P2). Without capillary rise the soil dries in five days and evaporation stops at 15~mm. With it, evaporation
 continues on water drawn from the aquifer: 180~mm with the water table 0.7~m deep, 117~mm at 1.3~m and 51~mm at 2.5~m
 (Figure~\ref{fig:v2caprise}).
@@ -576,21 +580,21 @@ restart continues exactly. On the hillslope test the mean head difference to the
 
 \subsection{Raven's processes on each part of an HRU}\label{sec:szclasses}
 Raven's processes act on an HRU's state, but the columns of an HRU can be very different: saturated at the foot of a
-slope, dry at its top. With \cmd{:SoilZoneClasses} $K$ the columns of each HRU are sorted at the start of every step by
-their saturated thickness $\lambda$, then their soil water, and grouped into up to $K$ classes of about equal area
+slope, dry at its top. With \cmd{:SoilZoneClasses} $N_c$ the columns of each HRU are sorted at the start of every step by
+their saturated thickness $b^{\mathrm{sz}}$, then their soil water, and grouped into up to $N_c$ classes of about equal area
 (classes with the same soil water are merged). In Raven's \cmd{ORDERED\_SERIES} solver the HRU's process sequence then
 runs once per class $c$ on a copy of the HRU's state with the class's mean soil water $\bar\phi_c$; the HRU's state
 becomes the area-weighted mean $\sum_cw_c\,\phi_c$ of the results (exact for every water store, since each run
 conserves water), the balances are weighted alike, and each class's result is shared among its own columns. With as
-many classes as columns an HRU behaves exactly like one HRU per cell (test P6: $8\times10^{-6}$~m). The cost is $K$
+many classes as columns an HRU behaves exactly like one HRU per cell (test P6: $8\times10^{-6}$~m). The cost is $N_c$
 evaluations of the HRU's processes per step. Other solvers keep the HRU mean (with a warning).
 
 \subsection{Columns over specified heads}\label{sec:szchd}
 Links on cells whose top active layer is a specified head have soil-zone columns too. MODFLOW does not apply
 boundaries on specified-head cells, and needs none: the head is known. After MODFLOW's solve each such column is
-solved with the specified head $h_s$,
+solved with the specified head $h^{\mathrm{chd}}_i$,
 \begin{equation}
-\Delta V+\frac{1000\,\dt}{a_c}\,q\big(\lambda(\phi^*+\Delta V),h_s\big)=0,
+\Delta\phi+\frac{1000\,\dt}{A_{k,i}}\,q^{\mathrm{sz}}_{k,i}\big(b^{\mathrm{sz}}(\phi^*+\Delta\phi),h^{\mathrm{chd}}_i\big)=0,
 \end{equation}
 which is exact for that column (the head does not respond), and the flow is booked as \emph{soil zone to specified
 heads} or \emph{specified heads to soil zone}; capillary rise there comes from the head as well. The column's recharge
@@ -603,7 +607,7 @@ column of an HRU now covers only the part outside the grid, where there is no aq
 \cmd{raven.szx} (GHB \cmd{SZX\_RAVEN}), \cmd{raven.szq} (WEL \cmd{SZQ\_RAVEN}), \cmd{raven.szd} (DRN \cmd{SZD\_RAVEN})
 and, with more than one layer, \cmd{raven.szw} (WEL \cmd{SZW\_RAVEN}, Section~\ref{sec:szcaprise}) to the model's name
 file next to \cmd{raven.rch}. The soil zone lies on the model's top: the soil-zone base is the top
-of the top active cell and the land surface is $D_k$ higher. Its relief within a cell comes from \cmd{:LandSurface}
+of the top active cell and the land surface is $d_{\mathrm{sz},k}$ higher. Its relief within a cell comes from \cmd{:LandSurface}
 when given (the DEM's points about their mean in the cell; with an \cmd{:OverlapWeights} table, which has no cell
 outlines, one point per cell). The soil--aquifer conductance and the storage check use the model's own vertical
 conductivity (\cmd{K33}, else \cmd{K}) and specific yield of the top active cell; unsaturated columns take the
@@ -622,7 +626,7 @@ MODFLOW computes from the input (for instance recharge into a confined cell unde
 \subsection{Cost}\label{sec:szcost}
 The unsaturated columns cost about 40~$\mu$s per column and day in a wet spell and much less when nothing moves;
 capillary rise costs a few table lookups per column and step (a few more for the drawdown root), the specified-head columns one local solve per column and step; classes
-cost $K$ evaluations of the HRU's processes. On the Liard example with \cmd{:SoilZone PHYSICAL} (85 HRUs, 4\,286 links,
+cost $N_c$ evaluations of the HRU's processes. On the Liard example with \cmd{:SoilZone PHYSICAL} (85 HRUs, 4\,286 links,
 one year, optimized build) the basic soil zone took 106~s; the column soil zone with its defaults takes 69~s, and with unsaturated columns, capillary rise
 and three classes 91~s (6\,378 outer iterations against 4\,809): Brent's method in the local solve more than pays for
 the new physics, and MODFLOW's solve remains the larger part.
@@ -662,14 +666,14 @@ the aquifer class (Raven warns otherwise).\par\smallskip
 \end{minipage}\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
-$H_j$ & layer thickness & soil profile (\cmd{:SoilProfiles}, \cmd{.rvp}) & m & Raven manual\\
-$n_j$, $S_{\mathrm{fc},j}$ & \cmd{POROSITY}, \cmd{FIELD\_CAPACITY} & soil class (\cmd{.rvp}) & -- & Raven manual\\
-$k_{\mathrm{sat},1}$ & \cmd{HYDRAUL\_COND} & soil class of \cmd{SOIL[$M-1$]} (\cmd{.rvp}) & mm/d & Raven manual\\
+$H_m$ & layer thickness & soil profile (\cmd{:SoilProfiles}, \cmd{.rvp}) & m & Raven manual\\
+$\eta_m$, $S_{\mathrm{fc},m}$, $\mathit{SF}_m$ & \cmd{POROSITY}, \cmd{FIELD\_CAPACITY}, \cmd{STONE\_FRAC} & soil class (\cmd{.rvp}) & -- & Raven manual\\
+$K_{\mathrm{sat},M-1}$ & \cmd{HYDRAUL\_COND} & soil class of \cmd{SOIL[$M-1$]} (\cmd{.rvp}) & mm/d & Raven manual\\
 $K_v$, $S_y$ & \cmd{K\_VERT}, \cmd{SPEC\_YIELD} & aquifer class of the top layer & m/d, -- & Sec.~\ref{app:class}\\
 $d_s$ & \cmd{SEEPAGE\_SMOOTHING\_DEPTH} & aquifer profile & m & Sec.~\ref{app:profile}\\
 $b$, $\psi_a$ (soil) & \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} & soil class (\cmd{.rvp}) & --, mm & Raven manual\\
 $b$, $\psi_a$, $\theta_s$ & \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} & aquifer class & --, m, -- & Sec.~\ref{app:class}\\
-$N$ & \cmd{:SoilZoneSubgrid} & \cmd{.rvg} & -- & Sec.~\ref{app:commands}\\
+$N_g$ & \cmd{:SoilZoneSubgrid} (points per side, squared) & \cmd{.rvg} & -- & Sec.~\ref{app:commands}\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
 \textbf{Outputs.} \cmd{GWBudget.csv}: \emph{soil zone to aquifer}, \emph{aquifer to soil zone}, \emph{rejected recharge},
 \emph{soil-zone overflow}, \emph{soil-zone exchange applied to Raven}, \emph{soil-zone shortfall}, \emph{interface updates},
@@ -755,9 +759,9 @@ A losing river cannot give more than it carries. The conductance is therefore li
 possible loss --- the disconnected rate $C(s-z_{\mathrm{bed}})$ --- is no more than the cell's share (by river length) of
 the flow in the channel reach at the start of the day (the channel flow, upstream of any reservoir at the subbasin outlet):
 \begin{equation}
-C^{\mathrm{riv}}\le\frac{Q^{\mathrm{out}}_p\,(L_{p,i}/L_p)}{s-z_{\mathrm{bed}}},
+C^{\mathrm{riv}}\le\frac{86\,400\,Q^{\mathrm{out}}_p\,(L_{p,i}/L_p)}{s-z_{\mathrm{bed}}},
 \end{equation}
-with $Q^{\mathrm{out}}_p$ in m$^3$/d and $L_p$ the subbasin's total river length on active cells. (Using the reservoir
+with $Q^{\mathrm{out}}_p$ in m$^3$/s ($\times86\,400$ gives m$^3$/d) and $L_p$ the subbasin's total river length on active cells. (Using the reservoir
 release instead would cut off every river cell above a lake whenever the lake is not spilling.) Rivers of disabled
 subbasins get no river cells.
 
@@ -768,9 +772,9 @@ first from that in-catchment inflow and then, inside Raven's routing loop, from 
 upstream. A loss that still cannot be supplied in the day --- rare, because of the limit above --- is \emph{carried} to the
 next day and taken from the river first thing then, so no water is created:
 \begin{equation}
-V^{\mathrm{applied}}_{p,n}=G_{p,n}\,\dt-K_{p,n-1}+K_{p,n},
+V^{\mathrm{applied},n}_p=G^n_p\,\dt-V^{\mathrm{carry},n-1}_p+V^{\mathrm{carry},n}_p,
 \end{equation}
-where $K_{p,n}$ [m$^3$] is the loss carried out of day $n$. Summed over a run, the water applied to Raven equals MODFLOW's net
+where $G^n_p$ is $G_p$ on day $n$ and $V^{\mathrm{carry},n}_p$ [m$^3$] is the loss carried out of day $n$. Summed over a run, the water applied to Raven equals MODFLOW's net
 river exchange minus whatever is still carried at the end (written to \cmd{solution.rvc} as \cmd{:GWRiverLossCarry} and
 taken on the first day of a restart).
 \begin{example}[: river exchange]
@@ -823,14 +827,14 @@ Plants and bare soil can draw water directly from a water table close to the sur
 $d_x>0$, each active column gets MODFLOW's EVT package. Raven first satisfies evaporation from its own stores; only the
 potential evaporation it could \emph{not} meet is offered to the water table:
 \begin{equation}
-E_i=\frac{1}{\Delta^2}\sum_kA_{k,i}\;\frac{\max\left(\mathrm{PET}_k\,\dt-\mathrm{AET}_k,\;0\right)}{1000\,\dt}\quad[\mathrm{m/d}],
+E_i=\frac{1}{|\Omega_i|}\sum_kA_{k,i}\;\frac{\max\left(\mathrm{PET}_k\,\dt-\mathrm{AET}_k,\;0\right)}{1000\,\dt}\quad[\mathrm{m/d}],
 \end{equation}
 where $\mathrm{PET}_k$ [mm/d] is the HRU's potential evaporation and $\mathrm{AET}_k$ [mm] what Raven already evaporated
-that day. Only HRUs whose own profile has an extinction depth contribute. The unmet demand of those HRUs in the cell (a volume) is spread over the whole cell area $\Delta^2$, because MODFLOW
+that day. Only HRUs whose own profile has an extinction depth contribute. The unmet demand of those HRUs in the cell (a volume) is spread over the whole cell area $|\Omega_i|$, because MODFLOW
 multiplies the rate by the full cell area. The most MODFLOW can remove is then exactly that unmet volume, even where coupled
 HRUs cover only part of the cell. MODFLOW removes
 \begin{equation}
-Q^{\mathrm{evt}}_i=E_i\,\Delta^2\;\min\!\left(1,\max\!\left(0,\;1-\frac{z_{\mathrm{land},i}-h_i}{d_x}\right)\right),
+Q^{\mathrm{evt}}_i=E_i\,|\Omega_i|\;\min\!\left(1,\max\!\left(0,\;1-\frac{z_{\mathrm{land},i}-h_i}{d_x}\right)\right),
 \end{equation}
 the full rate when the water table is at the surface, falling linearly to zero at depth $d_x$ (Figure~\ref{fig:curves}d).
 This water leaves the system as evaporation.
@@ -873,31 +877,31 @@ group, to the aquifer below.
 In each column holding HRUs of the group, the exchange is a river-type boundary (MODFLOW RIV package) whose bed is the
 model top and whose water level is the top plus the average depth of water in the store:
 \begin{equation}
-\bar s_i=\frac{\sum_kA_{k,i}\,s_k}{\sum_kA_{k,i}},\qquad h_b=z_{\mathrm{top},i}+\bar s_i,
-\qquad q=\begin{cases}C\left(h_b-h\right) & h>z_{\mathrm{top},i},\\ C\,\bar s_i & h\le z_{\mathrm{top},i},\end{cases}
+\bar d^{\,\mathrm{st}}_i=\frac{\sum_kA_{k,i}\,\phi^{\mathrm{st}}_k}{1000\sum_kA_{k,i}},\qquad h_b=z_{\mathrm{top},i}+\bar d^{\,\mathrm{st}}_i,
+\qquad q=\begin{cases}C\left(h_b-h\right) & h>z_{\mathrm{top},i},\\ C\,\bar d^{\,\mathrm{st}}_i & h\le z_{\mathrm{top},i},\end{cases}
 \end{equation}
-with $s_k$ the store depth of HRU $k$ in metres ($1/1000$ of the store in mm). Positive $q$ is leakage from the store to
+with $\phi^{\mathrm{st}}_k$ [mm] the water in the store of HRU $k$ and $\bar d^{\,\mathrm{st}}_i$ [m] its overlap-weighted mean depth in column $i$. Positive $q$ is leakage from the store to
 the aquifer; negative $q$ is groundwater feeding the store. Because leakage stops growing once the water table is below
-the store's bed, it can never exceed $C\,\bar s_i$.
+the store's bed, it can never exceed $C\,\bar d^{\,\mathrm{st}}_i$.
 
 \subsection{Never draining more than the store holds}
 The water available in a cell is the store's real volume, split among the HRU's cells by overlap and fixed at the start
 of the day:
 \begin{equation}
-V_{k,i}=s_k\,A_k\,\frac{A_{k,i}}{\sum_jA_{k,j}},\qquad V_i=\sum_kV_{k,i} .
+V^{\mathrm{st}}_{k,i}=\frac{\phi^{\mathrm{st}}_k}{1000}\,10^{6}A_k\,\frac{A_{k,i}}{\sum_jA_{k,j}},\qquad V^{\mathrm{st}}_i=\sum_kV^{\mathrm{st}}_{k,i} .
 \end{equation}
 The conductance is limited so that the largest possible leakage in the day is no more than this water:
 \begin{equation}
-C=\min\!\left(L\sum_kA_{k,i},\ \frac{V_i}{\dt\,\bar s_i}\right),\qquad C=0\ \text{when the stores are empty}.
+C=\min\!\left(\Lambda\sum_kA_{k,i},\ \frac{V^{\mathrm{st}}_i}{\dt\,\bar d^{\,\mathrm{st}}_i}\right),\qquad C=0\ \text{when the stores are empty}.
 \end{equation}
-After MODFLOW solves, leakage is removed from each HRU's store in proportion to $V_{k,i}$, and groundwater discharge is
+After MODFLOW solves, leakage is removed from each HRU's store in proportion to $V^{\mathrm{st}}_{k,i}$, and groundwater discharge is
 added in proportion to area. Because the shares come from the same fixed volumes used for the limit, no store can be
 over-drawn and the volumes on both sides match exactly. A store of an HRU may be connected by only one
 \cmd{:SurfaceWater\allowbreak Exchange}; Raven stops if two exchanges would draw on the same store. Groundwater that reaches the surface under an \emph{empty} store is
 still returned to Raven by the seepage drain (Section~\ref{ch:seepage}).
 \begin{example}[: wetland leakage]
-Group HRUs cover 3 km$^2$ of a cell, $L=0.05$ d$^{-1}$: $C\le0.05\times3\times10^6=150\,000$ m$^2$/d. The wetland holds
-20 mm ($\bar s=0.02$ m, $V=60\,000$ m$^3$ in this cell). The supply limit is $60\,000/(1\times0.02)=3\times10^6$ m$^2$/d, so
+Group HRUs cover 3 km$^2$ of a cell, $\Lambda=0.05$ d$^{-1}$: $C\le0.05\times3\times10^6=150\,000$ m$^2$/d. The wetland holds
+20 mm ($\bar d^{\,\mathrm{st}}=0.02$ m, $V^{\mathrm{st}}=60\,000$ m$^3$ in this cell). The supply limit is $60\,000/(1\times0.02)=3\times10^6$ m$^2$/d, so
 $C=150\,000$. With the water table 1 m below the top (disconnected), leakage is $150\,000\times0.02=3\,000$ m$^3$/d, i.e.\
 1 mm/d over the 3 km$^2$.
 \end{example}
@@ -920,8 +924,8 @@ an HRU may be connected by one exchange only.\par\smallskip
 where \cmd{DEPRESSION} is the Raven store, \cmd{WetlandHRUs} an HRU group and 0.01 the leakance [1/d].
 \par\smallskip\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr \hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
-$L$ & \cmd{LEAKANCE} & \cmd{:SurfaceWater\allowbreak Exchange} argument (\cmd{.rvg}) & 1/d & Sec.~\ref{app:commands}\\
-$s_k$ & store depth & Raven state variable (the named store) of HRU $k$ & mm & Raven state var.\\
+$\Lambda$ & \cmd{LEAKANCE} & \cmd{:SurfaceWater\allowbreak Exchange} argument (\cmd{.rvg}) & 1/d & Sec.~\ref{app:commands}\\
+$\phi^{\mathrm{st}}_k$ & store depth & Raven state variable (the named store) of HRU $k$ & mm & Raven state var.\\
 -- & HRU group & \cmd{:HRUGroup} (\cmd{.rvh}) & -- & Raven manual\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
 \textbf{Outputs.} \cmd{GWBudget.csv}: \emph{surface-store leakage to aquifer}, \emph{aquifer discharge to surface stores}, \emph{surface-store
@@ -929,10 +933,10 @@ exchange applied to Raven}; the store itself in Raven's outputs.
 \end{refcard}
 
 \section{Reservoirs}\label{ch:reservoirs}
-Raven reservoirs can already lose water to groundwater with their \cmd{:SeepageParameters} $k$ [m$^3$/s/m] and a fixed
-local groundwater level $h_{\mathrm{loc}}$:
+Raven reservoirs can already lose water to groundwater with their \cmd{:SeepageParameters} $k_{\mathrm{seep}}$ [m$^3$/s/m] and a fixed
+local groundwater level $h_{\mathrm{gw}}$:
 \begin{equation}
-V^{\mathrm{res}}=k\left(\tfrac12\left(h^{t}_{\mathrm{res}}+h^{t+\dt}_{\mathrm{res}}\right)-h_{\mathrm{loc}}\right)\cdot86\,400\,\dt
+V^{\mathrm{res}}=k_{\mathrm{seep}}\left(\tfrac12\left(h^{t}_{\mathrm{res}}+h^{t+\dt}_{\mathrm{res}}\right)-h_{\mathrm{gw}}\right)\cdot86\,400\,\dt
 \quad[\mathrm{m}^3],
 \end{equation}
 using the average of the stages at the start and end of the step. \cmd{:ReservoirExchange} connects this to the aquifer
@@ -943,7 +947,7 @@ for every reservoir that has \cmd{:SeepageParameters} and whose lake HRU (\cmd{:
 \item After MODFLOW solves a day, the local groundwater level of the reservoir is set to the average head under its
 lake HRU, weighted by overlap:
 \begin{equation}
-h_{\mathrm{loc}}=\sum_iw_i\,\max\!\left(z^{\mathrm{wt}}_i,\;\min\!\left(z_{\mathrm{top},i},\,h_{\mathrm{res}}\right)\right),\qquad w_i=\frac{A_{k,i}}{\sum_{j\notin\mathcal{C}}A_{k,j}} ,
+h_{\mathrm{gw}}=\sum_iw_i\,\max\!\left(z^{\mathrm{wt}}_i,\;\min\!\left(z_{\mathrm{top},i},\,h_{\mathrm{res}}\right)\right),\qquad w_i=\frac{A_{k,i}}{\sum_{j\notin\mathcal{C}}A_{k,j}} ,
 \end{equation}
 where the sums run over the lake HRU's cells that do not hold a fixed head ($\mathcal{C}$), as for recharge, and
 $z^{\mathrm{wt}}_i$ is the water table of column $i$ (the head of its highest wet cell; Section~\ref{ch:mf6}). A water table
@@ -982,7 +986,7 @@ otherwise Raven crashes in its first step (also without groundwater), and the co
 instead.
 \end{watch}
 \begin{example}[: reservoir seepage]
-$k=0.2$ m$^3$/s/m, average stage 1\,136 m, aquifer head below the lake 1\,132 m: seepage
+$k_{\mathrm{seep}}=0.2$ m$^3$/s/m, average stage 1\,136 m, aquifer head below the lake 1\,132 m: seepage
 $0.2\times4\times86\,400=69\,120$ m$^3$ that day, injected into the aquifer the next day.
 \end{example}
 
@@ -1003,7 +1007,7 @@ Stages must be absolute. A reservoir that dries out books only the water that ca
   :MaxDepth            10.0
   :LakeArea            5.0E7
   :AbsoluteCrestHeight 1133.0    # absolute stages (required)
-  :SeepageParameters   0.2 1128  # k [m3/s/m]; the head is replaced by the aquifer head
+  :SeepageParameters   0.2 1128  # k_seep [m3/s/m]; h_gw is replaced by the aquifer head
 :EndReservoir
 # .rvg
 :ReservoirExchange
@@ -1011,9 +1015,9 @@ Stages must be absolute. A reservoir that dries out books only the water that ca
 \end{minipage}\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr \hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
-$k$ & \cmd{:SeepageParameters} (first value) & reservoir (\cmd{:Reservoir}, \cmd{.rvh}) & m$^3$/s/m & Raven manual\\
+$k_{\mathrm{seep}}$ & \cmd{:SeepageParameters} (first value) & reservoir (\cmd{:Reservoir}, \cmd{.rvh}) & m$^3$/s/m & Raven manual\\
 $h_{\mathrm{res}}$ & stage & Raven reservoir state; \cmd{:AbsoluteCrest\allowbreak Height} & m & Raven state var.\\
-$h_{\mathrm{loc}}$ & local groundwater head & computed each step from MODFLOW (replaces the second value) & m & Sec.~\ref{ch:reservoirs}\\
+$h_{\mathrm{gw}}$ & local groundwater head & computed each step from MODFLOW (replaces the second value) & m & Sec.~\ref{ch:reservoirs}\\
 -- & \cmd{:ReservoirExchange} & \cmd{.rvg} option & -- & Sec.~\ref{app:commands}\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
 \textbf{Outputs.} \cmd{GWBudget.csv}: \emph{reservoir seepage sent}, \emph{delivered}, \emph{awaiting delivery}, \emph{reservoir gain not supplied by MODFLOW}; Raven's reservoir outputs show
@@ -1026,7 +1030,7 @@ Wells are listed in \cmd{:Wells} with their location and screen (top and bottom 
 time series \cmd{:WellFlowRate} in the \cmd{.rvt} file (m$^3$/d, negative for pumping, positive for injection). A screen that crosses several layers
 is split among them by transmissivity, so more water comes from the more permeable layers:
 \begin{equation}
-Q_{w,\ell}=Q_w\,\frac{T_\ell}{\sum_mT_m},\qquad
+Q_{w,\ell}=Q_w\,\frac{T_\ell}{\sum_{\ell'}T_{\ell'}},\qquad
 T_\ell=K_\ell\left[\min\!\left(z_{\mathrm{st}},z^{(\ell-1)}_{\mathrm{bot}}\right)-\max\!\left(z_{\mathrm{sb}},z^{(\ell)}_{\mathrm{bot}}\right)\right]_+,
 \end{equation}
 where $[x]_+=\max(x,0)$ and $z_{\mathrm{st}},z_{\mathrm{sb}}$ are the screen top and bottom. If the screen misses the

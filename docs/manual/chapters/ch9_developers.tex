@@ -107,15 +107,91 @@ lives in a separate repository.
 \end{itemize}
 Clone the two side by side in one folder; the tests and \cmd{get\_mf6.py} then find Raven without any setting.
 
-\section{Building}
-Linux/macOS: CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build}; links \cmd{-ldl}, and NetCDF when found) or
-\cmd{make} in \cmd{src/} (links \cmd{-ldl}; for NetCDF head output add \cmd{-Dnetcdf} to \cmd{CXXFLAGS} and
-\cmd{-lnetcdf} to \cmd{LDLIBS}, as the Makefile's commented lines show). Windows: CMake with Visual Studio 2022
-(\cmd{cmake --build build --config Release}) or \cmd{src/Raven.sln}. MODFLOW is not needed to build; it is loaded only
-when a model uses \cmd{:GroundwaterModel MODFLOW6}.
+\section{Building}\label{sec:building}
+Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}), with \cmd{make} in
+\cmd{src/} (links \cmd{-ldl}; for NetCDF head output add \cmd{-Dnetcdf} to \cmd{CXXFLAGS} and \cmd{-lnetcdf} to
+\cmd{LDLIBS}, as the Makefile's commented lines show), or on Windows with \cmd{src/Raven.sln}. Raven loads the MODFLOW~6
+library at run time; with CMake the build can also provide that library and put it next to the executable, chosen by
+the option \cmd{RAVEN\_MF6} (file \cmd{cmake/RavenMF6.cmake}):
+\begin{table}[!htbp]\centering
+\caption{The CMake option \cmd{RAVEN\_MF6}.}\label{tab:ravenmf6}
+\begin{tabular}{P{0.13\linewidth}P{0.815\linewidth}}\toprule\hdr
+Value & What the build does\\\midrule
+\cmd{SOURCE} & builds \cmd{libmf6} from the MODFLOW~6 source with MODFLOW's own meson build, during \cmd{cmake --build}
+(about one to three minutes on two cores). Needs a Fortran compiler (gfortran or ifx), meson~1.7 or newer, ninja and git.
+The source is a shallow git clone of the release tag \cmd{RAVEN\_MF6\_VERSION} (6.8.1), checked against its pinned
+commit (\cmd{5b2ebd1a95720d5c3732dc482e05fbf559e6ef41}); or a source folder (\cmd{RAVEN\_MF6\_SOURCE\_DIR}); or an
+archive (\cmd{RAVEN\_MF6\_SOURCE\_URL}, also \cmd{file://}; a release zip works, its \cmd{src/} is the tag's, and a pinned
+one is checked). The last two need no git.\\
+\cmd{PREBUILT} & downloads the official release zip for the platform at configure time (\cmd{mf6.8.1\_linux.zip},
+\cmd{mf6.8.1\_macarm.zip}, \cmd{mf6.8.1\_win64.zip}), checks it against the SHA-256 pinned in Raven and keeps only the
+library. Offline: \cmd{-DRAVEN\_MF6\_ZIP=/path/to/mf6.8.1\_linux.zip}.\\
+\cmd{PATH} & uses a library you have: \cmd{-DRAVEN\_MF6\_PATH=/path/to/libmf6.so} (a symbolic link or a renamed file such
+as \cmd{libmf6\_663.so} or \cmd{libmf6.so.6.8.1} is fine).\\
+\cmd{OFF} & Raven alone, exactly as without this option (same compile and link commands, no install rules). A coupled model
+then needs a library at run time (Section~\ref{sec:getmf6}).\\\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The default.} Without \cmd{RAVEN\_MF6} the choice is made again at every configure (the cache keeps only a value
+you give): an offline option names its mode (\cmd{RAVEN\_MF6\_PATH} $\to$ \cmd{PATH}, \cmd{RAVEN\_MF6\_ZIP} $\to$
+\cmd{PREBUILT}, \cmd{RAVEN\_MF6\_SOURCE\_DIR} or \cmd{RAVEN\_MF6\_SOURCE\_URL} $\to$ \cmd{SOURCE}); otherwise \cmd{SOURCE}
+when a Fortran compiler, meson~$\geq$~1.7, ninja and git are all found; otherwise \cmd{PREBUILT} when MODFLOW releases a
+library for the platform; otherwise \cmd{OFF} with a warning that names what is missing (\cmd{-DRAVEN\_MF6=OFF} silences
+it). A default that cannot be completed (the download fails) also falls back to \cmd{OFF} with a warning, so a plain
+\cmd{cmake -S . -B build} never stops because of MODFLOW; a mode you give (or one named by an offline option) that cannot
+be completed stops with a message naming the alternatives. An option that belongs to another mode is reported as
+ignored.
+
+\paragraph{Platforms without a release library.} MODFLOW~6.8.1 releases no library for Linux other than x86\_64 (e.g.\
+aarch64), for Windows on ARM64 (the target architecture is taken from \cmd{-A ARM64}, else the compiler, else the
+processor, and named in the message), or for Intel Macs (no Intel Mac zip from MODFLOW~6.8 on). There the default is
+\cmd{SOURCE} when the tools are present, otherwise \cmd{OFF}; use \cmd{SOURCE} or \cmd{PATH}.
+
+\paragraph{Checksums and offline use.} The release zips of 6.8.1 are pinned by SHA-256; only these are called ``official
+release'' in the configure output. Another zip given by \cmd{RAVEN\_MF6\_ZIP}, or the download of another version, is used
+with a warning (``not checked'') unless you give \cmd{-DRAVEN\_MF6\_ZIP\_SHA256=...}, which is then checked and named as
+your checksum. A local zip is identified by its own SHA-256: a replaced zip (or another one with the same name) is
+unpacked again, and the expected SHA-256 is compared with the file's at every configure, so a wrong checksum given later
+stops the configure. A damaged or truncated zip is refused with the expected and the actual SHA-256.
+Other settings: \cmd{RAVEN\_MF6\_VERSION} (release for \cmd{SOURCE} and \cmd{PREBUILT}; only 6.8.1 is pinned),
+\cmd{RAVEN\_MESON}, \cmd{RAVEN\_MF6\_FORTRAN}, \cmd{RAVEN\_MF6\_JOBS}, \cmd{RAVEN\_MF6\_RELEASE\_URL},
+\cmd{RAVEN\_MF6\_GIT\_URL}.
+
+\paragraph{The Fortran compiler.} meson builds with \cmd{RAVEN\_MF6\_FORTRAN} if given, else with \cmd{FC} (the
+environment variable meson itself reads), else with the compiler CMake's own check finds, else with gfortran or ifx on
+the \cmd{PATH}. \cmd{FC} is read directly because CMake's check ignores it with the Visual Studio generators; the
+compiler is named in the configure output and in \cmd{libmf6\_version.txt}. On Windows, gfortran from MSYS2 or
+\cmd{fortran-lang/setup-fortran} works with the Visual Studio and the Ninja generators (the continuous-integration
+workflow \cmd{.github/workflows/raven-mf6.yml} does this; it has not yet run on real Windows and macOS runners).
+
+\paragraph{What ends up where.} In every mode except \cmd{OFF} the library is copied next to the Raven executable under
+its standard name (\cmd{libmf6.so}, \cmd{libmf6.dylib}, \cmd{libmf6.dll}), with \cmd{libmf6\_version.txt} beside it
+(first line \cmd{MODFLOW 6.8.1} as written by \cmd{get\_mf6.py}, then its source and SHA-256). The version is the
+release's, or that in the source's \cmd{meson.build} for source folders, archives and renamed zips (a tag archive named
+\cmd{v6.7.2.tar.gz} gives 6.7.2 before it is built), and ``unknown (given library)'' for \cmd{PATH}. Raven's run path is
+\cmd{\$ORIGIN} (macOS \cmd{@loader\_path}) plus the folders of linked libraries outside the system folders (netCDF from
+conda or spack), in the build tree as in the install. \cmd{cmake --install build} puts Raven, the library,
+\cmd{libmf6\_version.txt} and the Fortran runtime the library needs (a gfortran-built library: \cmd{libgfortran.so.5} on
+Linux; official libraries need none) in one \cmd{bin} folder, also for staged installs with \cmd{DESTDIR}; the folder
+runs wherever it is moved. \cmd{cpack} packs it as \cmd{Raven-4.15-mf6-6.8.1-linux-x86\_64.tar.gz} (about 5~MB with a
+source-built library; ZIP on Windows; no MODFLOW version in the name when it is unknown).
+
+\paragraph{Version guard.} After loading the library, Raven asks its version (\cmd{get\_version}). A library older
+than 6.5.0 stops the run (``the MODFLOW 6 library \ldots\ is version \ldots; the coupling needs MODFLOW 6 6.5.0 or newer
+(tested with 6.8.1)''); 6.5.0 is a chosen floor (6.4.4 passed test P1; the fallbacks for older memory layouts are
+kept). Any other version than 6.8.1, a library that does not report its version, or a version that cannot be read
+(quoted in the message) gives one warning; outputs are otherwise unchanged. Suffixes such as \cmd{6.8.1-dev} or
+\cmd{6.8.1+abc.dirty} (a source build inside a git checkout) count as 6.8.1.
+
+\paragraph{Checks.} \cmd{tests/cmake\_checks.py} runs 14 offline configure checks of the above in about a minute (each
+also shown to fail on the defect it was written for: \cmd{--selftest}); \cmd{tests/mf6version\_check.py} checks the
+version guard with a stand-in library. A library built from source and the official one give the same results to
+round-off (Section~\ref{sec:getmf6}).
 
 \section{Getting MODFLOW 6}\label{sec:getmf6}
-The MODFLOW~6 shared library (\cmd{libmf6.so}, \cmd{libmf6.dll} or \cmd{libmf6.dylib}, about 15--55~MB) is not part of
+A Raven built with \cmd{RAVEN\_MF6} other than \cmd{OFF} has the library next to it and needs nothing more. Otherwise
+the MODFLOW~6 shared library (\cmd{libmf6.so}, \cmd{libmf6.dll} or \cmd{libmf6.dylib}, about 15--55~MB) is not part of
 either repository. One command in RavenHydroFramework-extra downloads it:
 \begin{lstlisting}
 python tools/get_mf6.py                   # MODFLOW 6.8.1, the tested version, for this computer
@@ -125,18 +201,24 @@ python tools/get_mf6.py --raven PATH      # PATH: the Raven checkout, or the fol
 \end{lstlisting}
 The script (standard Python only) picks the release zip for the computer from
 \url{https://github.com/MODFLOW-ORG/modflow6/releases} (\cmd{mf6.8.1\_linux.zip}, \cmd{mf6.8.1\_win64.zip},
-\cmd{mf6.8.1\_macarm.zip}; \cmd{\_mac.zip} for Intel Macs where one is released), keeps only the library, and records its
-version, source and SHA-256 in \cmd{libmf6\_version.txt} beside it. It puts the library in \cmd{lib/mf6/} of the Raven
-checkout beside RavenHydroFramework-extra (or the one named by \cmd{--raven} or \cmd{RAVEN\_SRC}), where Raven finds it. It does nothing
-when the library is already there (\cmd{--force} replaces it). The default is the tested version rather than the newest
-release, so that a new MODFLOW release cannot change a model's results unnoticed; with MODFLOW~6.6, for example, the
-Newton option behaved differently.
+\cmd{mf6.8.1\_macarm.zip}), keeps only the library, and records its version, source and SHA-256 in
+\cmd{libmf6\_version.txt} beside it. It puts the library in \cmd{lib/mf6/} of the Raven checkout beside
+RavenHydroFramework-extra (or the one named by \cmd{--raven} or \cmd{RAVEN\_SRC}), where Raven finds it. It does nothing
+when the library is already there (\cmd{--force} replaces it). It serves no library where MODFLOW releases none: Linux
+other than x86\_64 and Windows on ARM64 (it stops and points to \cmd{cmake -DRAVEN\_MF6=SOURCE} or \cmd{PATH}; on Windows
+on ARM64 a win64 zip given with \cmd{--zip} is used, with a note, for an x64 Raven running under emulation), and Intel
+Macs from MODFLOW~6.8 on (\cmd{--version 6.6.3}, the last tested release with an Intel Mac zip, or \cmd{SOURCE}). The
+default is the tested version rather than the newest release, so that a new MODFLOW release cannot change a model's
+results unnoticed; with MODFLOW~6.6, for example, the Newton option behaved differently.
 
 Raven looks for the library in this order: \cmd{:MF6Library} in the \cmd{.rvg} file; the environment variable
 \cmd{RAVEN\_MF6\_LIB}; next to the Raven executable; \cmd{lib/mf6/} beside it or one to three folders up (so
 \cmd{src/Raven.exe}, \cmd{build/Raven}, \cmd{build/Release/Raven.exe} and Visual Studio's \cmd{src/x64/Release/Raven.exe}
 of a Raven checkout all find the checkout's \cmd{lib/mf6/}); finally the platform's name on the system library path.
 \cmd{GWModelSummary.txt} names the library used and its version; when none loads, the message lists the places searched.
+
+\paragraph{Built from source or downloaded.} A library built here from the 6.8.1 source (gfortran~13, meson's release
+build) and the official one give the same results to round-off: in a one-year run of the Liard example the heads differ by at most $9\times10^{-11}$~m, and \cmd{Hydrographs.csv}, \cmd{WatershedStorage.csv} and \cmd{GWHRUState.csv} are identical. Building the library takes about one minute on two cores here; the installed folder with a source-built library (about 5~MB packed) ran this example after being moved, with no setting.
 
 \section{Adding a new exchange}
 \begin{enumerate}
