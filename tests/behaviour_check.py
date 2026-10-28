@@ -32,6 +32,7 @@ def setup(d):
         '\n:Reservoir TestLake\n  :SubBasinID 52\n  :HRUID %d\n  :Type RESROUTE_STANDARD\n  :WeirCoefficient 0.6\n'
         '  :CrestWidth 20.0\n  :MaxDepth 8.0\n  :LakeArea 5.0E7\n  :AbsoluteCrestHeight %.2f\n  :SeepageParameters 0.05 %.2f\n'
         ':EndReservoir\n' % (lid, elev, elev - 5))
+    open(os.path.join(d, 'Liard.rvc'), 'a').write('\n:InitialReservoirStage 52 %.2f\n' % elev)   # (else it starts at stage 0: a jump in Raven's balance)
     geo = [f for f in json.load(open(os.path.join(d, 'Liard_HRUs_standin.geojson')))['features']
            if int(f['properties']['HRU_ID']) == wid][0]
     pt = shape(geo['geometry']).representative_point()

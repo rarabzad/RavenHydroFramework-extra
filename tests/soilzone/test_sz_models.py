@@ -16,6 +16,9 @@ P7  columns over specified heads: the hillslope with a fixed head 0.2 m below th
      a restart from the first half (columns over the head included in :GWSoilZoneColumns) is exact.
 P8  restart with column classes on a steep slope (round-off decided whether the classes applied):
      3 classes, unsaturated columns, a specified-head toe; 25 + 25 days equal 50 days.
+P9  capillary rise across the shortest column (5 cm): the rise from a column just longer than 5 cm equals
+     the rise from the water table just below it and the rise without columns (within 10 %); it is implicit in the
+     drawdown it causes, so a water table near the soil base with a thin top layer that dries does not oscillate.
 P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
      HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
      than with the HRU mean (1 class).
@@ -257,8 +260,51 @@ def P8():
     print('  largest deviation of the restart from the continuous run %.2g -> %s' % (dq, 'ok' if ok else 'FAIL'))
     return ok
 
+def thin_top(d, layers):
+    p = os.path.join(d, 'm.rvp'); t = open(p).read()
+    s = 'AQ, %d, ' % (len(layers) + 1) + ''.join('SAND, %g, AQUIFER, ' % h for h in layers) + 'SAND, TO_BEDROCK, AQUIFER'
+    t2 = t.replace('AQ, 1, SAND, TO_BEDROCK, AQUIFER', s); assert t2 != t; open(p, 'w').write(t2)
+
+def P9():
+    print('P9 capillary rise across the shortest column')
+    cfg = dict(nhru=1, hru_w=200.0, rain=0.0, days=3, perc=1.0, ksat=400.0, Kv=0.5, Sy=0.15, soil_b=5.0, soil_psia=200.0, aq_b=4.0,
+               aq_psia=0.3, pet=4.0, phi0=(20.0, 20.0))
+    rise = {}
+    for tag, dep, ex in (('below', 1.045, VZ), ('above', 1.055, VZ), ('nocol', 1.055, '')):
+        d, _ = run('i_%s' % tag, init_depth=dep, extra_rvg=ex + ':SoilZoneCapillaryRise ON\n', **cfg)
+        if not d:
+            return False
+        b = budget(d); c = b['capillary rise to soil zone [m3]'] if 'capillary rise to soil zone [m3]' in b else 0.0 * b.iloc[:, 0]
+        rise[tag] = float(c.iloc[0] + b['capillary rise from the water table [m3]'].iloc[0])
+    r1 = abs(rise['above'] / rise['below'] - 1.0); r2 = abs(rise['above'] / rise['nocol'] - 1.0)
+    ok1 = r1 < 0.1 and r2 < 0.1
+    print('  day-1 rise: water table 4.5 cm below the base %.0f m3, 5.5 cm (column) %.0f, 5.5 cm without columns %.0f -> %s'
+          % (rise['below'], rise['above'], rise['nocol'], 'ok' if ok1 else 'FAIL'))
+    # a thin top layer that dries and rewets with the water table near its bottom: no oscillation
+    rain = [0.0] * 5 + [60.0, 40.0, 0.0, 0.0, 30.0] + [0.0] * 10 + [25.0] * 5 + [0.0] * 25
+    cfg2 = dict(nhru=4, hru_w=200.0, rain=rain, days=len(rain), perc=40.0, ksat=400.0, Kv=0.5, Sy=0.15, soil_b=5.0, soil_psia=200.0,
+                aq_b=4.0, aq_psia=0.3, init_depth=3.0, pet=3.0)
+    its = {}
+    for tag, ex in (('osc_vz', VZ), ('osc_off', VZ + ':SoilZoneCapillaryRise OFF\n')):
+        d = os.path.join(W, 'i_' + tag); shutil.rmtree(d, ignore_errors=True)
+        sz_models.make_case(d, extra_rvg=ex, **cfg2); thin_top(d, [1.5])
+        okr, txt = sz_check.run(d)
+        if not okr:
+            print('  i_%s: run FAILED\n%s' % (tag, txt[-1500:])); return False
+        r = sz_check.checks(d); print('  i_%s:' % tag)
+        if not sz_check.report(tag, r, {k: v for k, v in LIM.items() if k in r}):
+            return False
+        b = budget(d); its[tag] = b['outer iterations'].sum()
+        if tag == 'osc_vz':
+            s = pd.read_csv(os.path.join(d, 'out', 'GWSoilExchange.csv')); s = s[s['HRU_ID'] == 2]['water table [m]'].values
+            jump = np.abs(np.diff(s[25:])).max()        # (the dry spell after the last rain)
+    ok2 = jump < 0.05 and its['osc_vz'] < 1.3 * its['osc_off']
+    print('  dry spell: largest daily water-table change %.3f m; outer iterations %d with rise, %d without -> %s'
+          % (jump, its['osc_vz'], its['osc_off'], 'ok' if ok2 else 'FAIL'))
+    return ok1 and ok2
+
 def main():
-    res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8)]
+    res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9)]
     print('soil-zone model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 

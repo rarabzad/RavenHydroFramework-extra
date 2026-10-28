@@ -260,3 +260,18 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   within max(5 % of the cell, 5 cm) of the cell bottom the column's bottom takes no upward flow, and a negative bottom
   flux is taken back from the bottom node; the minimum column length is 5 cm. Liard with the columns then needs
   6 349 iterations, close to the 6 128 without them (O2 builds: v1 122 s, v2 default 78 s, all options 100 s).
+- **Audit round 3: capillary rise across the shortest column.** Above 5 cm the column's rise was capped at its top
+  node's water (about L/3.3 thick, so a few mm per step); below 5 cm the rise from the water table was limited only by
+  the soil's deficit, at the start-of-step head. They differed about 20 times (4 042 against 187 m³ on day 1), and a
+  thin top layer that dried and rewet made the water table swing 0.4 m from step to step (213 against 110–139 outer
+  iterations). Now one routine (`SZRiseLayers`) gives the rise into every layer below field capacity for both: from
+  the water table it is implicit in its own drawdown, Q = T(Q dt/(Sy a(1−F))) (Illinois root; no lateral resupply, the
+  bound of a single column); from a column it starts at the top node, goes into the same layers on the unsaturated
+  share only (it was on the whole column before), and is capped per step by the larger of the top node's water and the
+  water table's implicit rate, so the two meet as the column shortens (1 765 against 1 733 m³; test V2i).
+- **Found on the way (pre-existing).** With no initial reservoir flow or stage in the .rvc file Raven keeps the stage
+  at 0 until its first routing, so the step-1 stage check refused every such reservoir (lake, behaviour, budget_xcheck,
+  edge N30 had failed since the base). The check runs after the first step; a warning names the missing initial stage,
+  which otherwise makes a one-off jump in Raven's balance (behaviour test: 349 mm; the test now gives the stage). A
+  reservoir whose :HRUID lies in another subbasin crashes Raven itself (CReservoir::SetPrecip, also without
+  groundwater); the coupled model now stops with a message (edge N32 expects the error).
