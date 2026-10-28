@@ -337,8 +337,20 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   HDRY (−1e30) was taken as the water table (a column bottom at −1e30 m, 2e32 m³ booked): such columns are now left as they
   are until the cell rewets, and a column read at start-up uses the water table below a dry top cell. (C, open,
   pre-existing) without NEWTON, recharge MODFLOW moves from a dry top cell to the active cell below is not read back
-  (Raven's recharge package has no FIXED_CELL): the start-up warning asks for NEWTON. Restarts: heads, starting heads
-  and the soil-zone hotstart blocks are written with 17 digits (12 or 10 before: a head 3e-10 m above a cell bottom was
-  rounded away, and with it the upward limits); in near-dry cases with columns at air-dry, a restart still departs
-  from the continuous run as Raven's own state file keeps 5 decimals (one LAGGED case: 11 % after 50 days; 1e-6 in the
-  others). Test V2j extended.
+  (Raven's recharge package has no FIXED_CELL): the start-up warning asks for NEWTON. Restarts: MODFLOW's starting heads
+  (gwf.ic / raven.ic) are written with 17 significant digits when the soil zone is on (10 before: a head 3e-10 m above a
+  cell bottom was rounded away, and with it the upward limits). (The hotstart blocks of solution.rvc are written in
+  fixed notation, already 12-15 decimals: unchanged.) A restart can still depart from the continuous run because
+  Raven's own HRU state file keeps 5 decimals (round 9: median 2e-6, 90th percentile 3e-4 over 40 random restarts; two
+  cases above 1e-2, which a diagnostic build with 15 decimals brings to 3e-7): a limit of Raven's state file, not of the
+  coupling. Test V2j extended.
+- **Audit round 9.** (A) A column removed in a step (its deficit filled up to the source cell's limit) and the rise from
+  the water table in the same step each used the full limit: up to twice it (14 % over in a constructed case). The rise
+  now subtracts what the removed column took. (B, pre-existing) A diverged MODFLOW step with finite but absurd heads
+  (2e13 m) was accepted and booked impossible volumes (1e15 m³ shortfall); in one ill-conditioned model the more precise
+  starting heads tipped a step into it. Raven now stops when a head is not finite or lies beyond the model's highest top or
+  lowest bottom by more than 10 times its total relief (at least 1 km), except a dry cell's HDRY without NEWTON (a
+  per-cell bound stopped legitimate artesian heads in steep fuzz models). Also: a column's bottom does not
+  fall below the aquifer's bottom (a dry column's head can be lower). Sweeps of 768 randomised runs with per-step
+  invariants (contents within air-dry and porosity, bottom at or below the base, no unexplained lag, every cap held)
+  found nothing else.
