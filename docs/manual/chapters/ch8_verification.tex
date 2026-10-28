@@ -40,7 +40,7 @@ that dry out, restart files, constituent observations and the \cmd{:rvg\_Filenam
 \section{Automated audit of every run}\label{sec:audit}
 The tool \cmd{tools\_audit.py}, shipped with the example, checks any output folder for:
 \begin{enumerate}
-\item \textbf{recharge:} $\left(\sum V^{\mathrm{Raven}}-\sum V^{\mathrm{MF6}}-\Delta S^{\mathrm{delay}}-\sum V^{\mathrm{CHD}}\right)/\sum V^{\mathrm{Raven}}$;
+\item \textbf{recharge:} $\left(\sum V^{\mathrm{Raven}}-\sum V^{\mathrm{MF6}}-\Delta V^{\mathrm{dl}}-\sum V^{\mathrm{CHD}}\right)/\sum V^{\mathrm{Raven}}$;
 \item \textbf{MODFLOW's balance:} cumulative imbalance relative to the gross flow, and the worst single step;
 \item \textbf{convergence:} steps that failed to converge;
 \item \textbf{seepage, rivers and surface stores:} the volume applied to Raven against MODFLOW's flow, including carried river losses;
