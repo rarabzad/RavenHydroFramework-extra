@@ -15,9 +15,10 @@ For every step Raven computes all boundary flows from MODFLOW's own matrix terms
 and the storage change from MODFLOW's storage package, and reports the imbalance
 \begin{multline}
 \varepsilon=Q^{\mathrm{rch}}+Q^{\mathrm{sto}}-Q^{\mathrm{seep}}+Q^{\mathrm{riv}}_{\mathrm{in}}-Q^{\mathrm{riv}}_{\mathrm{out}}-Q^{\mathrm{evt}}
-+Q^{\mathrm{wel}}+Q^{\mathrm{ghb}}+Q^{\mathrm{chd}}\\+Q^{\mathrm{swx}}_{\mathrm{in}}-Q^{\mathrm{swx}}_{\mathrm{out}}+Q^{\mathrm{res}},
++Q^{\mathrm{wel}}+Q^{\mathrm{ghb}}+Q^{\mathrm{chd}}\\+Q^{\mathrm{swx}}_{\mathrm{in}}-Q^{\mathrm{swx}}_{\mathrm{out}}+Q^{\mathrm{res}}+Q^{\mathrm{sz}}_{\mathrm{in}}-Q^{\mathrm{sz}}_{\mathrm{out}},
 \end{multline}
-where $Q^{\mathrm{sto}}$ is water released from storage. It is written in m$^3$/d and as a percentage of the gross flow
+where $Q^{\mathrm{sto}}$ is water released from storage and $Q^{\mathrm{sz}}$ the soil-zone exchange (packages \cmd{SZX\_RAVEN} and
+\cmd{SZQ\_RAVEN}, only with \cmd{:SoilZone PHYSICAL}). It is written in m$^3$/d and as a percentage of the gross flow
 (the sum of the absolute values of all terms). In the tests of Chapter~\ref{ch:verification} the worst single-day error is about $5\times10^{-6}$\% and the
 cumulative error about $10^{-10}$.
 
@@ -28,8 +29,9 @@ the watershed. The coupling adds:
 \item \textbf{to output}: recharge (the end-of-day \cmd{GROUNDWATER} value of coupled HRUs, as Raven already does), and
 reservoir seepage (already counted by Raven as a reservoir loss);
 \item \textbf{to input}: every volume the coupling adds to Raven in the step --- seepage returned to HRU stores, the net
-river exchange applied to reaches, and the net surface-store exchange. A net loss (for example a losing river) is a
-negative input.
+river exchange applied to reaches, the net surface-store exchange, and with \cmd{:SoilZone PHYSICAL} the soil-zone
+exchange applied to the soil layers (rejected recharge plus the net exchange). A net loss (for example a losing river)
+is a negative input.
 \end{itemize}
 With these, Raven's own balance closes exactly as without groundwater (0.43--0.52 mm maximum over 20 years in the Liard
 example, the same as uncoupled).
@@ -38,9 +40,15 @@ example, the same as uncoupled).
 The water that leaves Raven as recharge enters MODFLOW (directly or via the delay store); the water MODFLOW sends back
 enters Raven. Reservoir seepage enters MODFLOW one day after leaving Raven. Therefore
 \begin{equation}
-\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}},
+\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}},
 \end{equation}
-and the audit tool checks this identity, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
+where $V^{\mathrm{rej}}$ is the recharge rejected on saturated ground (zero unless \cmd{:SoilZone PHYSICAL}). With the soil
+zone coupled, the volume applied to the soil layers in each step also satisfies
+\begin{equation}
+V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}},
+\end{equation}
+with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests). The audit tool
+checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
 
 \section{A real day of water accounts}
 \begin{example}[: 15 June 1996 in the Liard run]
@@ -64,7 +72,12 @@ they gained that day). The aquifer stored the difference: a water-table rise of 
 \begin{enumerate}
 \item \emph{MF6 balance error [\%]} should stay well below 0.1\% every step; larger values point to a non-converged step or a
 too-loose head tolerance (\cmd{:SolverHead\allowbreak Tolerance}, default 0.00001 m).
-\item \emph{Raven recharge} and \emph{MF6 recharge} are equal unless a recharge delay or fixed-head cells are used.
+\item \emph{Raven recharge} and \emph{MF6 recharge} are equal unless a recharge delay or fixed-head cells are used, or
+recharge is rejected on saturated ground (\cmd{:SoilZone PHYSICAL}).
+\item With \cmd{:SoilZone PHYSICAL}: \emph{soil-zone shortfall} is zero and \emph{interface converged} is 1 on (nearly) every
+step; a step that did not converge is also reported in \cmd{Raven\_errors.txt} with the HRU and cell. A shortfall
+(water created) can appear only on steps where MODFLOW stopped at a low \cmd{:SolverMaxOuterIterations} (below about
+20) without converging, together with a MODFLOW balance error; raise the limit.
 \item \emph{returned to Raven} equals \emph{seepage to Raven}.
 \item \emph{river loss carried to next step} is normally zero; when not, it is taken from the river the next day.
 \item Raven's \cmd{Watershed\allowbreak Storage.csv} MB error should be as small as without groundwater.
@@ -97,10 +110,13 @@ Algorithm~\ref{alg:step} lists exactly what happens in one Raven time step of a 
 \State Set river stages and conductances, well rates, GHB/CHD heads (Ch.~\ref{ch:rivers},\ref{ch:wells})
 \State Set water-table ET rates from PET left unmet by Raven (Ch.~\ref{ch:et})
 \State Deliver yesterday's reservoir seepage (Ch.~\ref{ch:reservoirs}); set surface-store levels and limited conductances (Ch.~\ref{ch:stores})
-\State MODFLOW \cmd{prepare\_solve}; \textbf{repeat} \cmd{solve} \textbf{until} converged or the iteration limit; \cmd{finalize\_solve}; \cmd{finalize\_time\_step}
+\State \cmd{:SoilZone PHYSICAL}: share Raven's soil changes among the soil-zone columns; connected fractions, rejected recharge, local solves, \cmd{SZX\_RAVEN} boundaries (Ch.~\ref{ch:soilzone})
+\State MODFLOW \cmd{prepare\_solve}; \textbf{repeat} \cmd{solve} (with \cmd{:SoilZone PHYSICAL}: then update the soil-zone interface) \textbf{until} converged or the iteration limit; \cmd{finalize\_solve}; \cmd{finalize\_time\_step}
 \State Compute every package flow as $\mathrm{HCOF}\cdot h-\mathrm{RHS}$; reservoir local heads for today's routing
 \State Surface-store exchange applied to Raven stores; seepage and river flows computed
-\If{the step did not converge} limit seepage and river gains returned to Raven to the step's total inflow; warn \EndIf
+\If{\cmd{:SoilZone PHYSICAL}} withhold from all discharge to Raven (seepage, gains, soil-zone inflow), in proportion, the soil-zone shortfall the booking would leave and, if the step did not converge, MODFLOW's negative residual; warn
+\ElsIf{the step did not converge} limit seepage and river gains returned to Raven to the step's total inflow; warn \EndIf
+\State \cmd{:SoilZone PHYSICAL}: MODFLOW's soil-zone flows and the rejected recharge applied to the columns; overflow to \cmd{SURFACE\_WATER}
 \State Seepage added to Raven stores; balance, heads, connectivity and NetCDF output written
 \State Raven: before routing, river gains added to / losses taken from each subbasin's in-catchment inflow
 \State Raven routing; losses not covered are taken from the flow entering each reach; reservoirs compute seepage
@@ -121,7 +137,7 @@ including the \cmd{.rvc}, have been read.
 \subsection{Restarting a run (hotstart)}
 At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states it contains \cmd{:GWHeads} (the head in
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
-transit, if used). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
+transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
 run --- continues exactly: in the tests the restarted run matched a continuous run to within $6\times10^{-6}$ in all flows.
 
 \subsection{Ensembles}
@@ -137,7 +153,8 @@ start is decided for each member separately
 \begin{itemize}
 \item \textbf{Non-converged steps.} All water returned to Raven in such a step (seepage plus river gains) is limited to
 the water that entered the aquifer in that step (recharge, river and store leakage, reservoir injection and boundary
-inflows); discharge into wetland and lake stores is limited the same way. The step is flagged and a warning written.
+inflows); discharge into wetland and lake stores is limited the same way. The soil-zone exchange is not limited: the
+soil zone takes whatever MODFLOW booked, and what does not fit overflows to \cmd{SURFACE\_WATER}. The step is flagged and a warning written.
 \item \textbf{Rivers and stores} can never lose more water than they hold (Sections~\ref{ch:rivers},\ref{ch:stores}).
 \item \textbf{Wells} cannot pump from a dry cell (\cmd{AUTO\_FLOW\_REDUCE}).
 \item \textbf{Step count}: Raven stops if it would run past MODFLOW's last step.

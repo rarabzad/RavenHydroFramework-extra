@@ -128,6 +128,10 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:RiverBedDepth m|REFERENCE\_FLOW} & riverbed depth below the DEM (\cmd{REFERENCE\_FLOW})\\
 \cmd{.rvg} & \cmd{:GWInitialization STEADY\_STATE r} & steady-state start, recharge $r\ge0$ mm/d (off); if it does not converge, the initial heads are used\\
 \cmd{.rvg} & \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & store--aquifer exchange, leakance $\Lambda>0$ 1/d\\
+\cmd{.rvg} & \cmd{:SoilZone CONCEPTUAL | PHYSICAL SOIL[0] \dots\ SOIL[$M-1$]} & soil zone owned by Raven, water table may rise into it (Section~\ref{ch:soilzone}); the last \cmd{:SoilZone} counts (\cmd{CONCEPTUAL})\\
+\cmd{.rvg} & \cmd{:SoilZoneIteration n \{$\delta_h$\} \{$\delta_q$\}} & interface updates after MODFLOW converged, $n\ge0$ (0: explicit), head [m] and flow [--] tolerances (100, 0.0001, 0.000001)\\
+\cmd{.rvg} & \cmd{:SoilZoneSubgrid n} & DEM points per cell side for the saturated area, $1\le n\le20$ (5)\\
+\cmd{.rvg} & \cmd{:SoilZoneOutput group} & \cmd{GWSoilExchange.csv} only for this HRU group (all soil-zone HRUs)\\
 \cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange (off)\\
 \cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT}\\
 \cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV}\\
@@ -142,7 +146,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvt} & \cmd{:BoundaryHead name units} \dots & time-varying boundary head\\
 \cmd{.rvt} & \cmd{:ObservationData GW\_HEAD id units} \dots & observed heads for diagnostics\\
 \cmd{.rvc} & \cmd{:InitialGWHeads FROM\_PROFILE|DEPTH\_BELOW\_SURFACE d|ELEVATION z} & initial heads (\cmd{FROM\_PROFILE})\\
-\cmd{.rvc} & \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} & hotstart blocks written by Raven (Section~\ref{app:hotstart})\\\bottomrule
+\cmd{.rvc} & \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns} & hotstart blocks written by Raven (Section~\ref{app:hotstart})\\\bottomrule
 \end{longtable}
 
 \section{Options}\label{app:options}
@@ -225,9 +229,17 @@ Column & Meaning\\\midrule\endhead
 \cmd{surface-store exchange applied to Raven [m3]} & net volume applied to Raven stores\\
 \cmd{reservoir seepage sent [m3/d]}, \cmd{delivered [m3/d]}, \cmd{awaiting delivery [m3]} & reservoir exchange\\
 \cmd{reservoir gain not supplied by MODFLOW [m3]} & lake gain a drying cell could not supply; taken back from the reach (normally 0)\\
-\cmd{other model packages [m3/d]} & existing models only: net flow of the model's own packages (wells, boundaries, \dots), positive into the aquifer\\\bottomrule
+\cmd{other model packages [m3/d]} & existing models only: net flow of the model's own packages (wells, boundaries, \dots), positive into the aquifer\\
+\cmd{soil zone to aquifer [m3/d]}, \cmd{aquifer to soil zone [m3/d]} & \cmd{:SoilZone PHYSICAL}: soil-zone exchange by direction\\
+\cmd{rejected recharge [m3]}, \cmd{soil-zone overflow [m3]} & recharge kept in the soil on saturated ground; water a full soil zone sent to \cmd{SURFACE\_WATER}\\
+\cmd{soil-zone exchange applied to Raven [m3]}, \cmd{soil-zone shortfall [m3]} & rejected recharge plus net exchange applied to the soil; water MODFLOW took that the soil did not hold (0)\\
+\cmd{interface updates}, \cmd{interface converged}, \cmd{interface change [m]} & soil-zone updates in the step, 1 if the interface converged, last change of the soil level\\
+\cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\
+\cmd{seepage and soil inflow withheld [m3]}, \cmd{river gains withheld [m3]}, \cmd{surface-store gains withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\\bottomrule
 \end{longtable}
-Other output files: \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
+Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
+water level, water table, saturated fraction, exchange both ways, rejected recharge and overflow [mm], soil water and
+capacity [mm], interface updates and change), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
 $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profile), \cmd{GWModelSummary.txt}, \cmd{GWHeads.nc}
 (optional), \cmd{mf6/} (MODFLOW model, list files, binary heads).
 
@@ -240,8 +252,9 @@ $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profi
 \cmd{:GWHeads nlay nrow ncol} & MODFLOW head of every cell (raw values, 12 digits); checked against the grid\\
 \cmd{:GWRechargeStore} & HRU ID, water in the recharge-delay reservoir [m$^3$]\\
 \cmd{:GWReservoirSeepage} & subbasin ID, reservoir seepage in transit [m$^3$]\\
-\cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\\bottomrule
-\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}).}\\
+\cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\
+\cmd{:GWSoilZoneColumns} & \cmd{:SoilZone PHYSICAL}: HRU ID, cell (grid column number; 0 for the rest of the HRU), water of each soil-zone layer from the bottom up [mm]; a block that does not match the HRU's columns is reported and the columns start from the water table\\\bottomrule
+\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning.}\\
 \end{longtable}
 
 \section{Error messages}\label{app:errors}
@@ -285,6 +298,11 @@ HRU mesh exceeds 5 million cells per layer & increase \cmd{:GridCellSize} or the
 grid exceeds 5 million cells per layer & increase \cmd{:GridCellSize}\\
 cannot load MODFLOW 6 library & run \cmd{python tools/get\_mf6.py}, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB}\\
 cannot enter MODFLOW 6 folder & output folder removed or not writable during the run\\
+\cmd{:SoilZone PHYSICAL}: SOIL[$m$] has zero thickness / no drainable porosity & every coupled HRU with soil needs all soil-zone layers, with \cmd{FIELD\_CAPACITY} $<1$ and \cmd{POROSITY} $>0$\\
+soil class \dots\ of SOIL[$M-1$] needs HYDRAUL\_COND & give \cmd{HYDRAUL\_COND} for the class of the bottom soil-zone layer\\
+recharge must leave the soil zone from its bottom layer & take percolation to \cmd{GROUNDWATER} from \cmd{SOIL[$M-1$]}\\
+RECHARGE\_DELAY \dots\ cannot be used with :SoilZone PHYSICAL & set \cmd{RECHARGE\_DELAY} to 0 in the profiles of soil-zone HRUs\\
+the soil zone \dots\ is \dots\ m thick & list physical soil layers only (at most 20 m)\\
 Raven is running more time steps than the MODFLOW 6 simulation holds & check \cmd{:Duration} and \cmd{:TimeStep}\\\bottomrule
 \end{longtable}
 
@@ -329,26 +347,34 @@ layers, thickness, type & aquifer profile & layer construction (Sec.~\ref{ch:lay
 \toprule\hdr Symbol & Meaning & Unit\\\midrule\endfirsthead
 \caption[]{Notation (continued)}\\
 \toprule\hdr Symbol & Meaning & Unit\\\midrule\endhead
-\multicolumn{3}{p{\dimexpr\linewidth-2\tabcolsep}}{\textit{Indices:} HRU $k$ (also $k'$); cell or column $i$ (neighbour $j$); subbasin $p$; MODFLOW layer $\ell$ (also $\ell'$); aquifer profile $a$; boundary $\beta$; polygon corner $v$; time step $n$ (superscript); Raven soil layer $m$ (\cmd{SOIL[$m$]}).}\\\midrule
+\multicolumn{3}{p{\dimexpr\linewidth-2\tabcolsep}}{\textit{Indices:} HRU $k$ (also $k'$); cell or column $i$ (neighbour $j$); subbasin $p$; MODFLOW layer $\ell$ (also $\ell'$); aquifer profile $a$; boundary $\beta$; polygon corner $v$; soil-zone DEM point $g$; time step $n$ (superscript); Raven soil layer $m$ (\cmd{SOIL[$m$]}).}\\\midrule
 $A_k$ & HRU area (\cmd{AREA}, \cmd{.rvh}); $10^6A_k$ in m$^2$ & km$^2$\\
 $A_{k,i}$, $A^{\mathrm{cov}}_i$ & overlap of HRU $k$ and column $i$; area of column $i$ covered by coupled HRUs & m$^2$\\
 $|\Omega_i|$ & area of cell $i$ (the polygon $\Omega_i$) & m$^2$\\
-$C$ & conductance & m$^2$/d\\
+$b_\ell$, $b_i$, $b^{\mathrm{sz}}$ & layer thickness; thickness of the top active cell of column $i$; saturated thickness of a soil-zone column & m\\
+$C$, $C^{\mathrm{sz}}_{k,i}$ & conductance; soil--aquifer conductance of the soil-zone column of HRU $k$ in cell $i$ & m$^2$/d\\
 $d_s$, $d_x$, $d_0$ & seepage smoothing depth; ET extinction depth; initial depth to water & m\\
 $d_{\mathrm{sz},a}$, $D_a$ & \cmd{SOIL\_ZONE\_DEPTH}, \cmd{DEFAULT\_BEDROCK\_DEPTH} of profile $a$ & m\\
+$d_{\mathrm{sz},k}$, $H_m$ & soil-zone thickness of HRU $k$ (\cmd{:SoilZone PHYSICAL}); thickness of \cmd{SOIL[$m$]} & m\\
 $\bar d^{\,\mathrm{st}}_i$ & mean depth of water in a surface store over column $i$ & m\\
 $\Delta$, $\dt$, $t_{\mathrm{end}}$ & cell size (\cmd{:GridCellSize}); time step; run duration & m, d, d\\
 $\delta_b$ & seed spacing along HRU boundaries (HRU mesh) & m\\
+$F$, $\bar F_i$, $w_g$ & saturated fraction of a soil-zone column; mean over cell $i$; contact weight of DEM point $g$ & --\\
 $h$, $z^{\mathrm{wt}}$ & head; water table of a column (highest wet cell) & m\\
+$h^{\mathrm{sz}}$, $z_{b,g}$ & soil water level of a soil-zone column; soil-zone base at DEM point $g$ & m\\
 $h_{\mathrm{gw}}$, $h_{\mathrm{res}}$ & local groundwater level of a reservoir; reservoir stage & m\\
 $K$, $K_h$, $K_v$, $K_b$ & hydraulic conductivity; horizontal; vertical; riverbed & m/d\\
+$K_{\mathrm{sat},m}$ & saturated conductivity of \cmd{SOIL[$m$]} (\cmd{HYDRAUL\_COND}) & mm/d\\
 $k_{\mathrm{seep}}$ & reservoir seepage constant & m$^3$/s/m\\
 $L_p$, $L_{p,i}$ & river length of subbasin $p$ on active cells; in cell $i$ & m\\
 $\Lambda$, $\Lambda_s$ & leakance (stores); seepage leakance & 1/d\\
 $\mathrm{lat}$, $\mathrm{lon}$ & latitude, longitude & degrees\\
+$M$, $N_g$ & number of soil-zone layers; DEM points per cell (\cmd{:SoilZoneSubgrid}, squared) & --\\
 $N_v$ & number of corners of a polygon & --\\
+$\eta_m$, $S_{\mathrm{fc},m}$, $\mathit{SF}_m$, $S_d$, $\chi_m$ & porosity, field capacity, stone fraction, drainable porosity and saturated share of \cmd{SOIL[$m$]} & --\\
 $\phi^{\mathrm{st}}_k$ & water in a Raven surface store of HRU $k$ & mm\\
-$Q$, $q$ & flow (positive into the aquifer for boundaries) & m$^3$/d\\
+$\phi_{k,i,m}$, $\phi_{\max,m}$, $\phi_{\mathrm{fc},m}$ & water of \cmd{SOIL[$m$]} in the soil-zone column of HRU $k$ in cell $i$; capacity; field capacity & mm\\
+$Q$, $q$, $q^{\mathrm{sz}}_{k,i}$ & flow (positive into the aquifer for boundaries); soil-zone exchange of a column & m$^3$/d\\
 $Q^{\mathrm{out}}_p$ & channel flow of subbasin $p$ & m$^3$/s\\
 $R_\oplus$ & radius of the Earth (sphere) & m\\
 $r_k$, $r_i$ & recharge depth of HRU $k$ in a step; recharge rate of cell $i$ & mm, m/d\\
@@ -359,5 +385,6 @@ $T$ & transmissivity & m$^2$/d\\
 $\tau$ & recharge delay time constant & d\\
 $V$ & volume & m$^3$\\
 $V^{\mathrm{dl}}_k$, $V^{\mathrm{carry},n}_p$, $V^{\mathrm{st}}_{k,i}$ & recharge delay store; river loss carried out of step $n$; store water of HRU $k$ in cell $i$ & m$^3$\\
+$V^{\mathrm{rej}}$, $V^{\mathrm{sz}}_{\mathrm{applied}}$, $V^{\mathrm{short}}$ & rejected recharge; soil-zone exchange applied to Raven; soil-zone shortfall & m$^3$\\
 $z_{\mathrm{land}}$, $z_{\mathrm{top}}$, $z_{\mathrm{br}}$, $z_{\mathrm{bed}}$ & land surface, model top, bedrock, riverbed elevations & m\\\bottomrule
 \end{longtable}

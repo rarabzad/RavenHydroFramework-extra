@@ -302,7 +302,7 @@ For each active column Raven needs three elevations:
 (\cmd{:LandSurface}); without a DEM, the area-weighted \cmd{ELEVATION} of the HRUs in the cell.
 \item[Model top] $z_{\mathrm{top},i}=z_{\mathrm{land},i}-d_{\mathrm{sz},a}$, where $d_{\mathrm{sz},a}$ is the
 \cmd{SOIL\_ZONE\_DEPTH} of the column's profile $a=a(i)$ (default 0, so the top is the land surface). With the soil-zone
-coupling (\cmd{:SoilZone PHYSICAL}) \cmd{SOIL\_ZONE\_DEPTH} is ignored for HRUs with a soil zone: the soil-zone thickness
+coupling (\cmd{:SoilZone PHYSICAL}, Section~\ref{ch:soilzone}) \cmd{SOIL\_ZONE\_DEPTH} is ignored for HRUs with a soil zone: the soil-zone thickness
 is the sum of the listed soil layers.
 \item[Bedrock] $z_{\mathrm{br},i}$: the average of 25 points of the bedrock map (\cmd{:BedrockSurface}); without a map,
 $z_{\mathrm{land},i}-D_a$ with $D_a$ the profile's \cmd{DEFAULT\_BEDROCK\_DEPTH}.

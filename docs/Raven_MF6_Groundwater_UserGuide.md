@@ -235,6 +235,40 @@ existing MODFLOW 6 model".
 - Tested on USGS example models (Sagehen Creek with UZF, SFR and mover; a steady-state stream-capture model) with MODFLOW
   6.8.1 and 6.6.3: `tests/existing/usgs_sagehen.py`, `usgs_capture.py`.
 
+### 4.3c The soil zone and the water table (`.rvg`)
+
+By default (`:SoilZone CONCEPTUAL`) Raven's soil and the aquifer meet only through recharge and the seepage drain. With
+`:SoilZone PHYSICAL` Raven owns the listed soil layers, MODFLOW starts below them (model top = land surface minus their
+thickness), and the water table can rise into them, as in GSFLOW:
+
+```
+:SoilZone PHYSICAL SOIL[0] SOIL[1]      # soil-zone layers, from the top
+:SoilZoneIteration 100 1.0E-4 1.0E-6    # optional: updates after MODFLOW converged (0 = explicit), head [m] and flow tolerances
+:SoilZoneSubgrid 5                      # optional: DEM points per cell side for the saturated area
+:SoilZoneOutput WetlandHRUs             # optional: GWSoilExchange.csv for one HRU group
+```
+
+- Recharge must leave the soil zone from its bottom layer (`:Percolation ... SOIL[1] GROUNDWATER` here).
+- Each soil-zone layer needs a positive thickness, `POROSITY` and `FIELD_CAPACITY` < 1 (drainable porosity); the soil
+  class of the bottom soil-zone layer needs `HYDRAUL_COND` [mm/d], which with `K_VERT` of the top aquifer layer sets
+  the soil–aquifer conductance. `SEEPAGE_SMOOTHING_DEPTH` sets how smoothly a point comes into contact (through that
+  depth below its base) and saturates (through that depth above it); keep it at 0.1–0.5 m (below 0.05 m a warning).
+  `RECHARGE_DELAY` must be 0 for soil-zone HRUs.
+- The soil zone of each HRU is kept per overlapping cell (columns, saved in `solution.rvc` as `:GWSoilZoneColumns`);
+  Raven's `SOIL[m]` holds their mean. Where the water table is in the soil, recharge is rejected (stays in the soil),
+  saturated soil drains to the aquifer, groundwater rises into the soil, and a full soil zone overflows to
+  `SURFACE_WATER`. Rain falls alike on every column (overflowing where full) and an HRU's recharge leaves the columns that gave it up (not shared by area). Water-table ET is
+  reduced on saturated ground; the seepage drain serves only HRUs without soil.
+- The soil zone and MODFLOW are iterated within each step until they agree; the flows Raven applies are always those
+  MODFLOW booked, so water is conserved even on a step that did not converge (reported in `Raven_errors.txt`).
+- Raven's processes run before the exchange, so daily steps carry a small splitting error (about 1 cm of head on the
+  hillslope test; shorter steps reduce it). Not available with an existing MODFLOW model (`:MF6Simulation`).
+
+Outputs: `GWBudget.csv` gains soil-zone exchange (both ways), rejected recharge, overflow, applied volume, shortfall
+(0) and interface columns; `GWSoilExchange.csv` gives per HRU and step the soil-zone base, soil water level, water
+table, saturated fraction and exchange. `tools/plot_soilzone.py OUTPUT_FOLDER` plots both. Manual: Section "The soil
+zone and the water table"; design note: `docs/design/soil_zone_coupling_plan.md`.
+
 ### 4.4 `.rvt`
 
 ```
@@ -261,7 +295,8 @@ Observed heads at date D are compared with the simulated head at D (end of the p
 
 Raven's `solution.rvc` also contains `:GWHeads nlay nrow ncol` (the head of every cell), and when needed
 `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir seepage in transit) and
-`:GWRiverLossCarry` (river loss still to be taken), each closed by its `:End...` line. Using `solution.rvc` as the `.rvc`
+`:GWRiverLossCarry` (river loss still to be taken) and `:GWSoilZoneColumns` (soil-zone columns, `:SoilZone PHYSICAL`),
+each closed by its `:End...` line. Using `solution.rvc` as the `.rvc`
 of the next run continues exactly where the previous run stopped.
 
 ## 5. Outputs
@@ -270,6 +305,7 @@ of the next run continues exactly where the previous run stopped.
 | --- | --- |
 | `GWBudget.csv` | per step: Raven recharge, MODFLOW recharge, seepage, storage release, balance error, river leakage and discharge, river exchange applied to Raven, river loss carried to next step, water-table ET, wells (specified, actual), GHB, CHD, recharge-delay storage, recharge onto CHD cells |
 | `GWHRUState.csv` | per coupled HRU: mean water-table head and depth below land surface |
+| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge, overflow, soil water, interface updates |
 | `GWHeads.csv` | head at each observation well, starting at t = 0 (a monitoring well whose screened cell is dry reports the missing value -1.2345) |
 | `GWConnectivity.csv` | saturated fraction of the top layer per profile; number of connected saturated areas |
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |
@@ -311,6 +347,11 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "process ... sends water to GROUNDWATER in HRU ... which has no AQUIFER_PROFILE" | that water leaves the model; restrict the process with :-->Conditional |
 | well rate is zero ("has no :WellFlowRate time series") | the `:WellFlowRate` block is missing or its well ID does not match an ID in `:Wells` |
 | "running more time steps than the MODFLOW 6 simulation holds" | `:Duration` or `:TimeStep` changed after the model files were built; rerun |
+| "soil class ... of SOIL[M-1] ... needs HYDRAUL_COND" | `:SoilZone PHYSICAL`: give `HYDRAUL_COND` for the class of the bottom soil-zone layer |
+| "soil-zone interface did not converge" | rare; raise `:SoilZoneIteration` or `:SolverMaxOuterIterations` (keep it at 20 or more), increase `SEEPAGE_SMOOTHING_DEPTH`, or shorten the time step |
+| warning "m3 that MODFLOW took from the soil zone was not in it" | `:SoilZone PHYSICAL` on steps MODFLOW ended unconverged at a low `:SolverMaxOuterIterations`: raise it (default 500; keep it at 20 or more) |
+| "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone |
+| warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
 
 ## 9. Limitations
 

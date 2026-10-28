@@ -3,7 +3,9 @@
 RavenHydroFramework-extra adds groundwater to the [Raven hydrological modelling framework](https://raven.uwaterloo.ca) with
 [MODFLOW 6](https://github.com/MODFLOW-ORG/modflow6). Raven either **builds a MODFLOW 6 model** from its HRUs
 (`:GroundwaterModel MODFLOW6`) or **couples an existing one** (`:MF6Simulation`), and exchanges recharge, seepage,
-river leakage, water-table ET, wells, boundaries and reservoir seepage with it every time step.
+river leakage, water-table ET, wells, boundaries and reservoir seepage with it every time step. Optionally
+(`:SoilZone PHYSICAL`) the water table rises into Raven's soil layers, with the soil zone and MODFLOW iterated to
+agreement within each step.
 
 The coupling's source code is part of Raven itself (RavenHydroFramework). This repository holds everything around it:
 
@@ -13,6 +15,8 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 | `examples/` | the Liard River model with a groundwater model built by Raven, and coupled to an existing MODFLOW 6 model; step-by-step guide in `examples/README.md` |
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
+| `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`) |
+| `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run, including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
 ## Quick start
 
