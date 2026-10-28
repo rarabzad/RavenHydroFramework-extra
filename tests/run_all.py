@@ -24,7 +24,7 @@ sys.path.insert(0, HERE)
 import testconfig as tc   # noqa: E402
 
 NOLIB = '--nolib' in sys.argv
-QUICK = '--quick' in sys.argv
+QUICK = ('--quick' in sys.argv) or (os.environ.get('RAVEN_TEST_QUICK', '') == '1')   # quick mode: --quick or RAVEN_TEST_QUICK=1
 ONLY = None
 for i, a in enumerate(sys.argv):
     if a == '--only' and i + 1 < len(sys.argv):
