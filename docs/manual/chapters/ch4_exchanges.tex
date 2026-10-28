@@ -563,9 +563,11 @@ length and time units. A generated soil-zone model coupled again as an existing 
 within the interface tolerances, also in feet and seconds (tests X1--X4).
 Where the model's top cells can dry it should use MODFLOW's \cmd{NEWTON} formulation (Raven warns otherwise): without it a
 dried cell leaves the solve (head HDRY), and the soil zone over it neither exchanges with the aquifer nor draws capillary
-rise until the cell rewets. Raven stops when MODFLOW's heads are not finite or lie far outside the model's elevations (beyond its highest top or
-lowest bottom by more than ten times its relief, at least 1~km: a diverged solve) rather than carry them on; the message
-names the cell and the date.
+rise until the cell rewets. Raven stops when MODFLOW's heads are not finite, or when a step MODFLOW did not converge leaves a head far outside the
+model's elevations (beyond its highest top or lowest bottom by more than ten times its relief, at least 1~km: a diverged
+solve), rather than carry them on; the message names the cell and the date. Such a head on a converged step is what
+MODFLOW computes from the input (for instance recharge into a confined cell under a dried top cell without
+\cmd{NEWTON}) and gives a warning.
 
 \subsection{Cost}\label{sec:szcost}
 The unsaturated columns cost about 40~$\mu$s per column and day in a wet spell and much less when nothing moves;

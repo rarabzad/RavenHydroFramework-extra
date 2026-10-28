@@ -348,9 +348,13 @@ Links on cells whose top active layer is a specified head get soil-zone columns 
   the water table in the same step each used the full limit: up to twice it (14 % over in a constructed case). The rise
   now subtracts what the removed column took. (B, pre-existing) A diverged MODFLOW step with finite but absurd heads
   (2e13 m) was accepted and booked impossible volumes (1e15 m³ shortfall); in one ill-conditioned model the more precise
-  starting heads tipped a step into it. Raven now stops when a head is not finite or lies beyond the model's highest top or
-  lowest bottom by more than 10 times its total relief (at least 1 km), except a dry cell's HDRY without NEWTON (a
-  per-cell bound stopped legitimate artesian heads in steep fuzz models). Also: a column's bottom does not
+  starting heads tipped a step into it. Raven now stops when a head is not finite, or when a step MODFLOW did not converge has a
+  head beyond the model's highest top or lowest bottom by more than 10 times its total relief (at least 1 km); on a
+  converged step such a head is what MODFLOW computes from the input (recharge into a confined cell under a top cell
+  dried without NEWTON; over-pumping) and only a warning is written. HDRY is recognised in the model's own units (round
+  10: in centimetre models it was taken as a head of −1e28 m; the two older HDRY checks of the columns had the same flaw,
+  so centimetre models now give the same results as metres). A per-cell bound stopped legitimate artesian heads in steep
+  fuzz models. Also: a column's bottom does not
   fall below the aquifer's bottom (a dry column's head can be lower). Sweeps of 768 randomised runs with per-step
   invariants (contents within air-dry and porosity, bottom at or below the base, no unexplained lag, every cap held)
   found nothing else.
