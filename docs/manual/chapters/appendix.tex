@@ -65,8 +65,8 @@ Fractured crystalline rock & $10^{-3}$--$10^{1}$ & 0.001--0.05 & $10^{-6}$ & 0.0
 \toprule\hdr Parameter & Meaning & Units & Default & Checked & Typical range\\\midrule\endhead
 \cmd{INITIAL\_HEAD\_DEPTH} & initial depth to water below land & m & 5 & any & site data\\
 \cmd{DEFAULT\_BEDROCK\_DEPTH} & bedrock depth where no bedrock map is given & m & 50 & $>0$ & 5--300\\
-\cmd{SOIL\_ZONE\_DEPTH} & model top below land surface & m & 0 & $\ge0$ & 0--3\\
-\cmd{SEEPAGE\_LEAKANCE} & seepage conductance per m$^2$ of cell & 1/d & 1 & $\ge0$ & 0.1--10\\
+\cmd{SOIL\_ZONE\_DEPTH} & model top below land surface (ignored under \cmd{:SoilZone PHYSICAL}) & m & 0 & $\ge0$ & 0--3\\
+\cmd{SEEPAGE\_LEAKANCE} & seepage conductance per m$^2$ of cell (not used for soil-zone HRUs) & 1/d & 1 & $\ge0$ & 0.1--10\\
 \cmd{SEEPAGE\_SMOOTHING\_DEPTH} & depth below the top where seepage starts & m & 0.5 & $\ge0$ & 0.1--1\\
 \cmd{RIVERBED\_K} & riverbed hydraulic conductivity & m/d & 0.5 & $\ge0$ & $10^{-3}$--10\\
 \cmd{RIVERBED\_THICKNESS} & riverbed thickness & m & 1 & $>0$ & 0.3--3\\
@@ -99,7 +99,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvi} & \cmd{:GroundwaterModel NONE|MODFLOW6} & switch the coupling on (\cmd{NONE})\\
 \cmd{.rvi} & \cmd{:rvg\_Filename file} & groundwater file, relative to the \cmd{.rvi} (\cmd{<model>.rvg})\\
 \cmd{.rvh} & \cmd{AQUIFER\_PROFILE} column of \cmd{:HRUs} & profile name or \cmd{[NONE]}\\
-\cmd{.rvh} & \cmd{:SeepageParameters k h} in \cmd{:Reservoir} & reservoir seepage constant; $h$ is replaced by the aquifer head under \cmd{:ReservoirExchange}\\
+\cmd{.rvh} & \cmd{:SeepageParameters} $k_{\mathrm{seep}}$ $h_{\mathrm{gw}}$ in \cmd{:Reservoir} & reservoir seepage constant; $h_{\mathrm{gw}}$ is replaced by the aquifer head under \cmd{:ReservoirExchange}\\
 \cmd{.rvp} & \cmd{:AquiferClasses} \dots\ \cmd{:EndAquiferClasses} & material table (Section~\ref{app:class})\\
 \cmd{.rvp} & \cmd{:AquiferProfiles} \dots\ \cmd{:EndAquiferProfiles} & name, number of layers, \{class, thickness or \cmd{TO\_BEDROCK}, type\}\\
 \cmd{.rvp} & \cmd{:AquiferProfile\allowbreak Parameters} \dots & per-profile parameters (Section~\ref{app:profile})\\
@@ -127,7 +127,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SeepageReturnTo SV} & store receiving seepage (lowest soil layer; \cmd{SURFACE\_WATER} for soil-less HRUs)\\
 \cmd{.rvg} & \cmd{:RiverBedDepth m|REFERENCE\_FLOW} & riverbed depth below the DEM (\cmd{REFERENCE\_FLOW})\\
 \cmd{.rvg} & \cmd{:GWInitialization STEADY\_STATE r} & steady-state start, recharge $r\ge0$ mm/d (off); if it does not converge, the initial heads are used\\
-\cmd{.rvg} & \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & store--aquifer exchange, $L>0$ 1/d\\
+\cmd{.rvg} & \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & store--aquifer exchange, leakance $\Lambda>0$ 1/d\\
 \cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange (off)\\
 \cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT}\\
 \cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV}\\
@@ -170,12 +170,12 @@ File & Command & Meaning (default)\\\midrule\endhead
 \toprule\hdr Exchange & MODFLOW package (name) & Formulation & Safeguard\\\midrule\endfirsthead
 \caption[]{Exchange algorithms and their safeguards (continued)}\\
 \toprule\hdr Exchange & MODFLOW package (name) & Formulation & Safeguard\\\midrule\endhead
-Recharge & RCH (\cmd{RCH\_RAVEN}) & $V_k=r_kA_k/1000$; optional linear delay; spread by overlap & fixed-head cells skipped; exact per HRU\\
-Seepage & DRN (\cmd{DRN\_RAVEN}) & $C f(h)(h-z_{\mathrm{top}}+d_s)$, $C=L_s\Delta^2$ & returned by overlap; soil-less HRUs to \cmd{SURFACE\_WATER}\\
-Rivers & RIV (\cmd{RIV\_RAVEN}) & $C(s-h)$, or $C(s-z_{\mathrm{bed}})$ below the bed; $C=K_bWL/M_b$ & $C$ limited by channel flow; unsupplied loss carried\\
+Recharge & RCH (\cmd{RCH\_RAVEN}) & $V_k=10^{6}A_k\,r_k/1000$; optional linear delay; spread by overlap & fixed-head cells skipped; exact per HRU\\
+Seepage & DRN (\cmd{DRN\_RAVEN}) & $C f(h)(h-z_{\mathrm{top}}+d_s)$, $C=\Lambda_s|\Omega_i|$ & returned by overlap; soil-less HRUs to \cmd{SURFACE\_WATER}\\
+Rivers & RIV (\cmd{RIV\_RAVEN}) & $C(s-h)$, or $C(s-z_{\mathrm{bed}})$ below the bed; $C=K_bW_pL_{p,i}/M_b$ & $C$ limited by channel flow; unsupplied loss carried\\
 Water-table ET & EVT (\cmd{EVT\_RAVEN}) & unmet PET over the cell, linear to $d_x$ & only ET-enabled HRUs; never above unmet demand\\
 Wetlands, lakes & RIV (\cmd{SWX\_RAVEN}) & bed = top, stage = top + store depth & $C$ limited by stored water; one exchange per store\\
-Reservoirs & WEL (\cmd{RES\_RAVEN}) & Raven seepage law, $h_{\mathrm{loc}}=\sum w_i\max(z^{\mathrm{wt}}_i,z_{\mathrm{top},i})$; one-step lag & in-transit volume reported and saved\\
+Reservoirs & WEL (\cmd{RES\_RAVEN}) & Raven seepage law, $h_{\mathrm{gw}}=\sum w_i\max(z^{\mathrm{wt}}_i,z_{\mathrm{top},i})$; one-step lag & in-transit volume reported and saved\\
 Wells & WEL (\cmd{WEL\_RAVEN}) & rate split by transmissivity of screened layers & \cmd{AUTO\_FLOW\_REDUCE}\\
 Head boundary & GHB (\cmd{GHB\_RAVEN}) & $C_g(h_g-h)$ & heads kept above cell bottoms\\
 Fixed head & CHD (\cmd{CHD\_RAVEN}) & head held at $h_c$ & heads kept above cell bottoms\\\bottomrule
@@ -329,20 +329,35 @@ layers, thickness, type & aquifer profile & layer construction (Sec.~\ref{ch:lay
 \toprule\hdr Symbol & Meaning & Unit\\\midrule\endfirsthead
 \caption[]{Notation (continued)}\\
 \toprule\hdr Symbol & Meaning & Unit\\\midrule\endhead
-$A_k$, $A_{k,i}$ & HRU area (\cmd{.rvh}); overlap of HRU $k$ and column $i$ & m$^2$\\
+\multicolumn{3}{p{\dimexpr\linewidth-2\tabcolsep}}{\textit{Indices:} HRU $k$ (also $k'$); cell or column $i$ (neighbour $j$); subbasin $p$; MODFLOW layer $\ell$ (also $\ell'$); aquifer profile $a$; boundary $\beta$; polygon corner $v$; time step $n$ (superscript); Raven soil layer $m$ (\cmd{SOIL[$m$]}).}\\\midrule
+$A_k$ & HRU area (\cmd{AREA}, \cmd{.rvh}); $10^6A_k$ in m$^2$ & km$^2$\\
+$A_{k,i}$, $A^{\mathrm{cov}}_i$ & overlap of HRU $k$ and column $i$; area of column $i$ covered by coupled HRUs & m$^2$\\
+$|\Omega_i|$ & area of cell $i$ (the polygon $\Omega_i$) & m$^2$\\
 $C$ & conductance & m$^2$/d\\
 $d_s$, $d_x$, $d_0$ & seepage smoothing depth; ET extinction depth; initial depth to water & m\\
-$\Delta$, $\dt$ & cell size; time step & m, d\\
+$d_{\mathrm{sz},a}$, $D_a$ & \cmd{SOIL\_ZONE\_DEPTH}, \cmd{DEFAULT\_BEDROCK\_DEPTH} of profile $a$ & m\\
+$\bar d^{\,\mathrm{st}}_i$ & mean depth of water in a surface store over column $i$ & m\\
+$\Delta$, $\dt$, $t_{\mathrm{end}}$ & cell size (\cmd{:GridCellSize}); time step; run duration & m, d, d\\
+$\delta_b$ & seed spacing along HRU boundaries (HRU mesh) & m\\
 $h$, $z^{\mathrm{wt}}$ & head; water table of a column (highest wet cell) & m\\
+$h_{\mathrm{gw}}$, $h_{\mathrm{res}}$ & local groundwater level of a reservoir; reservoir stage & m\\
 $K$, $K_h$, $K_v$, $K_b$ & hydraulic conductivity; horizontal; vertical; riverbed & m/d\\
-$k$ & reservoir seepage constant & m$^3$/s/m\\
-$L$, $L_s$ & leakance (stores); seepage leakance & 1/d\\
+$k_{\mathrm{seep}}$ & reservoir seepage constant & m$^3$/s/m\\
+$L_p$, $L_{p,i}$ & river length of subbasin $p$ on active cells; in cell $i$ & m\\
+$\Lambda$, $\Lambda_s$ & leakance (stores); seepage leakance & 1/d\\
+$\mathrm{lat}$, $\mathrm{lon}$ & latitude, longitude & degrees\\
+$N_v$ & number of corners of a polygon & --\\
+$\phi^{\mathrm{st}}_k$ & water in a Raven surface store of HRU $k$ & mm\\
 $Q$, $q$ & flow (positive into the aquifer for boundaries) & m$^3$/d\\
-$r_k$ & recharge depth of HRU $k$ in a step & mm\\
-$s$, $s_k$ & river stage; store depth & m\\
+$Q^{\mathrm{out}}_p$ & channel flow of subbasin $p$ & m$^3$/s\\
+$R_\oplus$ & radius of the Earth (sphere) & m\\
+$r_k$, $r_i$ & recharge depth of HRU $k$ in a step; recharge rate of cell $i$ & mm, m/d\\
+$s$ & river stage & m\\
 $S_s$, $S_y$ & specific storage; specific yield & 1/m, --\\
+$\mathcal{S}_i$ & storage capacity of cell $i$ & m$^2$\\
 $T$ & transmissivity & m$^2$/d\\
 $\tau$ & recharge delay time constant & d\\
 $V$ & volume & m$^3$\\
+$V^{\mathrm{dl}}_k$, $V^{\mathrm{carry},n}_p$, $V^{\mathrm{st}}_{k,i}$ & recharge delay store; river loss carried out of step $n$; store water of HRU $k$ in cell $i$ & m$^3$\\
 $z_{\mathrm{land}}$, $z_{\mathrm{top}}$, $z_{\mathrm{br}}$, $z_{\mathrm{bed}}$ & land surface, model top, bedrock, riverbed elevations & m\\\bottomrule
 \end{longtable}

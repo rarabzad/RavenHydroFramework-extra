@@ -7,7 +7,7 @@ surface down to bedrock, which MODFLOW files are written, and how MODFLOW solves
 \subsection{Which HRUs are coupled}
 An HRU is \emph{coupled} when its \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh} file names a profile defined in the
 \cmd{.rvp} file. HRUs with \cmd{[NONE]} (or an empty entry) keep Raven's usual behaviour. Disabled HRUs are never
-coupled (Raven prints a warning). We write $\mathcal{K}$ for the set of coupled HRUs and $p(k)$ for the profile of HRU $k$.
+coupled (Raven prints a warning). We write $\mathcal{K}$ for the set of coupled HRUs and $a(k)$ for the aquifer profile of HRU $k$.
 
 Raven checks two rules at start-up:
 \begin{itemize}
@@ -18,20 +18,20 @@ Raven warns so the user can restrict the process with \cmd{:-->Conditional}.
 \end{itemize}
 
 \subsection{Map projection}
-The HRU polygons are read from a GeoJSON file. GeoJSON coordinates are longitude $\lambda$ and latitude $\phi$ in
+The HRU polygons are read from a GeoJSON file. GeoJSON coordinates are longitude $\mathrm{lon}$ and latitude $\mathrm{lat}$ in
 degrees, which cannot be used directly for areas and distances. Raven converts them to metres with the
 \emph{Lambert azimuthal equal-area} projection \cite{snyder1987map}, centred on the average centroid
-$(\lambda_0,\phi_0)$ of the coupled HRUs, on a sphere of radius $R=6\,371\,007.181$ m:
+$(\mathrm{lon}_0,\mathrm{lat}_0)$ of the coupled HRUs, on a sphere of radius $R_\oplus=6\,371\,007.181$ m:
 \begin{align}
-k' &= \sqrt{\frac{2}{1+\sin\phi_0\sin\phi+\cos\phi_0\cos\phi\cos(\lambda-\lambda_0)}},\\
-x &= R\,k'\cos\phi\,\sin(\lambda-\lambda_0),\\
-y &= R\,k'\left[\cos\phi_0\sin\phi-\sin\phi_0\cos\phi\cos(\lambda-\lambda_0)\right].
+\kappa &= \sqrt{\frac{2}{1+\sin\mathrm{lat}_0\sin\mathrm{lat}+\cos\mathrm{lat}_0\cos\mathrm{lat}\cos(\mathrm{lon}-\mathrm{lon}_0)}},\\
+x &= R_\oplus\,\kappa\cos\mathrm{lat}\,\sin(\mathrm{lon}-\mathrm{lon}_0),\\
+y &= R_\oplus\,\kappa\left[\cos\mathrm{lat}_0\sin\mathrm{lat}-\sin\mathrm{lat}_0\cos\mathrm{lat}\cos(\mathrm{lon}-\mathrm{lon}_0)\right].
 \end{align}
 The reverse conversion (used to look up map values at cell locations) is
 \begin{align}
-\rho&=\sqrt{x^2+y^2},\qquad c=2\arcsin\frac{\rho}{2R},\\
-\phi&=\arcsin\!\left(\cos c\sin\phi_0+\frac{y\sin c\cos\phi_0}{\rho}\right),\\
-\lambda&=\lambda_0+\operatorname{atan2}\!\left(x\sin c,\;\rho\cos\phi_0\cos c-y\sin\phi_0\sin c\right).
+\rho&=\sqrt{x^2+y^2},\qquad c=2\arcsin\frac{\rho}{2R_\oplus},\\
+\mathrm{lat}&=\arcsin\!\left(\cos c\sin\mathrm{lat}_0+\frac{y\sin c\cos\mathrm{lat}_0}{\rho}\right),\\
+\mathrm{lon}&=\mathrm{lon}_0+\operatorname{atan2}\!\left(x\sin c,\;\rho\cos\mathrm{lat}_0\cos c-y\sin\mathrm{lat}_0\sin c\right).
 \end{align}
 \begin{plain}
 This projection keeps areas correct, which is what matters for water volumes: one square kilometre on the map is one
@@ -43,12 +43,12 @@ By default a square grid with cell size $\Delta$ (\cmd{:GridCellSize}, default 1
 coupled HRUs. Rows are numbered from north to south and columns from west to east. The plan-view cell (a whole column of
 layers) is indexed $i$; its lower-left corner is $(x_0+c\Delta,\;y_0+(n_r-1-r)\Delta)$ for row $r$ and column $c$. Rotated
 grids, grids refined around rivers and wells, quadtree grids, meshes that follow HRU boundaries and imported cells are
-described in Section~\ref{sec:gridtypes}; everything below applies to all of them, with cell $i$ a polygon of area $A_i$.
+described in Section~\ref{sec:gridtypes}; everything below applies to all of them, with cell $i$ a polygon $\Omega_i$ of area $|\Omega_i|$.
 
 \subsection{Polygon areas}
-The area of a polygon with corners $(x_1,y_1),\dots,(x_n,y_n)$ is given by the shoelace formula
+The area of a polygon with $N_v$ corners $(x_1,y_1),\dots,(x_{N_v},y_{N_v})$ is given by the shoelace formula
 \begin{equation}
-A=\tfrac12\sum_{j=1}^{n}\left(x_jy_{j+1}-x_{j+1}y_j\right),\qquad (x_{n+1},y_{n+1})=(x_1,y_1).
+A=\tfrac12\sum_{v=1}^{N_v}\left(x_vy_{v+1}-x_{v+1}y_v\right),\qquad (x_{N_v+1},y_{N_v+1})=(x_1,y_1).
 \end{equation}
 The result is positive when the corners run counter-clockwise. Raven orients outer boundaries counter-clockwise and
 holes clockwise, so the area of a polygon with holes is simply the sum over all its rings.
@@ -78,10 +78,10 @@ Every flow from this HRU to the grid is split 40/35/25.
 A column is \emph{active} when the coupled HRUs cover at least a fraction $f_{\min}$ (\cmd{:MinCellCoverage}, default
 0.25) of it:
 \begin{equation}
-a_i=\sum_{k\in\mathcal{K}}A_{k,i}\ \ge\ f_{\min}\,\Delta^2 .
+A^{\mathrm{cov}}_i=\sum_{k\in\mathcal{K}}A_{k,i}\ \ge\ f_{\min}\,|\Omega_i| .
 \end{equation}
 An active column takes the profile of the HRU with the largest overlap (the \emph{dominant} HRU),
-$p(i)=p\!\left(\arg\max_k A_{k,i}\right)$. Fluxes still use the exact overlaps, so a column shared by two HRUs receives
+$a(i)=a\!\left(\arg\max_k A_{k,i}\right)$. Fluxes still use the exact overlaps, so a column shared by two HRUs receives
 water from both.
 
 The table of overlaps $A_{k,i}$ over active columns is called the \emph{linkage}. It is the single source of truth for
@@ -220,9 +220,9 @@ two dots sit on opposite sides of an HRU boundary, at the same distance from it,
 on that boundary. Raven places its dots this way, so the cells follow the HRU boundaries. In detail, with
 \cmd{:GridType HRU\_MESH} the seed points are:
 \begin{enumerate}
-\item along every HRU boundary, pairs of seeds mirrored across the boundary at spacing $s_b=\min(\Delta/2,$ smallest
+\item along every HRU boundary, pairs of seeds mirrored across the boundary at spacing $\delta_b=\min(\Delta/2,$ smallest
 line refinement size (\cmd{RIVERS}, \cmd{LINES})$)$, or the \cmd{LAKES}/\cmd{POLYGONS} size where the boundary passes within
-one such size of a refinement polygon, and $0.3\,s_b$ from it --- the face between the two seeds of a pair lies on the boundary;
+one such size of a refinement polygon, and $0.3\,\delta_b$ from it --- the face between the two seeds of a pair lies on the boundary;
 \item seeds along refinement lines (rivers run through cell centres), in rings around refinement points (wells), and on a
 staggered lattice of the target size inside and within one size around refinement polygons (lakes); seeds outside the
 model's box (e.g.\ a monitoring well outside the model) are left out;
@@ -300,10 +300,12 @@ For each active column Raven needs three elevations:
 \begin{description}
 \item[Land surface] $z_{\mathrm{land},i}$: the average of 25 points ($5\times5$) of the DEM over the cell
 (\cmd{:LandSurface}); without a DEM, the area-weighted \cmd{ELEVATION} of the HRUs in the cell.
-\item[Model top] $z_{\mathrm{top},i}=z_{\mathrm{land},i}-d_{\mathrm{sz},p}$, where $d_{\mathrm{sz}}$ is the profile's
-\cmd{SOIL\_ZONE\_DEPTH} (default 0, so the top is the land surface).
+\item[Model top] $z_{\mathrm{top},i}=z_{\mathrm{land},i}-d_{\mathrm{sz},a}$, where $d_{\mathrm{sz},a}$ is the
+\cmd{SOIL\_ZONE\_DEPTH} of the column's profile $a=a(i)$ (default 0, so the top is the land surface). With the soil-zone
+coupling (\cmd{:SoilZone PHYSICAL}) \cmd{SOIL\_ZONE\_DEPTH} is ignored for HRUs with a soil zone: the soil-zone thickness
+is the sum of the listed soil layers.
 \item[Bedrock] $z_{\mathrm{br},i}$: the average of 25 points of the bedrock map (\cmd{:BedrockSurface}); without a map,
-$z_{\mathrm{land},i}-D_p$ with $D_p$ the profile's \cmd{DEFAULT\_BEDROCK\_DEPTH}.
+$z_{\mathrm{land},i}-D_a$ with $D_a$ the profile's \cmd{DEFAULT\_BEDROCK\_DEPTH}.
 \end{description}
 A column whose bedrock lies less than 0.5 m below its top has no room for an aquifer and is made inactive.
 
@@ -413,7 +415,7 @@ $f_{\min}$ & \cmd{:MinCellCoverage} & \cmd{.rvg} option & -- & Sec.~\ref{app:com
 $P_k$ & HRU polygon & \cmd{:HRUGeometry} (\cmd{.rvg}) & -- & Sec.~\ref{app:commands}\\
 $z_{\mathrm{land}}$ & land surface & \cmd{:LandSurface} (\cmd{.rvg}); else HRU \cmd{ELEVATION} & m & Sec.~\ref{app:commands}\\
 $z_{\mathrm{br}}$ & bedrock & \cmd{:BedrockSurface} (\cmd{.rvg}); else \cmd{DEFAULT\_BEDROCK\_DEPTH} (aquifer profile) & m & Sec.~\ref{app:profile}\\
-$d_{\mathrm{sz}}$ & \cmd{SOIL\_ZONE\_DEPTH} & aquifer profile & m & Sec.~\ref{app:profile}\\
+$d_{\mathrm{sz},a}$ & \cmd{SOIL\_ZONE\_DEPTH} & aquifer profile $a$ & m & Sec.~\ref{app:profile}\\
 $b_\ell$ & layer thickness, type & aquifer profile (\cmd{:AquiferProfiles}) & m & Sec.~\ref{app:layers}\\
 $K_h$, $K_v$ & \cmd{K\_HORIZ}, \cmd{K\_VERT} & aquifer class of the layer & m/d & Sec.~\ref{app:class}\\
 $S_s$, $S_y$ & \cmd{SPEC\_STORAGE}, \cmd{SPEC\_YIELD} & aquifer class of the layer & 1/m, -- & Sec.~\ref{app:class}\\
@@ -488,8 +490,8 @@ IMS setting & Value & Meaning\\\midrule
 
 \section{How MODFLOW solves each time step}\label{ch:mf6}
 \subsection{Time steps}
-MODFLOW's time steps are generated from Raven's \cmd{:StartDate}, \cmd{:Duration} and \cmd{:TimeStep}: one transient
-stress period of $N=\mathrm{round}(T/\dt)$ steps of length $\dt$, preceded by a one-day steady-state period when
+MODFLOW's time steps are generated from Raven's \cmd{:StartDate}, \cmd{:Duration} ($t_{\mathrm{end}}$) and \cmd{:TimeStep} ($\dt$): one transient
+stress period of $N=\mathrm{round}(t_{\mathrm{end}}/\dt)$ steps of length $\dt$, preceded by a one-day steady-state period when
 \cmd{:GWInitialization STEADY\_STATE} is used. MODFLOW therefore always takes exactly one step for each Raven step.
 If Raven would run more steps than MODFLOW holds, Raven stops with a clear message.
 
