@@ -115,7 +115,7 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         if physical:
             f.write(':SoilZone PHYSICAL SOIL[0] SOIL[1]\n:SoilZoneSubgrid %d\n' % subgrid)
         if iteration:
-            f.write(':SoilZoneIteration %d %g %g %g\n' % iteration)
+            f.write(':SoilZoneIteration %d %g %g\n' % iteration)
         if steady is not None:
             f.write(':GWInitialization STEADY_STATE %g\n' % steady)
         if chd is not None:  # fixed head along the downslope edge: thin polygon over the last cell column

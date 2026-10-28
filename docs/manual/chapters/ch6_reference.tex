@@ -184,7 +184,10 @@ wells specified, wells actual [m$^3$/d] & requested and delivered well rates\\
 GHB, CHD [m$^3$/d] & boundary flows (positive into the aquifer)\\
 surface-store leakage / discharge [m$^3$/d], applied [m$^3$] & wetland and lake exchange\\
 reservoir seepage sent, delivered [m$^3$/d], awaiting delivery [m$^3$] & reservoir exchange\\
-reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that a drying cell could not supply; taken back from the water reaching the subbasin in the same step (normally 0)\\\bottomrule
+reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that a drying cell could not supply; taken back from the water reaching the subbasin in the same step (normally 0)\\
+soil zone to aquifer, aquifer to soil zone [m$^3$/d] & \cmd{:SoilZone PHYSICAL}: soil-zone exchange, each direction\\
+rejected recharge, soil-zone overflow, exchange applied to Raven, shortfall [m$^3$] & Section~\ref{ch:soilzone}; shortfall is 0\\
+interface updates, converged, change [m] & soil-zone interface iteration of the step\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -207,6 +210,7 @@ Recharge leaving Raven equals recharge entering MODFLOW; on this wet June day th
 \begin{tabular}{P{0.25\linewidth}P{0.698\linewidth}}\toprule\hdr
 File & Content\\\midrule
 \cmd{GWHRUState.csv} & per coupled HRU: overlap-weighted mean water table of its columns and mean depth to water\\
+\cmd{GWSoilExchange.csv} & \cmd{:SoilZone PHYSICAL}: per soil-zone HRU and step, soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge, overflow, soil water and capacity, interface updates and change (Section~\ref{ch:soilzone})\\
 \cmd{GWHeads.csv} & head at each monitoring well, from $t=0$ (missing value $-1.2345$ when the screened cell is dry)\\
 \cmd{GWConnectivity.csv} & number of separate wet areas; wet fraction of each profile\\
 \cmd{mf6/grid\_cells.geojson} & every cell as a lon/lat polygon: number, active, profile, dominant HRU, area\\
@@ -216,7 +220,7 @@ File & Content\\\midrule
 \cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds})\\
 \cmd{Diagnostics.csv} & Raven's usual file, now also with \cmd{GW\_HEAD} statistics\\
 \cmd{Watershed\allowbreak Storage.csv} & Raven's balance; includes all exchanged water\\
-\cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}\\\bottomrule
+\cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}\\\bottomrule
 \end{tabular}
 \end{table}
 

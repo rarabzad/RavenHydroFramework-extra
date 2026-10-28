@@ -158,6 +158,16 @@ STEPS = [
     ('usgs_capture', True, lambda: [PY, 'existing/usgs_capture.py', USGS], last_line(r'capture checks: ALL PASSED'), 3 * 3600),
     ('ext_fuzz', True, [PY, 'existing/fuzz_ext.py', FE[0], FE[1]],
      fuzz_json(lambda: [os.path.join(tc.WORK, 'extmodel', 'fz_results_%s.json' % FE[0])]), 12 * 3600),
+    # :SoilZone PHYSICAL (docs/design/soil_zone_coupling_plan.md section 9)
+    ('soilzone_unit', False, '%s soilzone/soilzone_unit.cpp %s/GWSoilZone.cpp -o %s/soilzone_unit && %s/soilzone_unit'
+     % (cxx, ROOT, LOGS, LOGS), last_line(r'soil-zone unit tests: \d+ checks, 0 failed'), 600),
+    ('soilzone_spike', True, [PY, 'soilzone/spike_xmi.py'], last_line(r'spike: ALL PASSED'), 1800),
+    ('soilzone_column', True, [PY, 'soilzone/test_column.py'], last_line(r'column tests: ALL PASSED'), 1800),
+    ('soilzone_hillslope', True, [PY, 'soilzone/test_hillslope.py'], last_line(r'T2/T3 hillslope: PASS'), 1800),
+    ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
+    ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
+    ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
+    ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
 
 have_lib = bool(tc.MF6LIB) and os.path.exists(tc.MF6LIB)

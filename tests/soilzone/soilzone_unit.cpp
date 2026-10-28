@@ -1,4 +1,4 @@
-// Unit tests of the soil-zone interface functions (src/GWSoilZone.cpp), plan §9.1 G1-G6 plus randomized checks.
+// Unit tests of the soil-zone interface functions (src/GWSoilZone.cpp), plan §9.1 G1-G7 plus randomized checks.
 // build: g++ -std=c++11 -O2 -I$RAVEN_SRC/src soilzone_unit.cpp $RAVEN_SRC/src/GWSoilZone.cpp -o soilzone_unit
 #include "GWSoilZone.h"
 #include <cstdio>
@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <vector>
 #include <random>
+#include <algorithm>
 using namespace gwsz;
 using std::vector;
 
@@ -46,55 +47,87 @@ int main()
   { vector<double> p={50,0}; Fill(L,p,40); check(close(SatThickness(L,p),0.0),"G4 deficit fill does not raise the level");
     Fill(L,p,60); check(close(SatThickness(L,p),0.25),"G4 then free water raises it",SatThickness(L,p),0.25); }
 
-  //-- local solve: hand case. A=1e4 m2, dt=1 d, one link C=100 m2/d, zb=0, h=0.5, soil (100,0): upward flow into soil.
-  // root: dV = c*C*(h - lambda), lambda = dV/1000/0.2 m (dV mm); c=1000*1/1e4=0.1 -> dV = 10*(0.5 - dV/200) -> dV=5/1.05
+  //-- local solve: hand case. A=1e4 m2, dt=1 d, one sample (zb=0), step connection, C=100 m2/d, h=0.5, soil (100,0):
+  // upward flow into soil. root: dV = c*C*(h - lambda), lambda = dV/1000/0.2 m (dV mm); c=0.1 -> dV = 10*(0.5 - dV/200)
+  sz_cell one; one.zbs=vector<double>(1,0.0); one.ds=0.0; one.D=1.0; one.C=100.0;
   {
-    vector<double> p={100,0}; vector<sz_link> lk(1); lk[0].Ceff=100; lk[0].zb=0; lk[0].h=0.5;
-    double dV,ovf; double lam=LocalSolve(L,p,lk,1e4,1.0,dV,ovf);
+    vector<double> p={100,0}; double dV,ovf,lp; double lam=LocalSolve(L,p,one,0.5,0.5,1e4,1.0,dV,ovf,lp);
     double want=5.0/1.05;
     check(close(dV,want,1e-10),"local solve hand case dV",dV,want);
     check(close(lam,want/200.0,1e-10),"local solve hand case lambda",lam,want/200.0);
+    check(close(lp,1.0/200.0,1e-9),"local solve hand case dlambda/dV",lp,1.0/200.0);
   }
   //-- full: huge head -> overflow equals excess
   {
-    vector<double> p={190,190}; vector<sz_link> lk(1); lk[0].Ceff=1e4; lk[0].zb=0; lk[0].h=5.0;
-    double dV,ovf; double lam=LocalSolve(L,p,lk,1e4,1.0,dV,ovf);
+    sz_cell c1=one; c1.C=1e4;
+    vector<double> p={190,190}; double dV,ovf,lp; double lam=LocalSolve(L,p,c1,5.0,5.0,1e4,1.0,dV,ovf,lp);
     // full: lambda=1, q=C*(1-5)= -4e4 m3/d up, needs 4e4 m3 = 4000 mm; room 20 mm -> overflow 3980 mm
-    check(close(lam,1.0)&&close(dV,20)&&close(ovf,3980,1e-9),"G5 local solve full -> overflow",ovf,3980);
+    check(close(lam,1.0)&&close(dV,20)&&close(ovf,3980,1e-9)&&(lp==0.0),"G5 local solve full -> overflow",ovf,3980);
   }
   //-- drain case: saturated soil above a lower head
   {
-    vector<double> p={200,150}; vector<sz_link> lk(1); lk[0].Ceff=50; lk[0].zb=0; lk[0].h=0.2;
-    double dV,ovf; double lam=LocalSolve(L,p,lk,1e4,1.0,dV,ovf);
+    sz_cell c1=one; c1.C=50;
+    vector<double> p={200,150}; double dV,ovf,lp; double lam=LocalSolve(L,p,c1,0.2,0.2,1e4,1.0,dV,ovf,lp);
     double g=dV+0.1*50*(lam-0.2);
     check(std::fabs(g)<1e-9 && dV<0 && ovf==0,"local solve drain: residual",g,0);
   }
+  //-- sub-grid level: inverse pair, limits, slope
+  {
+    sz_cell c; c.zbs={0.0,0.2,0.2,0.9,1.5}; c.ds=0.3; c.D=1.0; c.C=1.0; bool ok=true;
+    for (double lam=0.0;lam<=1.0;lam+=0.01){double Lv=SubgridLevel(c,lam); if (std::fabs(SubgridThickness(c,Lv)-lam)>1e-12){ok=false;}}
+    ok&=close(SubgridLevel(c,0.0),0.0) && close(SubgridLevel(c,1.0),2.5);
+    for (double lam=0.013;lam<0.99;lam+=0.0371){double d; double Lv=SubgridLevel(c,lam,&d); double fd=(SubgridLevel(c,lam+1e-7)-SubgridLevel(c,lam-1e-7))/2e-7;
+      if (std::fabs(fd-d)>1e-5*std::max(1.0,d) && std::fabs(SubgridThickness(c,Lv+1e-6)-SubgridThickness(c,Lv-1e-6))>1e-9){ok=false;}}
+    check(ok,"SubgridLevel: inverse of SubgridThickness, limits, dLv/dlam");
+  }
+  //-- sub-grid flux: one sample is the plain link; derivatives; continuity in h (a sample joins at its own base)
+  {
+    double F,qh,qc,ql;
+    double q=SubgridFlux(one,0.3,0.5,0.5,F,qh,qc,ql);
+    check(close(q,100*(0.3-0.5))&&close(F,1.0)&&close(qh,-100)&&close(ql,100),"SubgridFlux one sample = C (zb + lambda - h)",q,-20);
+    sz_cell c; c.zbs={0.0,0.2,0.2,0.9,1.5}; c.ds=0.3; c.D=1.0; c.C=7.0; int bad=0,badj=0;
+    for (double lam=0.05;lam<1.0;lam+=0.11){
+      for (double h=-0.4;h<3.0;h+=0.0137){
+        double q0=SubgridFlux(c,lam,h,h,F,qh,qc,ql),q1=SubgridFlux(c,lam,h+1e-7,h+1e-7,F,qh,qc,ql),q2=SubgridFlux(c,lam,h-1e-7,h-1e-7,F,qh,qc,ql);
+        double fdh=(q1-q2)/2e-7; SubgridFlux(c,lam,h,h,F,qh,qc,ql);
+        double l1=SubgridFlux(c,lam+1e-7,h,h,F,qh,qc,ql),l2=SubgridFlux(c,lam-1e-7,h,h,F,qh,qc,ql); double fdl=(l1-l2)/2e-7; SubgridFlux(c,lam,h,h,F,qh,qc,ql);
+        bool kink=std::fabs((q1-q0)-(q0-q2))>1e-6*std::fabs(q1-q2)+1e-12 || std::fabs((l1-q0)-(q0-l2))>1e-6*std::fabs(l1-l2)+1e-12;
+        if (!kink && (std::fabs(fdh-(qh+qc))>1e-4*std::max(1.0,std::fabs(qh+qc)) || std::fabs(fdl-ql)>1e-4*std::max(1.0,std::fabs(ql)))){bad++;}
+        if (std::fabs(q1-q2)>1e-4){badj++;}   //no jump in h
+      }
+    }
+    check(bad==0,"SubgridFlux: dq/dh and dq/dlam match finite differences",bad,0);
+    check(badj==0,"SubgridFlux: continuous in h (samples join at their own base, even with ds=0.3)",badj,0);
+    int badj0=0; //straddle every sample base exactly (also where perched water stands above it)
+    for (double lam=0.05;lam<1.0;lam+=0.11){for (size_t i=0;i<c.zbs.size();i++){double z=c.zbs[i];
+      double q1=SubgridFlux(c,lam,z+1e-9,z+1e-9,F,qh,qc,ql),q2=SubgridFlux(c,lam,z-1e-9,z-1e-9,F,qh,qc,ql); if (std::fabs(q1-q2)>1e-6){badj0++;}}}
+    check(badj0==0,"SubgridFlux: continuous in h across each sample base (ds>0)",badj0,0);
+  }
 
-  //-- randomized: monotonicity of g, root residual, mass balance of Apply, contraction dlambda/dh in [0,1)
+  //-- randomized: monotonicity of g, root residual, mass balance of Apply, dlambda/dh in [0,1), Robin slope
   std::mt19937 rng(12345);
   std::uniform_real_distribution<double> U(0,1);
-  int bad_mono=0,bad_root=0,bad_mass=0,bad_contr=0,bad_cont=0,ncases=20000;
+  int bad_mono=0,bad_root=0,bad_mass=0,bad_contr=0,bad_cont=0,bad_slope=0,nslope=0,ncases=20000;
   for (int t=0;t<ncases;t++){
     int n=1+(int)(U(rng)*4);
-    vector<sz_layer> Lr(n); vector<double> p(n);
+    vector<sz_layer> Lr(n); vector<double> p(n); double D=0;
     for (int j=0;j<n;j++){
       Lr[j].H=0.05+U(rng)*2; double cap=Lr[j].H*1000*(0.1+0.5*U(rng)); Lr[j].phimax=cap; Lr[j].phifc=cap*(0.05+0.9*U(rng));
-      p[j]=U(rng)*cap*1.0;
+      p[j]=U(rng)*cap*1.0; D+=Lr[j].H;
     }
-    int nl=1+(int)(U(rng)*4); vector<sz_link> lk(nl);
-    for (int l=0;l<nl;l++){lk[l].Ceff=std::pow(10.0,-2+6*U(rng)); lk[l].zb=-0.5+U(rng); lk[l].h=lk[l].zb+(U(rng)-0.3)*3;
-      if (lk[l].h<lk[l].zb){lk[l].Ceff=0.0;}} //contact only above the base (F=0 below it)
-    double A=std::pow(10.0,2+4*U(rng)),dt=0.01+U(rng)*2;
-    double c=1000*dt/A,sC=0,sR=0; for (int l=0;l<nl;l++){sC+=lk[l].Ceff; sR+=lk[l].Ceff*(lk[l].zb-lk[l].h);}
+    sz_cell cl; int ns=1+(int)(U(rng)*9); for (int k=0;k<ns;k++){cl.zbs.push_back(-1.0+2.0*U(rng));} std::sort(cl.zbs.begin(),cl.zbs.end());
+    cl.ds=(U(rng)<0.2)?0.0:0.01+U(rng); cl.D=D; cl.C=std::pow(10.0,-2+6*U(rng));
+    double h=-1.5+(4.0+D)*U(rng);
+    double A=std::pow(10.0,2+4*U(rng)),dt=0.01+U(rng)*2,c=1000*dt/A,F,qh,qc,ql;
+    auto gAt=[&](double dv,double hh){vector<double> w=p; double sh; Apply(Lr,w,dv,sh); return dv+c*SubgridFlux(cl,SatThickness(Lr,w),hh,hh,F,qh,qc,ql);};
     // monotonicity on a grid of dV
     double lo=-StackFreeWater(Lr,p),hi=Room(Lr,p),gprev=-1e300;
     for (int s=0;s<=50;s++){
-      double dv=lo+(hi-lo)*s/50.0; vector<double> w=p; double sh; Apply(Lr,w,dv,sh);
-      double g=dv+c*(sR+sC*SatThickness(Lr,w));
+      double dv=lo+(hi-lo)*s/50.0, g=gAt(dv,h);
       if (g<gprev-1e-9*std::max(1.0,std::fabs(g))){bad_mono++; break;} gprev=g;
     }
     { // a jump persists when the interval shrinks; a steep but continuous change does not
-      double sumH=0; for (int j=0;j<n;j++){sumH+=Lr[j].H;}
+      double sumH=D;
       auto lamAt=[&](double dv){vector<double> w=p; double sh; Apply(Lr,w,dv,sh); return SatThickness(Lr,w);};
       for (int s=0;s<200;s++){
         double a=lo+(hi-lo)*s/200.0,b=lo+(hi-lo)*(s+1)/200.0, la=lamAt(a), lb=lamAt(b);
@@ -103,21 +136,32 @@ int main()
         if (std::fabs(lb-la)>1e-6*sumH){bad_cont++; break;}
       }
     }
-    double dV,ovf; double lam=LocalSolve(Lr,p,lk,A,dt,dV,ovf);
-    if (sC>0 && ovf==0 && dV>lo+1e-12 && dV<hi-1e-12){
-      double g=dV+c*(sR+sC*lam);
+    double dV,ovf,lp; double lam=LocalSolve(Lr,p,cl,h,h,A,dt,dV,ovf,lp);
+    double q=SubgridFlux(cl,lam,h,h,F,qh,qc,ql);
+    if (F>0 && ovf==0 && dV>lo+1e-12 && dV<hi-1e-12){
+      double g=dV+c*q;
       if (std::fabs(g)>1e-7*std::max(1.0,std::fabs(dV))){bad_root++;}
     }
     // mass: Apply(dV) changes total by dV - overflow
     { vector<double> w=p; double sh; double o=Apply(Lr,w,dV,sh); double s0=0,s1=0; for (int j=0;j<n;j++){s0+=p[j]; s1+=w[j];}
       if (std::fabs((s1-s0)-(dV-o))>1e-8*std::max(1.0,std::fabs(dV))+1e-9 || sh>0){bad_mass++;} }
-    // contraction: perturb one head by 1 mm (only where the link is in contact and the soil is neither full nor at its floor)
-    if (sC>0 && ovf==0){
-      int l0=0; while (l0<nl && lk[l0].Ceff==0){l0++;}
-      if (l0<nl){
-        vector<sz_link> lk2=lk; lk2[l0].h+=1e-3; double dV2,o2; double lam2=LocalSolve(Lr,p,lk2,A,dt,dV2,o2);
-        double d=(lam2-lam)/1e-3;
-        if (o2==0 && (d<-1e-6 || d>=1.0+1e-9)){bad_contr++;}
+    // perturb the head by 1e-5 m: dlambda/dh and the total slope dq/dh = q_h/(1 + c q_lam lambda') of the boundary
+    // MODFLOW gets match finite differences (lambda can fall as h rises: a rising water table connects more samples, and
+    // where the soil water stands above the water table they drain into the aquifer)
+    if (F>0 && ovf==0){
+      double dV2,o2,lp2,dV3,o3,lp3;
+      double lam2=LocalSolve(Lr,p,cl,h+1e-5,h+1e-5,A,dt,dV2,o2,lp2),lam3=LocalSolve(Lr,p,cl,h-1e-5,h-1e-5,A,dt,dV3,o3,lp3);
+      double F2,F3,a1,a2,a3;
+      double q2=SubgridFlux(cl,lam2,h+1e-5,h+1e-5,F2,a1,a3,a2),q3=SubgridFlux(cl,lam3,h-1e-5,h-1e-5,F3,a1,a3,a2);
+      double d=(lam2-lam3)/2e-5;
+      double qmid=0.5*(q2+q3);
+      bool smooth=std::fabs(qmid-q)<1e-7*std::max(1.0,std::fabs(q)) && std::fabs(0.5*(lam2+lam3)-lam)<1e-9*std::max(1.0,lam);
+      if (o2==0 && o3==0 && smooth){
+        nslope++;
+        double dl=-lp*c*(qh+qc)/(1.0+c*ql*lp);   //implicit function theorem on dV + c q(lambda(dV),h) = 0
+        if (std::fabs(d-dl)>1e-3*std::max(std::fabs(dl),1e-9)+1e-9){bad_contr++;}
+        double pred=(qh+qc)/(1.0+c*ql*lp), fd=(q2-q3)/2e-5;
+        if (std::fabs(fd-pred)>1e-3*std::max(std::fabs(pred),1e-6*cl.C)+1e-8){bad_slope++;}
       }
     }
   }
@@ -125,36 +169,13 @@ int main()
   check(bad_root==0,"random: root residual",bad_root,0);
   check(bad_cont==0,"random: lambda has no jumps along dV",bad_cont,0);
   check(bad_mass==0,"random: Apply mass balance",bad_mass,0);
-  check(bad_contr==0,"G6 random: dlambda/dh in [0,1)",bad_contr,0);
-  //-- saturated fraction
+  check(bad_contr<=nslope/1000,"G6 random: dlambda/dh = -lambda' c q_h/(1 + c q_lam lambda') (finite difference)",bad_contr,nslope);
+  check(bad_slope<=nslope/1000 && nslope>5000,"G7 random: boundary slope dq/dh = q_h/(1 + c q_lam lambda') (finite difference)",bad_slope,nslope);
+  //-- connected fraction
   { vector<double> z={0.0}; check(SatFraction(-0.1,z,0.5)==0.0 && SatFraction(0.6,z,0.5)==1.0 && close(SatFraction(0.25,z,0.5),0.5),"SatFraction ramp"); }
   { vector<double> z={0.0,1.0}; check(close(SatFraction(0.5,z,0.0),0.5),"SatFraction sub-grid sharp"); }
-  { vector<double> z={0.0,0.3,0.7}; int bad=0;
-    for (double h=-0.2;h<1.5;h+=0.0137){double d=(SatFraction(h+1e-6,z,0.5)-SatFraction(h-1e-6,z,0.5))/2e-6; if (std::fabs(d-SatFractionSlope(h,z,0.5))>1e-4){bad++;}}
-    check(bad==0,"SatFractionSlope = dF/dh",bad,0); }
-  { vector<double> z={0.0,0.3,0.7}; bool ok=true;
-    ok&=close(ConnectedBase(-0.5,z,0.2),0.0);                       //nothing connected: the lowest base
-    ok&=close(ConnectedBase(2.0,z,0.2),(0.0+0.3+0.7)/3.0);          //all connected: the mean
-    for (double h=-0.2;h<1.2;h+=0.01){double b=ConnectedBase(h,z,0.2); if (SatFraction(h,z,0.2)>0 && !(b<h)){ok=false;}}
-    double c1=ConnectedBase(0.3-1e-9,z,0.2),c2=ConnectedBase(0.3+1e-9,z,0.2); ok&=std::fabs(c1-c2)<1e-6;  //continuous
-    check(ok,"ConnectedBase: lowest base, mean, below h when F>0, continuous"); }
-  //-- G7: one link (a soil-zone column): dlambda/dh from the slope of lambda at the root = finite difference
-  { std::mt19937 rng(7); std::uniform_real_distribution<double> U(0.0,1.0); int bad=0,tested=0;
-    for (int it=0;it<20000;it++){
-      int n=1+(int)(U(rng)*3); vector<sz_layer> Lr(n); vector<double> p(n);
-      for (int j=0;j<n;j++){Lr[j].H=0.1+U(rng); Lr[j].phimax=Lr[j].H*1000*(0.2+0.3*U(rng)); Lr[j].phifc=Lr[j].phimax*(0.2+0.6*U(rng)); p[j]=Lr[j].phimax*U(rng);}
-      vector<sz_link> lk(1); lk[0].Ceff=1+1e4*U(rng); lk[0].zb=0; lk[0].h=-0.5+2.5*U(rng);
-      double A=1e3+1e5*U(rng),dt=0.04+U(rng),dV,ovf,lp; double lam=LocalSolve(Lr,p,lk,A,dt,dV,ovf,&lp);
-      double x=1000*dt/A*lk[0].Ceff*lp, pred=x/(1+x);
-      vector<sz_link> a=lk,b=lk; a[0].h-=1e-5; b[0].h+=1e-5; double d1,o1,d2,o2;
-      double la=LocalSolve(Lr,p,a,A,dt,d1,o1), lb=LocalSolve(Lr,p,b,A,dt,d2,o2);
-      double fd=(lb-la)/2e-5;
-      if (std::fabs((lb-lam)-(lam-la))>1e-3*std::fabs(lb-la)+1e-12){continue;} //a kink inside the stencil
-      tested++; if (std::fabs(fd-pred)>1e-5+1e-4*std::fabs(pred) || pred<0 || pred>=1){bad++;}
-    }
-    check(bad==0 && tested>10000,"G7 single link: dlambda/dh = c Ceff lambda'/(1 + c Ceff lambda')",bad,tested); }
   //-- column distribution: totals exact, bounds kept, gains never lower and losses never raise a column
-  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_tot=0,bad_bnd=0,bad_dir=0;
+  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_tot=0,bad_bnd=0,bad_dir=0,bad_fw=0;
     for (int it=0;it<20000;it++){
       int n=1+(int)(U(rng)*3),nc=1+(int)(U(rng)*6); vector<sz_layer> Lr(n);
       for (int j=0;j<n;j++){Lr[j].H=0.5; Lr[j].phimax=50+200*U(rng); Lr[j].phifc=0.5*Lr[j].phimax;}
@@ -170,11 +191,48 @@ int main()
           if (c[k][j]<-1e-9 || c[k][j]>Lr[j].phimax*(1+1e-12)+1e-9){bad_bnd++;}
           if ((tg[j]>m0 && c[k][j]<c0[k][j]-1e-12) || (tg[j]<m0 && c[k][j]>c0[k][j]+1e-12)){bad_dir++;}
         }
+        double fw=0; for (int k=0;k<nc;k++){fw+=w[k]*std::max(c0[k][j]-Lr[j].phifc,0.0);}
+        if ((tg[j]<m0) && (m0-tg[j]<=fw)){ //a loss that free water covers leaves columns at or below field capacity alone
+          for (int k=0;k<nc;k++){if ((c0[k][j]<=Lr[j].phifc && std::fabs(c[k][j]-c0[k][j])>1e-9*Lr[j].phimax) || (c[k][j]<std::min(c0[k][j],Lr[j].phifc)-1e-9)){bad_fw++;}}
+        }
       }
     }
     check(bad_tot==0,"Distribute: area-weighted totals equal the targets",bad_tot,0);
     check(bad_bnd==0,"Distribute: every column stays within [0, phimax]",bad_bnd,0);
-    check(bad_dir==0,"Distribute: gains never lower, losses never raise a column",bad_dir,0); }
+    check(bad_dir==0,"Distribute: gains never lower, losses never raise a column",bad_dir,0);
+    check(bad_fw==0,"Distribute: a loss comes from free water first (columns at field capacity keep their water)",bad_fw,0); }
+  //-- edge cases found by the checks
+  { vector<sz_layer> L2=TwoLayers(); vector<double> p={L2[0].phimax+10.0,0.0}; double tot0=p[0]+p[1];
+    double o=Fill(L2,p,10.0); check(close(p[0]+p[1]+o,tot0+10.0),"Fill keeps water above capacity in an overfull layer",p[0]+p[1]+o,tot0+10.0); }
+  { vector<sz_layer> L3(3); L3[0]={200,100,1}; L3[1]={0,0,0}; L3[2]={200,100,1}; vector<double> p={200,0,150};
+    double l=SatThickness(L3,p); check(std::isfinite(l),"SatThickness finite for a layer without free-water capacity",l,0);
+    vector<sz_layer> L4(1); L4[0]={100,100,1}; vector<double> p4={100}; check(SatThickness(L4,p4)==1.0,"SatThickness of a full layer at phimax==phifc",SatThickness(L4,p4),1.0); }
+  { sz_cell cb; cb.zbs={0.0,0.2}; cb.D=1.0; cb.ds=0.0; cb.C=10.0; double F,qh,qc,ql;
+    SubgridFlux(cb,0.1,2.0,2.0,F,qh,qc,ql); check(close(ql,10.0),"q_lam at a breakpoint of the soil water level",ql,10.0); }
+  { vector<sz_layer> L2=TwoLayers(); vector<vector<double> > c(2,vector<double>(2,50.0)); vector<double> w={0.45,0.45},tg={L2[0].phimax*1.1,10.0};
+    Distribute(L2,c,w,tg); double m0=w[0]*c[0][0]+w[1]*c[1][0],m1=w[0]*c[0][1]+w[1]*c[1][1];
+    check(close(m0,tg[0]) && close(m1,tg[1]),"Distribute: totals exact for weights not summing to 1 (remainder branch)",m0,tg[0]); }
+  { // connection head above the water table (secant/regula falsi steps): never drains more than the column holds, q_hc
+    // matches finite differences, and the local balance holds
+    std::mt19937 rg(777); std::uniform_real_distribution<double> V(0,1); int bshort=0,broot=0,bqc=0,nqc=0;
+    for (int t=0;t<20000;t++){
+      int n=1+(int)(V(rg)*3); vector<sz_layer> Lr(n); vector<double> p(n); double D=0;
+      for (int j=0;j<n;j++){Lr[j].H=0.05+V(rg); double cap=Lr[j].H*1000*(0.1+0.5*V(rg)); Lr[j].phimax=cap; Lr[j].phifc=cap*(0.05+0.9*V(rg)); p[j]=V(rg)*cap; D+=Lr[j].H;}
+      sz_cell cl; int ns=1+(int)(V(rg)*9); for (int k=0;k<ns;k++){cl.zbs.push_back(-1.0+2.0*V(rg));} std::sort(cl.zbs.begin(),cl.zbs.end());
+      cl.ds=(V(rg)<0.2)?0.0:0.01+V(rg); cl.D=D; cl.C=std::pow(10.0,-2+6*V(rg));
+      double h=-1.5+3.0*V(rg),hc=h+(V(rg)-0.3)*1.5,A=std::pow(10.0,2+4*V(rg)),dt=0.01+V(rg)*2,c=1000*dt/A;
+      double dV,ovf,lp,F,qh,qc,ql; double lam=LocalSolve(Lr,p,cl,h,hc,A,dt,dV,ovf,lp);
+      double q=SubgridFlux(cl,lam,h,hc,F,qh,qc,ql);
+      vector<double> w=p; double sh; Apply(Lr,w,-c*q-ovf,sh);  //book the solved exchange (and the overflow) on the column
+      if (sh>1e-9*std::max(1.0,c*std::fabs(q))){bshort++;}
+      if (ovf==0 && std::fabs(dV+c*q)>1e-7*std::max(1.0,std::fabs(dV))){broot++;}
+      if (cl.ds>0){double e=1e-6,a1,a2,a3,F1; double q1=SubgridFlux(cl,lam,h,hc+e,F1,a1,a2,a3),q2=SubgridFlux(cl,lam,h,hc-e,F1,a1,a2,a3);
+        double qm=SubgridFlux(cl,lam,h,hc,F1,a1,a2,a3);
+        if (std::fabs((q1-qm)-(qm-q2))<1e-6*std::fabs(q1-q2)+1e-12){nqc++; if (std::fabs((q1-q2)/(2*e)-qc)>1e-4*std::max(1.0,std::fabs(qc))){bqc++;}}}
+    }
+    check(bshort==0,"hc > h: the solved exchange never exceeds the column's water",bshort,0);
+    check(broot==0,"hc != h: local balance dV + c q = 0",broot,0);
+    check(bqc==0 && nqc>1000,"q_hc matches finite differences",bqc,nqc); }
   printf("soil-zone unit tests: %d checks, %d failed (%d random cases)\n",ncheck,nfail,ncases);
   return nfail?1:0;
 }

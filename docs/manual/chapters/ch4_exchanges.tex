@@ -1,21 +1,23 @@
 \chapter{Water exchanges between Raven and MODFLOW}\label{ch:c4}
-Raven and MODFLOW exchange water in eight ways (Table~\ref{tab:exchanges}). Each section below explains what the exchange represents and gives its equations. It then says what Raven does with the
+Raven and MODFLOW exchange water in eight ways, and in a ninth when the soil zone is coupled (Table~\ref{tab:exchanges}). Each section below explains what the exchange represents and gives its equations. It then says what Raven does with the
 result, which safeguards keep the water accounts exact, which inputs control it, where to see it in the outputs, and gives
 a worked example.
 
 \begin{plain}
 Water crosses between the two models in eight places. The two main ones are \emph{recharge} --- water soaking down from
 Raven's soil to the water table --- and \emph{seepage} --- groundwater coming back up where the water table reaches the ground.
-Rivers, lakes and reservoirs, wetlands, wells and evaporation from a shallow water table make up the rest. For each one this
+Rivers, lakes and reservoirs, wetlands, wells and evaporation from a shallow water table make up the rest. Optionally the
+water table can also rise into Raven's soil layers and exchange water with them directly (the soil zone). For each one this
 chapter gives the formula, a worked example with numbers, and the checks that make sure no water is created or lost on the
 way.
 \end{plain}
 \begin{table}[!htbp]\centering
-\caption{The eight exchanges between Raven and MODFLOW.}\label{tab:exchanges}\small
+\caption{The exchanges between Raven and MODFLOW.}\label{tab:exchanges}\small
 \begin{tabular}{lllll}\toprule\hdr
 Exchange & Direction & MODFLOW package & Raven side & Section\\\midrule
 Recharge & Raven $\to$ aquifer & RCH & \cmd{GROUNDWATER} & \ref{ch:recharge}\\
 Seepage & aquifer $\to$ Raven & DRN & lowest soil layer & \ref{ch:seepage}\\
+Soil zone (\cmd{PHYSICAL}) & both & GHB, WEL & soil-zone layers & \ref{ch:soilzone}\\
 Rivers & both & RIV & reach inflow & \ref{ch:rivers}\\
 Water-table ET & aquifer $\to$ air & EVT & unmet PET & \ref{ch:et}\\
 Wetlands, lakes & both & RIV & HRU store & \ref{ch:stores}\\
@@ -136,7 +138,8 @@ Raven's \cmd{GROUNDWATER} storage shows each day's recharge (mm) of every HRU.
 \textit{Can recharge be negative?} Only if a Raven process removes water from \cmd{GROUNDWATER}, which is forbidden in coupled
 HRUs; recharge is therefore never negative. \textit{Does recharge depend on the water table?} Not directly --- Raven decides
 it. If the water table reaches the surface, the extra water returns immediately as seepage (Section~\ref{ch:seepage}), which
-acts as ``rejected recharge''.
+acts as ``rejected recharge''. With \cmd{:SoilZone PHYSICAL} rejection is explicit: recharge falling on saturated ground stays in
+the soil (Section~\ref{ch:soilzone}).
 
 \section{Seepage: groundwater returning to the surface}\label{ch:seepage}
 Where the water table reaches the land surface, groundwater flows out: springs, wet meadows, seepage faces. Every active
@@ -152,7 +155,7 @@ where $L_s$ [1/d] is the aquifer profile parameter \cmd{SEEPAGE\_LEAKANCE} and $
 The factor $f$ rises smoothly from 0 at $d_s$ below the top to 1 at the top (Figure~\ref{fig:curves}b). Where the top cell is
 thinner than $d_s$, $d_s$ is limited to its thickness (MODFLOW does not accept a smoothing interval below the cell). Without this
 smoothing the drain would switch on abruptly, which makes the Newton iterations harder; with it, seepage starts gently
-as the water table approaches the surface.
+as the water table approaches the surface. Under \cmd{:SoilZone PHYSICAL} (Section~\ref{ch:soilzone}) the drain serves only the HRUs without a soil zone (its conductance is scaled by their share of the cell); HRUs with a soil zone exchange through the soil-zone conductance.
 
 \subsection{Back to Raven}
 Each column's seepage is shared among the HRUs above it by overlap:
@@ -201,6 +204,152 @@ $z_{\mathrm{top}}$ & land surface $-$ \cmd{SOIL\_ZONE\_DEPTH} & \cmd{:LandSurfac
 A large leakance makes the drain a strong outlet: the water table then stays within a few centimetres of the surface wherever
 the aquifer is full, and seepage follows recharge closely. A small leakance lets the water table rise above the surface
 (ponding in the model's sense) and delays seepage. Values of 0.1--10 d$^{-1}$ cover most cases; 1 d$^{-1}$ is the default.
+
+\section{The soil zone and the water table}\label{ch:soilzone}
+By default (\cmd{:SoilZone CONCEPTUAL}) Raven's soil and the aquifer meet only through recharge and the seepage drain:
+Raven's soil never sees the water table. With \cmd{:SoilZone PHYSICAL} the water table can rise into chosen Raven soil
+layers, saturated soil drains to the aquifer, recharge stops where the ground is saturated, and a full soil zone
+overflows to the surface --- the arrangement of GSFLOW \cite{markstrom2008gsflow}, where the soil zone sits above the
+MODFLOW domain.
+
+\begin{plain}
+Think of the soil layers you name (for example \cmd{SOIL[0]} and \cmd{SOIL[1]}) as the top of the aquifer, owned by
+Raven. MODFLOW starts below them. When the water table climbs to the bottom of the soil, it carries on rising inside the
+soil layers; rain falling on that saturated ground cannot soak down any more and stays in the soil, and once the soil is
+full the extra water runs off. When it is dry, saturated soil drains down into the aquifer again. On a slope this
+happens first at the bottom of the hill, because Raven checks the ground height at many points in each cell.
+\end{plain}
+
+\subsection{Who owns which depth}
+Raven owns the soil zone \cmd{SOIL[0]}\,\dots\,\cmd{SOIL[$M-1$]} of every coupled HRU with soil; MODFLOW owns everything
+below. The soil-zone thickness is $D_k=\sum_jH_j$ (the thicknesses of those layers in the HRU's soil profile) and the
+model top of column $i$ is
+\begin{equation}
+z_{\mathrm{top},i}=z_{\mathrm{land},i}-\frac{\sum_kA_{k,i}D_k}{\sum_kA_{k,i}},
+\end{equation}
+so the soil pore space is not counted twice. HRUs without soil (lake, water, glacier and rock types) have $D_k=0$ and
+keep the seepage drain (Section~\ref{ch:seepage}); \cmd{SOIL\_ZONE\_DEPTH} and, for soil-zone HRUs,
+\cmd{SEEPAGE\_LEAKANCE} are not used. Recharge must leave the soil zone from its bottom layer \cmd{SOIL[$M-1$]}
+(start-up check), as in GSFLOW, where gravity drainage leaves the bottom of the soil zone.
+
+\subsection{Columns: one soil zone per HRU and cell}
+An HRU usually spans several cells, and the water table differs between them. The soil zone of HRU $k$ is therefore kept
+as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), plus one column for the rest of the
+HRU (over fixed-head cells or outside the grid). Each column has its own soil water $\phi_{c,j}$ [mm] in every layer;
+Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before. Between
+exchanges Raven changes the HRU totals; a gain is shared among the columns in proportion to their room, a loss first in
+proportion to their free water (above field capacity) and then to their water. The columns are saved in
+\cmd{solution.rvc} (\cmd{:GWSoilZoneColumns}). At the start (no hotstart) every column is filled up to the initial water
+table of its cell.
+
+\subsection{Soil water level}
+Each layer $j$ (counted from the bottom of the soil zone) holds $\phi_j$ between field capacity
+$\phi_{\mathrm{fc},j}=\phi_{\max,j}S_{\mathrm{fc},j}$ and capacity $\phi_{\max,j}=1000H_jn_j(1-SF_j)$ [mm]. Its saturated share is
+$s_j=\min(\max((\phi_j-\phi_{\mathrm{fc},j})/(\phi_{\max,j}-\phi_{\mathrm{fc},j}),0),1)$ and the saturated thickness of the
+column is
+\begin{equation}
+\lambda=\sum_jH_j\,s_j\prod_{i<j}s_i\quad[\mathrm m]:
+\end{equation}
+water up to field capacity fills the deficit without raising the level, free water raises it with the drainable porosity
+$S_d=n(1-SF)(1-S_{\mathrm{fc}})$, and the level rises through a layer once the layers below are full. The cell's land
+surface is sampled at $N$ points (\cmd{:SoilZoneSubgrid}; 25 by default) with soil-zone bases
+$z_{b,s}=z_{\mathrm{land},s}-D_k$. The column's free water stands at one flat level $L_v$ over these points (as MODFLOW's
+head is flat over the cell), defined by $\frac1N\sum_s\min(\max(L_v-z_{b,s},0),D_k)=\lambda$.
+
+\subsection{Exchange}
+A point is connected to the aquifer where the water table is above its base, smoothly over the depth $d_s$
+(\cmd{SEEPAGE\_SMOOTHING\_DEPTH}): $w_s=\sigma((h_i-z_{b,s})/d_s)$ with $\sigma(x)=3x^2-2x^3$ on $(0,1)$, 0 below and 1
+above. The connected fraction is $F=\frac1N\sum_sw_s$, and the exchange into the aquifer is
+\begin{equation}
+q=\frac{C}{N}\sum_sw_s\Big(\min(\max(L_v,z_{b,s}),z_{b,s}+D_k)-h_i\Big),\qquad
+C=\frac{A_{k,i}}{\dfrac{H_1}{2\,k_{\mathrm{sat},1}/1000}+\dfrac{b_i}{2\,K_{v,i}}}\quad[\mathrm{m^2/d}],
+\end{equation}
+positive into the aquifer: the soil--aquifer conductance $C$ is the series resistance of half the bottom soil-zone layer
+($k_{\mathrm{sat}}$ = \cmd{HYDRAUL\_COND} [mm/d]) and half the top aquifer cell (thickness $b_i$, vertical conductivity
+$K_v$). With a single point this is simply $q=FC(z_b+\lambda-h_i)$: water flows up when the water table is above the soil
+water level and down when it is below. The exchange goes to MODFLOW through a GHB package \cmd{SZX\_RAVEN} (one entry per
+HRU--cell column, plus a WEL package \cmd{SZQ\_RAVEN} for the part of the boundary that would lie below the cell bottom).
+GHB rather than RIV or DRN because the exchange runs both ways and must stop where the water table is below the soil
+(through $F$) without adding a second drainage path next to Raven's percolation.
+
+\subsection{Rejected recharge, overflow and evaporation}
+Of each column's share of the HRU's recharge, the connected fraction $F$ is \emph{rejected}: it stays in the column
+instead of reaching MODFLOW, which receives $(1-F)$ (Section~\ref{ch:recharge}). Water that does not fit into a full
+column overflows to the HRU's \cmd{SURFACE\_WATER} and is routed the same day (saturation-excess runoff and
+exfiltration). Water-table ET is reduced by $(1-\bar F_i)$ of the cell, because saturated soil already evaporates in
+Raven.
+
+\subsection{Solving soil and aquifer together}
+Within a day the soil column and the aquifer must agree. For given heads each column is solved implicitly
+(backward Euler) for its change $\Delta V$ [mm]:
+\begin{equation}
+\Delta V+\frac{1000\,\dt}{a_c}\,q\big(\lambda(\phi^*+\Delta V),h_i\big)=0,
+\end{equation}
+where $a_c$ is the column area and $\phi^*$ its water after Raven's processes plus the rejected recharge. The left side
+increases strictly with $\Delta V$, so there is exactly one solution (found by bisection); if it lies beyond full, the
+column fills and the rest overflows. MODFLOW receives each column as a linear boundary that reproduces this exchange at
+the current head and its slope, including the column's own response (a Robin interface condition). After MODFLOW's
+outer iterations the columns are solved again with the new heads --- after every one of the first five, and afterwards
+after every iteration on which MODFLOW has converged --- until the soil levels change by less than the head tolerance
+and the total exchange by less than the flow tolerance (\cmd{:SoilZoneIteration}). The flows Raven applies are always
+the ones MODFLOW booked, so no water is created or lost even on a step whose interface did not converge (reported in
+\cmd{Raven\_errors.txt}).
+
+\begin{example}[: water table rising into the soil]
+Two soil-zone layers of 0.5 m with $n=0.4$, $S_{\mathrm{fc}}=0.5$: $\phi_{\max}=200$ mm, $\phi_{\mathrm{fc}}=100$ mm and
+$S_d=0.2$ in each. The top aquifer layer has $S_y=0.2$ and receives 10 mm/d of recharge. Below the soil the water table
+rises $10/0.2=50$ mm/d. When it reaches the soil base the recharge is rejected and stays in the soil, where it raises
+the soil water level by $10/0.2=50$ mm/d as well; the 400 mm of capacity hold the remaining 200 mm of free water after 20
+more days, after which all recharge overflows (test T1, Chapter~\ref{ch:verification}). Exchange: with
+$k_{\mathrm{sat}}=100$ mm/d, a 10 m top cell with $K_v=1$ m/d and a 100$\times$100 m column,
+$C=10^4/(0.5/0.2+10/2)=1\,333$ m$^2$/d. Soil water 0.2 m and water table 0.1 m above the base ($F=1$) give
+$q=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
+\end{example}
+
+\begin{refcard}{soil zone}
+\textbf{Sources/sinks.} Moves water both ways between the soil-zone columns of each coupled HRU with soil (Raven's
+\cmd{SOIL[0..$M-1$]} hold their mean) and the top active cell of each overlapping column (MODFLOW GHB \cmd{SZX\_RAVEN} with WEL
+\cmd{SZQ\_RAVEN}); returns rejected recharge to the columns and sends overflow to \cmd{SURFACE\_WATER}.\par\smallskip
+\textbf{Constraints/notes.} Recharge must come from \cmd{SOIL[$M-1$]}; every soil-zone layer needs a positive thickness and
+drainable porosity, and the class of \cmd{SOIL[$M-1$]} needs \cmd{HYDRAUL\_COND}. Not available with an existing model
+(\cmd{:MF6Simulation}). Raven's processes run before the exchange in each step, so a long step carries a first-order
+splitting error (hillslope test: 1.2 cm mean head difference at daily steps, 0.2 cm hourly). Keep $d_s>0$.\par\smallskip
+\par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
+\begin{lstlisting}
+# .rvg
+:SoilZone PHYSICAL SOIL[0] SOIL[1]      # layers from the top; default CONCEPTUAL
+:SoilZoneIteration 100 1.0E-4 1.0E-6    # updates after MODFLOW converged, tolerances
+:SoilZoneSubgrid 5                      # DEM points per cell side
+:SoilZoneOutput  WetlandHRUs            # optional: GWSoilExchange.csv for one group
+# .rvi -- recharge from the bottom soil-zone layer
+:Percolation PERC_GAWSER SOIL[1] GROUNDWATER
+\end{lstlisting}
+\end{minipage}\par\smallskip
+\par\noindent\begin{minipage}{\linewidth}\textbf{Parameters}\par\smallskip
+\begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.283\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
+$H_j$ & layer thickness & soil profile (\cmd{:SoilProfiles}, \cmd{.rvp}) & m & Raven manual\\
+$n_j$, $S_{\mathrm{fc},j}$ & \cmd{POROSITY}, \cmd{FIELD\_CAPACITY} & soil class (\cmd{.rvp}) & -- & Raven manual\\
+$k_{\mathrm{sat},1}$ & \cmd{HYDRAUL\_COND} & soil class of \cmd{SOIL[$M-1$]} (\cmd{.rvp}) & mm/d & Raven manual\\
+$K_v$, $S_y$ & \cmd{K\_VERT}, \cmd{SPEC\_YIELD} & aquifer class of the top layer & m/d, -- & Sec.~\ref{app:class}\\
+$d_s$ & \cmd{SEEPAGE\_SMOOTHING\_DEPTH} & aquifer profile & m & Sec.~\ref{app:profile}\\
+$N$ & \cmd{:SoilZoneSubgrid} & \cmd{.rvg} & -- & Sec.~\ref{app:commands}\\
+\bottomrule\end{tabular}\end{minipage}\par\smallskip
+\textbf{Outputs.} \cmd{GWBudget.csv}: \emph{soil zone to aquifer}, \emph{aquifer to soil zone}, \emph{rejected recharge},
+\emph{soil-zone overflow}, \emph{soil-zone exchange applied to Raven}, \emph{soil-zone shortfall}, \emph{interface updates},
+\emph{interface converged}, \emph{interface change}; \cmd{GWSoilExchange.csv} per HRU and step: soil-zone base, soil water
+level, water table, saturated fraction, exchange, rejected recharge, overflow, soil water and capacity.
+\cmd{tools/plot\_soilzone.py} plots both.
+\end{refcard}
+
+\subsection{Common questions}
+\textit{Which layers should form the soil zone?} Physical soil layers above the aquifer, typically the top one or two;
+not conceptual reservoirs of tens of metres (a soil zone over 20 m stops the run, over 5 m gives a warning).
+\textit{Does $S_y$ have to match the soil?} No, but where the top aquifer layer's $S_y$ and the soil's drainable porosity
+differ by more than a factor two the water table rises at visibly different rates below and inside the soil, and a
+warning says so. \textit{Why does an HRU's soil level differ from its cells' water tables?} The HRU value is the mean
+over its columns; \cmd{GWSoilExchange.csv} reports area-weighted means. \textit{How short should the step be?} Daily
+steps are adequate for most catchments; where the soil zone fills and drains within a day, sub-daily steps reduce the
+splitting error.
 
 \section{Rivers}\label{ch:rivers}
 Rivers exchange water with the aquifer in both directions: a \emph{gaining} river receives groundwater (baseflow); a

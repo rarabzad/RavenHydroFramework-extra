@@ -301,7 +301,8 @@ For each active column Raven needs three elevations:
 \item[Land surface] $z_{\mathrm{land},i}$: the average of 25 points ($5\times5$) of the DEM over the cell
 (\cmd{:LandSurface}); without a DEM, the area-weighted \cmd{ELEVATION} of the HRUs in the cell.
 \item[Model top] $z_{\mathrm{top},i}=z_{\mathrm{land},i}-d_{\mathrm{sz},p}$, where $d_{\mathrm{sz}}$ is the profile's
-\cmd{SOIL\_ZONE\_DEPTH} (default 0, so the top is the land surface).
+\cmd{SOIL\_ZONE\_DEPTH} (default 0, so the top is the land surface). Under \cmd{:SoilZone PHYSICAL} (Section~\ref{ch:soilzone})
+\cmd{SOIL\_ZONE\_DEPTH} is ignored: the soil-zone thickness is the sum of the listed soil layers.
 \item[Bedrock] $z_{\mathrm{br},i}$: the average of 25 points of the bedrock map (\cmd{:BedrockSurface}); without a map,
 $z_{\mathrm{land},i}-D_p$ with $D_p$ the profile's \cmd{DEFAULT\_BEDROCK\_DEPTH}.
 \end{description}

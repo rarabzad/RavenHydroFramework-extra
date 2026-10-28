@@ -1,0 +1,364 @@
+# Soil-zone ↔ groundwater coupling (`:SoilZone PHYSICAL`): design as built
+
+Status: implemented on `mf6-groundwater` (Raven) with tests and docs in `RavenHydroFramework-extra`. This file replaces
+the design plan of 2026-10-20 (written after James Craig's review: the water table must be able to rise into the Raven
+soil profile, on flat ground and on slopes). Where the build departs from the plan, the reason is given. When code and
+this file disagree, fix one of them in the same commit.
+
+Code: `src/GWSoilZone.h/.cpp` (pure functions of one soil-zone column, namespace `gwsz`, unit tested on their own),
+`src/GWSoilZoneModel.cpp` (the `CGroundwaterModel::SZ*` methods), and the soil-zone parts of `GroundwaterModel.cpp/.h`,
+`MF6Engine.cpp`, `ParseGWFile.cpp`, `ParsePropertyFile.cpp`, `ParseInitialConditionFile.cpp`.
+
+---
+
+## 0. What it does
+
+With `:SoilZone CONCEPTUAL` (the default) soil and aquifer meet only through recharge and the seepage drain at the model
+top; the results are byte-identical to the code before this work. With `:SoilZone PHYSICAL SOIL[0] … SOIL[M-1]`:
+
+1. **One owner for every depth.** Raven owns the soil zone `SOIL[0..M-1]` of every coupled HRU with soil; MODFLOW owns
+   everything below. The MODFLOW model top is the land surface minus the soil-zone thickness.
+2. **Two-way, head-driven exchange** at the soil-zone base (GHB package `SZX_RAVEN`, one entry per HRU–cell link): the
+   water table rises into the soil and saturated soil drains to the aquifer.
+3. **Recharge rejection** where the ground is saturated (Raven's gravity drainage stops there), and saturation-excess
+   overflow to `SURFACE_WATER` when the soil zone is full.
+4. **Sub-grid saturated area** from the DEM samples of each cell, so a water table that is in the soil at the toe of a
+   slope and below it at the top is represented.
+5. **Interface iteration inside MODFLOW's outer loop**: the soil zone is solved again after MODFLOW's iterations until
+   both agree (a Robin interface condition), so the result does not depend on an explicit lag.
+
+References: GSFLOW (Markstrom et al., 2008, USGS TM 6-D1): soil zone above the MODFLOW domain, gravity reservoirs per
+HRU–cell, gravity drainage ceases where the water table is in the soil zone, groundwater discharge to the soil zone,
+Dunnian runoff, PRMS soil modules called in the MODFLOW iteration loop. iMOD Coupler MetaSWAP–MODFLOW 6: the unsaturated
+zone solved inside every MODFLOW outer iteration through XMI.
+
+---
+
+## 1. Notation
+
+Indices: HRU $k$; grid cell $i$; link $e=(k,i)$ (an HRU–cell overlap with a soil-zone exchange entry); column $c$;
+soil layer $j$ of the soil zone, counted **from the bottom** ($j=1$ is `SOIL[M-1]`); DEM sample $s$ of a cell
+($N$ samples); time step $n$; MODFLOW outer iteration $\nu$.
+
+| Symbol | Meaning | Unit | Code |
+|---|---|---|---|
+| $A_k$ | HRU area | m² | `GetArea()*M2_PER_KM2` |
+| $A_{k,i}$ | overlap of HRU $k$ and cell $i$ | m² | `gw_link::area` |
+| $P_k$ | polygon area of HRU $k$, at least $\sum_i A_{k,i}$ | m² | |
+| $a_c$ | area of column $c$ | m² | `_szColA` |
+| $H_j$ | layer thickness | m | `sz_layer::H` |
+| $\phi_j$ | layer water | mm | `SOIL[m]`, `_szColPhi` |
+| $\phi_{max,j}=1000H_jn_j(1-SF_j)$, $\phi_{fc,j}=\phi_{max,j}S_{fc,j}$ | capacity, field capacity | mm | `sz_layer::phimax, phifc` |
+| $D_k=\sum_jH_j$ | soil-zone thickness | m | `_szD` |
+| $\lambda$ | saturated thickness of a column (mean over its samples) | m | `_szxLam` |
+| $z_{b,s}=z_{land,s}-D_k$ | soil-zone base at sample $s$ (sorted ascending) | m | `sz_cell::zbs` |
+| $L_v$ | soil water level of a column (flat over its samples) | m | `SubgridLevel` |
+| $h$ | head in the top active cell | m | `_X` |
+| $h_c$ | connection head (sets the connection weights; $=h$ at convergence) | m | `_szxHc` |
+| $d_s$ | connection smoothing depth (`SEEPAGE_SMOOTHING_DEPTH` of the aquifer profile) | m | `sz_cell::ds` |
+| $w_s$ | connection weight of sample $s$ | – | |
+| $F$ | connected (saturated) fraction $=\frac1N\sum_sw_s$ | – | `_linkF` |
+| $C$ | soil–aquifer conductance of a link | m²/d | `sz_cell::C`, `_szxC` |
+| $q$ | exchange of a link, **positive into the aquifer** | m³/d | `_szxQc` (local solve), `_szxQ` (MODFLOW's booked flow) |
+| $C_g$, $H_g$ | conductance and head of the Robin boundary given to MODFLOW | m²/d, m | `_szxCg`, GHB `BHEAD/COND` |
+| $\Delta t$ | time step | d | |
+
+---
+
+## 2. Configuration (`.rvg`)
+
+```
+:SoilZone PHYSICAL SOIL[0] SOIL[1]        # soil-zone layers, listed from the top; recharge must leave SOIL[M-1]
+:SoilZone CONCEPTUAL                      # default; the last :SoilZone command counts
+:SoilZoneIteration 100 1.0E-4 1.0E-6      # updates after MODFLOW converged (0 = explicit predictor only),
+                                          #   head tolerance [m], flow tolerance [-]; tolerances optional
+:SoilZoneSubgrid 5                        # DEM samples per cell side (N = 25); 1 = cell-mean land surface
+:SoilZoneOutput HRU_GROUP                 # optional: GWSoilExchange.csv for one HRU group only
+```
+
+Checks (start-up errors unless noted):
+
+- `SOIL[0..M-1]` contiguous from the top and present in the model; every coupled HRU with soil has all of them with
+  $H_j>0$, $\phi_{max,j}>\phi_{fc,j}$ (drainable porosity), and `HYDRAUL_COND` $>0$ in `SOIL[M-1]`. HRUs of type LAKE,
+  WATER, GLACIER, ROCK, or with a soil zone thinner than 1 µm, have no soil zone and keep the seepage drain.
+- `HYDRAUL_COND`, `POROSITY`, `FIELD_CAPACITY` are registered as needed soil parameters when the `.rvg` asks for
+  PHYSICAL (`GWFileUsesPhysicalSoilZone`, read ahead of the `.rvp`; otherwise Raven discards them as not needed).
+  `HYDRAUL_COND` must be given for the class of the bottom soil-zone layer of every coupled HRU: Raven's automatic
+  value (0.001 mm/d) is a placeholder, so the set-up stops there (classes recorded before Raven's auto-calculation,
+  `NoteSoilClassWithoutKsat`). Classes used only outside the soil zone do not need it.
+- Every process with `GROUNDWATER` as target in a coupled HRU must draw from `SOIL[M-1]`.
+- $D_k\le20$ m (warning above 5 m). `SOIL_ZONE_DEPTH` is ignored (warning). `:SeepageReturnTo` applies only to the HRUs
+  without a soil zone (warning).
+- Storage consistency: warning where the top layer's $S_y$ and the drainable porosity of `SOIL[M-1]` differ by more
+  than a factor 2 (the water table then rises at different rates below and inside the soil, §5.7).
+- `:SoilZoneIteration`, `:SoilZoneSubgrid`, `:SoilZoneOutput` without PHYSICAL: warning, ignored.
+- Existing-model mode (`:MF6Simulation`): PHYSICAL is refused (not yet available).
+
+---
+
+## 3. Geometry
+
+### 3.1 Soil-zone base and model top
+
+$$z_{top,i}=z_{land,i}-\frac{\sum_kA_{k,i}D_k}{\sum_kA_{k,i}}$$
+
+(HRUs without a soil zone contribute $D_k=0$.) The base of a link follows the DEM inside the cell: at sample $s$ it is
+$z_{b,s}=z_{land,s}-D_k$.
+
+### 3.2 Conductance (no new parameter)
+
+Series resistance of half the bottom soil-zone layer and half the top active aquifer cell:
+
+$$C_e=\frac{A_{k,i}}{\dfrac{H_1}{2\,k_{sat,1}/1000}+\dfrac{b_{top,i}}{2\,K_{v,top,i}}}\quad[\mathrm{m^2/d}]$$
+
+($b_{top}$ the full thickness of the top active cell, so $C$ is fixed during the step.)
+
+### 3.3 Links and entries
+
+One `SZX_RAVEN` GHB entry per link whose top cell is active and not a specified-head cell (`gwf.szx`, written with
+head $\max(z_b,\ \text{bottom}+1\,\text{mm})$ and conductance 0; Raven sets both in memory). A WEL package `SZQ_RAVEN`
+(`gwf.szq`) has one entry per link as well (§7.1). The seepage drain `DRN_RAVEN` keeps only the share of the cell
+covered by HRUs without a soil zone (conductance × that share), and its discharge returns only to those HRUs.
+
+---
+
+## 4. Soil-zone columns
+
+The soil zone of HRU $k$ is split into one column per link with an SZX entry plus a **rest** column (the parts of the HRU
+over specified-head cells or outside the grid); this is GSFLOW's gravity reservoir per HRU–cell.
+
+$$a_e=A_{k,i}\,\frac{A_k}{P_k},\qquad a_{rest}=A_k-\sum_ea_e\ (\ge0)$$
+
+Each column keeps its own layer water $\phi_{c,j}$. Raven's `SOIL[m]` of the HRU is the area-weighted mean of its
+columns. Raven's processes change the HRU totals between exchanges; `gwsz::Distribute` shares the change among the
+columns: a gain in proportion to each column's room, a loss first in proportion to each column's free water (above
+field capacity: the water Raven's drainage acts on sits in the saturated columns) and then to its water (no column leaves
+$[0,\phi_{max}]$ that was inside it; only a target outside $[0,\phi_{max}]$, from round-off, is spread uniformly).
+`SZSyncColumns` does this at the start of every exchange and before applying it.
+
+Departure from the plan: the plan had one soil water level per HRU. With a slope, one level per HRU makes the cells
+of the HRU exchange with each other through the soil instantly; per-link columns keep the exchange local, as in GSFLOW.
+
+---
+
+## 5. Physics of one column (`GWSoilZone.cpp`)
+
+### 5.1 Saturated thickness
+
+Saturated share of layer $j$: $s_j=\mathrm{clip}\big((\phi_j-\phi_{fc,j})/(\phi_{max,j}-\phi_{fc,j}),0,1\big)$
+(a layer without free-water capacity counts as saturated only when full). Product closure, layers from the bottom:
+
+$$\lambda=\sum_jH_j\,s_j\prod_{i<j}s_i$$
+
+With every layer below full this is the stack definition (the level rises through a layer once the layers below are
+full). Free water perched above a partly saturated layer counts in proportion to how saturated the layers below are,
+which keeps $\lambda$ continuous and non-decreasing in every $\phi_j$ (the plan's hard "count only once the layer
+below is full" jumps when the layer below fills, and then the local solve has no root).
+
+### 5.2 Fill and drain
+
+`Fill(V)`: from the bottom up, each layer to $\phi_{max}$; what does not fit is overflow. `Drain(V)`: free water
+($\phi-\phi_{fc}$) from the top of the saturated stack downwards; never perched water above it. `Apply(dV)`: Fill for
+$dV>0$, Drain for $dV<0$; a removal that free water cannot supply (round-off only) is taken below field capacity,
+and what even that cannot supply is the shortfall (reported; 0 in all tests).
+
+### 5.3 Sub-grid soil water level
+
+The column's free water is a flat soil water level $L_v$ over the cell's samples (as MODFLOW's head is flat over the
+cell): the saturated thickness at sample $s$ is $\mathrm{clip}(L_v-z_{b,s},0,D)$ and
+
+$$\frac1N\sum_s\mathrm{clip}(L_v-z_{b,s},0,D)=\lambda$$
+
+defines $L_v(\lambda)$ (`SubgridLevel`: exact walk over the breakpoints $z_{b,s}$ and $z_{b,s}+D$; the inverse is
+`SubgridThickness`). $\mathrm dL_v/\mathrm d\lambda=N/n_{active}$ is taken on the segment above a breakpoint.
+
+### 5.4 Connection
+
+$$w_s=\sigma\!\left(\frac{h_c-z_{b,s}}{d_s}\right),\quad \sigma(x)=\begin{cases}0&x\le0\\3x^2-2x^3&0<x<1\\1&x\ge1\end{cases},\qquad F=\frac1N\sum_sw_s$$
+
+A sample connects as the water table rises through the smoothing depth above its base ($d_s\le0$: a step).
+
+### 5.5 Exchange law
+
+$$q=\frac CN\sum_sw_s\Big(\mathrm{clip}(L_v,z_{b,s},z_{b,s}+D)-\max(h,z_{b,s})\Big)$$
+
+With one sample and $h_c=h$ above the base: $q=wC(z_b+\lambda-h)$. The aquifer side of a sample is the water table, or
+its base where the water table is below it; that case arises only while the iteration lets $h_c$ lag above $h$, and then
+the sample drains just its own saturated water, never the empty soil beneath it (so $q\le0$ at $\lambda=0$ always).
+At $h_c=h$ the term is the plain $h$. A sample that has just connected adds nothing when no water perches above its
+base; a sample holding perched water adds $C(L_v-z_{b,s})/N$ over the depth $d_s$ as the water table reaches it, which
+is continuous for $d_s>0$ (a jump for $d_s=0$).
+
+Partial derivatives (`SubgridFlux`): $q_h=-\frac CN\sum_{z_{b,s}<h}w_s$ ($=-CF$ at $h_c=h$), $q_{h_c}$,
+$q_\lambda=\frac CN\sum_{\text{active }s}w_s\,\mathrm dL_v/\mathrm d\lambda$.
+
+Why GHB and not RIV/DRN: a RIV's disconnected branch would add a second gravity-drainage path next to Raven's
+percolation; DRN is one-directional. The cut-off below the base comes from $F$.
+
+### 5.6 Local backward-Euler solve (per column, given $h$, $h_c$)
+
+$\phi^*$ = column water after Raven's processes plus the link's rejected recharge (§6.1). With $c=1000\Delta t/a_c$
+[mm per m³]:
+
+$$g(dV)=dV+c\,q\big(\lambda(\mathrm{Apply}(\phi^*,dV)),h,h_c\big)=0,\qquad dV\in[-\text{free water},\ \text{room}]$$
+
+$g$ is continuous and strictly increasing ($q$ is non-decreasing in $\lambda$), so it has one root; `LocalSolve` finds
+it by bisection (relative 10⁻¹³). If $g(\text{room})<0$ the column fills and $-g(\text{room})$ overflows. It returns
+$\lambda$ at the root and $\lambda'=\mathrm d\lambda/\mathrm dV$ there (one-sided on the side that stays inside the
+interval; 0 when full).
+
+### 5.7 Storage consistency
+
+Below the base the water table rises at $r/S_y$, inside the soil at $r/S_d$ ($S_d$ the drainable porosity). Different
+materials make the rate change at the base; the start-up warning (§2) flags a factor above 2. T1b tests it.
+
+---
+
+## 6. Recharge, ET and the seepage drain
+
+### 6.1 Recharge rejection
+
+The HRU's recharge this step (end-of-step `GROUNDWATER`, after the optional delay store) is shared among its links by
+link area. Of a link's share, $F$ is rejected (returned to that link's column before its local solve) and $(1-F)$ goes
+to MODFLOW's RCH. Recharge onto specified-head cells and outside the grid is handled as in CONCEPTUAL mode.
+
+### 6.2 Water-table ET
+
+`EVT_RAVEN` surface = model top (the soil-zone base); its rate is scaled by $(1-\bar F_i)$ (the area-weighted $F$ of
+the cell): saturated soil already evaporates in Raven.
+
+### 6.3 Seepage drain
+
+See §3.3: `DRN_RAVEN` serves only the HRUs without a soil zone; groundwater reaching the land surface under soil-zone
+HRUs fills the soil and leaves as overflow.
+
+---
+
+## 7. Interface with MODFLOW
+
+### 7.1 Robin boundary
+
+For each link MODFLOW gets $q=C_g(H_g-h)$, linear in its own head, which reproduces the local solve's exchange $q^*$ at
+the current head $h^*$ and its slope with the column's response included (implicit function theorem on §5.6, $h_c$
+held):
+
+$$C_g=\frac{-q_h}{1+c\,q_\lambda\,\lambda'},\qquad H_g=h^*+\frac{q^*}{C_g}$$
+
+For $q^*<0$ (water rising into the soil) $C_g$ is kept at least the secant $-q^*/(h^*-z_{b,min})$, so a linear
+boundary never extracts water from a cell that has fallen below every base; always $C_g\ge10^{-9}C$. $C_g$ sets only
+how fast the interface converges: at a converged interface MODFLOW's flow equals the local solve's whatever $C_g$.
+
+MODFLOW refuses a GHB head below the cell bottom. Where $H_g<\text{bottom}+1$ mm the GHB head is the bottom
+(+1 mm) and the WEL `SZQ_RAVEN` carries $C_g(H_g-\text{bottom})$; the boundary $q(h)=C_g(H_g-h)$ is unchanged.
+
+### 7.2 Step sequence
+
+1. `Exchange`: `SZSyncColumns` (Raven's processes → columns).
+2. Predictor: $h_c=h^n$; $F$, recharge split, local solves, arrays (`SZLinkFractions`, `SZRecharge`, `SZLocalSolves`,
+   `SZSetArrays`).
+3. MODFLOW's outer loop (`CMF6Engine::SolveTimeStep`) with the callback `SZIterate` after every outer iteration.
+4. Final flows read from MODFLOW (`HCOF·h − RHS` of SZX + SZQ), the non-convergence guard, `SZApply`.
+
+### 7.3 Schedule and budget
+
+The interface is updated after each of the first 5 outer iterations (on easy steps both converge together), and after
+that only after iterations on which MODFLOW has converged, so the changing boundary does not keep MODFLOW's own
+iteration (under-relaxation, backtracking) from converging. Updates made after MODFLOW converged count against the
+budget (`:SoilZoneIteration` max, default 100); when it is used up the values are frozen. 0 = the explicit predictor
+only. MODFLOW's tolerance relaxation for hard steps counts only iterations MODFLOW did not converge on.
+
+### 7.4 Connection head update
+
+After an iteration on which MODFLOW converged, per link, residual $r=h-h_c$:
+
+- plain update $h_c\leftarrow h$;
+- secant extrapolation while $r$ keeps its sign and shrinks ($0<r/r_{prev}<0.95$);
+- Illinois regula falsi once $r$ has changed sign (bracket reset when it collapses).
+
+Before MODFLOW has converged, $h_c=h$ and the history is reset (brackets from unconverged heads mislead).
+
+Departure from the plan: the plan iterated the soil level with under-relaxation $\omega$. Relaxing the level (and
+Aitken acceleration of $\lambda$ and $F$) cycled on stiff cases; lagging only the connection, with the column's
+response inside $C_g$, converges in ≤ 8 updates on the stiffest test (T5).
+
+### 7.5 Convergence and consistency
+
+Converged when
+
+$$\max_e\Big(|\Delta\lambda_e|,\ \frac{|q(h,h)-q(h,h_c)|}{C}\Big)<\delta_h\quad\text{and}\quad|\Delta Q|\le\max\Big(\delta_q\textstyle\sum|q|,\ \sum FC\cdot\max(\delta_h,\mathrm{DVCLOSE})\Big)$$
+
+($Q=\sum_eq_e$, change since the previous update) and MODFLOW has converged. On convergence, and after the last
+allowed outer iteration (no solve follows), the state MODFLOW last solved with is restored ($F$, $h_c$, $\lambda$, $q$,
+$C_g$, rejection) and the arrays are not rewritten, so MODFLOW's budget and the flows Raven books agree exactly.
+
+A step whose interface did not converge is reported (warning, first 10, with the HRU and cell); Raven still applies
+MODFLOW's booked flows, so mass is conserved.
+
+### 7.6 Applying the step (`SZApply`)
+
+Per link column: Fill(rejected recharge), then Apply($-q\Delta t/a_c$) with $q$ = MODFLOW's booked flow; overflow →
+`SURFACE_WATER` of the HRU (routed the same step); shortfall counted. Raven's `SOIL[m]` = column mean.
+
+---
+
+## 8. Initialization, steady state, hotstart
+
+- **Cold start**: after MODFLOW's initial heads (and the optional steady state) and before Raven takes its initial
+  storage, each link column is filled up to $\lambda=$ `SubgridThickness`$(h_0)$ (`SZInitColumns`); the rest column
+  keeps Raven's initial soil water; Raven's `SOIL` becomes the column mean.
+- **Steady-state initialization**: the soil zone has no storage; the boundary is the local exchange law with
+  $\lambda=0$ (water table above the base drains at the base), iterated the same way.
+- **Hotstart**: `:GWSoilZoneColumns` in `solution.rvc` (HRU ID, cell = grid column number of the link, 0 for the rest
+  column, water of each layer from the bottom up); columns are matched by cell, not by order. A block that does not
+  match the HRU's columns (grid or `:SoilZone` changed) is reported and the columns start from the water table. (The
+  block was keyed by column order only in unreleased development builds; there are no files of that format to read.)
+- In a run without `:GroundwaterModel MODFLOW6`, groundwater blocks in the `.rvc` are skipped (each to its own end
+  line) with a warning.
+
+---
+
+## 9. Water balance (checked every step by the tests and `tools_audit.py`)
+
+1. Recharge: Raven recharge = MF6 recharge + rejected + recharge onto CHD cells + change of the delay store.
+2. Soil zone: exchange applied to Raven = rejected + (aquifer → soil − soil → aquifer)·Δt + shortfall.
+3. MODFLOW residual (all packages, SZX and SZQ included) ≈ 0.
+4. Raven's mass-balance error = change of the pass-through `GROUNDWATER` store (pre-existing Raven reporting).
+
+`GWBudget.csv` columns: soil zone to aquifer, aquifer to soil zone [m³/d], rejected recharge, soil-zone overflow,
+exchange applied to Raven, shortfall [m³], interface updates, converged, last change [m]. `GWSoilExchange.csv` per
+step and HRU: base, soil water level, water table, saturated fraction, exchange both ways, rejected, overflow, soil
+water and capacity, interface updates and change. `tools/plot_soilzone.py` draws both.
+
+---
+
+## 10. Tests (`tests/soilzone/`, in `run_all.py`)
+
+| Step | What |
+|---|---|
+| `soilzone_unit` | `soilzone_unit.cpp`: λ, Fill/Drain/Apply mass, sub-grid level and its inverse, flux derivatives against finite differences, continuity across sample bases, local solve (monotone, root, mass, $h_c\neq h$ included), the Robin slope, Distribute; 20 000 random cases each |
+| `soilzone_spike` | V1–V3: named input arrays reach the solver between outer iterations, coefficients recomputed every iteration, a solve after convergence is a normal iteration |
+| `soilzone_column` | T1/T1b flat column: rise 50 (125) mm/d below the base, 50 mm/d inside the soil, water table = soil level once connected, soil full on day ~41, storage warning |
+| `soilzone_hillslope` | T2/T3 hillslope vs a monolithic MODFLOW reference (soil as top layer, DRN at the land surface): heads, soil water, outflow |
+| `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
+| `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
+| `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched hotstart |
+| `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
+
+Regression: every existing test without `:SoilZone` gives byte-identical outputs (both Liard examples compared).
+
+---
+
+## 11. Known limitations
+
+- **Operator splitting.** Raven's vertical processes run before the exchange in each step, so daily steps carry a
+  first-order splitting error against a monolithic model (hillslope: mean 1.2 cm daily, 0.4 cm at 6 h, 0.17 cm at 1 h;
+  outflow within 0.02%). Shorter steps reduce it.
+- Raven's processes act on the HRU mean of the soil water; the columns differ only through the exchange.
+- Not available with an existing MODFLOW model (`:MF6Simulation`).
+- With $d_s=0$, perched water joining the water table makes the exchange jump; keep $d_s>0$.
+
+## 12. Answers to the plan's open questions
+
+(a) Equilibrium above the water table: kept (free water collects at the bottom of the stack, §5.1), with perched water
+counted in proportion. (b) Rejected recharge returns to the link's column (from the bottom up, §5.2). (c) The smoothing
+depth is `SEEPAGE_SMOOTHING_DEPTH` of the aquifer profile (no new parameter).

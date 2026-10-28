@@ -14,9 +14,10 @@ def audit(run,dt=1.0):
     st=b['recharge delay storage [m3]'].iloc[-1] if 'recharge delay storage [m3]' in b else 0.0
     chdv=b['recharge onto CHD cells [m3/d]'] if 'recharge onto CHD cells [m3/d]' in b else 0*b['MF6 recharge [m3/d]']
     s0=(st if False else 0.0)
+    rejv=b['rejected recharge [m3]'] if 'rejected recharge [m3]' in b else 0*b['MF6 recharge [m3/d]']   #:SoilZone PHYSICAL: recharge on saturated ground goes back to the soil (also subtracted)
+    rej=rejv.sum()
     if 'recharge delay storage [m3]' in b:
-        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt
-    rej=b['rejected recharge [m3]'].sum() if 'rejected recharge [m3]' in b else 0.0   #:SoilZone PHYSICAL: recharge on saturated ground goes back to the soil (also subtracted)
+        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]
     R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej)/max(rr,1)
     R['recharge delay store at end [m3]']=st
     flows=b['MF6 recharge [m3/d]']+b['storage release [m3/d]']-b['seepage to Raven [m3/d]']+b['river leakage to aquifer [m3/d]']\

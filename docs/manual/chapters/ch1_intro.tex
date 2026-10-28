@@ -150,8 +150,9 @@ Every drop of water in the coupled system belongs to exactly one of the two mode
 \item \textbf{Raven} owns snow, canopy, soil and vadose-zone stores, depressions and wetlands, rivers, lakes and
 reservoirs.
 \item \textbf{MODFLOW} owns the saturated groundwater below the \emph{model top}. By default the model top is the land
-surface (as in GSFLOW \cite{markstrom2008gsflow}); users with physically based soil layers can lower it with
-\cmd{SOIL\_ZONE\_DEPTH}.
+surface; users with physically based soil layers can lower it with \cmd{SOIL\_ZONE\_DEPTH}, or with
+\cmd{:SoilZone PHYSICAL} hand the soil layers to Raven and let the water table rise into them, as in GSFLOW
+\cite{markstrom2008gsflow} (Section~\ref{ch:soilzone}).
 \end{itemize}
 Water moves between the two only through the exchanges described in Chapter~\ref{ch:c4}, and each exchange is recorded on both
 sides. In a coupled HRU, Raven's \cmd{GROUNDWATER} store is a \emph{pass-through}: whatever enters it during a day is

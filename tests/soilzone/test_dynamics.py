@@ -7,7 +7,7 @@ T4  time step: 1 d, 6 h and 1 h, each against the MODFLOW-only reference run wit
     hourly mean below 3 mm); the balances close at every step size and the interface converges in every step.
 T5  stiffness: a thin, conductive soil-aquifer contact (C^sz/A ~ 9.5 /d against S_d = 0.2: dt/t_c ~ 48 for 1-day
     steps). The iterated interface converges in a few updates and matches the reference as closely as the soft case;
-    one pass without iteration (`:SoilZoneIteration 1 ...`) is less accurate. Both runs conserve water exactly.
+    one pass without iteration (`:SoilZoneIteration 0 ...`) is less accurate. Both runs conserve water exactly.
 SG  sub-grid saturated fraction (`:SoilZoneSubgrid 5`, ramp 0.5 m) on the same slope: F changes smoothly instead of
     cell by cell, the balances close and the totals stay close to the reference.
 """
@@ -79,7 +79,7 @@ def main():
     # ---------------- T5: stiffness, explicit vs iterated
     stiff = dict(Kv=100.0, ksat=10000.0)
     d_it, r_it = run_case('stiff_iterated', **stiff)
-    d_ex, r_ex = run_case('stiff_explicit', iteration=(1, 1e-4, 1e-6, 1.0), **stiff)
+    d_ex, r_ex = run_case('stiff_explicit', iteration=(0, 1e-4, 1e-6), **stiff)
     if d_it and d_ex:
         rd = os.path.join(W, 'stiff_reference'); shutil.rmtree(rd, ignore_errors=True)
         ref = sz_reference.build(d_it, rd, RAIN, CFG['H0'], CFG['H1'], CFG['n'], CFG['sfc'], stiff['ksat'],
