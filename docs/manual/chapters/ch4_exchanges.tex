@@ -236,9 +236,10 @@ keep the seepage drain (Section~\ref{ch:seepage}); \cmd{SOIL\_ZONE\_DEPTH} and, 
 
 \subsection{Columns: one soil zone per HRU and cell}
 An HRU usually spans several cells, and the water table differs between them. The soil zone of HRU $k$ is therefore kept
-as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), plus one column for the rest of the
-HRU (over fixed-head cells or outside the grid). The column of HRU $k$ in cell $i$ has its own soil water $\phi_{k,i,m}$ [mm] in every layer $m$;
-Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before. Between
+as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), including cells with a specified
+head (Section~\ref{sec:szchd}), plus one column for the rest of the HRU (outside the grid). The column of HRU $k$ in cell $i$ has its own soil water $\phi_{k,i,m}$ [mm] in every layer $m$;
+Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before (or, with
+\cmd{:SoilZoneClasses}, each class of its columns separately; Section~\ref{sec:szclasses}). Between
 exchanges Raven changes the HRU totals, and the changes are shared among the columns as the processes would have made
 them there: the recharge leaves the columns as the percolation takes it (every column alike for \cmd{PERC\_CONSTANT},
 from free water for a drainage), percolation between soil layers stays in its column, evaporation is taken alike on
@@ -261,7 +262,7 @@ water up to field capacity fills the deficit without raising the level, free wat
 $S_d=\eta(1-\mathit{SF})(1-S_{\mathrm{fc}})$, and the level rises through a layer once the layers below are full. The cell's land
 surface is sampled at $N_g$ points $g$ (\cmd{:SoilZoneSubgrid}; 25 by default) with soil-zone bases
 $z_{b,g}=z_{\mathrm{land},g}-d_{\mathrm{sz},k}$. The column's free water stands at one flat level $h^{\mathrm{sz}}$ over these points (as MODFLOW's
-head is flat over the cell), defined by $\frac1{N_g}\sum_g\min(\max(h^{\mathrm{sz}}-z_{b,g},0),d_{\mathrm{sz},k})=b^{\mathrm{sz}}$.
+head is flat over the cell), defined by $\frac1{N_g}\sum_g\min(\max(h^{\mathrm{sz}}-z_{b,g},0),d_{\mathrm{sz},k})=b^{\mathrm{sz}}$. Section~\ref{sec:szslope} shows how this handles sloping and irregular land.
 
 \subsection{Exchange}
 A point comes into hydraulic contact with the aquifer as the water table rises through the depth $d_s$
@@ -292,6 +293,56 @@ column overflows to the HRU's \cmd{SURFACE\_WATER} and is routed the same day (s
 exfiltration). Water-table ET is reduced by $(1-\bar F_i)$ of the cell, because saturated soil already evaporates in
 Raven.
 
+\subsection{Sloping and irregular land}\label{sec:szslope}
+Partial saturation is handled at two scales. \emph{Between cells}, MODFLOW gives every cell its own head and its own
+top and bottom (the layers need not be horizontal: the generated model's top follows the land, one soil-zone thickness below it, and an existing model
+keeps its own geometry), and every HRU--cell link has its own column; so along a slope each column sees its own water
+table, and an HRU can be saturated at its foot and dry at its top. \emph{Within a cell}, MODFLOW's head is one flat
+level, but the land is not. The $N_g$ DEM points of the cell carry the land's relief into the soil zone: each point has its
+own soil-zone base $z_{b,g}$, so a water table rising into a sloping or bumpy cell saturates the soil first at the low
+points and only later at the high ones. Figure~\ref{fig:szsubgrid} shows one cell with the formulas of this chapter:
+\begin{itemize}
+\item (a) The water table is below every base: no point is in contact ($w_g=0$), $F=0$, and the recharge reaches the
+aquifer in full (through the unsaturated column, Section~\ref{sec:szvadose}, when \cmd{:SoilZoneVadose RICHARDS} is on).
+\item (b) The water table has risen into the soil at the low end of the cell only. There the soil is saturated
+($F=0.40$: 40\,\% of the recharge is rejected and stays in the soil), while the high end still drains freely. At rest the
+soil water level equals the water table and nothing is exchanged.
+\item (c) After rain the soil water stands above the water table ($h^{\mathrm{sz}}>h_i$): the points in contact drain into the aquifer
+(arrows, $q>0$). The point at 45~m holds water above its base but is not yet in contact (the water table is more than
+$d_s$ below it); that water is perched and leaves by percolation, as recharge.
+\item (d) A high water table below a drier soil ($h_i>h^{\mathrm{sz}}$) pushes water up into the soil ($q<0$); at the lowest points
+the water table is above the land. All four states use the same $F$, $w_g$ and $q$; nothing is switched.
+\end{itemize}
+The bottom panel shows how $F$, the mean contact $\bar w$ and the saturated thickness at rest grow with the water table:
+each point adds a smooth step (width $d_s$), so the curves are continuous and monotone for any relief, which keeps
+MODFLOW's Newton iterations smooth. With \cmd{:SoilZoneSubgrid 1} each cell has a single point and $F$ is one step.
+
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_subgrid.png}
+\caption{One 100~m cell with irregular land ($d_{\mathrm{sz}}=1$~m, $d_s=0.3$~m), seen along a transect of its DEM points (circles at the
+soil-zone base, shaded by their contact weight $w_g$). (a)--(d): four states of the water table $h$ and soil water level
+$h^{\mathrm{sz}}$, with the saturated fraction $F$, the saturated thickness $b^{\mathrm{sz}}$ and the exchange $q/C$ (positive into the aquifer);
+arrows show each point's share of the exchange. Bottom: $F$, the mean contact $\bar w$ and $b^{\mathrm{sz}}/d_{\mathrm{sz}}$ at rest
+($h^{\mathrm{sz}}=h$) against the water table. Computed with the model's formulas
+(script \texttt{make\_sz\_subgrid\_figures.py} in the manual's figures folder).}\label{fig:szsubgrid}\end{figure}
+
+Figure~\ref{fig:szhillslope} shows a coupled run: the hillslope of test T2/T3 (ten 100~m HRUs on a 0.5\,\% slope) with a hump
+at 300~m and hollows at 620 and 850~m added to its DEM, 25 points per cell and $d_s=0.1$~m. The water table is a step
+per cell (MODFLOW's flat head). Under rain the saturated area spreads up from the foot of the slope and from the
+hollows; over the hump (HRUs 3--4) and near the top (HRU 2) the cells are only partly saturated for months
+($0<F<1$). Water moves down the slope in the aquifer: it rises into the soil of the lower cells, which fill and
+overflow to surface water (saturation-excess runoff and exfiltration). After the rain the saturated area retreats
+downslope, the hollows last. The run closes every balance of Section~\ref{ch:verification} to $10^{-9}$ or better.
+
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_hillslope.png}
+\caption{Coupled hillslope with irregular land (rain 10~mm/d for 150 days, then dry). Top: land surface, soil-zone base and
+the water table of each cell on four days; shaded, the saturated soil on day 150. Bottom: saturated fraction $F$ of each
+HRU over time (1 = top of the slope), with the days on which the HRU overflows to surface water.}\label{fig:szhillslope}\end{figure}
+
+What the sub-grid closure does not resolve: a column keeps one flat soil water level, so within a cell the soil water is
+spread over the points at once, and the column overflows only when it is full, that is when $h^{\mathrm{sz}}$ reaches the highest
+land point. A water table above the land at the low points of a partly filled cell (panel (d)) therefore pushes water into the higher parts of the column instead of running off there;
+seepage faces smaller than a cell need smaller cells. Between cells, soil water moves only through the aquifer.
+
 \subsection{Solving soil and aquifer together}
 Within a day the soil column and the aquifer must agree. For given heads each column is solved implicitly
 (backward Euler) for its change $\Delta\phi$ [mm]:
@@ -299,7 +350,7 @@ Within a day the soil column and the aquifer must agree. For given heads each co
 \Delta\phi+\frac{1000\,\dt}{A_{k,i}}\,q^{\mathrm{sz}}_{k,i}\big(b^{\mathrm{sz}}(\phi^*+\Delta\phi),h_i\big)=0,
 \end{equation}
 where $A_{k,i}$ [m$^2$] is the column area and $\phi^*$ its water after Raven's processes plus the rejected recharge. The left side
-increases strictly with $\Delta\phi$, so there is exactly one solution (found by bisection); if it lies beyond full, the
+increases strictly with $\Delta\phi$, so there is exactly one solution (found by Brent's method); if it lies beyond full, the
 column fills and the rest overflows. MODFLOW receives each column as a linear boundary that reproduces this exchange at
 the current head and its slope, including the column's own response (a Robin interface condition). After MODFLOW's
 outer iterations the columns are solved again with the new heads --- after every one of the first five, and afterwards
@@ -312,6 +363,14 @@ and the last update before the interface freezes) may not take more from a colum
 drains, its slope is limited by the column's free water; where water rises into the soil, the line becomes a smoothed
 drain that stops at its zero-flow level instead of turning into flow out of a column that has no water to give.
 
+While the water table is below the soil base the exchange does not depend on the head (a rate: the soil drains to its
+base), and MODFLOW would have no way to return water to the soil if the head rose past the base during its solve: the
+excess would go into the elastic storage above the cell top, heads metres above ground in one iteration (352~m). Such links therefore also get a drain in \cmd{SZD\_RAVEN} at the lowest base point of the cell, smoothed
+over $d_s$, with the link's conductance $C$ and at least the conductance that carries the link's inflow (its rate and
+its share of the cell's recharge) out over one soil-zone thickness, $\max\big(C,\,Q_{\mathrm{in}}/d_{\mathrm{sz},k}\big)$. Below the
+base it carries nothing, so a converged step that stays below the base is unchanged; above it the water goes back to
+the soil as exchange (aquifer to soil zone), as the next interface update would send it.
+
 \begin{example}[: water table rising into the soil]
 Two soil-zone layers of 0.5 m with $\eta=0.4$, $\mathit{SF}=0$, $S_{\mathrm{fc}}=0.5$: $\phi_{\max}=200$ mm, $\phi_{\mathrm{fc}}=100$ mm and
 $S_d=0.2$ in each. The top aquifer layer has $S_y=0.2$ and receives 10 mm/d of recharge. Below the soil the water table
@@ -323,14 +382,272 @@ $C^{\mathrm{sz}}=10^4/(0.5/0.2+10/2)=1\,333$ m$^2$/d. Soil water 0.2 m and water
 $q^{\mathrm{sz}}=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
 \end{example}
 
+\subsection{Every position of the water table}\label{sec:szregimes}
+The water table can stand anywhere relative to the soil zone, and it moves through all of these positions in the
+course of a year. Figure~\ref{fig:szregimes} shows what carries the water in each; the coupling switches between them
+smoothly, column by column and step by step, without any setting.
+\begin{figure}[!htbp]\centering\input{figures/tikz_sz_regimes}
+\caption{Where the water table can be and what moves the water in each case. (a) Deep: recharge crosses an unsaturated
+column solved with Richards' equation (\cmd{:SoilZoneVadose RICHARDS}), which delays and spreads it; the column also
+feeds capillary rise into the soil zone. (b) Within the column's minimum length below the soil base: no column; the
+exchange starts through the fringe $d_s$, and capillary rise from the water table reaches the layers above. (c) In the
+soil zone: the saturated soil exchanges with the aquifer, recharge on saturated ground is rejected, capillary rise
+continues into the layers above the water table. (d) At the surface: the full soil zone overflows. (e) Over a specified
+head: each column exchanges with the fixed head exactly.}\label{fig:szregimes}
+\end{figure}
+
+\begin{plain}
+When the water table is deep, rain that drains out of the soil takes days to weeks to reach it, and arrives spread
+out; Raven now follows that trip through the dry ground below the soil. When the water table is shallow, it also
+works the other way: dry soil pulls water up from it, so plants and evaporation keep drawing on groundwater after the
+rain stops. Both are computed from the soil's own retention curve, not from a fitted delay or a rate you set.
+\end{plain}
+
+\subsection{The unsaturated column}\label{sec:szvadose}
+With \cmd{:SoilZoneVadose RICHARDS} every exchange column whose water table lies more than
+$L_{\min}=0.05$~m below its soil-zone base gets an unsaturated column from the base $z_b$ down to the
+water table $h$ (the head of the top active cell at the start of the step). Its water content $\theta(z,t)$ follows
+the mixed form of Richards' equation \cite{celia1990}, $z$ upward,
+\begin{equation}
+\frac{\partial\theta}{\partial t}=\frac{\partial}{\partial z}\Big[K(\psi)\Big(\frac{\partial\psi}{\partial z}+1\Big)\Big],
+\end{equation}
+with Campbell's retention curve \cite{campbell1974} and its Hutson--Cass parabola near saturation \cite{hutson1987},
+\begin{equation}
+\psi(S)=\begin{cases}-\psi_a\,S^{-b}, & S\le S_i,\\[2pt] -\psi_i\sqrt{\dfrac{1-S}{1-S_i}}, & S>S_i,\end{cases}\qquad
+S=\frac{\theta}{\theta_s},\quad S_i=\frac{2b}{1+2b},\quad \psi_i=\psi_a S_i^{-b},\qquad K=K_s\,S^{2b+3}
+\end{equation}
+(continuous with a continuous slope at $S_i$, so the Newton iteration never meets a kink). The material of each depth
+is the aquifer class of the MODFLOW layer there: $K_s$ = \cmd{K\_VERT}, $\theta_s$ = \cmd{POROSITY}, $b$ = \cmd{CLAPP\_B},
+$\psi_a$ = \cmd{AIR\_ENTRY\_PRESSURE} [m], $S_y$ = \cmd{SPEC\_YIELD} (Section~\ref{app:class}). Layers of different
+classes form a layered column, so a slowly permeable layer holds a perched saturated zone above it.
+
+\paragraph{Discretization.} Each column has at most $N$ finite volumes (\cmd{:SoilZoneVadose RICHARDS} $\epsilon$ $N$;
+$N=16$ by default), about 5~cm thick at both ends and growing geometrically by 1.3 towards the middle. Each Raven step
+is divided into substeps, each solved by backward Euler in the mixed (mass-conservative) form with Newton's method on
+the tridiagonal system; a substep is accepted when no cell changes its content by more than $\epsilon$ (0.02 by
+default) and halved otherwise, and the next one grows by half when Newton converged quickly. Newton's updates are
+damped in logarithmic steps towards saturation (a dry node recovers in a few iterations), and once the top has
+saturated the next substeps try the saturated top first; an air-dry top under an upward demand likewise switches to
+its driest suction ($10^5$~m), and the demand it cannot supply is returned to the soil zone. Upward flow through the
+bottom comes out of the cell holding the water table (Section~\ref{sec:szcaprise}: the top cell, or through
+\cmd{SZW\_RAVEN} a cell below it when the top cell has dried); out of a cell near drying it is scaled down with that
+cell's water, and where no cell has water there is none: even a trace of negative recharge into a dry cell makes
+MODFLOW's Newton iteration oscillate (on Liard it quadrupled the outer iterations). The bottom boundary is
+$\psi=0$ at the water table. The top boundary is the unsaturated share of the column's recharge (Section~\ref{ch:recharge}),
+$q_{\mathrm{top}}=(1-F)R_{k,i}/A_{k,i}$, less the capillary rise into the soil zone; when the top cell saturates it switches to
+$\psi=0$ and what it cannot take is \emph{rejected}: it returns to the soil-zone column as rejected recharge, exactly
+like recharge on saturated ground. The flux into MODFLOW is taken from the column's storage change,
+\begin{equation}
+q_{\mathrm{bot}}=q_{\mathrm{top}}-\frac{1}{\dt}\sum_i\big(\theta_i^{n+1}-\theta_i^{n}\big)\Delta z_i,
+\end{equation}
+so the column conserves water to round-off whatever the Newton tolerance; $q_{\mathrm{bot}}A_{k,i}$ replaces the column's
+share of the recharge in \cmd{RCH\_RAVEN}. The column is solved once per Raven step, before MODFLOW's solve, with the
+water table of the start of the step.
+
+\paragraph{A moving water table.} The water table's own rise and fall is MODFLOW's: its specific yield stores and
+releases the water. The column therefore carries only what differs from the hydrostatic (equilibrium) profile above
+the water table, $\theta_{\mathrm{eq}}(z)=\theta\big(\psi=-(z-h)\big)$: water in transit to the water table, and
+deficits left by evaporation and capillary rise (\emph{unsaturated zone storage}
+$=\sum_i(\theta_i-\theta_{\mathrm{eq},i})\Delta z_i$). At the start of every step the column's bottom moves to the new
+water table: the excess keeps its elevation, the equilibrium follows the water table, and where the water table has
+risen the excess below it joins the aquifer as recharge this step (\emph{unsaturated zone to aquifer} includes it);
+where it has fallen, the new cells start at equilibrium, and the water they take comes out of the cell holding the
+water table, at most what that cell can give in the step (above; the column's bottom then follows more slowly). The
+same limit applies to the deficit below a risen water table in a column dried by evaporation or capillary rise. (Opening them at $\theta_s-S_y$, what MODFLOW's specific yield
+leaves behind, would leave a dry band next to the water table that refills from the aquifer at once, a feedback that
+diverges with explicit coupling wherever $S_y$ exceeds the drainable porosity the retention curve implies near the
+water table.) A node that the move leaves above its porosity, or drier than air-dry, is clipped and the difference
+exchanged with the aquifer. A rising water table releases at most what MODFLOW stores for that rise, $S_y\Delta h$ per
+unit area, in one step; the column's bottom then follows more slowly and releases the rest in the next steps. With
+$S_y$ consistent with the retention curve this never binds; with $S_y$ well below the drainable porosity a rising water
+table would otherwise release more from the column at each step than the last (a feedback with gain $(\theta-\theta_{\mathrm{eq}})/S_y>1$),
+and Raven warns at start-up when $S_y$ and $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2.
+When the water table rises to within $L_{\min}$ of the base the column disappears and the
+soil zone's contact exchange (above) takes over; when it falls again the column reappears at equilibrium. The columns
+are saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}).
+
+\begin{example}[: delay through a deep unsaturated zone]
+A 3-day storm of 40 mm/d on soil over a water table 6~m deep, sand with $K_s=0.5$ m/d, $b=4$, $\psi_a=0.3$~m (test P1).
+Without the column the recharge reaches MODFLOW with the percolation, centroid on day~6.1. With it, the recharge
+arrives spread over two weeks, peak 45\% lower, and its centroid moves to day~15.6; nothing is lost: inflow, outflow
+and storage change of the columns close to $10^{-11}$ (Figure~\ref{fig:v2delay}).
+\end{example}
+
+\subsection{Capillary rise}\label{sec:szcaprise}
+Dry soil above a water table draws water up. In a steady upward flux $q$ (positive up) through a profile whose
+conductivity depends on the suction $\psi>0$, Darcy's law gives $d\psi/dz=1+q/K(\psi)$, so between two points a height
+$\Delta z$ apart, with suctions $\psi_1$ (below) and $\psi_2$ (above),
+\begin{equation}\label{eq:rise}
+\Delta z=\int_{\psi_1}^{\psi_2}\frac{d\psi}{1+q/K(\psi)},\qquad K(\psi)=\begin{cases}K_s,&\psi\le\psi_a\\K_s(\psi_a/\psi)^m,&\psi>\psi_a\end{cases},\quad m=2+\frac3b .
+\end{equation}
+The right side falls monotonically from $\psi_2-\psi_1$ ($q=0$) to 0 ($q\to\infty$): there is exactly one $q$ when
+$\psi_2-\psi_1>\Delta z$, and none (no rise) when the upper point is at or wetter than hydrostatic. Raven solves
+(\ref{eq:rise}) for $q$: in dimensionless form ($u=\psi/\psi_a$, $Q=q/K_s$) the integral is tabulated once per
+Clapp--Hornberger exponent, and the root is found with Brent's method on the table (within 2\% of the direct solution
+everywhere, mostly within 0.5\%; suctions within a factor $e^2$ of each other are integrated directly). With an
+infinitely dry top and a deep water table (\ref{eq:rise}) tends to Gardner's classic result
+\cite{gardner1958,eagleson1978}, $q_\infty=K_s\big(1+\tfrac{1.5}{m-1}\big)(\psi_a/d)^m$, which overestimates the rise by
+up to 70\% when the soil is only moderately dry (Figure~\ref{fig:v2rise}); Raven uses the exact relation.
+
+\paragraph{From the water table.} Where a column has no unsaturated column (no \cmd{:SoilZoneVadose}, or the water
+table within $L_{\min}$ of the base or above it), every soil-zone layer $m$ below field capacity whose middle lies above
+the water table receives
+\begin{gather}
+Q_m=\min\Big(A_{k,i}(1-F)\,q\big(\Delta z=z_{\mathrm{mid},m}-h,\ \psi_1=0,\ \psi_2=\psi_{s,m}\big),\ \frac{(\phi_{\mathrm{fc},m}-\phi_m)A_{k,i}}{1000\,\dt}\Big),\\
+\psi_{s,m}=\psi_{a,m}\Big(\frac{\phi_m}{\phi_{\max,m}}\Big)^{-b_m},\nonumber
+\end{gather}
+with the layer's own soil (\cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} [mm], \cmd{HYDRAUL\_COND} of its soil class); all
+layers together at most the rise to the lowest of them with an infinitely dry top, since the water reaching the upper
+layers passes through it. The rise is taken from the aquifer as a fixed rate for the step (through \cmd{SZQ\_RAVEN}) and
+added to the layers after the exchange; it is reported as \emph{capillary rise from the water table}.
+
+\paragraph{Which cell supplies it.} Upward flows --- this rise, the unsaturated column's upflow and the repayment of
+the lagged exchange's debt --- are rates MODFLOW must take out of a cell. While the top cell holds the water table more
+than $\max(5\%\text{ of its thickness},\,5\text{ cm})$ above its bottom they come out of it (\cmd{SZQ\_RAVEN}, the
+recharge for the column's upflow). When it has dried, they come out of the highest cell below that does, through a WEL
+package \cmd{SZW\_RAVEN} with one entry per active cell below each link's top cell, and the rise is computed from that
+cell's head and specific yield: a water table below a thin top layer still feeds the soil (with a 0.5~m
+top layer the rise had been zero; now it equals that of a thick top layer, 4\,565~m$^3$ in the test). When no cell holds
+the water table clear of its bottom, the highest cell with water supplies them, scaled down smoothly to zero as it dries
+($s^2(3-2s)$ of its saturated part over the margin), so nothing switches on or off abruptly. Out of an aquifer cell they
+are moreover together at most half the water it holds above its bottom under the link, faded out the same way,
+$\tfrac12 f\,S_yA_{k,i}(h-z_{\mathrm{bot}})/\dt$ per step, so a thin cell is never pumped dry within a step (MODFLOW diverged otherwise); the water the new nodes of an unsaturated column take when the water table falls
+(below) counts first, then the column's upflow, the rise from the water table and the repayment of the lagged
+exchange's debt (what the cell cannot give is repaid later; the column's draw counts also when it goes through the top
+cell's recharge); what the column's
+upflow does not get from MODFLOW is taken back out of the column, bottom node first, down to air-dry. A specified head
+below a dried top cell supplies the rise and the column's upflow itself, without drawdown or limit; MODFLOW ignores a
+well in such a cell, so these flows are booked as \emph{specified heads to soil zone} and (the column's) as negative
+\emph{recharge onto CHD cells} (booked as a well they had created water).
+
+\paragraph{Implicit in the drawdown.} The rise lowers the water table it comes from, and the rate falls steeply with the
+depth. A rate from the head at the start of the step overshoots: on dry, conductive soil 5~cm above the water table it
+drew 0.1~m in one day and lowered the water table by 0.67~m, which then swung back and forth from step to step. Raven
+therefore takes the rate at the end-of-step water table of the column itself,
+\begin{equation}\label{eq:riseimpl}
+Q=T\Big(\frac{Q\,\dt}{S_y\,A_{k,i}(1-F)}\Big),\qquad T(D)=\min\Big(\sum_m Q_m(\Delta z_m+D),\ Q_{\infty}(\Delta z_{\mathrm{low}}+D)\Big),
+\end{equation}
+the total rate with the water table lowered by the risen volume over the specific yield and the share's area (no
+lateral resupply: the bound of a single column, stable for any step length; $S_y$ at least 0.01). $T$ falls with $D$,
+so (\ref{eq:riseimpl}) has one root between $T(T_0w)$ and $T_0$, $w=\dt/(S_yA_{k,i}(1-F))$; Raven finds it with the
+Illinois variant of regula falsi (a geometric bisection after a step that does not halve the bracket), keeping the best
+lower bound ($T(Qw)$ for every trial $Q$ above the root), to 0.2\% of the root --- about four evaluations of $T$ ---
+and the layers keep their shares of $T$. Over specified heads the head does not move and $D=0$. $Q_\infty$ is the rise to
+the lowest layer whose middle lies above the water table, whether or not that layer takes water itself, since all rising
+water passes through it. With \cmd{:SoilZoneVadose RICHARDS} and no column (the water table less than $L_{\min}$ below
+the base) the water also crosses the aquifer material between the water table and the base first: $Q_\infty$ is at most
+that material's own rise to an infinitely dry top over the gap (\cmd{K\_VERT}, \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}
+of the aquifer class), as a column just longer than $L_{\min}$ sees it (on an aquifer with $K_v=5$~mm/d
+the rise had been up to six times larger without the column than with it).
+
+\paragraph{From an unsaturated column.} The same layers receive (\ref{eq:rise}) from the column's top node (its suction
+$\psi_1$, the distance from the node to each layer's middle), on the unsaturated share $A_{k,i}(1-F)$ and within the layers'
+deficits, and the column's top flux is reduced by the same amount (\emph{capillary rise to soil zone}). In one step the
+column passes on at most the larger of the water its top node holds down to the suction of the lowest layer above it
+and what the water table itself could supply by (\ref{eq:riseimpl}); what the column cannot deliver within the step
+comes back as an unmet upward demand and is not added to the soil. As the column shortens towards $L_{\min}$ its top
+node empties and the second term takes over, so the rise just above $L_{\min}$ equals the rise from the water table
+just below it (test P9: 1\,733 against 1\,765~m$^3$ on the first day). \cmd{:SoilZoneCapillaryRise ON|OFF} switches both; the default is on with \cmd{:SoilZoneVadose RICHARDS} and
+off without it.
+
+\begin{example}[: a drying soil over a shallow water table]
+Soil zone of 2$\times$0.5~m, $b=5$, $\psi_a=200$~mm, $K_{\mathrm{sat}}=200$~mm/d, PET 4 mm/d and no rain for 60 days
+(test P2). Without capillary rise the soil dries in five days and evaporation stops at 15~mm. With it, evaporation
+continues on water drawn from the aquifer: 180~mm with the water table 0.7~m deep, 117~mm at 1.3~m and 51~mm at 2.5~m
+(Figure~\ref{fig:v2caprise}).
+\end{example}
+
+\subsection{Timing within a step}\label{sec:sztiming}
+Raven's processes and the exchange cannot both come first within a step. With \cmd{:SoilZoneExchangeTiming AFTER} (the basic soil zone)
+the processes run first and do not see the water the exchange brings in the same step. With \cmd{LAGGED}, the
+default, each column first receives its exchange of the last step,
+\begin{equation}
+L_c=-q_c^{\,n-1}\dt\quad\text{(limited to the column's room or water)},
+\end{equation}
+so that evaporation and drainage see the water that is rising in; when the exchange of the step begins the source is
+taken back out of the column as far as the column still holds it ($r_c$), and what the processes used of it,
+$D_c=-L_c-r_c$, is settled after the step's exchange:
+\begin{equation}
+\Delta\phi_c=L_c+r_c+\big(-q_c^{\,n}\dt+D_c\big)=-q_c^{\,n}\dt .
+\end{equation}
+Over the step the column receives exactly MODFLOW's booked exchange; only the order changes, and the splitting error
+scales with $q^n-q^{n-1}$ instead of $q^n$. If the column cannot give back $D_c$ (the processes used more of the lent
+water than the step's exchange supplied), the remainder is a \emph{debt} that the aquifer repays in the following
+steps through \cmd{SZQ\_RAVEN}; nothing is created or lost (\emph{lagged-exchange debt}, \emph{lagged-exchange
+repayment}). The last step's exchange and any open debt are saved in \cmd{solution.rvc} (\cmd{:GWSoilZoneLag}), so a
+restart continues exactly. On the hillslope test the mean head difference to the MODFLOW-only reference falls from
+1.8~cm to 0.7~cm and the largest from 6.6~cm to 2.5~cm, with 20\% fewer outer iterations (Figure~\ref{fig:v2timing}).
+
+\subsection{Raven's processes on each part of an HRU}\label{sec:szclasses}
+Raven's processes act on an HRU's state, but the columns of an HRU can be very different: saturated at the foot of a
+slope, dry at its top. With \cmd{:SoilZoneClasses} $N_c$ the columns of each HRU are sorted at the start of every step by
+their saturated thickness $b^{\mathrm{sz}}$, then their soil water, and grouped into up to $N_c$ classes of about equal area
+(classes with the same soil water are merged). In Raven's \cmd{ORDERED\_SERIES} solver the HRU's process sequence then
+runs once per class $c$ on a copy of the HRU's state with the class's mean soil water $\bar\phi_c$; the HRU's state
+becomes the area-weighted mean $\sum_cw_c\,\phi_c$ of the results (exact for every water store, since each run
+conserves water), the balances are weighted alike, and each class's result is shared among its own columns. With as
+many classes as columns an HRU behaves exactly like one HRU per cell (test P6: $8\times10^{-6}$~m). The cost is $N_c$
+evaluations of the HRU's processes per step. Other solvers keep the HRU mean (with a warning).
+
+\subsection{Columns over specified heads}\label{sec:szchd}
+Links on cells whose top active layer is a specified head have soil-zone columns too. MODFLOW does not apply
+boundaries on specified-head cells, and needs none: the head is known. After MODFLOW's solve each such column is
+solved with the specified head $h^{\mathrm{chd}}_i$,
+\begin{equation}
+\Delta\phi+\frac{1000\,\dt}{A_{k,i}}\,q^{\mathrm{sz}}_{k,i}\big(b^{\mathrm{sz}}(\phi^*+\Delta\phi),h^{\mathrm{chd}}_i\big)=0,
+\end{equation}
+which is exact for that column (the head does not respond), and the flow is booked as \emph{soil zone to specified
+heads} or \emph{specified heads to soil zone}; capillary rise there comes from the head as well. The column's recharge
+goes to the specified head (\emph{recharge onto CHD cells}), rejected where the ground is saturated. With an existing
+model the specified-head cells may change with its stress periods; the columns follow them step by step. The rest
+column of an HRU now covers only the part outside the grid, where there is no aquifer to exchange with.
+
+\subsection{With an existing MODFLOW model}\label{sec:szexisting}
+\cmd{:SoilZone PHYSICAL} works with \cmd{:MF6Simulation} as with a generated model (Chapter~\ref{ch:existing}). Raven adds
+\cmd{raven.szx} (GHB \cmd{SZX\_RAVEN}), \cmd{raven.szq} (WEL \cmd{SZQ\_RAVEN}), \cmd{raven.szd} (DRN \cmd{SZD\_RAVEN})
+and, with more than one layer, \cmd{raven.szw} (WEL \cmd{SZW\_RAVEN}, Section~\ref{sec:szcaprise}) to the model's name
+file next to \cmd{raven.rch}. The soil zone lies on the model's top: the soil-zone base is the top
+of the top active cell and the land surface is $d_{\mathrm{sz},k}$ higher. Its relief within a cell comes from \cmd{:LandSurface}
+when given (the DEM's points about their mean in the cell; with an \cmd{:OverlapWeights} table, which has no cell
+outlines, one point per cell). The soil--aquifer conductance and the storage check use the model's own vertical
+conductivity (\cmd{K33}, else \cmd{K}) and specific yield of the top active cell; unsaturated columns take the
+conductivity and specific yield of every layer from the model, and $b$, $\psi_a$ and $\theta_s$ from
+\cmd{:SoilZoneAquiferClass} (Section~\ref{app:commands}). Heads, conductances and rates are converted from the model's
+length and time units. A generated soil-zone model coupled again as an existing model reproduces the generated run
+within the interface tolerances, also in feet and seconds (tests X1--X4).
+Where the model's top cells can dry it should use MODFLOW's \cmd{NEWTON} formulation (Raven warns otherwise): without it a
+dried cell leaves the solve (head HDRY), and the soil zone over it neither exchanges with the aquifer nor draws capillary
+rise until the cell rewets. Raven stops when MODFLOW's heads are not finite, or when a step MODFLOW did not converge leaves a head far outside the
+model's elevations (beyond its highest top or lowest bottom by more than ten times its relief, at least 1~km: a diverged
+solve), rather than carry them on; the message names the cell and the date. Such a head on a converged step is what
+MODFLOW computes from the input (for instance recharge into a confined cell under a dried top cell without
+\cmd{NEWTON}) and gives a warning.
+
+\subsection{Cost}\label{sec:szcost}
+The unsaturated columns cost about 40~$\mu$s per column and day in a wet spell and much less when nothing moves;
+capillary rise costs a few table lookups per column and step (a few more for the drawdown root), the specified-head columns one local solve per column and step; classes
+cost $N_c$ evaluations of the HRU's processes. On the Liard example with \cmd{:SoilZone PHYSICAL} (85 HRUs, 4\,286 links,
+one year, optimized build) the basic soil zone took 106~s; the column soil zone with its defaults takes 69~s, and with unsaturated columns, capillary rise
+and three classes 91~s (6\,378 outer iterations against 4\,809): Brent's method in the local solve more than pays for
+the new physics, and MODFLOW's solve remains the larger part.
+
 \begin{refcard}{soil zone}
 \textbf{Sources/sinks.} Moves water both ways between the soil-zone columns of each coupled HRU with soil (Raven's
 \cmd{SOIL[0..$M-1$]} hold their mean) and the top active cell of each overlapping column (MODFLOW GHB \cmd{SZX\_RAVEN} with WEL
-\cmd{SZQ\_RAVEN}); returns rejected recharge to the columns and sends overflow to \cmd{SURFACE\_WATER}.\par\smallskip
+\cmd{SZQ\_RAVEN} and DRN \cmd{SZD\_RAVEN}; upward flows out of the cell holding the water table below a dried top cell
+through WEL \cmd{SZW\_RAVEN}); returns rejected recharge to the columns and sends overflow to \cmd{SURFACE\_WATER}.\par\smallskip
 \textbf{Constraints/notes.} Recharge must come from \cmd{SOIL[$M-1$]}; every soil-zone layer needs a positive thickness and
 drainable porosity, and the class of \cmd{SOIL[$M-1$]} needs \cmd{HYDRAUL\_COND}. \cmd{RECHARGE\_DELAY} must be 0 for
-soil-zone HRUs. Not available with an existing model (\cmd{:MF6Simulation}). Raven's processes run before the exchange in each step, so a long step carries a first-order
-splitting error (hillslope test: 1.5 cm mean head difference at daily steps, 0.16 cm hourly). Keep $d_s>0$.\par\smallskip
+soil-zone HRUs. Works with an existing model (\cmd{:MF6Simulation}; Section~\ref{sec:szexisting}). With the default
+\cmd{LAGGED} timing the splitting error of Raven's processes ahead of the exchange scales with the change of the
+exchange between steps (hillslope test: 0.7 cm mean head difference at daily steps; 1.8 cm with \cmd{AFTER}).
+Capillary rise needs \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} of the soil classes (Raven estimates them from the
+texture otherwise); unsaturated columns need them for the aquifer classes. \cmd{:SoilZoneClasses} needs
+\cmd{:Method ORDERED\_SERIES}. Keep $d_s>0$. The saturated fraction that rejects recharge is fixed for each step from
+the head at its start: on a slowly permeable aquifer a storm that lifts the water table through the soil base within
+one step can push it above the land surface for that step (a test with $K_v=5$~mm/d: 3.3~m above the base of a 1~m
+soil zone for one day); shorter steps avoid it. With unsaturated columns give $S_y$ close to the drainable porosity of
+the aquifer class (Raven warns otherwise).\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
 # .rvg
@@ -338,6 +655,11 @@ splitting error (hillslope test: 1.5 cm mean head difference at daily steps, 0.1
 :SoilZoneIteration 100 1.0E-4 1.0E-6    # updates after MODFLOW converged, tolerances
 :SoilZoneSubgrid 5                      # DEM points per cell side
 :SoilZoneOutput  WetlandHRUs            # optional: GWSoilExchange.csv for one group
+:SoilZoneVadose RICHARDS 0.02 16        # unsaturated columns: accuracy, nodes; default NONE
+:SoilZoneCapillaryRise ON               # default ON with RICHARDS, else OFF
+:SoilZoneExchangeTiming LAGGED          # default LAGGED; AFTER = the basic soil zone order
+:SoilZoneClasses 5                      # Raven's processes per class of columns; default 1
+:SoilZoneAquiferClass SAND              # existing models: retention of the cells (RICHARDS)
 # .rvi -- recharge from the bottom soil-zone layer
 :Percolation PERC_GAWSER SOIL[1] GROUNDWATER
 \end{lstlisting}
@@ -349,11 +671,17 @@ $\eta_m$, $S_{\mathrm{fc},m}$, $\mathit{SF}_m$ & \cmd{POROSITY}, \cmd{FIELD\_CAP
 $K_{\mathrm{sat},M-1}$ & \cmd{HYDRAUL\_COND} & soil class of \cmd{SOIL[$M-1$]} (\cmd{.rvp}) & mm/d & Raven manual\\
 $K_v$, $S_y$ & \cmd{K\_VERT}, \cmd{SPEC\_YIELD} & aquifer class of the top layer & m/d, -- & Sec.~\ref{app:class}\\
 $d_s$ & \cmd{SEEPAGE\_SMOOTHING\_DEPTH} & aquifer profile & m & Sec.~\ref{app:profile}\\
+$b$, $\psi_a$ (soil) & \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} & soil class (\cmd{.rvp}) & --, mm & Raven manual\\
+$b$, $\psi_a$, $\theta_s$ & \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} & aquifer class & --, m, -- & Sec.~\ref{app:class}\\
 $N_g$ & \cmd{:SoilZoneSubgrid} (points per side, squared) & \cmd{.rvg} & -- & Sec.~\ref{app:commands}\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
 \textbf{Outputs.} \cmd{GWBudget.csv}: \emph{soil zone to aquifer}, \emph{aquifer to soil zone}, \emph{rejected recharge},
 \emph{soil-zone overflow}, \emph{soil-zone exchange applied to Raven}, \emph{soil-zone shortfall}, \emph{interface updates},
-\emph{interface converged}, \emph{interface change}, \emph{soil-zone layer redistribution}, \emph{seepage and soil inflow withheld}, \emph{river gains withheld}, \emph{surface-store gains withheld}; \cmd{GWSoilExchange.csv} per HRU and step: soil-zone base, soil water
+\emph{interface converged}, \emph{interface change}, \emph{soil-zone layer redistribution}, \emph{seepage and soil inflow withheld}, \emph{river gains withheld}, \emph{surface-store gains withheld};
+with the column options also \emph{unsaturated zone inflow}, \emph{unsaturated zone to aquifer}, \emph{capillary rise to soil
+zone}, \emph{unsaturated zone storage}, \emph{capillary rise from the water table}, \emph{lagged-exchange debt},
+\emph{lagged-exchange repayment}, \emph{soil zone to specified heads}, \emph{specified heads to soil zone}
+(Section~\ref{sec:accsz2}); \cmd{GWSoilExchange.csv} per HRU and step: soil-zone base, soil water
 level, water table, saturated fraction, exchange, rejected recharge, overflow, soil water and capacity.
 \cmd{tools/plot\_soilzone.py} plots both.
 \end{refcard}
@@ -366,7 +694,10 @@ differ by more than a factor two the water table rises at visibly different rate
 warning says so. \textit{Why does an HRU's soil level differ from its cells' water tables?} The HRU value is the mean
 over its columns; \cmd{GWSoilExchange.csv} reports area-weighted means. \textit{How short should the step be?} Daily
 steps are adequate for most catchments; where the soil zone fills and drains within a day, sub-daily steps reduce the
-splitting error.
+splitting error. \textit{Do I need the unsaturated columns?} Where the water table is more than a metre or two below
+the soil for long periods, yes: without them recharge reaches MODFLOW when it leaves the soil. \textit{How many
+classes?} Three to five capture most of the difference between wet and dry parts of an HRU; as many as an HRU has
+cells reproduces one HRU per cell.
 
 \section{Rivers}\label{ch:rivers}
 Rivers exchange water with the aquifer in both directions: a \emph{gaining} river receives groundwater (baseflow); a
@@ -647,7 +978,12 @@ reservoir bottom that happens to start above 0~m therefore also starts at the cr
 \cmd{:InitialReservoirStage}.
 \begin{watch}
 The reservoir stage and the aquifer heads must use the same vertical datum. Give reservoirs absolute elevations (for
-simple lakes, \cmd{:AbsoluteCrest\allowbreak Height}).
+simple lakes, \cmd{:AbsoluteCrest\allowbreak Height}) and an initial stage or flow in the \cmd{.rvc} file
+(\cmd{:InitialReservoirStage} or \cmd{:InitialReservoirFlow}): without either Raven starts the reservoir at stage 0 and
+fills it in the first step, a jump in Raven's water balance (a warning says so). A stage below the whole aquifer under
+the lake after the first step stops the run. The lake HRU (\cmd{:HRUID}) must lie in the reservoir's own subbasin;
+otherwise Raven crashes in its first step (also without groundwater), and the coupled model stops with a message
+instead.
 \end{watch}
 \begin{example}[: reservoir seepage]
 $k_{\mathrm{seep}}=0.2$ m$^3$/s/m, average stage 1\,136 m, aquifer head below the lake 1\,132 m: seepage

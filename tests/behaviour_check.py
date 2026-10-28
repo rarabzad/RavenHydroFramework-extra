@@ -3,8 +3,11 @@
   reservoir  a 50 km2 lake with seepage on the largest coupled HRU of subbasin 52 (:ReservoirExchange), two years, plus a
              pumping well and a monitoring well: the seepage MODFLOW receives each step must equal the volume that left
              the lake the step before, all of it delivered; exact water accounts on both sides
-  ensemble   the same set-up as a two-member Monte Carlo ensemble with a fixed parameter: both members must equal each
-             other and the single run (groundwater budget, heads, hydrographs, reservoir stages)
+  ensemble   the same set-up as a two-member Monte Carlo ensemble with a fixed parameter: the first member must equal the
+             single run (groundwater budget, heads, hydrographs, reservoir stages); the second must start from the same
+             groundwater state (the heads after its first step within 1e-6 of the single run's) and keep every account
+             exact. (Raven itself does not reset routing and reservoir outflow between ensemble members, also without
+             groundwater, so the second member's hydrographs differ from the single run in its first days.)
 
 Usage: python3 behaviour_check.py      (needs RAVEN_MF6_LIB)
 """
@@ -32,6 +35,7 @@ def setup(d):
         '\n:Reservoir TestLake\n  :SubBasinID 52\n  :HRUID %d\n  :Type RESROUTE_STANDARD\n  :WeirCoefficient 0.6\n'
         '  :CrestWidth 20.0\n  :MaxDepth 8.0\n  :LakeArea 5.0E7\n  :AbsoluteCrestHeight %.2f\n  :SeepageParameters 0.05 %.2f\n'
         ':EndReservoir\n' % (lid, elev, elev - 5))
+    open(os.path.join(d, 'Liard.rvc'), 'a').write('\n:InitialReservoirStage 52 %.2f\n:InitialReservoirFlow 52 0.0\n' % elev)   # (else it starts at stage 0: a jump in Raven's balance)
     geo = [f for f in json.load(open(os.path.join(d, 'Liard_HRUs_standin.geojson')))['features']
            if int(f['properties']['HRU_ID']) == wid][0]
     pt = shape(geo['geometry']).representative_point()
@@ -82,20 +86,29 @@ r = subprocess.run([tc.RAVEN, 'Liard', '-o', 'out/'], cwd=e, capture_output=True
 emsg = (re.findall(r'Exiting Gracefully: (.*)', r.stdout + r.stderr) or ['(no exit line)'])[-1]
 print('ensemble: 2 Monte Carlo members: %s' % emsg)
 worst = 0.0
-for m in ('ens_1', 'ens_2'):
-    for f in ('GWBudget.csv', 'GWHeads.csv', 'Hydrographs.csv', 'ReservoirStages.csv', 'GWHRUState.csv'):
-        pa, pb = os.path.join(d, 'out', f), os.path.join(e, m, f)
-        if not os.path.exists(pa):
-            continue
-        if not os.path.exists(pb):
-            print('  %s/%s missing' % (m, f)); ok_all = False; continue
-        a, c = pd.read_csv(pa), pd.read_csv(pb)
-        num = [k for k in a.columns if k in c.columns and pd.api.types.is_numeric_dtype(a[k]) and pd.api.types.is_numeric_dtype(c[k])]
-        dev = max(float(((a[k] - c[k]).abs() / (a[k].abs().max() + 1e-9)).max()) for k in num)
-        worst = max(worst, dev)
-        if len(a) != len(c):
-            print('  %s/%s: %d rows instead of %d' % (m, f, len(c), len(a))); ok_all = False
-print('  largest relative difference of a member from the single run: %.1e  %s' % (worst, 'ok' if worst < 1e-12 else 'FAIL'))
+for f in ('GWBudget.csv', 'GWHeads.csv', 'Hydrographs.csv', 'ReservoirStages.csv', 'GWHRUState.csv'):
+    pa, pb = os.path.join(d, 'out', f), os.path.join(e, 'ens_1', f)
+    if not os.path.exists(pa):
+        continue
+    if not os.path.exists(pb):
+        print('  ens_1/%s missing' % f); ok_all = False; continue
+    a, c = pd.read_csv(pa), pd.read_csv(pb)
+    num = [k for k in a.columns if k in c.columns and pd.api.types.is_numeric_dtype(a[k]) and pd.api.types.is_numeric_dtype(c[k])]
+    worst = max(worst, max(float(((a[k] - c[k]).abs() / (a[k].abs().max() + 1e-9)).max()) for k in num))
+    if len(a) != len(c):
+        print('  ens_1/%s: %d rows instead of %d' % (f, len(c), len(a))); ok_all = False
+print('  first member against the single run: largest relative difference %.1e  %s' % (worst, 'ok' if worst < 1e-12 else 'FAIL'))
 ok_all &= worst < 1e-12 and 'Successful' in emsg
+h0 = pd.read_csv(os.path.join(d, 'out', 'GWHRUState.csv')); h2 = pd.read_csv(os.path.join(e, 'ens_2', 'GWHRUState.csv'))
+hc = [k for k in h0.columns if k.startswith('head_')]
+dh = float((h0[hc].iloc[0] - h2[hc].iloc[0]).abs().max())
+A2 = tc.audit.audit(os.path.join(e, 'ens_2'))
+c2 = [('second member: heads after step 1 against the single run [m]', dh, 1e-6),
+      ('second member: recharge identity', abs(A2['recharge: (Raven - MF6 - dStore - toCHD)/Raven']), 1e-9),
+      ('second member: MODFLOW cumulative residual', abs(A2['MF6 cumulative residual / gross flow']), 1e-8),
+      ('second member: reservoir (delivered + not supplied) / sent - 1', abs(A2['reservoir: (delivered + not supplied) / sent'] - 1), 1e-9)]
+for name, v, lim in c2:
+    ok = v < lim; ok_all &= ok
+    print('  %-62s %.2e  %s' % (name, v, 'ok' if ok else 'FAIL'))
 print('behaviour checks: %s' % ('ALL PASSED' if ok_all else 'FAILED'))
 sys.exit(0 if ok_all else 1)

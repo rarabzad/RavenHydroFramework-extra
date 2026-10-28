@@ -17,8 +17,10 @@ and the storage change from MODFLOW's storage package, and reports the imbalance
 \varepsilon=Q^{\mathrm{rch}}+Q^{\mathrm{sto}}-Q^{\mathrm{seep}}+Q^{\mathrm{riv}}_{\mathrm{in}}-Q^{\mathrm{riv}}_{\mathrm{out}}-Q^{\mathrm{evt}}
 +Q^{\mathrm{wel}}+Q^{\mathrm{ghb}}+Q^{\mathrm{chd}}\\+Q^{\mathrm{swx}}_{\mathrm{in}}-Q^{\mathrm{swx}}_{\mathrm{out}}+Q^{\mathrm{res}}+Q^{\mathrm{sz}}_{\mathrm{in}}-Q^{\mathrm{sz}}_{\mathrm{out}},
 \end{multline}
-where $Q^{\mathrm{sto}}$ is water released from storage and $Q^{\mathrm{sz}}$ the soil-zone exchange (packages \cmd{SZX\_RAVEN} and
-\cmd{SZQ\_RAVEN}, only with \cmd{:SoilZone PHYSICAL}). It is written in m$^3$/d and as a percentage of the gross flow
+where $Q^{\mathrm{sto}}$ is water released from storage and $Q^{\mathrm{sz}}$ the soil-zone exchange (packages \cmd{SZX\_RAVEN},
+\cmd{SZQ\_RAVEN} and \cmd{SZD\_RAVEN}, only with \cmd{:SoilZone PHYSICAL}; the upward flows out of a lower cell through
+\cmd{SZW\_RAVEN} are booked with the terms they belong to: the columns' upflow in $Q^{\mathrm{rch}}$, the rise and the
+debt repayment below). It is written in m$^3$/d and as a percentage of the gross flow
 (the sum of the absolute values of all terms). In the tests of Chapter~\ref{ch:verification} the worst single-day error is about $5\times10^{-6}$\% and the
 cumulative error about $10^{-10}$.
 
@@ -47,8 +49,26 @@ zone coupled, the volume applied to the soil layers in each step also satisfies
 \begin{equation}
 V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}},
 \end{equation}
-with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests). The audit tool
-checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
+with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests).
+
+\paragraph{Soil zone.}\label{sec:accsz2} With the unsaturated columns the recharge passes through them: the first identity
+becomes
+\begin{equation}
+\sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}}
++\sum\big(V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}\big),
+\end{equation}
+and the columns themselves close as
+$\Delta V^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}-V^{\mathrm{uz}}_{\mathrm{cap}}$ (storage relative to the
+hydrostatic profile, Section~\ref{sec:szvadose}). The water applied to the soil zone gains the capillary rise (from the columns
+and from the water table), the exchange with specified heads and the lagged-exchange debt:
+\begin{equation}
+V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}}
++V^{\mathrm{uz}}_{\mathrm{cap}}+V^{\mathrm{wt}}_{\mathrm{cap}}+\left(Q^{\mathrm{chd}}_{\mathrm{out}}-Q^{\mathrm{chd}}_{\mathrm{in}}\right)\dt+V^{\mathrm{debt}},
+\end{equation}
+and MODFLOW's balance includes the rise from the water table and the debt repayment as outflows through
+\cmd{SZQ\_RAVEN} (or \cmd{SZW\_RAVEN} when they come out of a cell below a dried top cell). Each of these is a column of \cmd{GWBudget.csv}; the test suite checks all of them on every run.
+
+The audit tool checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
 
 \section{A real day of water accounts}
 \begin{example}[: 15 June 1996 in the Liard run]

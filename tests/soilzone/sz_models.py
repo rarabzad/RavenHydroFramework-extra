@@ -34,7 +34,8 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
               H0=0.5, H1=0.5, n=0.4, sfc=0.5, ksat=100.0, phi0=None,
               rain=10.0, perc=10.0, days=60, Sy=0.2, Kh=10.0, Kv=1.0, aq_thick=20.0,
               init_depth=2.0, chd=None, physical=True, smooth=0.5, subgrid=5,
-              iteration=None, pet=0.0, steady=None, extra_rvg='', perc_type='PERC_CONSTANT', timestep=1.0):
+              iteration=None, pet=0.0, steady=None, extra_rvg='', perc_type='PERC_CONSTANT', timestep=1.0,
+              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None):
     os.makedirs(d, exist_ok=True)
     L = nhru * hru_w
     # HRU polygons, centred on (LON0, LAT0): Raven's grid origin snaps to whole cells around that centre, so with
@@ -85,11 +86,20 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         f.write(':SoilProfiles\n  SOILP, 2, SOIL, %g, SOIL, %g\n:EndSoilProfiles\n' % (H0, H1))
         f.write(':VegetationClasses\n  :Attributes, MAX_HT, MAX_LAI, MAX_LEAF_COND\n  :Units, m, none, mm_per_s\n  GRASS, 1, 1, 5\n:EndVegetationClasses\n')
         f.write(':LandUseClasses\n  :Attributes, IMPERM, FOREST_COV\n  :Units, frac, frac\n  OPEN, 0, 0\n:EndLandUseClasses\n')
-        f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE\n  :Units, none, none, none, mm_per_d, mm_per_d\n')
-        f.write('  [DEFAULT], %g, %g, 0.0, %g, %g\n:EndSoilParameterList\n' % (n, sfc, ksat, perc))
+        if soil_b is None:
+            f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE\n  :Units, none, none, none, mm_per_d, mm_per_d\n')
+            f.write('  [DEFAULT], %g, %g, 0.0, %g, %g\n:EndSoilParameterList\n' % (n, sfc, ksat, perc))
+        else:  # Campbell retention of the soil (capillary rise): CLAPP_B [-], AIR_ENTRY_PRESSURE [mm]
+            f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE, CLAPP_B, AIR_ENTRY_PRESSURE\n'
+                    '  :Units, none, none, none, mm_per_d, mm_per_d, none, mm\n')
+            f.write('  [DEFAULT], %g, %g, 0.0, %g, %g, %g, %g\n:EndSoilParameterList\n' % (n, sfc, ksat, perc, soil_b, soil_psia))
         f.write(':LandUseParameterList\n  :Parameters, PARTITION_COEFF\n  :Units, none\n  [DEFAULT], 0.0\n:EndLandUseParameterList\n')
-        f.write(':AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY\n  :Units, m/d, m/d, 1/m, none, none\n')
-        f.write('  SAND, %g, %g, 1.0E-5, %g, 0.3\n:EndAquiferClasses\n' % (Kh, Kv, Sy))
+        if aq_b is None:
+            f.write(':AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY\n  :Units, m/d, m/d, 1/m, none, none\n')
+            f.write('  SAND, %g, %g, 1.0E-5, %g, 0.3\n:EndAquiferClasses\n' % (Kh, Kv, Sy))
+        else:  # retention of the aquifer material (unsaturated columns): CLAPP_B [-], AIR_ENTRY_PRESSURE [m]
+            f.write(':AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY, CLAPP_B, AIR_ENTRY_PRESSURE\n  :Units, m/d, m/d, 1/m, none, none, none, m\n')
+            f.write('  SAND, %g, %g, 1.0E-5, %g, %g, %g, %g\n:EndAquiferClasses\n' % (Kh, Kv, Sy, max(0.3, Sy + 0.05), aq_b, aq_psia))
         f.write(':AquiferProfiles\n  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n:EndAquiferProfiles\n')
         f.write(':AquiferProfileParameters\n  :Attributes, INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH\n')
         f.write('  :Units, m, m, 1/d, m\n  AQ, %g, %g, 1.0, %g\n:EndAquiferProfileParameters\n' % (init_depth, aq_thick + H0 + H1, smooth))

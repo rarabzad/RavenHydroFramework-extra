@@ -90,6 +90,7 @@ def setup(name,cfg,days,start='1985-10-01'):
     if cfg['res']:
         h=cfg['res']; zc=land_at_lake(h[0])
         open(f'{d}/Liard.rvh','a').write(f"\n:Reservoir FuzzLake\n  :SubBasinID 52\n  :HRUID {h[0]}\n  :Type RESROUTE_STANDARD\n  :WeirCoefficient 0.6\n  :CrestWidth 20.0\n  :MaxDepth 8.0\n  :LakeArea 2.0E7\n  :AbsoluteCrestHeight {zc:.2f}\n  :SeepageParameters {cfg['resk']} {zc-5:.2f}\n:EndReservoir\n")
+        open(f'{d}/Liard.rvc','a').write(f"\n:InitialReservoirStage 52 {zc:.2f}\n")   # (else it starts at stage 0: a jump in Raven's balance)
     return d
 def run(d):
     os.makedirs(d+'/out',exist_ok=True)

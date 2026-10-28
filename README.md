@@ -5,7 +5,11 @@ RavenHydroFramework-extra adds groundwater to the [Raven hydrological modelling 
 (`:GroundwaterModel MODFLOW6`) or **couples an existing one** (`:MF6Simulation`), and exchanges recharge, seepage,
 river leakage, water-table ET, wells, boundaries and reservoir seepage with it every time step. Optionally
 (`:SoilZone PHYSICAL`) the water table rises into Raven's soil layers, with the soil zone and MODFLOW iterated to
-agreement within each step.
+agreement within each step, for generated and existing models alike. Below the soil, recharge can cross an
+unsaturated zone solved with Richards' equation (`:SoilZoneVadose RICHARDS`); dry soil draws water up from a shallow
+water table by capillary rise; the exchange is lagged into Raven's step to cut the splitting error; Raven's processes
+can act on classes of an HRU's columns (`:SoilZoneClasses`); and soil over specified heads exchanges with them exactly
+(manual Sections 5.3.7–5.3.15, design note `docs/design/soil_zone_columns_plan.md`).
 
 The coupling's source code is part of Raven itself (RavenHydroFramework). This repository holds everything around it:
 
