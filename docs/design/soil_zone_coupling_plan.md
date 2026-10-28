@@ -56,8 +56,7 @@ soil layer $j$ of the soil zone, counted **from the bottom** ($j=1$ is `SOIL[M-1
 | $h$ | head in the top active cell | m | `_X` |
 | $h_c$ | connection head (sets the connection weights; $=h$ at convergence) | m | `_szxHc` |
 | $d_s$ | connection smoothing depth (`SEEPAGE_SMOOTHING_DEPTH` of the aquifer profile) | m | `sz_cell::ds` |
-| $w_s$ | connection weight of sample $s$ | – | |
-| $w_s$, $F$ | contact weight of sample $s$; saturated fraction (§5.4) | – | `SubgridFlux`, `_linkF` |
+| $w_s$; $F$ | contact weight of sample $s$; saturated fraction (§5.4) | – | `SubgridFlux`; `_linkF` |
 | $C$ | soil–aquifer conductance of a link | m²/d | `sz_cell::C`, `_szxC` |
 | $q$ | exchange of a link, **positive into the aquifer** | m³/d | `_szxQc` (local solve), `_szxQ` (MODFLOW's booked flow) |
 | $C_g$, $H_g$ | conductance and head of the Robin boundary given to MODFLOW | m²/d, m | `_szxCg`, GHB `BHEAD/COND` |
@@ -86,7 +85,9 @@ Checks (start-up errors unless noted):
   `HYDRAUL_COND` must be given for the class of the bottom soil-zone layer of every coupled HRU: Raven's automatic
   value (0.001 mm/d) is a placeholder, so the set-up stops there (classes recorded before Raven's auto-calculation,
   `NoteSoilClassWithoutKsat`). Classes used only outside the soil zone do not need it.
-- Every process with `GROUNDWATER` as target in a coupled HRU must draw from `SOIL[M-1]`.
+- Every process with `GROUNDWATER` as target in a coupled HRU must draw from `SOIL[M-1]`; lateral processes may not
+  move water into or out of `GROUNDWATER` of a coupled HRU. Where a `PERC_CONSTANT` process from `SOIL[M-1]` applies
+  (per HRU, through its conditions) the recharge leaves the columns by area (§4).
 - $D_k\le20$ m (warning above 5 m). `SOIL_ZONE_DEPTH` is ignored (warning). `:SeepageReturnTo` applies only to the HRUs
   without a soil zone (warning).
 - Storage consistency: warning where the top layer's $S_y$ and the drainable porosity of `SOIL[M-1]` differ by more
@@ -139,22 +140,26 @@ The link's conductance (§3.2) is scaled by $a_e/A_{k,i}$ too, so that it acts o
 area, an HRU whose polygon is larger than its `AREA` exchanged its soil water that much faster).
 
 Each column keeps its own layer water $\phi_{c,j}$. Raven's `SOIL[m]` of the HRU is the area-weighted mean of its
-columns. Raven's processes change the HRU totals between exchanges; `gwsz::Distribute` shares each layer's change
-among the columns (bottom layer first):
+columns. Raven's processes change the HRU totals between exchanges; `gwsz::Distribute` shares the changes among the
+columns as the processes would have made them in each column:
 
-- a loss first in proportion to each column's free water (above field capacity: the water Raven's drainage acts on sits
-  in the saturated columns), then in proportion to its water;
-- a gain falls on every column alike (rain does not move to where there is room); what a full layer of a column cannot
-  take stays in the layer above in the same column (percolation into a full layer does not happen), and what its top
-  layer cannot take overflows to the HRU's `SURFACE_WATER` (saturation excess on the full columns) and is counted in
-  the soil-zone overflow;
-- with constant-rate percolation into `GROUNDWATER` (`PERC_CONSTANT`), the step's recharge (end-of-step
-  `GROUNDWATER`, which only `SOIL[M-1]` fills) is first taken from the columns' bottom layers by area (each column alike,
-  where it has the water), and the rest of the bottom layer's change shared after it.
+1. the step's recharge (end-of-step `GROUNDWATER`, which only `SOIL[M-1]` fills) leaves the bottom layers first, as the
+   percolation takes it: by area for a constant rate (`PERC_CONSTANT`: each column alike, where it has the water), from
+   free water first for a drainage (the other types: in proportion to each column's water above field capacity);
+2. where a layer lost water and the layer below gained, the matched part percolates within each column: it leaves the
+   upper layer the same way (by area or free water first) and enters the same column's lower layer;
+3. the other losses (evaporation) are taken alike on every column, limited to its water;
+4. gains (rain) fall on every column alike, together with the water percolating into the column from above; what a
+   full layer of a column cannot take stays in the layer above in the same column, and what its top layer cannot take
+   overflows to the HRU's `SURFACE_WATER` (saturation excess on the full columns) and is counted in the soil-zone
+   overflow.
 
 `SZSyncColumns` does this at the start of every exchange, after which Raven's `SOIL[m]` is set to the column means.
-(The first build shared gains by room: rain on the saturated toe of a slope moved instantly to the dry columns upslope;
-robustness test R2.)
+(The first builds shared gains by room and all losses from free water first: rain on the saturated toe of a slope moved
+instantly to the dry columns upslope, and percolation and evaporation moved water from the saturated to the dry columns.
+Against ten one-cell HRUs, one HRU over the same ten cells now gives the hillslope's total outflow within 3% for
+`PERC_CONSTANT`, `PERC_GAWSER`, `PERC_GAWSER_CONSTRAIN` and `PERC_LINEAR` on gentle and steep slopes, within 3% with one
+or two layers and evaporation, 7% with three layers; robustness tests R2, R2c.)
 
 Departure from the plan: the plan had one soil water level per HRU. With a slope, one level per HRU makes the cells
 of the HRU exchange with each other through the soil instantly; per-link columns keep the exchange local, as in GSFLOW.
@@ -246,12 +251,10 @@ materials make the rate change at the base; the start-up warning (§2) flags a f
 
 ### 6.1 Recharge rejection
 
-The HRU's recharge this step (end-of-step `GROUNDWATER`) is shared among its links in proportion to what each link's
-column gave up: with a drainage of free water (all percolation types but `PERC_CONSTANT`) the free water its bottom
-layer lost when Raven's changes were shared (§4; if no column lost any, the free water each held before; without free
-water anywhere, by area); with `PERC_CONSTANT` the recharge each column gave up by area (§4). (Shared by area, drainage
-from saturated columns at the toe of a slope recharged the aquifer upslope and circulated back: robustness tests R2,
-R2c, one HRU over ten cells against ten HRUs.) Of a link's share, $F$ is rejected (returned to that link's column before its local solve) and $(1-F)$
+The HRU's recharge this step (end-of-step `GROUNDWATER`) is shared among its links in proportion to the recharge each
+link's column gave up (§4, step 1; by area if the recharge is 0). (Shared by area, drainage from saturated columns at
+the toe of a slope recharged the aquifer upslope and circulated back: robustness tests R2, R2c. Shared by the free water
+a column lost in the net change, a column 1e-12 mm wetter than the others received the whole HRU's recharge: test R8.) Of a link's share, $F$ is rejected (returned to that link's column before its local solve) and $(1-F)$
 goes to MODFLOW's RCH. Recharge onto specified-head cells and outside the grid is handled as in CONCEPTUAL mode.
 `Raven recharge` in `GWBudget.csv` includes the rejected water (Raven drains the free water each step and rejection
 returns it), so the net recharge is `MF6 recharge`.
@@ -311,9 +314,14 @@ iteration (under-relaxation, backtracking) from converging. Updates made after M
 budget (`:SoilZoneIteration` max, default 100); when it is used up the values are frozen. 0 = the explicit predictor
 only. MODFLOW's tolerance relaxation for hard steps counts only iterations MODFLOW did not converge on. The last
 $\max(2,\ \text{max outer}/10)$ outer iterations are left to MODFLOW on the boundary it has: an update just before the
-limit left MODFLOW's final solve unconverged, and its residual was water created or lost (robustness test R5).
+limit left MODFLOW's final solve unconverged, and its residual was water created or lost (robustness test R5). Iteration
+1 always updates when the limit allows a second; a step with no update at all is reported as not converged. The
+boundary of the last update before the freeze is supply-limited as in explicit mode (below), as no update follows it.
 In explicit mode (`:SoilZoneIteration 0`) the boundary is also supply-limited: $C_g(H_g-\text{bottom})$ never exceeds the
-column's free water over the step (robustness test R7).
+column's free water over the step (robustness test R7), while for water rising into the soil $C_g$ stays at least the
+secant to the end of the contact; a linear boundary cannot hold both exactly, so some water can still rise while the
+head is between the lowest base and the end of the contact (the explicit mode's linearization error; no water is
+created).
 
 ### 7.4 Connection head update
 
@@ -335,7 +343,8 @@ Converged when
 
 $$\max_e\Big(|\Delta\lambda_e|,\ \frac{|q(h,h)-q(h,h_c)|}{C}\Big)<\delta_h\quad\text{and}\quad|\Delta Q|\le\max\Big(\delta_q\textstyle\sum|q|,\ \sum FC\cdot\max(\delta_h,\mathrm{DVCLOSE})\Big)$$
 
-($Q=\sum_eq_e$, change since the previous update) and MODFLOW has converged. On convergence, and after the last
+($Q=\sum_eq_e$, change since the previous update; $F$ here is the contact fraction, the mean contact weight of the
+link) and MODFLOW has converged. On convergence, and after the last
 allowed outer iteration (no solve follows), the state MODFLOW last solved with is restored ($F$, $h_c$, $\lambda$, $q$,
 $C_g$, rejection) and the arrays are not rewritten, so MODFLOW's budget and the flows Raven books agree exactly.
 
@@ -360,8 +369,9 @@ Per link column: Fill(rejected recharge), then Apply($-q\Delta t/a_c$) with $q$ 
   $\lambda=0$ (water table above the base drains at the base), iterated the same way.
 - **Hotstart**: `:GWSoilZoneColumns` in `solution.rvc` (HRU ID, cell = grid column number of the link, 0 for the rest
   column, water of each layer from the bottom up); columns are matched by cell, not by order. A block that does not
-  match the HRU's columns (grid or `:SoilZone` changed) is reported and the columns start from the water table. (The
-  block was keyed by column order only in unreleased development builds; there are no files of that format to read.)
+  match the HRU's columns (grid or `:SoilZone` changed) is reported and the columns start from the water table. Soil
+  water in the `.rvc` beyond what full columns hold starts in `SURFACE_WATER` (warning). (The block was keyed by
+  column order only in unreleased development builds; there are no files of that format to read.)
 - In a run without `:GroundwaterModel MODFLOW6`, groundwater blocks in the `.rvc` are skipped (each to its own end
   line) with a warning.
 
@@ -392,7 +402,7 @@ water and capacity, interface updates and change. `tools/plot_soilzone.py` draws
 | `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
 | `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
 | `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model |
-| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (outflow within 3% with free-water drainage, 10% with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall |
+| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off |
 | `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
 
 Regression: every existing test without `:SoilZone` gives byte-identical outputs (both Liard examples compared).
@@ -404,7 +414,9 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
 - **Operator splitting.** Raven's vertical processes run before the exchange in each step, so daily steps carry a
   first-order splitting error against a monolithic model (hillslope: mean 1.5 cm daily, 0.5 cm at 6 h, 0.16 cm at 1 h;
   outflow within 0.03%). Shorter steps reduce it.
-- Raven's processes act on the HRU mean of the soil water; the columns differ only through the exchange.
+- Raven's processes act on the HRU mean of the soil water; the columns differ through the exchange and the rules of
+  §4. With evaporation from saturated soil on a slope the HRU-mean process differs most from separate HRUs (total
+  outflow 19% lower in a 90-day dry test with 5 mm/d PET).
 - The rest column (parts of the HRU over specified-head cells or outside the grid) has no exchange: it does not see a
   specified head above its base.
 - Churn with fast drainage: Raven drains a column's free water every step and rejection returns the saturated share,

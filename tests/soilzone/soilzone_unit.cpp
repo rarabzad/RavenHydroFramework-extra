@@ -177,42 +177,56 @@ int main()
     SubgridFlux(c1,0.0,0.0,0.0,F,qh,qc,ql); double F0=F; SubgridFlux(c1,0.0,-0.25,-0.25,F,qh,qc,ql); double Fm=F; SubgridFlux(c1,0.0,-0.6,-0.6,F,qh,qc,ql);
     check(F0==1.0 && close(Fm,0.5) && F==0.0,"contact weights: through ds below the base, full at it",Fm,0.5); }
   { vector<double> z={0.0,1.0}; check(close(SatFraction(0.5,z,0.0),0.5),"SatFraction sub-grid sharp"); }
-  //-- column distribution: mass (totals + overflow), bounds, gains alike on every column, losses from free water first
-  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_mass=0,bad_bnd=0,bad_uni=0,bad_fw=0,bad_tot=0;
+  //-- column distribution: mass (totals + overflow), bounds, layer totals, the rules for recharge, percolation, losses, gains
+  { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0);
+    int bad_mass=0,bad_bnd=0,bad_tot=0,bad_rfw=0,bad_rar=0,bad_loss=0,bad_gain=0,bad_vert=0,bad_lr=0;
     for (int it=0;it<20000;it++){
       int n=1+(int)(U(rng)*3),nc=1+(int)(U(rng)*6); vector<sz_layer> Lr(n);
       for (int j=0;j<n;j++){Lr[j].H=0.5; Lr[j].phimax=50+200*U(rng); Lr[j].phifc=0.5*Lr[j].phimax;}
       vector<vector<double> > c(nc,vector<double>(n)); vector<double> w(nc),tg(n); double sw=0;
       for (int k=0;k<nc;k++){w[k]=(U(rng)<0.1)?0.0:U(rng); sw+=w[k];} if (sw<=0){w[0]=1; sw=1;} for (int k=0;k<nc;k++){w[k]/=sw;}
       for (int k=0;k<nc;k++){for (int j=0;j<n;j++){double r=U(rng); c[k][j]=(r<0.15)?0.0:((r<0.3)?Lr[j].phimax:Lr[j].phimax*U(rng));}}
+      vector<double> m0(n,0.0); for (int j=0;j<n;j++){for (int k=0;k<nc;k++){m0[j]+=w[k]*c[k][j];}}
       for (int j=0;j<n;j++){tg[j]=Lr[j].phimax*U(rng);}
-      vector<vector<double> > c0=c; double ovf=Distribute(Lr,c,w,tg);
-      double sumT=0,sumA=0; for (int j=0;j<n;j++){sumT+=tg[j]; for (int k=0;k<nc;k++){sumA+=w[k]*c[k][j];}}
+      double R=(U(rng)<0.5)?std::min(m0[0],20.0*U(rng)):0.0; bool byA=(U(rng)<0.5);
+      vector<vector<double> > c0=c; vector<double> lr; double ovf=Distribute(Lr,c,w,tg,0,R,byA,&lr);
+      double sumT=0,sumA=0,sumL=0; for (int j=0;j<n;j++){sumT+=tg[j]; for (int k=0;k<nc;k++){sumA+=w[k]*c[k][j];}}
+      for (int k=0;k<nc;k++){sumL+=w[k]*lr[k];}
       if (std::fabs(sumA+ovf-sumT)>1e-9*(1+sumT) || ovf<-1e-12){bad_mass++;}
-      bool spill=(ovf>1e-12);
+      if (std::fabs(sumL-R)>1e-9*(1+R)){bad_lr++;}
+      bool full=false; for (int k=0;k<nc;k++){for (int j=0;j<n;j++){if (c[k][j]>=Lr[j].phimax*(1-1e-12)){full=true;}}}
       for (int j=0;j<n;j++){
-        double m0=0; for (int k=0;k<nc;k++){m0+=w[k]*c0[k][j];}
         for (int k=0;k<nc;k++){if (c[k][j]<-1e-9 || c[k][j]>Lr[j].phimax*(1+1e-12)+1e-9){bad_bnd++;}}
-        //a gain that every column has room for (and nothing spilled from below) falls alike on every column
-        bool room=true; for (int k=0;k<nc;k++){if (c0[k][j]+(tg[j]-m0)>Lr[j].phimax){room=false;}}
-        bool below=false; for (int jj=0;jj<j;jj++){double mm=0; for (int k=0;k<nc;k++){mm+=w[k]*c0[k][jj];} for (int k=0;k<nc;k++){if (tg[jj]>mm && c0[k][jj]+(tg[jj]-mm)>Lr[jj].phimax){below=true;}}}
-        if (tg[j]>m0 && room && !below){
-          for (int k=0;k<nc;k++){if (w[k]>0 && std::fabs((c[k][j]-c0[k][j])-(tg[j]-m0))>1e-9*Lr[j].phimax){bad_uni++;}}
-          double m=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j];} if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}
-        }
-        if (n==1 && tg[j]<m0){ //a loss that free water covers leaves columns at or below field capacity alone
-          double fw=0; for (int k=0;k<nc;k++){fw+=w[k]*std::max(c0[k][j]-Lr[j].phifc,0.0);}
-          if (m0-tg[j]<=fw){for (int k=0;k<nc;k++){if ((c0[k][j]<=Lr[j].phifc && std::fabs(c[k][j]-c0[k][j])>1e-9*Lr[j].phimax) || (c[k][j]<std::min(c0[k][j],Lr[j].phifc)-1e-9)){bad_fw++;}}}
-          double m=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j];} if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}
-        }
+        if (!full && ovf<=0.0){double m=0; for (int k=0;k<nc;k++){m+=w[k]*c[k][j];} if (std::fabs(m-tg[j])>1e-9*Lr[j].phimax){bad_tot++;}}
       }
-      (void)spill;
+      if (n==1){ //single layer: recharge first (free water first or by area), then the rest alike
+        double d=tg[0]-m0[0]+R;   //change after the recharge
+        double fw=0; for (int k=0;k<nc;k++){fw+=w[k]*std::max(c0[k][0]-Lr[0].phifc,0.0);}
+        double minw=1e300; for (int k=0;k<nc;k++){if (w[k]>0){minw=std::min(minw,c0[k][0]);}}
+        if (R>0 && !byA && R<=fw){ //drained from free water first: a column at field capacity gives nothing
+          for (int k=0;k<nc;k++){if (c0[k][0]<=Lr[0].phifc && lr[k]>1e-9){bad_rfw++;}}}
+        if (R>0 && byA && R<=minw){ //by area: every column gives the same depth
+          for (int k=0;k<nc;k++){if (w[k]>0 && std::fabs(lr[k]-R)>1e-9*(1+R)){bad_rar++;}}}
+        if (d<0 && R==0 && -d<=minw){ //other losses alike
+          for (int k=0;k<nc;k++){if (w[k]>0 && std::fabs((c0[k][0]-c[k][0])+d)>1e-9*Lr[0].phimax){bad_loss++;}}}
+        if (d>0 && R==0){bool room=true; for (int k=0;k<nc;k++){if (c0[k][0]+d>Lr[0].phimax){room=false;}}
+          if (room){for (int k=0;k<nc;k++){if (w[k]>0 && std::fabs((c[k][0]-c0[k][0])-d)>1e-9*Lr[0].phimax){bad_gain++;}}}}
+      }
+      if (n==2 && R==0){ //percolation stays in its column: upper loses, lower gains, nothing full -> lower gains only where upper lost
+        double du=tg[1]-m0[1],dl=tg[0]-m0[0];
+        if (du<0 && dl>0 && -du>=dl && ovf<=0){
+          for (int k=0;k<nc;k++){double gl=c[k][0]-c0[k][0],lu=c0[k][1]-c[k][1]; if (w[k]>0 && gl>lu+1e-9*Lr[0].phimax){bad_vert++;}}}
+      }
     }
     check(bad_mass==0,"Distribute: column totals plus overflow equal the targets",bad_mass,0);
+    check(bad_lr==0,"Distribute: the columns' parts of the recharge add up to it",bad_lr,0);
     check(bad_bnd==0,"Distribute: every column stays within [0, phimax]",bad_bnd,0);
-    check(bad_uni==0,"Distribute: a gain falls alike on every column",bad_uni,0);
-    check(bad_tot==0,"Distribute: layer totals exact where nothing overflows or spills",bad_tot,0);
-    check(bad_fw==0,"Distribute: a loss comes from free water first (columns at field capacity keep their water)",bad_fw,0); }
+    check(bad_tot==0,"Distribute: layer totals exact where nothing is full",bad_tot,0);
+    check(bad_rfw==0,"Distribute: recharge of a drainage comes from free water first",bad_rfw,0);
+    check(bad_rar==0,"Distribute: recharge of a constant rate comes from every column alike",bad_rar,0);
+    check(bad_loss==0,"Distribute: other losses (evaporation) alike on every column",bad_loss,0);
+    check(bad_gain==0,"Distribute: a gain falls alike on every column",bad_gain,0);
+    check(bad_vert==0,"Distribute: percolation stays in its column",bad_vert,0); }
   { vector<sz_layer> L2=TwoLayers(); vector<vector<double> > c(2,vector<double>(2)); vector<double> w={0.5,0.5};
     c[0][0]=L2[0].phimax; c[0][1]=L2[1].phimax; c[1][0]=L2[0].phifc; c[1][1]=L2[1].phifc;   //a full and a dry column
     vector<double> tg={0.5*(c[0][0]+c[1][0]),0.5*(c[0][1]+c[1][1])+20.0};                   //20 mm of rain on the top layer

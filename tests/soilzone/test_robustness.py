@@ -3,17 +3,18 @@
 R1 stiff flat column: drainable porosity 0.02 against S_y = 0.25 and a high conductance; the water table rises to the
    base and the soil zone fills. The interface and MODFLOW converge on every step in few updates (a connection that
    opened only above the base left MODFLOW's top cell confined there and the iteration cycled).
-R2 one HRU over ten cells against ten one-cell HRUs (same hillslope and forcing): the HRU's recharge leaves the columns
-   that give up free water and rain falls alike on every column (overflowing where full), so the soil-zone overflow
-   (the hillslope's outflow) agrees within 3% and MODFLOW's recharge within a factor 1.6 (sharing recharge by area
-   pumped drainage of the saturated toe up the slope: outflow -36%, recharge x2.3); also with constant-rate
-   percolation (within 10%).
+R2 one HRU over ten cells against ten one-cell HRUs (same hillslope and forcing): rain falls alike on every column
+   (overflowing where full), percolation stays in its column, and the recharge leaves the columns as the process takes
+   it, so the hillslope's total outflow agrees within 3% and MODFLOW's recharge within a factor 1.6 (sharing recharge
+   and gains by area / by room moved water up the slope: outflow -36%, recharge x2.3); R2c the same with constant-rate
+   percolation (outflow within 3%, recharge within 20%).
 R3 RECHARGE_DELAY with :SoilZone PHYSICAL is refused with a clear message.
 R4 a smoothing depth below 0.1 m is reported.
 R5 hourly steps with a 0.001 m smoothing depth: the interface is frozen for MODFLOW's last outer iterations, so no step
    ends with a MODFLOW residual.
 R6 a steep hillslope (slope 0.1) with 5x5 DEM samples per cell converges on every step.
 R7 explicit mode (:SoilZoneIteration 0): the boundary never drains more than a column holds (no shortfall).
+R8 a column 1e-6 mm wetter than the others does not attract the HRU's recharge (the heads stay uniform).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -25,6 +26,12 @@ def case(name, **kw):
     d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
     sz_models.make_case(d, **kw)
     return d
+
+def outflow(d, dt=1.0):
+    import pandas as pd
+    hy = pd.read_csv(os.path.join(d, 'out', 'Hydrographs.csv'))
+    fc = [x for x in hy.columns if '[m3/s]' in x and 'precip' not in x.lower()]
+    return float(hy[fc[0]].iloc[1:].sum() * 86400.0 * dt)
 
 def errors(d):
     p = os.path.join(d, 'out', 'Raven_errors.txt')
@@ -51,12 +58,12 @@ def main():
         ok, _ = sz_check.run(d)
         if ok:
             b = sz_check.outputs(d)[0]; r = sz_check.checks(d)
-            out[name] = (b['soil-zone overflow [m3]'].sum(), b['MF6 recharge [m3/d]'].sum(), r['iface_not_conv'])
+            out[name] = (outflow(d), b['MF6 recharge [m3/d]'].sum(), r['iface_not_conv'])
     g = False
     if len(out) == 2:
         (o1, m1, n1), (o2, m2, n2) = out['R2_one'], out['R2_ten']
         g = abs(o1 - o2) <= 0.03 * o2 and 1 / 1.6 <= m1 / m2 <= 1.6 and n1 == 0 and n2 == 0
-        print('  R2: overflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3 (ratio %.2f)'
+        print('  R2: outflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3 (ratio %.2f)'
               % (o1, o2, 100 * (o1 - o2) / o2, m1, m2, m1 / m2))
     res.append(('R2 one HRU over ten cells = ten HRUs', g))
     out = {}
@@ -65,12 +72,12 @@ def main():
         ok, _ = sz_check.run(d)
         if ok:
             b = sz_check.outputs(d)[0]
-            out[name] = (b['soil-zone overflow [m3]'].sum(), b['MF6 recharge [m3/d]'].sum())
+            out[name] = (outflow(d), b['MF6 recharge [m3/d]'].sum())
     g = False
     if len(out) == 2:
         (o1, m1), (o2, m2) = out['R2c_one'], out['R2c_ten']
-        g = abs(o1 - o2) <= 0.10 * o2
-        print('  R2c (constant percolation 5 mm/d): overflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3'
+        g = abs(o1 - o2) <= 0.03 * o2 and 1 / 1.2 <= m1 / m2 <= 1.2
+        print('  R2c (constant percolation 5 mm/d): outflow %.0f vs %.0f m3 (%.1f%%), MF6 recharge %.0f vs %.0f m3'
               % (o1, o2, 100 * (o1 - o2) / o2, m1, m2))
     res.append(('R2c same with constant-rate percolation', g))
 
@@ -119,6 +126,37 @@ def main():
         g = r['shortfall'] < 1e-6 and r['sz_identity'] < 1e-8
         print('  R7: explicit predictor: shortfall %.3g m3' % r['shortfall'])
     res.append(('R7 explicit mode never drains more than the column holds', g))
+
+    # R8: a column 1e-6 mm wetter than the others must not attract the HRU's recharge
+    import re
+    c8 = dict(nhru=1, hru_w=400.0, width=200.0, cell=100.0, slope=0.0, Kh=1.0, Kv=1.0, ksat=500.0, perc=1000.0,
+              perc_type='PERC_GAWSER_CONSTRAIN', subgrid=3, smooth=0.2, init_depth=5.0, rain=[0.0] * 2, days=2)
+    d0 = case('R8_pre', **c8); ok0, _ = sz_check.run(d0)
+    g = False
+    if ok0:
+        rvc = open(os.path.join(d0, 'out', 'solution.rvc')).read()
+        blk = re.search(r'(:GWSoilZoneColumns[^\n]*\n)(.*?)(:EndGWSoilZoneColumns)', rvc, re.S)
+        rows = [l for l in blk.group(2).split('\n') if l.strip()]
+        new = []
+        for i, l in enumerate(rows):
+            p = [x.strip() for x in l.split(',')]
+            p[2] = '%.15f' % (100.0 + (1e-6 if i == 0 else 0.0)); p[3] = '100.0'
+            new.append('  ' + ', '.join(p))
+        rvc = rvc.replace(blk.group(2), '\n'.join(new) + '\n')
+        c8.update(rain=[10.0] * 20, days=20)
+        d = case('R8', **c8)
+        open(os.path.join(d, 'm.rvc'), 'w').write(rvc)
+        for f in ('m.rvi', 'm.rvt'):
+            t = open(os.path.join(d, f)).read(); open(os.path.join(d, f), 'w').write(t.replace('2000-01-01 00:00:00', '2000-01-03 00:00:00'))
+        open(os.path.join(d, 'm.rvg'), 'a').write(':HeadSaveFrequency 1\n')
+        ok, _ = sz_check.run(d)
+        if ok:
+            import flopy, numpy as np
+            hf = flopy.utils.HeadFile(os.path.join(d, 'out', 'mf6', 'gwf.hds')); h = hf.get_data(totim=hf.get_times()[-1]).ravel()
+            h = h[np.abs(h) < 1e20]
+            g = (h.max() - h.min()) < 0.001
+            print('  R8: head spread after 20 days of rain with one column 1e-6 mm wetter: %.2e m' % (h.max() - h.min()))
+    res.append(('R8 recharge shares insensitive to round-off', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

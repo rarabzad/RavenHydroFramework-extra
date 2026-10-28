@@ -237,9 +237,11 @@ An HRU usually spans several cells, and the water table differs between them. Th
 as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), plus one column for the rest of the
 HRU (over fixed-head cells or outside the grid). Each column has its own soil water $\phi_{c,j}$ [mm] in every layer;
 Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before. Between
-exchanges Raven changes the HRU totals: a gain falls on every column alike, and what a full column cannot take
-overflows to \cmd{SURFACE\_WATER}; a loss is taken first in proportion to the columns' free water (above field
-capacity) and then to their water (with \cmd{PERC\_CONSTANT} the recharge leaves every column alike). The columns are saved in
+exchanges Raven changes the HRU totals, and the changes are shared among the columns as the processes would have made
+them there: the recharge leaves the columns as the percolation takes it (every column alike for \cmd{PERC\_CONSTANT},
+from free water for a drainage), percolation between soil layers stays in its column, evaporation is taken alike on
+every column, and rain falls alike on every column, what a full column cannot take overflowing to
+\cmd{SURFACE\_WATER}. The columns are saved in
 \cmd{solution.rvc} (\cmd{:GWSoilZoneColumns}). At the start (no hotstart) every column is filled up to the initial water
 table of its cell.
 
@@ -277,9 +279,8 @@ GHB rather than RIV or DRN because the exchange runs both ways and must stop whe
 (through $F$) without adding a second drainage path next to Raven's percolation.
 
 \subsection{Rejected recharge, overflow and evaporation}
-The HRU's recharge is shared among its columns as they gave it up --- the free water their bottom soil-zone layer lost
-(or, with \cmd{PERC\_CONSTANT}, alike) --- not by area, so drainage from saturated columns at the foot of a slope is not
-sent up the slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
+The HRU's recharge goes to the cells of the columns that gave it up, not by area, so drainage from saturated columns at
+the foot of a slope is not sent up the slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
 water table has risen into the soil --- is \emph{rejected}: it stays in the column instead of reaching MODFLOW, which
 receives $(1-F)$ (Section~\ref{ch:recharge}). \emph{Raven recharge} in \cmd{GWBudget.csv} therefore includes water that is
 rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does not fit into a full
