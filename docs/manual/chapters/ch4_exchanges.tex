@@ -258,7 +258,7 @@ water up to field capacity fills the deficit without raising the level, free wat
 $S_d=n(1-SF)(1-S_{\mathrm{fc}})$, and the level rises through a layer once the layers below are full. The cell's land
 surface is sampled at $N$ points (\cmd{:SoilZoneSubgrid}; 25 by default) with soil-zone bases
 $z_{b,s}=z_{\mathrm{land},s}-D_k$. The column's free water stands at one flat level $L_v$ over these points (as MODFLOW's
-head is flat over the cell), defined by $\frac1N\sum_s\min(\max(L_v-z_{b,s},0),D_k)=\lambda$.
+head is flat over the cell), defined by $\frac1N\sum_s\min(\max(L_v-z_{b,s},0),D_k)=\lambda$. Section~\ref{sec:szslope} shows how this handles sloping and irregular land.
 
 \subsection{Exchange}
 A point comes into hydraulic contact with the aquifer as the water table rises through the depth $d_s$
@@ -288,6 +288,56 @@ rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does 
 column overflows to the HRU's \cmd{SURFACE\_WATER} and is routed the same day (saturation-excess runoff and
 exfiltration). Water-table ET is reduced by $(1-\bar F_i)$ of the cell, because saturated soil already evaporates in
 Raven.
+
+\subsection{Sloping and irregular land}\label{sec:szslope}
+Partial saturation is handled at two scales. \emph{Between cells}, MODFLOW gives every cell its own head and its own
+top and bottom (the layers need not be horizontal: the generated model's top follows the land, one soil-zone thickness below it, and an existing model
+keeps its own geometry), and every HRU--cell link has its own column; so along a slope each column sees its own water
+table, and an HRU can be saturated at its foot and dry at its top. \emph{Within a cell}, MODFLOW's head is one flat
+level, but the land is not. The $N$ DEM points of the cell carry the land's relief into the soil zone: each point has its
+own soil-zone base $z_{b,s}$, so a water table rising into a sloping or bumpy cell saturates the soil first at the low
+points and only later at the high ones. Figure~\ref{fig:szsubgrid} shows one cell with the formulas of this chapter:
+\begin{itemize}
+\item (a) The water table is below every base: no point is in contact ($w_s=0$), $F=0$, and the recharge reaches the
+aquifer in full (through the unsaturated column, Section~\ref{sec:szvadose}, when \cmd{:SoilZoneVadose RICHARDS} is on).
+\item (b) The water table has risen into the soil at the low end of the cell only. There the soil is saturated
+($F=0.40$: 40\,\% of the recharge is rejected and stays in the soil), while the high end still drains freely. At rest the
+soil water level equals the water table and nothing is exchanged.
+\item (c) After rain the soil water stands above the water table ($L_v>h_i$): the points in contact drain into the aquifer
+(arrows, $q>0$). The point at 45~m holds water above its base but is not yet in contact (the water table is more than
+$d_s$ below it); that water is perched and leaves by percolation, as recharge.
+\item (d) A high water table below a drier soil ($h_i>L_v$) pushes water up into the soil ($q<0$); at the lowest points
+the water table is above the land. All four states use the same $F$, $w_s$ and $q$; nothing is switched.
+\end{itemize}
+The bottom panel shows how $F$, the mean contact $\bar w$ and the saturated thickness at rest grow with the water table:
+each point adds a smooth step (width $d_s$), so the curves are continuous and monotone for any relief, which keeps
+MODFLOW's Newton iterations smooth. With \cmd{:SoilZoneSubgrid 1} each cell has a single point and $F$ is one step.
+
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_subgrid.png}
+\caption{One 100~m cell with irregular land ($D=1$~m, $d_s=0.3$~m), seen along a transect of its DEM points (circles at the
+soil-zone base, shaded by their contact weight $w_s$). (a)--(d): four states of the water table $h$ and soil water level
+$L_v$, with the saturated fraction $F$, the saturated thickness $\lambda$ and the exchange $q/C$ (positive into the aquifer);
+arrows show each point's share of the exchange. Bottom: $F$, the mean contact $\bar w$ and $\lambda/D$ at rest
+($L_v=h$) against the water table. Computed with the model's formulas
+(script \texttt{make\_sz\_subgrid\_figures.py} in the manual's figures folder).}\label{fig:szsubgrid}\end{figure}
+
+Figure~\ref{fig:szhillslope} shows a coupled run: the hillslope of test T2/T3 (ten 100~m HRUs on a 0.5\,\% slope) with a hump
+at 300~m and hollows at 620 and 850~m added to its DEM, 25 points per cell and $d_s=0.1$~m. The water table is a step
+per cell (MODFLOW's flat head). Under rain the saturated area spreads up from the foot of the slope and from the
+hollows; over the hump (HRUs 3--4) and near the top (HRU 2) the cells are only partly saturated for months
+($0<F<1$). Water moves down the slope in the aquifer: it rises into the soil of the lower cells, which fill and
+overflow to surface water (saturation-excess runoff and exfiltration). After the rain the saturated area retreats
+downslope, the hollows last. The run closes every balance of Section~\ref{ch:verification} to $10^{-9}$ or better.
+
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_hillslope.png}
+\caption{Coupled hillslope with irregular land (rain 10~mm/d for 150 days, then dry). Top: land surface, soil-zone base and
+the water table of each cell on four days; shaded, the saturated soil on day 150. Bottom: saturated fraction $F$ of each
+HRU over time (1 = top of the slope), with the days on which the HRU overflows to surface water.}\label{fig:szhillslope}\end{figure}
+
+What the sub-grid closure does not resolve: a column keeps one flat soil water level, so within a cell the soil water is
+spread over the points at once, and the column overflows only when it is full, that is when $L_v$ reaches the highest
+land point. A water table above the land at the low points of a partly filled cell (panel (d)) therefore pushes water into the higher parts of the column instead of running off there;
+seepage faces smaller than a cell need smaller cells. Between cells, soil water moves only through the aquifer.
 
 \subsection{Solving soil and aquifer together}
 Within a day the soil column and the aquifer must agree. For given heads each column is solved implicitly
