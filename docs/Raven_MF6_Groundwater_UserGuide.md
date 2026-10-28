@@ -349,6 +349,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "running more time steps than the MODFLOW 6 simulation holds" | `:Duration` or `:TimeStep` changed after the model files were built; rerun |
 | "soil class ... of SOIL[M-1] ... needs HYDRAUL_COND" | `:SoilZone PHYSICAL`: give `HYDRAUL_COND` for the class of the bottom soil-zone layer |
 | "soil-zone interface did not converge" | rare; raise `:SoilZoneIteration` or `:SolverMaxOuterIterations` (keep it at 20 or more), increase `SEEPAGE_SMOOTHING_DEPTH`, or shorten the time step |
+| warning "m3 that MODFLOW took from the soil zone was not in it" | `:SoilZone PHYSICAL` on steps MODFLOW ended unconverged at a low `:SolverMaxOuterIterations`: raise it (default 500; keep it at 20 or more) |
 | "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone |
 | warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
 

@@ -75,7 +75,9 @@ too-loose head tolerance (\cmd{:SolverHead\allowbreak Tolerance}, default 0.0000
 \item \emph{Raven recharge} and \emph{MF6 recharge} are equal unless a recharge delay or fixed-head cells are used, or
 recharge is rejected on saturated ground (\cmd{:SoilZone PHYSICAL}).
 \item With \cmd{:SoilZone PHYSICAL}: \emph{soil-zone shortfall} is zero and \emph{interface converged} is 1 on (nearly) every
-step; a step that did not converge is also reported in \cmd{Raven\_errors.txt} with the HRU and cell.
+step; a step that did not converge is also reported in \cmd{Raven\_errors.txt} with the HRU and cell. A shortfall
+(water created) can appear only on steps where MODFLOW stopped at a low \cmd{:SolverMaxOuterIterations} (below about
+20) without converging, together with a MODFLOW balance error; raise the limit.
 \item \emph{returned to Raven} equals \emph{seepage to Raven}.
 \item \emph{river loss carried to next step} is normally zero; when not, it is taken from the river the next day.
 \item Raven's \cmd{Watershed\allowbreak Storage.csv} MB error should be as small as without groundwater.

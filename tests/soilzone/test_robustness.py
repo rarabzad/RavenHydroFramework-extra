@@ -18,6 +18,9 @@ R8 a column 1e-6 mm wetter than the others does not attract the HRU's recharge (
 R9 hotstart columns that cannot hold the .rvc layer split (wet columns with a full lower layer, Raven's lower layer 50 mm
    wetter): the percolation no column can take stays in the upper layer and is reported in step 1 (layer
    redistribution 50 mm over the HRU).
+R10 water rising into a thin soil on a steep, low-storage hillslope with an update budget of 1 and in explicit mode:
+   the boundary MODFLOW keeps never takes more from a column than it holds (no shortfall). A slope kept at the secant
+   to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns (4100 m3 created with a budget of 1, 7900 m3 in explicit mode).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -186,6 +189,19 @@ def main():
             g = abs(mv[0] - 0.05 * A) < 1e-6 * A and abs(mv[1:]).max() < 1e-9 and sz_check.checks(d)['sz_identity'] < 1e-8
             print('  R9: hotstart layer redistribution in step 1: %.1f m3 (expected %.1f), later steps %.2g m3' % (mv[0], 0.05 * A, abs(mv[1:]).max()))
     res.append(('R9 hotstart redistribution reported in step 1', g))
+
+    B10 = dict(nhru=4, hru_w=100.0, H0=0.1, H1=0.1, n=0.1, sfc=0.3, ksat=1e4, perc=1e3, Sy=0.01, Kh=200.0, Kv=50.0,
+               slope=0.05, aq_thick=3.0, init_depth=0.05, smooth=0.3, subgrid=3, days=30, rain=([60.0] * 2 + [0.0] * 8) * 3)
+    g = True; msg = []
+    for name, it in (('R10_b1', (1, 1e-4, 1e-6)), ('R10_x', (0, 1e-4, 1e-6))):
+        c = dict(B10); c.update(iteration=it); d = case(name, **c)
+        ok, _ = sz_check.run(d)
+        if not ok: g = False; msg.append('%s failed' % name); continue
+        r = sz_check.checks(d)
+        g = g and r['shortfall'] < 1e-6 and r['sz_identity'] < 1e-8 and r['mf6_not_conv'] == 0
+        msg.append('%s shortfall %.3g m3' % (name, r['shortfall']))
+    print('  R10: ' + ', '.join(msg))
+    res.append(('R10 frozen / explicit boundary never overdraws', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))
