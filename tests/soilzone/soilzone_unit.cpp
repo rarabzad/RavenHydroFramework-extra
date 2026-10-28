@@ -172,7 +172,10 @@ int main()
   check(bad_contr<=nslope/1000,"G6 random: dlambda/dh = -lambda' c q_h/(1 + c q_lam lambda') (finite difference)",bad_contr,nslope);
   check(bad_slope<=nslope/1000 && nslope>5000,"G7 random: boundary slope dq/dh = q_h/(1 + c q_lam lambda') (finite difference)",bad_slope,nslope);
   //-- connected fraction
-  { vector<double> z={0.0}; check(SatFraction(-0.1,z,0.5)==0.0 && SatFraction(0.6,z,0.5)==1.0 && close(SatFraction(0.25,z,0.5),0.5),"SatFraction ramp"); }
+  { vector<double> z={0.0}; check(SatFraction(-0.1,z,0.5)==0.0 && SatFraction(0.6,z,0.5)==1.0 && close(SatFraction(0.25,z,0.5),0.5),"SatFraction ramp: through ds above the base"); }
+  { sz_cell c1; c1.zbs={0.0}; c1.D=1.0; c1.ds=0.5; c1.C=10.0; double F,qh,qc,ql;
+    SubgridFlux(c1,0.0,0.0,0.0,F,qh,qc,ql); double F0=F; SubgridFlux(c1,0.0,-0.25,-0.25,F,qh,qc,ql); double Fm=F; SubgridFlux(c1,0.0,-0.6,-0.6,F,qh,qc,ql);
+    check(F0==1.0 && close(Fm,0.5) && F==0.0,"contact weights: through ds below the base, full at it",Fm,0.5); }
   { vector<double> z={0.0,1.0}; check(close(SatFraction(0.5,z,0.0),0.5),"SatFraction sub-grid sharp"); }
   //-- column distribution: totals exact, bounds kept, gains never lower and losses never raise a column
   { std::mt19937 rng(11); std::uniform_real_distribution<double> U(0.0,1.0); int bad_tot=0,bad_bnd=0,bad_dir=0,bad_fw=0;

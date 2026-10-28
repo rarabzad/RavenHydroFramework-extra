@@ -299,6 +299,7 @@ cannot enter MODFLOW 6 folder & output folder removed or not writable during the
 \cmd{:SoilZone PHYSICAL}: SOIL[$j$] has zero thickness / no drainable porosity & every coupled HRU with soil needs all soil-zone layers, with \cmd{FIELD\_CAPACITY} $<1$ and \cmd{POROSITY} $>0$\\
 soil class \dots\ of SOIL[$M-1$] needs HYDRAUL\_COND & give \cmd{HYDRAUL\_COND} for the class of the bottom soil-zone layer\\
 recharge must leave the soil zone from its bottom layer & take percolation to \cmd{GROUNDWATER} from \cmd{SOIL[$M-1$]}\\
+RECHARGE\_DELAY \dots\ cannot be used with :SoilZone PHYSICAL & set \cmd{RECHARGE\_DELAY} to 0 in the profiles of soil-zone HRUs\\
 the soil zone \dots\ is \dots\ m thick & list physical soil layers only (at most 20 m)\\
 Raven is running more time steps than the MODFLOW 6 simulation holds & check \cmd{:Duration} and \cmd{:TimeStep}\\\bottomrule
 \end{longtable}

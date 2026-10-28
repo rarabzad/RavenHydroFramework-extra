@@ -251,11 +251,14 @@ thickness), and the water table can rise into them, as in GSFLOW:
 - Recharge must leave the soil zone from its bottom layer (`:Percolation ... SOIL[1] GROUNDWATER` here).
 - Each soil-zone layer needs a positive thickness, `POROSITY` and `FIELD_CAPACITY` < 1 (drainable porosity); the soil
   class of the bottom soil-zone layer needs `HYDRAUL_COND` [mm/d], which with `K_VERT` of the top aquifer layer sets
-  the soil–aquifer conductance. `SEEPAGE_SMOOTHING_DEPTH` sets how smoothly a point connects; keep it above 0.
+  the soil–aquifer conductance. `SEEPAGE_SMOOTHING_DEPTH` sets how smoothly a point comes into contact (through that
+  depth below its base) and saturates (through that depth above it); keep it at 0.1–0.5 m (below 0.05 m a warning).
+  `RECHARGE_DELAY` must be 0 for soil-zone HRUs.
 - The soil zone of each HRU is kept per overlapping cell (columns, saved in `solution.rvc` as `:GWSoilZoneColumns`);
   Raven's `SOIL[m]` holds their mean. Where the water table is in the soil, recharge is rejected (stays in the soil),
   saturated soil drains to the aquifer, groundwater rises into the soil, and a full soil zone overflows to
-  `SURFACE_WATER`. Water-table ET is reduced on saturated ground; the seepage drain serves only HRUs without soil.
+  `SURFACE_WATER`. An HRU's recharge leaves the columns that hold free water (not shared by area). Water-table ET is
+  reduced on saturated ground; the seepage drain serves only HRUs without soil.
 - The soil zone and MODFLOW are iterated within each step until they agree; the flows Raven applies are always those
   MODFLOW booked, so water is conserved even on a step that did not converge (reported in `Raven_errors.txt`).
 - Raven's processes run before the exchange, so daily steps carry a small splitting error (about 1 cm of head on the
@@ -345,7 +348,8 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | well rate is zero ("has no :WellFlowRate time series") | the `:WellFlowRate` block is missing or its well ID does not match an ID in `:Wells` |
 | "running more time steps than the MODFLOW 6 simulation holds" | `:Duration` or `:TimeStep` changed after the model files were built; rerun |
 | "soil class ... of SOIL[M-1] ... needs HYDRAUL_COND" | `:SoilZone PHYSICAL`: give `HYDRAUL_COND` for the class of the bottom soil-zone layer |
-| "soil-zone interface did not converge" | rare; raise `:SoilZoneIteration` or `:SolverMaxOuterIterations`, increase `SEEPAGE_SMOOTHING_DEPTH`, or shorten the time step |
+| "soil-zone interface did not converge" | rare; raise `:SoilZoneIteration` or `:SolverMaxOuterIterations` (keep it at 20 or more), increase `SEEPAGE_SMOOTHING_DEPTH`, or shorten the time step |
+| "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone |
 | warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
 
 ## 9. Limitations

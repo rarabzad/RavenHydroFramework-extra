@@ -167,6 +167,7 @@ STEPS = [
     ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
     ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
     ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
+    ('soilzone_robustness', True, [PY, 'soilzone/test_robustness.py'], last_line(r'robustness tests: ALL PASSED'), 1800),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
 

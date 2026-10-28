@@ -257,24 +257,31 @@ $z_{b,s}=z_{\mathrm{land},s}-D_k$. The column's free water stands at one flat le
 head is flat over the cell), defined by $\frac1N\sum_s\min(\max(L_v-z_{b,s},0),D_k)=\lambda$.
 
 \subsection{Exchange}
-A point is connected to the aquifer where the water table is above its base, smoothly over the depth $d_s$
-(\cmd{SEEPAGE\_SMOOTHING\_DEPTH}): $w_s=\sigma((h_i-z_{b,s})/d_s)$ with $\sigma(x)=3x^2-2x^3$ on $(0,1)$, 0 below and 1
-above. The connected fraction is $F=\frac1N\sum_sw_s$, and the exchange into the aquifer is
-\begin{equation}
-q=\frac{C}{N}\sum_sw_s\Big(\min(\max(L_v,z_{b,s}),z_{b,s}+D_k)-h_i\Big),\qquad
+A point comes into hydraulic contact with the aquifer as the water table rises through the depth $d_s$
+(\cmd{SEEPAGE\_SMOOTHING\_DEPTH}) below its base, the capillary fringe, and is fully in contact at its base:
+$w_s=\sigma((h_i-z_{b,s})/d_s+1)$ with $\sigma(x)=3x^2-2x^3$ on $(0,1)$, 0 below and 1 above. (Full contact at the base,
+because MODFLOW's top cell ends there: above it the soil's storage must take over at once.) The exchange into the
+aquifer is
+\begin{gather}
+q=\frac{C}{N}\sum_sw_s\Big(\min(\max(L_v,z_{b,s}),z_{b,s}+D_k)-\max(h_i,z_{b,s})\Big),\\
 C=\frac{A_{k,i}}{\dfrac{H_1}{2\,k_{\mathrm{sat},1}/1000}+\dfrac{b_i}{2\,K_{v,i}}}\quad[\mathrm{m^2/d}],
-\end{equation}
+\end{gather}
 positive into the aquifer: the soil--aquifer conductance $C$ is the series resistance of half the bottom soil-zone layer
 ($k_{\mathrm{sat}}$ = \cmd{HYDRAUL\_COND} [mm/d]) and half the top aquifer cell (thickness $b_i$, vertical conductivity
-$K_v$). With a single point this is simply $q=FC(z_b+\lambda-h_i)$: water flows up when the water table is above the soil
-water level and down when it is below. The exchange goes to MODFLOW through a GHB package \cmd{SZX\_RAVEN} (one entry per
+$K_v$). With a single point and the water table above the base this is simply $q=C(z_b+\lambda-h_i)$: water flows up
+when the water table is above the soil water level and down when it is below; a point in contact while the water table
+is still below its base only drains the water standing in its soil. The exchange goes to MODFLOW through a GHB package \cmd{SZX\_RAVEN} (one entry per
 HRU--cell column, plus a WEL package \cmd{SZQ\_RAVEN} for the part of the boundary that would lie below the cell bottom).
 GHB rather than RIV or DRN because the exchange runs both ways and must stop where the water table is below the soil
 (through $F$) without adding a second drainage path next to Raven's percolation.
 
 \subsection{Rejected recharge, overflow and evaporation}
-Of each column's share of the HRU's recharge, the connected fraction $F$ is \emph{rejected}: it stays in the column
-instead of reaching MODFLOW, which receives $(1-F)$ (Section~\ref{ch:recharge}). Water that does not fit into a full
+The HRU's recharge is shared among its columns in proportion to the free water in their bottom soil-zone layer (the
+water Raven's drainage takes), not by area, so drainage from saturated columns at the foot of a slope is not sent up the
+slope. Of each column's share, the saturated fraction $F=\frac1N\sum_s\sigma((h_i-z_{b,s})/d_s)$ --- the points where the
+water table has risen into the soil --- is \emph{rejected}: it stays in the column instead of reaching MODFLOW, which
+receives $(1-F)$ (Section~\ref{ch:recharge}). \emph{Raven recharge} in \cmd{GWBudget.csv} therefore includes water that is
+rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does not fit into a full
 column overflows to the HRU's \cmd{SURFACE\_WATER} and is routed the same day (saturation-excess runoff and
 exfiltration). Water-table ET is reduced by $(1-\bar F_i)$ of the cell, because saturated soil already evaporates in
 Raven.
@@ -311,9 +318,9 @@ $q=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
 \cmd{SOIL[0..$M-1$]} hold their mean) and the top active cell of each overlapping column (MODFLOW GHB \cmd{SZX\_RAVEN} with WEL
 \cmd{SZQ\_RAVEN}); returns rejected recharge to the columns and sends overflow to \cmd{SURFACE\_WATER}.\par\smallskip
 \textbf{Constraints/notes.} Recharge must come from \cmd{SOIL[$M-1$]}; every soil-zone layer needs a positive thickness and
-drainable porosity, and the class of \cmd{SOIL[$M-1$]} needs \cmd{HYDRAUL\_COND}. Not available with an existing model
-(\cmd{:MF6Simulation}). Raven's processes run before the exchange in each step, so a long step carries a first-order
-splitting error (hillslope test: 1.2 cm mean head difference at daily steps, 0.2 cm hourly). Keep $d_s>0$.\par\smallskip
+drainable porosity, and the class of \cmd{SOIL[$M-1$]} needs \cmd{HYDRAUL\_COND}. \cmd{RECHARGE\_DELAY} must be 0 for
+soil-zone HRUs. Not available with an existing model (\cmd{:MF6Simulation}). Raven's processes run before the exchange in each step, so a long step carries a first-order
+splitting error (hillslope test: 1.5 cm mean head difference at daily steps, 0.16 cm hourly). Keep $d_s>0$.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
 # .rvg

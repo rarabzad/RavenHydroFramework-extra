@@ -112,7 +112,7 @@ Algorithm~\ref{alg:step} lists exactly what happens in one Raven time step of a 
 \State MODFLOW \cmd{prepare\_solve}; \textbf{repeat} \cmd{solve} (with \cmd{:SoilZone PHYSICAL}: then update the soil-zone interface) \textbf{until} converged or the iteration limit; \cmd{finalize\_solve}; \cmd{finalize\_time\_step}
 \State Compute every package flow as $\mathrm{HCOF}\cdot h-\mathrm{RHS}$; reservoir local heads for today's routing
 \State Surface-store exchange applied to Raven stores; seepage and river flows computed
-\If{the step did not converge} limit seepage, river gains and soil-zone discharge returned to Raven to the step's total inflow; warn \EndIf
+\If{the step did not converge} limit seepage and river gains returned to Raven to the step's total inflow; warn \EndIf
 \State \cmd{:SoilZone PHYSICAL}: MODFLOW's soil-zone flows and the rejected recharge applied to the columns; overflow to \cmd{SURFACE\_WATER}
 \State Seepage added to Raven stores; balance, heads, connectivity and NetCDF output written
 \State Raven: before routing, river gains added to / losses taken from each subbasin's in-catchment inflow
@@ -150,7 +150,8 @@ start is decided for each member separately
 \begin{itemize}
 \item \textbf{Non-converged steps.} All water returned to Raven in such a step (seepage plus river gains) is limited to
 the water that entered the aquifer in that step (recharge, river and store leakage, reservoir injection and boundary
-inflows); discharge into wetland and lake stores and into the soil zone is limited the same way. The step is flagged and a warning written.
+inflows); discharge into wetland and lake stores is limited the same way. The soil-zone exchange is not limited: the
+soil zone takes whatever MODFLOW booked, and what does not fit overflows to \cmd{SURFACE\_WATER}. The step is flagged and a warning written.
 \item \textbf{Rivers and stores} can never lose more water than they hold (Sections~\ref{ch:rivers},\ref{ch:stores}).
 \item \textbf{Wells} cannot pump from a dry cell (\cmd{AUTO\_FLOW\_REDUCE}).
 \item \textbf{Step count}: Raven stops if it would run past MODFLOW's last step.
