@@ -21,6 +21,8 @@ R9 hotstart columns that cannot hold the .rvc layer split (wet columns with a fu
 R10 water rising into a thin soil on a steep, low-storage hillslope with an update budget of 1 and in explicit mode:
    the boundary MODFLOW keeps never takes more from a column than it holds (no shortfall). A slope kept at the secant
    to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns (4100 m3 created with a budget of 1, 7900 m3 in explicit mode).
+R11 explicit mode on the R2 hillslope (ten HRUs) gives the iterated run's total outflow within 3%: the kept boundary
+   neither reverses nor lifts water from below the contact (a line there was 30-50% off).
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -202,6 +204,17 @@ def main():
         msg.append('%s shortfall %.3g m3' % (name, r['shortfall']))
     print('  R10: ' + ', '.join(msg))
     res.append(('R10 frozen / explicit boundary never overdraws', g))
+
+    out = {}
+    for name, it in (('R11_it', None), ('R11_x', (0, 1e-4, 1e-6))):
+        c = dict(hill); c.update(nhru=10, hru_w=100.0)
+        if it: c.update(iteration=it)
+        d = case(name, **c); ok, _ = sz_check.run(d)
+        if ok and sz_check.checks(d)['shortfall'] < 1e-6: out[name] = outflow(d)
+    g = len(out) == 2 and abs(out['R11_x'] - out['R11_it']) <= 0.03 * out['R11_it']
+    if len(out) == 2:
+        print('  R11: explicit outflow %.0f m3 vs iterated %.0f m3 (%.1f%%)' % (out['R11_x'], out['R11_it'], 100 * (out['R11_x'] - out['R11_it']) / out['R11_it']))
+    res.append(('R11 explicit mode close to the iterated run', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

@@ -124,7 +124,8 @@ $$C_e=\frac{A_{k,i}}{\dfrac{H_1}{2\,k_{sat,1}/1000}+\dfrac{b_{top,i}}{2\,K_{v,to
 
 One `SZX_RAVEN` GHB entry per link whose top cell is active and not a specified-head cell (`gwf.szx`, written with
 head $\max(z_b,\ \text{bottom}+1\,\text{mm})$ and conductance 0; Raven sets both in memory). A WEL package `SZQ_RAVEN`
-(`gwf.szq`) has one entry per link as well (§7.1). The seepage drain `DRN_RAVEN` keeps only the share of the cell
+(`gwf.szq`) and a smoothed DRN package `SZD_RAVEN` (`gwf.szd`, auxiliary `DDRN`) have one entry per link as well
+(§7.1, §7.3). The seepage drain `DRN_RAVEN` keeps only the share of the cell
 covered by HRUs without a soil zone (conductance × that share), and its discharge returns only to those HRUs.
 
 ---
@@ -337,18 +338,31 @@ make their boundary supply-limited as in explicit mode. Once the interface is fr
 (tried in round 6) left too few solves for MODFLOW to absorb it on steps MODFLOW could not converge, and its residual
 was water created or lost (relative MODFLOW error up to 6e-3 with 30 outer iterations, against 1e-12 without it;
 audit round 7), while no case showed a shortfall it prevented.
-In explicit mode (`:SoilZoneIteration 0`) the boundary is also supply-limited: $C_g(H_g-\text{bottom})$ never exceeds the
-column's free water over the step (robustness tests R7, R10). For water rising into the soil ($q<0$) the iterated
-boundary's slope is kept at least the secant to the end of the contact; a linear boundary cannot hold both limits, and
-for a boundary MODFLOW keeps (explicit, or frozen) the supply limit wins: with the secant floor, a head falling below
-$H_g$ reversed the boundary and drained columns that held no free water, which created water (audit round 8: 4100 m³
-with an update budget of 1, 7900 m³ in explicit mode on a steep low-storage hillslope). What the supply-limited boundary
-costs instead is harmless for the mass: more water can rise than the contact allows (the column fills and overflows),
-and it keeps extracting when the head falls below every base. MODFLOW needs iterations to settle on such a boundary, so
-with fewer than 5 solves left (an outer-iteration limit below about 7) the floor is kept. Two other remedies were
-tried and dropped: a drain boundary (one-sided) for $q<0$ links made MODFLOW fail to converge where much water rises
-(the kink at $H_g$), and limiting the slopes of the boundary MODFLOW already has at the freeze (or extracting a carried
-shortfall from the aquifer in later steps) turned the shortfall into larger MODFLOW residuals.
+A boundary MODFLOW keeps without further updates (explicit mode, `:SoilZoneIteration 0`; the update after iteration
+$\text{max outer}-\max(2,\ \text{max outer}/10)$; the last update the budget allows) may not take more from a column
+than it holds, whatever the head does:
+
+- where the soil drains to the aquifer ($q\ge0$) the slope is limited so that $C_g(H_g-\text{bottom})$ never exceeds
+  the column's free water over the step (robustness test R7);
+- where water rises into the soil ($q<0$) and the line could take more than the column holds (its slope above that
+  limit), the line is given to MODFLOW as a drain, `SZD_RAVEN`: $q=-C_g(h-H_g)$ above $H_g$, nothing below, with the
+  onset smoothed by MODFLOW's `DDRN` over half the distance to $H_g$ (at most $d_s$, at least $d_s/4$). The secant
+  floor keeps $H_g$ at or above the end of the contact, so it neither reverses into flow from the soil nor lifts water
+  from below the contact. A drain level below the cell bottom is raised to the bottom by steepening the line (at most
+  to the link conductance), not continued by a fixed rate that would pump a dried cell (robustness test R10).
+
+A linear boundary cannot hold both limits for rising water. With the secant floor winning, a head falling below $H_g$
+reversed the boundary and drained columns without free water (water created; audit round 8: 4100 m³ with an update
+budget of 1, 7900 m³ in explicit mode on a steep low-storage hillslope); with the supply limit winning, the boundary
+kept lifting water when the head fell below every base (audit round 9: explicit outflows 44–164% off, a restart chain
+diverging). The drain does neither: the explicit runs of the audit batch now give the iterated runs' outflow within
+0.1–2% (they were 30–50% off), and the budget and explicit shortfall cases are 0. It costs MODFLOW iterations where much
+water rises into dry columns (up to about 20 per step instead of 2 with an update budget of 1). With fewer than 10
+MODFLOW solves left (low outer-iteration limits) the line stays, limited as far as the secant floor allows, because
+MODFLOW did not settle on the changed boundary in so few iterations; a reversal can then still overdraw (§11). Dropped
+remedies: an unsmoothed drain everywhere (MODFLOW failed to converge where much water rises), limiting the slopes of
+the boundary MODFLOW already has at the freeze, and extracting a carried shortfall from the aquifer in later steps
+(both turned the shortfall into larger MODFLOW residuals).
 
 ### 7.4 Connection head update
 
@@ -430,7 +444,7 @@ water and capacity, interface updates and change. `tools/plot_soilzone.py` draws
 | `soilzone_dynamics` | T4 step size (1 d, 6 h, 1 h against same-Δt references; errors fall with Δt), T5 stiff conductance (iterated vs explicit), sub-grid case |
 | `soilzone_restart` | 300 d vs 150 + 150 d from `solution.rvc`: identical to 1e-6 relative |
 | `soilzone_inputs` | input handling: missing `HYDRAUL_COND`, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart, `.rvc` groundwater blocks without a groundwater model |
-| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water |
+| `soilzone_robustness` | R1 stiff column (drainable porosity 0.02, $S_y$ 0.25) converges in few updates; R2/R2c one HRU over ten cells = ten HRUs (total outflow within 3% with free-water drainage and with constant-rate percolation); R3 `RECHARGE_DELAY` refused; R4 small smoothing depth reported; R5 hourly steps with 0.001 m smoothing leave no MODFLOW residual; R6 steep sub-grid hillslope converges; R7 explicit mode has no shortfall; R8 recharge shares insensitive to round-off; R9 hotstart layer redistribution reported in step 1; R10 frozen (budget 1) and explicit boundaries never overdraw on rising water; R11 explicit mode within 3% of the iterated outflow (0.1%; a line was 32% off) |
 | `soilzone_liard` | T7 Liard PHYSICAL variant (365 d): all identities |
 
 Regression: every existing test without `:SoilZone` gives byte-identical outputs (both Liard examples compared).
@@ -459,9 +473,10 @@ Regression: every existing test without `:SoilZone` gives byte-identical outputs
 - Not available with an existing MODFLOW model (`:MF6Simulation`).
 - With $d_s=0$, perched water joining the water table makes the exchange jump; keep $d_s>0$.
 - **Low outer-iteration limits.** When MODFLOW does not converge within `:SolverMaxOuterIterations` (below about 20,
-  which is warned at setup), the boundary it keeps can be one from an earlier, not supply-limited update, and MODFLOW's
-  head can move far from where it was linearized: it can then take more from a column than it holds. That water is
-  created, like MODFLOW's own residual on such steps; both are reported per step (`soil-zone shortfall [m3]`,
+  which is warned at setup), the boundary it keeps can be one from an earlier, not supply-limited update, or (below 10
+  solves left, and in explicit mode with a limit below 10) a line rather than the one-sided drain, and MODFLOW's head
+  can move far from where it was linearized: it can then take more from a column than it holds. That water is created,
+  like MODFLOW's own residual on such steps; both are reported per step (`soil-zone shortfall [m3]`,
   `MF6 balance error`) and warned. Seen only with limits of 3–20 on a steep, low-storage hillslope with a thin soil
   (shortfall 2–20% of the gross exchange); none with the default limits in any test.
 

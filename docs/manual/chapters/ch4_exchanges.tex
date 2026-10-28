@@ -303,7 +303,10 @@ after every iteration on which MODFLOW has converged, but not in MODFLOW's last 
 the soil levels change by less than the head tolerance and the total exchange by less than the flow tolerance
 (\cmd{:SoilZoneIteration}). The flows Raven applies are always
 the ones MODFLOW booked, so no water is created or lost even on a step whose interface did not converge (reported in
-\cmd{Raven\_errors.txt}).
+\cmd{Raven\_errors.txt}). A boundary MODFLOW keeps without further updates (explicit mode, \cmd{:SoilZoneIteration 0},
+and the last update before the interface freezes) may not take more from a column than it holds: where the soil
+drains, its slope is limited by the column's free water; where water rises into the soil, the line becomes a smoothed
+drain that stops at its zero-flow level instead of turning into flow out of a column that has no water to give.
 
 \begin{example}[: water table rising into the soil]
 Two soil-zone layers of 0.5 m with $n=0.4$, $S_{\mathrm{fc}}=0.5$: $\phi_{\max}=200$ mm, $\phi_{\mathrm{fc}}=100$ mm and
