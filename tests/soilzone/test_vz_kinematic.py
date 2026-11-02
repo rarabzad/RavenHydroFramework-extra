@@ -82,6 +82,7 @@ def budget(d):
 
 def k1():
     print('K1 unit tests of the kinematic column')
+    os.makedirs(W, exist_ok=True)   # (a fresh work folder: K1 runs first)
     exe = os.path.join(W, 'vadose_kw_unit')
     src = tc.SRC
     c = subprocess.run(['g++', '-O2', '-std=c++11', '-I' + src, os.path.join(HERE, 'vadose_kw_unit.cpp'), os.path.join(src, 'GWVadose.cpp'),

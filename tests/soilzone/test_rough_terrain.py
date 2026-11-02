@@ -384,7 +384,7 @@ def check(d, S, meta, res, none_exf):
             st = b['unsaturated zone storage [m3]'].shift(1)
             v0 = getattr(sz_check, 'vz_start', lambda d: None)(d)
             st.iloc[0] = v0 if v0 is not None else np.nan
-            lim = b['Raven recharge [m3/d]'] + st
+            lim = b['Raven recharge [m3/d]'] + st.clip(lower=0.0)   # (storage above the reference: columns drier than it hold nothing to hand back)
             ex = (b['rejected recharge [m3]'] - lim - 1e-9 * lim.abs() - 1e-6)[st.notna()]
             if len(ex) and ex.max() > 0: F.append('rejected recharge exceeds the recharge plus the columns\' storage by %.3g m3' % ex.max())
 
