@@ -77,12 +77,13 @@ def build_model(d, S, polys, Dk, method, meta):
     land[~ok] = np.nanmean(land) if ok.any() else S['land']['z0']
     # columns: inactive (IDOMAIN 0) where not covered, a few at random; every HRU keeps an active column
     idom = np.ones((nl, ncpl), int)
-    act = cover > 1e-6
+    act = cover >= S['min_cover'] * np.array([P.area for P in cellP])   # (Raven links only columns covered by :MinCellCoverage)
     for ic in range(ncpl):
         if rng.random() < E['inactive']: act[ic] = False
     for k, p in enumerate(polys):
         if not any(act[ic] and p.intersection(cellP[ic]).area > 1e-6 for ic in range(ncpl)):
-            best = max(range(ncpl), key=lambda ic: p.intersection(cellP[ic]).area); act[best] = True
+            ok = [ic for ic in range(ncpl) if cover[ic] >= S['min_cover'] * cellP[ic].area and p.intersection(cellP[ic]).area > 1e-6]
+            if ok: act[max(ok, key=lambda ic: p.intersection(cellP[ic]).area)] = True
     top = land - Dc + E['top_off'] * Dc * rng.uniform(-1.0, 1.0, ncpl)
     xs = np.array([cellP[ic].centroid.x for ic in range(ncpl)]); ys = np.array([cellP[ic].centroid.y for ic in range(ncpl)])
     u = (xs - xs.mean()) / max(np.ptp(xs), cs) * 2.0 + (ys - ys.mean()) / max(np.ptp(ys), cs)

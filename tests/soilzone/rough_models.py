@@ -197,7 +197,7 @@ def gen_spec(seed, family=None):
     S['land'] = dict(z0=float(rng.uniform(200, 400)), slope=slope, aspect=float(rng.uniform(0, 2 * math.pi)), terms=_terms(rng, L, W, relief, x0, y0))
     S['dem_res'] = float(cs * _logu(rng, 0.08, 1.6))
     nh = int(rng.choice([0, 0, 1, 2, 3]))
-    S['holes'] = [[float(x0 + rng.uniform(0, L)), float(y0 + rng.uniform(0, W)), float(max(S['dem_res'], cs) * rng.uniform(0.2, 0.8))] for _ in range(nh)]
+    S['holes'] = [[float(x0 + rng.uniform(0, L)), float(y0 + rng.uniform(0, W)), float(cs * rng.uniform(0.1, 0.35))] for _ in range(nh)]   # (smaller than a cell: no cell loses all its land samples)
     S['dem_cut'] = float(rng.uniform(0.6, 0.97)) if rng.random() < 0.12 else None
     # HRUs: a tiling cut at random positions; sometimes a small HRU inside one cell
     ncx = int(rng.integers(1, 4)); xs = _cuts(rng, x0, x0 + L, ncx, cs, nx)
@@ -212,6 +212,11 @@ def gen_spec(seed, family=None):
     if not _covered(S):     # every HRU over at least one active column (else Raven stops: not a case the suite means to draw)
         S['min_cover'] = 0.1
         if not _covered(S): S['hru_small'] = None
+        while not _covered(S):   # (slivers along the domain edge over thinly covered columns: drop cuts until every HRU is linked)
+            yy = [i for i, c in enumerate(S['hru_y']) if len(c) > 2]
+            if yy: S['hru_y'][yy[-1]] = [S['hru_y'][yy[-1]][0]] + S['hru_y'][yy[-1]][2:]
+            elif len(S['hru_x']) > 2: S['hru_x'] = [S['hru_x'][0]] + S['hru_x'][2:]; S['hru_y'] = S['hru_y'][1:]
+            else: break
     # aquifer classes and profiles (two by position: south / north)
     ncls = int(rng.integers(2, 4)); S['classes'] = []
     for i in range(ncls):
@@ -310,12 +315,13 @@ def raven_files(d, S, polys, soilof, aqof, Dk, method, vz_classes, extra_rvg, da
         f.write(':SubBasins\n  :Attributes, NAME, DOWNSTREAM_ID, PROFILE, REACH_LENGTH, GAUGED\n  :Units, none, none, none, km, none\n  1, box, -1, NONE, ZERO-, 1\n:EndSubBasins\n')
         f.write(':HRUs\n  :Attributes, AREA, ELEVATION, LATITUDE, LONGITUDE, BASIN_ID, LAND_USE_CLASS, VEG_CLASS, SOIL_PROFILE, AQUIFER_PROFILE, TERRAIN_CLASS, SLOPE, ASPECT\n')
         f.write('  :Units, km2, m, deg, deg, none, none, none, none, none, none, deg, deg\n')
-        Fl = S['land']
+        Fl = S['land']; elevs = []
         for k, p in enumerate(polys):
             c = p.representative_point()
+            elevs.append(round(float(field(Fl, c.x, c.y)), 4))
             # (every HRU carries the projection origin as its centroid: Raven's projection origin is their mean, so the
             # projected coordinates of the files are exactly those of the spec)
-            f.write('  %d, %.10f, %.4f, %.6f, %.6f, 1, OPEN, GRASS, SOILP%d, AQP%d, [NONE], 0, 0\n' % (k + 1, p.area / 1e6, float(field(Fl, c.x, c.y)), LAT0, LON0, soilof[k], aqof[k]))
+            f.write('  %d, %.10f, %.4f, %.6f, %.6f, 1, OPEN, GRASS, SOILP%d, AQP%d, [NONE], 0, 0\n' % (k + 1, p.area / 1e6, elevs[-1], LAT0, LON0, soilof[k], aqof[k]))
         f.write(':EndHRUs\n')
     with open(os.path.join(d, 'm.rvi'), 'w') as f:
         f.write(':StartDate 2000-01-01 00:00:00\n:Duration %d\n:TimeStep 1.0\n:Method ORDERED_SERIES\n' % days)
@@ -395,7 +401,7 @@ def build(d, S, method='NONE', vz_classes=1, extra_rvg='', days=None):
         xc = x0 + S['dem_cut'] * L
         keep = lambda X, Y: X < xc
     raster_over(os.path.join(d, 'dem.asc'), S['land'], x0 - cs, x1 + cs, y0 - cs, y1 + cs, S['dem_res'], S['holes'], keep)
-    meta = dict(polys=[[list(c) for c in p.exterior.coords] for p in polys], areas=[p.area for p in polys], Dk=Dk, soilof=soilof,
+    meta = dict(elev=[round(float(field(S['land'], p.representative_point().x, p.representative_point().y)), 4) for p in polys], polys=[[list(c) for c in p.exterior.coords] for p in polys], areas=[p.area for p in polys], Dk=Dk, soilof=soilof,
                 aqof=aqof, method=method, vz_classes=vz_classes, days=days, family=S['family'])
     if S['family'] == 'ext':
         import rough_ext
@@ -502,7 +508,7 @@ def geometry(d, S, meta, chd=True, grid=None):
         v = dem.sample(lo, la); v = v[np.isfinite(v)]
         if len(v): land[ic] = float(np.mean(v)); hi5 = float(v.max())
         else:
-            ew = sum(ov[k].get(ic, 0.0) * round(float(field(S['land'], polys[k].representative_point().x, polys[k].representative_point().y)), 4) for k in range(len(polys)))
+            ew = sum(ov[k].get(ic, 0.0) * meta['elev'][k] for k in range(len(polys)))
             land[ic] = ew / cover[ic]; hi5 = land[ic]   # (the HRUs' .rvh ELEVATION, as written)
         # sub-grid samples (as SZBuildEntries: DEM at the n x n points, else the cell's land)
         n = S['subgrid']
