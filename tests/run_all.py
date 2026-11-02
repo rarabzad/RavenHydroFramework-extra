@@ -184,6 +184,7 @@ STEPS = [
     ('soilzone_vz_lag', True, [PY, 'soilzone/test_vz_lag.py'], last_line(r'LAG tests: ALL PASSED'), 1800),
     ('soilzone_vz_classes', True, [PY, 'soilzone/test_vz_classes.py'], last_line(r'vz classes tests: ALL PASSED'), 3600),
     ('soilzone_vz_initial', True, [PY, 'soilzone/test_vz_initial.py'], last_line(r'initial-state tests: ALL PASSED'), 3600),
+    ('soilzone_rough_terrain', True, [PY, 'soilzone/test_rough_terrain.py', '--quick', '--methods', 'NONE,RICHARDS,KINEMATIC,LAG'], last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
     ('soilzone_models_ext', True, [PY, 'soilzone/test_sz_models_ext.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
