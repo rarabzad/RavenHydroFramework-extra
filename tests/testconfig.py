@@ -36,6 +36,11 @@ def _default_raven():
 
 
 RAVEN = os.path.abspath(os.environ.get('RAVEN_EXE', _default_raven()))
+REF = os.environ.get('RAVEN_EXE_REF', '')                            # reference build of the byte-identity checks ('' = skipped)
+if not REF and os.environ.get('RAVEN_REF_EXE'):                      # (the name test_vz_lag.py once used)
+    REF = os.environ['RAVEN_REF_EXE']
+    print('testconfig: RAVEN_REF_EXE is read as RAVEN_EXE_REF; please use RAVEN_EXE_REF')
+REF = os.path.abspath(REF) if REF else ''
 MF6LIB = os.environ.get('RAVEN_MF6_LIB', '')
 if not MF6LIB:   # the library fetched by tools/get_mf6.py, where Raven itself also finds it
     for _d in (os.path.dirname(RAVEN), os.path.join(RAVEN_ROOT, 'lib', 'mf6'), os.path.join(REPO, 'lib', 'mf6')):
@@ -61,6 +66,11 @@ def need_mf6():
         sys.exit('MODFLOW 6 library not found: run  python tools/get_mf6.py  in RavenHydroFramework-extra, or set RAVEN_MF6_LIB to libmf6.so / libmf6.dll / libmf6.dylib')
     if not os.path.exists(RAVEN):
         sys.exit('Raven not found at %s: build RavenHydroFramework beside this repository, or set RAVEN_SRC or RAVEN_EXE' % RAVEN)
+
+
+def skip(what, why='RAVEN_EXE_REF not set'):
+    """reports a check that was not made: one line 'SKIP <what>: <why>' (run_all.py counts these lines), never 'ok'"""
+    print('SKIP %s: %s' % (what, why))
 
 
 def work(*parts):

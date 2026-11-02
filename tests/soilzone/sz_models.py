@@ -35,7 +35,9 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
               rain=10.0, perc=10.0, days=60, Sy=0.2, Kh=10.0, Kv=1.0, aq_thick=20.0,
               init_depth=2.0, chd=None, physical=True, smooth=0.5, subgrid=5,
               iteration=None, pet=0.0, steady=None, extra_rvg='', perc_type='PERC_CONSTANT', timestep=1.0,
-              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None):
+              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None, top=None, demf=None, aq_conf=False):
+    # top: thickness [m] of a separate top aquifer layer (default: one layer to bedrock); demf(x, y): relief [m] added to the
+    # planar DEM (e.g. an egg-crate); aq_conf: the layer below the top layer is CONFINED_AQUIFER
     os.makedirs(d, exist_ok=True)
     L = nhru * hru_w
     # HRU polygons, centred on (LON0, LAT0): Raven's grid origin snaps to whole cells around that centre, so with
@@ -57,8 +59,8 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         for r in range(nrow):
             row = []
             for c in range(ncol):
-                x = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)[0]
-                row.append('%.4f' % (z0 - slope * (x - xs)))
+                x, y = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)
+                row.append('%.4f' % (z0 - slope * (x - xs) + (demf(x, y) if demf else 0.0)))
             f.write(' '.join(row) + '\n')
     # .rvh
     with open(os.path.join(d, 'm.rvh'), 'w') as f:
@@ -100,7 +102,10 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         else:  # retention of the aquifer material (unsaturated columns): CLAPP_B [-], AIR_ENTRY_PRESSURE [m]
             f.write(':AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY, CLAPP_B, AIR_ENTRY_PRESSURE\n  :Units, m/d, m/d, 1/m, none, none, none, m\n')
             f.write('  SAND, %g, %g, 1.0E-5, %g, %g, %g, %g\n:EndAquiferClasses\n' % (Kh, Kv, Sy, max(0.3, Sy + 0.05), aq_b, aq_psia))
-        f.write(':AquiferProfiles\n  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n:EndAquiferProfiles\n')
+        if top is None:
+            f.write(':AquiferProfiles\n  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n:EndAquiferProfiles\n')
+        else:
+            f.write(':AquiferProfiles\n  AQ, 2, SAND, %g, AQUIFER, SAND, TO_BEDROCK, %s\n:EndAquiferProfiles\n' % (top, 'CONFINED_AQUIFER' if aq_conf else 'AQUIFER'))
         f.write(':AquiferProfileParameters\n  :Attributes, INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH\n')
         f.write('  :Units, m, m, 1/d, m\n  AQ, %g, %g, 1.0, %g\n:EndAquiferProfileParameters\n' % (init_depth, aq_thick + H0 + H1, smooth))
     # .rvt
