@@ -71,7 +71,7 @@ exchange) is taken from the HRU's other columns in proportion to their water, an
 booked as ``negative recharge the soil zone did not hold'' (its own \cmd{GWBudget.csv} column, warning and run total). On HRUs
 without a soil zone and without \cmd{:SoilZone PHYSICAL} it is plain recharge, not limited (a warning).
 
-\paragraph{Drained columns.} With \cmd{NEWTON}, before each solve a column whose active cells are all convertible
+\paragraph{Drained columns.}\label{sec:drained} With \cmd{NEWTON}, before each solve a column whose active cells are all convertible
 (\cmd{ICELLTYPE}$\neq0$: a generated model's layer types, an existing model's from MODFLOW's memory) and whose lowest cell is
 at or below its bottom is set 1~mm above that bottom in MODFLOW's iterate, once per step, once more on a later solve of the
 step that leaves the lowest cell more than 1~m below its bottom, and after a solve with heads that are not finite; never in
