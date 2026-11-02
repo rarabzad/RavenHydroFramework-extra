@@ -29,6 +29,8 @@ import numpy as np, pandas as pd
 import sz_models, sz_check
 
 tc = sz_check.tc
+if not hasattr(tc, 'skip'):   # (testconfig.skip of the final suite: 'SKIP <what>: <why>', never 'ok')
+    tc.skip = lambda what, why: print('SKIP %s: %s' % (what, why))
 W = tc.work('soilzone', 'vz_classes')
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
 REF = os.environ.get('RAVEN_EXE_REF', '') or os.environ.get('RAVEN_REF_EXE', '')
@@ -134,7 +136,174 @@ def c1():
     print('C1 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
-TESTS = [('C1', c1)]
+def c2():
+    print('C2 hummocky cell: mean base near the water table, hummocks above it')
+    rain = [0.0] * 5 + [30.0] * 3 + [0.0] * (22 if QUICK else 52)
+    cfg = dict(BASE, init_depth=1.03, rain=rain, days=len(rain), dem_fn=hummocks(2.5), Sy=0.25, Kv=0.05, smooth=0.1,
+               perc_type='PERC_GAWSER_CONSTRAIN', phi0=(100.0, 100.0))
+    ok = True; vin = {}; dly = {}
+    for K in (1, 3, 5):
+        d = case('c2_k%d' % K, extra_rvg=vz('RICHARDS', K), **cfg)
+        ok &= check('c2_k%d' % K, d)
+        if d:
+            b = budget(d); t = np.arange(1, len(b) + 1)
+            i, o = b['unsaturated zone inflow [m3]'].values, b['unsaturated zone to aquifer [m3]'].values
+            vin[K] = i.sum()
+            dly[K] = ((o * t).sum() / o.sum() - (i * t).sum() / i.sum()) if i.sum() > 0 else 0.0
+    if len(vin) == 3:
+        print('  recharge through the class columns: K=1 %.0f m3 (no column: the mean base is within 5 cm of the water table), '
+              'K=3 %.0f m3 delayed %.2f d, K=5 %.0f m3 delayed %.2f d (outflow centroid - inflow centroid)'
+              % (vin[1], vin[3], dly[3], vin[5], dly[5]))
+        ok &= (vin[1] == 0.0) and (vin[3] > 0.0) and (vin[5] > 0.0) and (dly[3] > 0.0) and (dly[5] > 0.0)
+        RESULTS['c2'] = (vin, dly)
+    print('C2 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def terraces(levels, step, lam=100.0):
+    """terraces inside every cell: `levels` flat bands across x, each lam/levels wide, `step` m apart (mean 0)"""
+    def f(x, y):
+        u = ((x + 100.0 + 1e-6) % lam) / lam          # (the strip starts at x = -100 m: a cell edge)
+        i = min(int(u * levels), levels - 1)
+        return step * (i - 0.5 * (levels - 1))
+    return f
+
+def squares(amp, n=3, lam=100.0, seed=7):
+    """n x n squares per cell, each flat at a random level in [-amp, amp] (seeded); with :SoilZoneSubgrid n every DEM sample
+    lies at a square's centre, so K = n*n classes model the squares one by one"""
+    import random
+    rnd = random.Random(seed); lev = {}
+    def f(x, y):
+        key = (int((x + 1000.0 + 1e-6) // (lam / n)), int((y + 1000.0 + 1e-6) // (lam / n)))
+        if key not in lev:
+            lev[key] = amp * (2.0 * rnd.random() - 1.0)
+        return lev[key]
+    return f
+
+def c3():
+    print('C3 convergence to the sub-areas modelled one by one')
+    rain = [0.0] * 3 + [25.0] * 4 + [0.0] * (23 if QUICK else 53)
+    # (name, relief, samples per cell side, water table below the mean land [m], K values, reference K): squares: 9 squares
+    # per cell at random levels, the reference K = 9 models every square with its own column (the sub-areas one by one; with
+    # 5 x 5 samples it would need K = 25, beyond the limit of 10); terraces: 2 levels, K = 2 is exact
+    fams = [('squares', squares(1.0), 3, 1.3, [1, 2, 3] if QUICK else [1, 2, 3, 4, 5, 6, 8], 9)]
+    if not QUICK:
+        fams += [('terraces', terraces(2, 1.2), 8, 1.3, [1], 2), ('deep', squares(1.4, seed=11), 3, 3.0, [1, 2, 4, 6], 9)]
+    ok = True
+    for nm, fn, sg, depth, Ks, Kref in fams:
+        cfg = dict(BASE, init_depth=depth, rain=rain, days=len(rain), dem_fn=fn, subgrid=sg, perc_type='PERC_GAWSER_CONSTRAIN', phi0=(100.0, 100.0))
+        res = {}
+        for K in Ks + [Kref]:
+            d = case('c3_%s_k%d' % (nm, K), extra_rvg=vz('RICHARDS', K), **cfg)
+            ok &= check('c3_%s_k%d' % (nm, K), d)
+            if d:
+                res[K] = budget(d)['MF6 recharge [m3/d]'].values
+        if Kref in res and len(res) > 1:
+            r = res.pop(Kref)
+            err = {K: np.abs(v - r).sum() / max(np.abs(r).sum(), 1e-30) for K, v in res.items()}
+            print('  %s: relative error of the recharge to MODFLOW vs K = %d: %s' % (nm, Kref, ', '.join('K=%d %.3g' % (K, e) for K, e in sorted(err.items()))))
+            ks = sorted(err)
+            ok &= (err[ks[-1]] < err[ks[0]]) if len(ks) > 1 else (err[ks[0]] > 0.0)
+            RESULTS['c3_' + nm] = err
+        else:
+            ok = False
+    print('C3 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def c4():
+    print('C4 capillary rise from class columns (K = 4)')
+    days = 20 if QUICK else 60
+    cfg = dict(BASE, init_depth=1.8, rain=[0.0] * days, days=days, dem_fn=hummocks(0.8), pet=4.0, soil_b=5.0, soil_psia=200.0)
+    d = case('c4_k4', extra_rvg=vz('RICHARDS', 4), **cfg)
+    ok = check('c4_k4', d, LIM9)
+    if d:
+        cap = budget(d)['capillary rise to soil zone [m3]'].sum()
+        print('  capillary rise from the columns %.1f m3' % cap); ok &= cap > 0
+    print('C4 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def c5():
+    print('C5 rising and falling water tables through several class columns')
+    rain = ([0.0] * 6 + [45.0] * 4) * (2 if QUICK else 5)
+    ok = True
+    for K in (1, 3):
+        cfg = dict(BASE, nhru=4, slope=0.01, init_depth=1.5, rain=rain, days=len(rain), dem_fn=hummocks(0.8), Sy=0.1, Kh=2.0, pet=3.0,
+                   soil_b=5.0, soil_psia=200.0, chd=None)
+        d = case('c5_k%d' % K, extra_rvg=vz('RICHARDS', K), **cfg)
+        ok &= check('c5_k%d' % K, d)
+    print('C5 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def c6():
+    print('C6 dried top cell, specified-head toe, hotstart with K = 3 and K mismatch')
+    ok = True
+    rain = ([0.0] * 5 + [30.0] * 5) * 4
+    cfg = dict(BASE, nhru=4, slope=0.05, chd=59.9, init_depth=1.5, perc=40.0, ksat=400.0, Sy=0.15, pet=4.0, soil_b=5.0, soil_psia=200.0,
+               dem_fn=hummocks(0.8))
+    full = case('c6_full', extra_rvg=vz('RICHARDS', 3), rain=rain, days=40, **cfg)
+    first = case('c6_first', extra_rvg=vz('RICHARDS', 3), rain=rain[:20], days=20, **cfg)
+    ok &= check('c6_full', full) & check('c6_first', first)
+    if full and first:
+        rvc = os.path.join(first, 'out', 'solution.rvc')
+        hasblk = ':GWVadoseClassColumns' in open(rvc).read()
+        second = case('c6_second', extra_rvg=vz('RICHARDS', 3), start='2000-01-21', rvc=rvc, rain=rain[20:], days=20, **cfg)
+        ok &= check('c6_second', second) and hasblk
+        if second:
+            a, b = budget(full).iloc[20:].reset_index(drop=True), budget(second)
+            cols = ['MF6 recharge [m3/d]', 'soil-zone exchange applied to Raven [m3]', 'unsaturated zone to aquifer [m3]', 'unsaturated zone storage [m3]']
+            dq = max((a[c] - b[c]).abs().max() / max(a[c].abs().max(), 1.0) for c in cols)
+            print('  restart (block :GWVadoseClassColumns %s): largest deviation from the continuous run %.2g' % ('written' if hasblk else 'MISSING', dq))
+            ok &= dq < 1e-4
+        mm = case('c6_mismatch_k1', extra_rvg=vz('RICHARDS', 1), start='2000-01-21', rvc=rvc, rain=rain[20:], days=20, **cfg)
+        ok &= check('c6_mismatch_k1', mm)
+        w = warnings(mm) if mm else ''
+        ok &= 'do not match the columns' in w
+        print('  K = 3 hotstart read with K = 1: %s' % ('warning' if 'do not match the columns' in w else 'NO WARNING'))
+    k1 = case('c6_first_k1', extra_rvg=vz('RICHARDS', 1), rain=rain[:20], days=20, **cfg)
+    if k1:
+        mm = case('c6_mismatch_k3', extra_rvg=vz('RICHARDS', 3), start='2000-01-21', rvc=os.path.join(k1, 'out', 'solution.rvc'), rain=rain[20:], days=20, **cfg)
+        ok &= check('c6_mismatch_k3', mm)
+        w = warnings(mm) if mm else ''
+        ok &= 'do not match the columns' in w
+        print('  K = 1 hotstart read with K = 3: %s' % ('warning' if 'do not match the columns' in w else 'NO WARNING'))
+    # a thin top layer that dries: the water table in the cell below (SZW_RAVEN), with classes
+    d = case('c6_szw', extra_rvg=vz('RICHARDS', 3) + ':SoilZoneCapillaryRise ON\n', rain=[0.0] * 30, days=30,
+             **dict(BASE, init_depth=2.4, pet=5.0, soil_b=5.0, soil_psia=200.0, dem_fn=hummocks(0.8)))
+    if d:
+        rvp = os.path.join(d, 'm.rvp'); t = open(rvp).read()
+        t = t.replace('AQ, 1, SAND, TO_BEDROCK, AQUIFER', 'AQ, 2, SAND, 1.5, AQUIFER, SAND, TO_BEDROCK, AQUIFER')
+        open(rvp, 'w').write(t)
+        ok2, txt = sz_check.run(d)
+        ok &= ok2 and check('c6_szw', d)
+    print('C6 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def c7():
+    print('C7 cost of the class columns (machine-dependent)')
+    days = 30 if QUICK else 120
+    rain = ([0.0] * 6 + [20.0] * 4) * (days // 10)
+    t = {}
+    for K in (1, 3, 5):
+        d = case('c7_k%d' % K, extra_rvg=vz('RICHARDS', K), **dict(BASE, nhru=4, slope=0.01, init_depth=2.0, rain=rain, days=days, dem_fn=hummocks(0.8)))
+        if d:
+            t[K] = RESULTS['c7_k%d' % K]
+    print('  run times: ' + ', '.join('K=%d %.2f s' % (K, v) for K, v in sorted(t.items())))
+    return len(t) == 3
+
+def c8():
+    print('C8 KINEMATIC and LAG with K = 3: identities')
+    rain = [0.0] * 5 + [30.0] * 3 + [0.0] * (12 if QUICK else 42)
+    ok = True
+    for m in ('KINEMATIC', 'LAG'):
+        d = case('c8_%s' % m, extra_rvg=vz(m, 3), **dict(BASE, init_depth=1.3, rain=rain, days=len(rain), dem_fn=hummocks(1.0)))
+        ok &= check('c8_%s' % m, d, LIM9)
+    print('C8 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def c9():
+    tc.skip('C9 band_e43 LAG K = 3 connection test', 'the connection test belongs to the interface iteration (GWSoilZoneModel.cpp, R20 of test_rough_terrain)')
+    return True
+
+TESTS = [('C1', c1), ('C2', c2), ('C3', c3), ('C4', c4), ('C5', c5), ('C6', c6), ('C7', c7), ('C8', c8), ('C9', c9)]
 
 def main():
     tc.need_mf6()

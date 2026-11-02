@@ -175,6 +175,8 @@ STEPS = [
     ('soilzone_vadose_unit', False, '%s soilzone/vadose_unit.cpp %s/GWVadose.cpp -o %s/vadose_unit && %s/vadose_unit %s/vadose_drain.txt && %s soilzone/vadose_ref.py %s/vadose_drain.txt'
      % (cxx, ROOT, LOGS, LOGS, LOGS, PY, LOGS), last_line(r'vadose reference: PASS'), 900),
     ('soilzone_models', True, [PY, 'soilzone/test_sz_models.py'], last_line(r'soil-zone model tests: ALL PASSED'), 3600),
+    ('soilzone_vz_classes', True, [PY, 'soilzone/test_vz_classes.py'], last_line(r'vz classes tests: ALL PASSED'), 3600),
+    ('soilzone_vz_initial', True, [PY, 'soilzone/test_vz_initial.py'], last_line(r'initial-state tests: ALL PASSED'), 3600),
     ('soilzone_models_ext', True, [PY, 'soilzone/test_sz_models_ext.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
