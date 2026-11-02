@@ -36,6 +36,15 @@ def outputs(d):
     w = pd.read_csv(os.path.join(o, 'WatershedStorage.csv'))
     return b, s, w
 
+def vz_start(d):
+    """the unsaturated columns' storage at the start of the run [m3] (GWModelSummary.txt: "unsaturated storage   : V m3 at
+    the start"), or None (no such line: no columns, or a build older than )"""
+    import re
+    f = os.path.join(d, 'out', 'GWModelSummary.txt')
+    if not os.path.exists(f): return None
+    m = re.search(r'^\s*unsaturated storage\s*:\s*(\S+) m3 at the start', open(f).read(), re.M)
+    return float(m.group(1)) if m else None
+
 def checks(d, dt=1.0):
     b, s, w = outputs(d)
     res = {}
@@ -48,11 +57,19 @@ def checks(d, dt=1.0):
     dl = b['recharge delay storage [m3]'].diff().fillna(b['recharge delay storage [m3]'])
     rej = b['rejected recharge [m3]'] if 'rejected recharge [m3]' in b else 0.0
     ident = rr - b['MF6 recharge [m3/d]'] * dt - rej - b['recharge onto CHD cells [m3/d]'] * dt - dl
+    if 'recharge not applied by MODFLOW [m3/d]' in b:   # existing model without NEWTON
+        ident = ident - b['recharge not applied by MODFLOW [m3/d]'] * dt
     if 'unsaturated zone inflow [m3]' in b:   # :SoilZoneVadose RICHARDS: recharge passes through the unsaturated columns
         ident = ident - b['unsaturated zone inflow [m3]'] + b['unsaturated zone to aquifer [m3]']
         vzs = b['unsaturated zone storage [m3]']
-        vzr = (vzs.diff() - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]'])[1:]
-        res['vz_identity'] = float((vzr.abs() / (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + vzs.abs() * 1e-9).clip(lower=1.0)[1:]).max()) if len(vzr) else 0.0
+        s0 = vz_start(d)   # storage at the start (from step 1 when Raven writes it, until then from step 2)
+        res['vz_step1'] = s0 is not None
+        ds = vzs.diff()
+        if s0 is not None: ds.iloc[0] = vzs.iloc[0] - s0
+        vzr = ds - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]']
+        sc = (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + vzs.abs() * 1e-9).clip(lower=1.0)
+        k0 = 0 if s0 is not None else 1
+        res['vz_identity'] = float((vzr.abs() / sc)[k0:].max()) if len(vzr) > k0 else 0.0
     gross = rr.abs() + (b['MF6 recharge [m3/d]'] * dt).abs() + (rej.abs() if hasattr(rej, 'abs') else 0.0) + (b['recharge onto CHD cells [m3/d]'] * dt).abs() + dl.abs()
     if 'unsaturated zone inflow [m3]' in b: gross = gross + b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs()
     res['rch_identity'] = float((ident.abs() / gross.clip(lower=1.0)).max())   # (by the terms' magnitudes, at least 1 m3: dry steps have no recharge)
@@ -61,13 +78,16 @@ def checks(d, dt=1.0):
         if 'capillary rise to soil zone [m3]' in b: sz = sz - b['capillary rise to soil zone [m3]']
         wt = b['capillary rise from the water table [m3]'] if 'capillary rise from the water table [m3]' in b else 0.0
         sz = sz - wt   # rise from the water table (taken from the aquifer through SZQ_RAVEN, booked apart from the contact exchange)
+        nh = b['negative recharge the soil zone did not hold [m3]'] if 'negative recharge the soil zone did not hold [m3]' in b else 0.0
+        sz = sz - nh   # (a cut of a negative recharge the soil zone did not hold: not taken from it)
+        res['neg_unheld'] = float(nh.sum()) if hasattr(nh, 'sum') else 0.0
         if 'soil zone to specified heads [m3/d]' in b:   # columns over specified heads (no MODFLOW boundary)
             sz = sz - (b['specified heads to soil zone [m3/d]'] - b['soil zone to specified heads [m3/d]']) * dt
         if 'lagged-exchange debt [m3]' in b:   # LAGGED: lagged source the processes used beyond the exchange (repaid by the aquifer later)
             sz = sz - b['lagged-exchange debt [m3]']
             res['lag_debt_open'] = float(b['lagged-exchange debt [m3]'].sum() - b['lagged-exchange repayment [m3]'].sum())
         scale = (b['soil-zone exchange applied to Raven [m3]'].abs() + rej.abs() + (b['aquifer to soil zone [m3/d]']
-                 + b['soil zone to aquifer [m3/d]']) * dt + wt).clip(lower=1.0)
+                 + b['soil zone to aquifer [m3/d]']) * dt + wt + (nh.abs() if hasattr(nh, 'abs') else 0.0)).clip(lower=1.0)
         res['sz_identity'] = float((sz.abs() / scale).max())   # relative: the CSV carries 10 significant digits
         res['shortfall'] = float(b['soil-zone shortfall [m3]'].sum())
         res['iface_not_conv'] = int((b['interface converged'] == 0).sum())
@@ -78,11 +98,43 @@ def checks(d, dt=1.0):
 def report(name, res, limits):
     ok = True
     for k, lim in limits.items():
-        v = res.get(k, float('nan'))
+        if k not in res:   # (not in this run: no columns, no soil zone)
+            continue
+        v = res[k]
         good = (v <= lim)
         ok &= bool(good)
         print('  %-34s %-12.3g %s (limit %g)' % (k, v, 'ok' if good else 'FAIL', lim))
     return ok
 
 STD_LIMITS = {'mf6_err_rel': 1e-5, 'raven_mb_mm': 1e-5, 'rch_identity': 5e-9, 'sz_identity': 1e-8, 'shortfall': 1e-6,
-              'iface_not_conv': 0, 'mf6_not_conv': 0}
+              'neg_unheld': 1e-6, 'iface_not_conv': 0, 'mf6_not_conv': 0}
+# the identities alone (no convergence counts), the standard limits of every soil-zone test
+ID_LIMITS = {'mf6_err_rel': 1e-5, 'raven_mb_mm': 1e-5, 'rch_identity': 5e-9, 'sz_identity': 1e-8, 'vz_identity': 1e-8,
+             'shortfall': 1e-6, 'neg_unheld': 1e-6}
+DIAGNOSTIC_COLUMNS = ('interface change [m]',)
+ADDED_COLUMNS = ('negative recharge the soil zone did not hold [m3]', 'recharge not applied by MODFLOW [m3/d]')
+
+def same_file(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
+    """CSV/rvc files a and b hold the same values (columns in skip left out; columns in added may be in a only)"""
+    if not os.path.exists(b): return False
+    if a.endswith('.csv'):
+        try:
+            x, y = pd.read_csv(a), pd.read_csv(b)
+        except Exception:
+            return open(a, 'rb').read() == open(b, 'rb').read()
+        cx = [c for c in x.columns if c not in skip and c not in added]
+        cy = [c for c in y.columns if c not in skip and c not in added]
+        if cx != cy or len(x) != len(y): return False
+        return x[cx].astype(str).equals(y[cy].astype(str))
+    return open(a, 'rb').read() == open(b, 'rb').read()
+
+def same_outputs(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
+    """the out/*.csv and out/*.rvc files of run folder a that differ in run folder b (an empty list: the same results);
+    the run log and summary carry dates and paths and are not compared; the diagnostic columns (skip) are left out of the
+    CSV comparison (DIAGNOSTIC_COLUMNS)"""
+    bad = []
+    for f in sorted(os.listdir(os.path.join(a, 'out'))):
+        if f.endswith('.csv') or f.endswith('.rvc'):
+            if not same_file(os.path.join(a, 'out', f), os.path.join(b, 'out', f), skip, added):
+                bad.append(f)
+    return bad
