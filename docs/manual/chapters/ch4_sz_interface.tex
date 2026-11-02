@@ -1,0 +1,100 @@
+% Soil zone: interface iteration, negative recharge and the MODFLOW side
+\subsection{The interface iteration in detail}\label{sec:szinterface}
+
+\paragraph{Schedule.} After each of the first $n_{\mathrm{early}}=\min(5,\max(1,n_{\max}/5))$ outer iterations the interface
+is updated whether or not MODFLOW has converged ($n_{\max}$ the outer-iteration limit, \cmd{:SolverMaxOuterIterations} or the
+existing model's \cmd{OUTER\_MAXIMUM}); later only after outer iterations on which MODFLOW has converged, at most
+\cmd{:SoilZoneIteration} \emph{max} of them. The last tenth of the limit (at least two outer iterations) is left to MODFLOW
+on the boundary it has: the update after iteration $n_{\max}-\max(2,n_{\max}/10)$ and the last one the budget allows are
+\emph{supply-limited} (below), and once the interface is frozen nothing changes. A step without any update is reported
+unconverged. \cmd{:SoilZoneIteration 0} is explicit coupling (the predictor only), and so is an outer-iteration limit of 1,
+which leaves no update; both report the interface converged. With a limit of 2 or 3 the step has a single update, whose
+flow test compares with the predictor's total exchange.
+
+\paragraph{The rejected recharge as a head-dependent term.} With the connection head $h_c$ of the update MODFLOW receives
+the link's recharge $R_l\,(1-F(h_c))$ as a rate and, combined with the exchange's line, the linearization of the rejection
+about $h_c$,
+\begin{equation}
+q_{\mathrm{rej}}(h)=s\,(h_c-h),\qquad s=\max\Big(R_lF'(h_c),\ \frac{R_l\big(F(h^*)-F(h_c)\big)}{h^*-h_c}\Big)\ge0,
+\end{equation}
+$h^*$ the head MODFLOW returned last (a GHB of head $h_c$ and conductance $s$, merged with the exchange's GHB). MODFLOW's own
+iteration then sees that more recharge is rejected as its head rises (over a top layer with $K_v<0.01$~m/d, confined above
+its top, the recharge is otherwise a valve of very high gain: the interface failed on 10 to 100\,\% of the steps of test S1
+with 170 to 350 outer iterations per step; now 4 to 6). The term is booked with the exchange, so mass is exact. On a link
+whose unsaturated column carries the step the saturated share is rejected with the fraction of the start of the step $F_0$;
+the water the column gives back to the soil zone on ground that saturated since then (rule (i)) follows the connection head
+and is in the term, $R_q\min(\max(F(h)-F_0,0),1-F_0)$ with $R_q$ the column's outputs over $1-F_0$ (everything when $F_0=1$;
+in explicit coupling only that).
+
+\paragraph{The kink drain.} Where water rises into a soil zone without free water, nothing rises below the level where the
+contact ends and the column has nothing to give: the exchange has a kink there, across which a line overshoots (it reverses
+into flow out of a column that holds none) and the iteration cycles (test S2). MODFLOW then gets the exchange as a drain
+(\cmd{SZD\_RAVEN}) ending at the line's zero, at least the cell bottom $+1$~mm (no DEM sample base lies below that level:
+bases are clipped there), steepened at that level to carry the local solve's exchange at the head of linearization (at most
+the larger of $C_g$ and the link conductance), its onset smoothed over at least 1~mm. A column that holds free water keeps
+the line (it drains below the line's zero).
+
+\paragraph{Convergence.} An update is converged when the last change of every column's soil level is below $\epsilon_h$,
+the total exchange changed by no more than $\max(\mathrm{tol}_Q\,G,\ \sum F C\max(\epsilon_h,\mathrm{DVCLOSE}))$ and, per link
+in head units (over $K=\max(C,S_ya/\Delta t)$): the rejection at MODFLOW's head and at the connection MODFLOW solved with
+differ by less than $\epsilon_h$; the boundary MODFLOW solved with (its HCOF and RHS as booked) differs at the current head
+from the local solve's exchange plus the change of the rejection by less than $\epsilon_h$, with only two exemptions --- (i) a
+line (not a drain) whose local solves' secant through a real head change (more than $\epsilon_h$, the connection held) has the
+wrong sign: its exchange part up to $B=\max(10\,\%\ |Q_c|,\ \epsilon_hK)$; (ii) a kink drain within 1~mm of its level: the
+part MODFLOW's smoothing of the drain's onset takes; and the connection MODFLOW solved with gives the converged exchange at
+the current head (lag below $\epsilon_hC$ beyond $B$). Then two more tests: the boundary MODFLOW solved with takes from no
+column more than it holds at the current heads (the \emph{supply test}), and no link's connection head lies further than
+$\max(d_s,10\epsilon_h)$ from MODFLOW's head where the saturated fractions differ by more than $10^{-6}$ (the
+\emph{connection test}; specified heads and HDRY skipped). A link failing the connection test has its regula falsi bracket
+and its last residual dropped, so that its next update is the plain one ($h_c=h$; counted in \cmd{GWModelSummary.txt},
+``connection-test drops''). On the first ten unconverged steps \cmd{Raven\_errors.txt} names the step by its end, the last
+change of the soil level and its link (HRU and top active cell), the change of the total exchange and its tolerance --- or,
+when both were within the tolerances, the test that failed: the shortfall [m$^3$] and the link of the largest, or the
+connection head's distance from MODFLOW's head, its link and the saturated fractions at both heads. No update is made from an
+iterate MODFLOW has not converged on that holds a head that is not finite, or in which a link's top cell lies far outside the
+model's elevations (the divergence margin below) and away from that link's connection head (more than the margin from it,
+and on the other side of the model or more than the margin further outside).
+
+\paragraph{Supply limits.} In explicit coupling and on the supply-limited update the boundary MODFLOW keeps may not take more
+from a column than its free water, down to the lowest head the cell can reach (the bottom of the column's lowest active
+cell): first the rejection's term ($s(h_c-z_{\mathrm{low}})$ at most the head-dependent rejection and at most the free water
+the line leaves), then the line with what the term leaves. \cmd{GWModelSummary.txt} reports the number of such link updates
+and the largest take beyond the free water (0 up to round-off).
+
+\paragraph{Negative recharge.} A process that takes water out of \cmd{GROUNDWATER} (e.g. \cmd{PERC\_GR4JEXCH SOIL[1]
+GROUNDWATER} with a positive \cmd{GR4J\_X2}) gives a negative recharge. On an HRU with a soil zone it is never split by $F$: all
+of it is taken from MODFLOW (through the column on a column link), at most what the top cell can still give in the step
+(half its water above its bottom under the link, less what the columns, the capillary rise and the repayment of a lagged
+debt took before); the rest is cut and taken back out of the soil zone as a negative rejected recharge (run total ``negative
+recharge cut''). What the soil zone does not hold of that cut (a process after the import moved it on before the coupled
+exchange) is taken from the HRU's other columns in proportion to their water, and only what the whole HRU cannot supply is
+booked as ``negative recharge the soil zone did not hold'' (its own \cmd{GWBudget.csv} column, warning and run total). On HRUs
+without a soil zone and without \cmd{:SoilZone PHYSICAL} it is plain recharge, not limited (a warning).
+
+\paragraph{Drained columns.} With \cmd{NEWTON}, before each solve a column whose active cells are all convertible
+(\cmd{ICELLTYPE}$\neq0$: a generated model's layer types, an existing model's from MODFLOW's memory) and whose lowest cell is
+at or below its bottom is set 1~mm above that bottom in MODFLOW's iterate, once per step, once more on a later solve of the
+step that leaves the lowest cell more than 1~m below its bottom, and after a solve with heads that are not finite; never in
+the last two outer iterations (except for heads that are not finite). A column with an active confined cell is never drained.
+
+\paragraph{Heads far outside the model.} A step whose heads are not finite stops the run at once. A step MODFLOW did not
+converge on that holds a head beyond the model's highest top or lowest bottom by more than ten times its relief (at least
+1~km) is carried on only if every such head that moved in the step (relative to the heads of the last converged step, by
+position) moved by at most that margin in the last outer iteration and MODFLOW's residual is at most 1\,\% of the gross flow
+through the aquifer (every entry's inflow and outflow, MODFLOW's TOTAL IN plus TOTAL OUT; Raven's percentage divides by
+IN$+$OUT, half MODFLOW's PERCENT DISCREPANCY); such a step is warned with its residual. Otherwise the run stops, naming the
+head, its cell, its last move, the residual and the usual causes. An unconverged step without a far head is carried on
+whatever its residual, as MODFLOW's own \cmd{CONTINUE} option would: the residual is MODFLOW's balance error and a negative one
+is withheld from the discharge returned to Raven. A far head on a converged step is warned about once per run (per ensemble
+member).
+
+\paragraph{Existing models.} \cmd{:SoilZone PHYSICAL} needs an existing model with \cmd{NEWTON} (start-up stop naming the name
+file; MODFLOW then needs \cmd{LINEAR\_ACCELERATION BICGSTAB}). A model without a storage package is steady state: storage 0,
+$S_y=0.2$ assumed (a warning) for the soil-zone checks, the release limits and the columns; with one, \cmd{SY} is taken as
+MODFLOW holds it, also where it is 0 (common with \cmd{ICONVERT} 0, all of the model included), floored at 0.01 for the
+release limits and the columns, with a warning counting the cells below 0.01: such a model's outputs are unchanged. The warning
+about an outer-iteration limit below 20 is written once MODFLOW's limit is known (\cmd{OUTER\_MAXIMUM} for an existing model).
+A restart writes the heads with 17 significant digits and writes 0 as the lagged exchange of links whose cell was a specified
+head in the last step. Without \cmd{NEWTON} (\cmd{:SoilZone CONCEPTUAL}) the recharge MODFLOW does not apply to a column whose
+cells are all dry or whose highest active cell is a specified head is booked, signed, as ``recharge not applied by MODFLOW''
+(the water such cells held when they dried is in neither balance; confined cells never dry).

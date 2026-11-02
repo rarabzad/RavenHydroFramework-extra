@@ -37,7 +37,14 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
               rain=10.0, perc=10.0, days=60, Sy=0.2, Kh=10.0, Kv=1.0, aq_thick=20.0,
               init_depth=2.0, chd=None, physical=True, smooth=0.5, subgrid=5,
               iteration=None, pet=0.0, steady=None, extra_rvg='', perc_type='PERC_CONSTANT', timestep=1.0,
-              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None, dem_fn=None, dem_res=None):
+              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None, top=None, demf=None, aq_conf=False, extra_proc='', extra_soil=None, aq_layers=None,
+              dem_fn=None, dem_res=None):
+    # top: thickness [m] of a separate top aquifer layer (default: one layer to bedrock); demf(x, y): relief [m] added to the
+    # planar DEM (e.g. an egg-crate); aq_conf: the layer below the top layer is CONFINED_AQUIFER;
+    # extra_proc: process lines added after the percolation; extra_soil: {parameter: value} added to the soil parameters
+    # (e.g. GR4J_X2); aq_layers: [(thickness or 'TO_BEDROCK', type), ...] the aquifer profile's layers
+    # dem_fn(x, y): the same as demf (name used by the depth-class tests); dem_res: DEM raster columns (default 200)
+    if demf is None: demf = dem_fn
     os.makedirs(d, exist_ok=True)
     L = nhru * hru_w
     # HRU polygons, centred on (LON0, LAT0): Raven's grid origin snaps to whole cells around that centre, so with
@@ -59,12 +66,8 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         for r in range(nrow):
             row = []
             for c in range(ncol):
-                if dem_fn is None:
-                    x = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)[0]
-                    row.append('%.4f' % (z0 - slope * (x - xs)))
-                else:   # irregular land: dem_fn(x, y) [m] added to the plane (x, y projected, origin at the strip's centre)
-                    x, y = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)
-                    row.append('%.4f' % (z0 - slope * (x - xs) + dem_fn(x, y)))
+                x, y = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)
+                row.append('%.4f' % (z0 - slope * (x - xs) + (demf(x, y) if demf else 0.0)))
             f.write(' '.join(row) + '\n')
     # .rvh
     with open(os.path.join(d, 'm.rvh'), 'w') as f:
@@ -84,7 +87,7 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         f.write(':HydrologicProcesses\n  :Precipitation PRECIP_RAVEN ATMOS_PRECIP MULTIPLE\n  :Infiltration INF_RATIONAL PONDED_WATER MULTIPLE\n')
         if pet > 0:
             f.write('  :SoilEvaporation SOILEVAP_ALL SOIL[0] ATMOSPHERE\n')
-        f.write('  :Percolation   %s SOIL[0] SOIL[1]\n  :Percolation   %s SOIL[1] GROUNDWATER\n:EndHydrologicProcesses\n' % (perc_type, perc_type))
+        f.write('  :Percolation   %s SOIL[0] SOIL[1]\n  :Percolation   %s SOIL[1] GROUNDWATER\n' % (perc_type, perc_type) + extra_proc + ':EndHydrologicProcesses\n')
         f.write(':GroundwaterModel MODFLOW6\n:WriteMassBalanceFile\n:SilentMode\n')
     # .rvp
     with open(os.path.join(d, 'm.rvp'), 'w') as f:
@@ -92,9 +95,11 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         f.write(':SoilProfiles\n  SOILP, 2, SOIL, %g, SOIL, %g\n:EndSoilProfiles\n' % (H0, H1))
         f.write(':VegetationClasses\n  :Attributes, MAX_HT, MAX_LAI, MAX_LEAF_COND\n  :Units, m, none, mm_per_s\n  GRASS, 1, 1, 5\n:EndVegetationClasses\n')
         f.write(':LandUseClasses\n  :Attributes, IMPERM, FOREST_COV\n  :Units, frac, frac\n  OPEN, 0, 0\n:EndLandUseClasses\n')
+        xs_n = ''.join(', ' + k for k in (extra_soil or {})); xs_u = ', none' * len(extra_soil or {})
+        xs_v = ''.join(', %g' % v for v in (extra_soil or {}).values())
         if soil_b is None:
-            f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE\n  :Units, none, none, none, mm_per_d, mm_per_d\n')
-            f.write('  [DEFAULT], %g, %g, 0.0, %g, %g\n:EndSoilParameterList\n' % (n, sfc, ksat, perc))
+            f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE%s\n  :Units, none, none, none, mm_per_d, mm_per_d%s\n' % (xs_n, xs_u))
+            f.write('  [DEFAULT], %g, %g, 0.0, %g, %g%s\n:EndSoilParameterList\n' % (n, sfc, ksat, perc, xs_v))
         else:  # Campbell retention of the soil (capillary rise): CLAPP_B [-], AIR_ENTRY_PRESSURE [mm]
             f.write(':SoilParameterList\n  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HYDRAUL_COND, MAX_PERC_RATE, CLAPP_B, AIR_ENTRY_PRESSURE\n'
                     '  :Units, none, none, none, mm_per_d, mm_per_d, none, mm\n')
@@ -106,7 +111,12 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         else:  # retention of the aquifer material (unsaturated columns): CLAPP_B [-], AIR_ENTRY_PRESSURE [m]
             f.write(':AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY, CLAPP_B, AIR_ENTRY_PRESSURE\n  :Units, m/d, m/d, 1/m, none, none, none, m\n')
             f.write('  SAND, %g, %g, 1.0E-5, %g, %g, %g, %g\n:EndAquiferClasses\n' % (Kh, Kv, Sy, max(0.3, Sy + 0.05), aq_b, aq_psia))
-        f.write(':AquiferProfiles\n  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n:EndAquiferProfiles\n')
+        if aq_layers:
+            f.write(':AquiferProfiles\n  AQ, %d, ' % len(aq_layers) + ', '.join('SAND, %s, %s' % (t if isinstance(t, str) else '%g' % t, ty) for t, ty in aq_layers) + '\n:EndAquiferProfiles\n')
+        elif top is None:
+            f.write(':AquiferProfiles\n  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n:EndAquiferProfiles\n')
+        else:
+            f.write(':AquiferProfiles\n  AQ, 2, SAND, %g, AQUIFER, SAND, TO_BEDROCK, %s\n:EndAquiferProfiles\n' % (top, 'CONFINED_AQUIFER' if aq_conf else 'AQUIFER'))
         f.write(':AquiferProfileParameters\n  :Attributes, INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH\n')
         f.write('  :Units, m, m, 1/d, m\n  AQ, %g, %g, 1.0, %g\n:EndAquiferProfileParameters\n' % (init_depth, aq_thick + H0 + H1, smooth))
     # .rvt

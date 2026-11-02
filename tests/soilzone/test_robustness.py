@@ -29,6 +29,27 @@ R12 explicit mode with 15 outer iterations where water rises into cells that are
 R13 a stiff, very low-storage hillslope with an update budget of 1 and 12 outer iterations, on which MODFLOW does not
    converge: neither MODFLOW's residual nor the soil-zone shortfall is handed to Raven, so the outflow stays within 1.5 times the iterated run's (it was
    17 times).
+R14 (N1) negative recharge: :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER with GR4J_X2 3 mm/d (Raven's processes take water
+   out of GROUNDWATER) on an egg-crate hillslope, NONE and RICHARDS (all methods in the full mode, and three depth classes): it
+   is never split by the saturated fraction, all of it goes to MODFLOW; identities and Raven's balance at round-off (a
+   negative rejection booked with Fill created water in the soil).
+R15 (N2) negative recharge limited by what the top cell can give: a 2 m aquifer 2.5 m deep, 40 dry days, slope 0.03, no
+   specified head: the cut goes back to the soil zone (run total "negative recharge cut"); the run completes (before: head
+   -10 586 m, "diverged").
+R16 (N3) the hand-back of a column's outputs with one depth class follows the link's own fraction:
+   a RICHARDS run with negative recharge and rain; identities at round-off.
+R17 (N4) not held: the N2 import with the soil drained in the same step by :Baseflow BASE_LINEAR from SOIL[1] and SOIL[0]
+   after the import: the cut the soil zone does not hold is booked as "negative recharge the soil zone did not hold" (own
+   column, warning, run total), soil-zone shortfall 0, identities; :SoilZoneExchangeTiming AFTER books it too (the process
+   after the import, not the lagged timing, is the cause).
+R18 (N5) an existing model without NEWTON (CONCEPTUAL) whose cells the negative recharge dries: booked (signed, negative) as
+   recharge not applied by MODFLOW, the warning keeps the sign and says the water held by the dried cells is in neither
+   balance; R18c the same with confined cells (ICELLTYPE 0): they never dry, MODFLOW applies all of it, nothing booked as
+   not applied.
+R19 (N7) RICHARDS with three depth classes drawing upflow from a nearly empty top cell (R17 setup): all steps converged, no
+   head far outside the model (the column took 16.4 m3/d from a cell that could give 2.6e-9).
+R20 (N6) sibling columns: one HRU over 8 cells, BASEFLOW_COEFF 0.5, a 2 m aquifer from 1.8 m deep, 30 days, AFTER and LAGGED:
+   "not held" is booked only on steps whose HRU soil zone is empty (the cut is first taken from the HRU's other columns) and no round-off is booked.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -243,6 +264,113 @@ def main():
     if len(out) == 2:
         print('  R13: unconverged steps, outflow %.0f m3 vs iterated %.0f m3 (x%.2f)' % (out['R13_b1'], out['R13_it'], out['R13_b1'] / out['R13_it']))
     res.append(('R13 MODFLOW residual not handed to Raven', g))
+
+    # ---- negative recharge (N1-N7 = R14-R20) ------------------------------------------------------------------------
+    import re, pandas as pd
+    QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
+    def egg(amp, lam=50.0):
+        import math
+        return lambda x, y: amp * math.sin(2 * math.pi * x / lam) * math.sin(2 * math.pi * y / lam)
+    GR = dict(extra_proc='  :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER\n', extra_soil={'GR4J_X2': 60.0, 'GR4J_X3': 150.0})
+    N1 = dict(nhru=5, hru_w=200.0, slope=0.03, rain=[6.0] * 10 + [0.0] * 10 + [12.0] * 10, days=30, init_depth=1.2, perc=1.0,
+              ksat=200.0, aq_b=4.0, aq_psia=0.3, demf=egg(0.3), **GR)
+    LIM = dict(sz_check.ID_LIMITS)
+    def ident(d, lim=LIM, skip=()):
+        r = sz_check.checks(d)
+        return sz_check.report(os.path.basename(d), r, {k: v for k, v in lim.items() if k in r and k not in skip}), r
+    def vz(m, k=1):
+        return '' if m == 'NONE' else ':SoilZoneVadose %s\n' % m + (':SoilZoneVadoseClasses %d\n' % k if k > 1 else '')
+    g = True
+    meths = [('NONE', 1), ('RICHARDS', 1)] if QUICK else [('NONE', 1), ('RICHARDS', 1), ('KINEMATIC', 1), ('LAG', 1), ('RICHARDS', 3), ('LAG', 3)]
+    for m, k in meths:
+        d = case('R14_%s%d' % (m.lower(), k), extra_rvg=vz(m, k), **N1); ok, txt = sz_check.run(d)
+        if not ok: print('  R14 %s: run FAILED\n%s' % (m, txt[-600:])); g = False; continue
+        good, r = ident(d); b = sz_check.outputs(d)[0]
+        neg = float((b['Raven recharge [m3/d]'] < 0).sum())
+        print('  R14 %s K=%d: steps with negative recharge %d' % (m, k, neg)); g &= good and neg > 0
+    res.append(('R14 negative recharge: identities at round-off', g))
+
+    DRY2 = dict(nhru=5, hru_w=200.0, aq_thick=2.0, init_depth=2.5, rain=[0.0] * 40, days=40, slope=0.03, perc=0.0, **GR)
+    d = case('R15_dry2_none', **DRY2); ok, txt = sz_check.run(d); g = False
+    if ok:
+        good, r = ident(d)
+        m_ = re.search(r'negative recharge cut : ([-0-9.e+]+) m3', sz_check.summary(d))
+        cut = float(m_.group(1)) if m_ else 0.0
+        g = good and cut > 0
+        print('  R15: completes; negative recharge cut %.0f m3' % cut)
+    else: print('  R15: run FAILED\n' + txt[-600:])
+    res.append(('R15 negative recharge limited by the top cell', g))
+
+    d = case('R16_handback_richards', extra_rvg=vz('RICHARDS'), **dict(N1, rain=15.0, init_depth=1.25)); ok, txt = sz_check.run(d); g = False
+    if ok: g, r = ident(d); print('  R16: hand-back with one depth class, identities %s' % ('ok' if g else 'FAIL'))
+    else: print('  R16: run FAILED\n' + txt[-600:])
+    res.append(('R16 one-class hand-back', g))
+
+    BL = '  :Baseflow BASE_LINEAR SOIL[1] SURFACE_WATER\n  :Baseflow BASE_LINEAR SOIL[0] SURFACE_WATER\n'
+    GRX = {'GR4J_X2': 60.0, 'GR4J_X3': 1.0, 'BASEFLOW_COEFF': 0.5}   # (X3 1 mm: the import at its full rate X2 while SOIL[1] holds water)
+    DR2 = dict(DRY2, rain=5.0, perc=5.0, extra_proc=GR['extra_proc'] + BL, extra_soil=GRX)
+    vols = {}; g = True
+    for tim in ('LAGGED', 'AFTER'):
+        d = case('R17_drain2_%s' % tim.lower(), extra_rvg=':SoilZoneExchangeTiming %s\n' % tim, **DR2); ok, txt = sz_check.run(d)
+        if not ok: print('  R17 %s: run FAILED\n%s' % (tim, txt[-600:])); g = False; continue
+        good, r = ident(d, skip=('neg_unheld',))
+        b = sz_check.outputs(d)[0]; nh = float(b['negative recharge the soil zone did not hold [m3]'].sum()); vols[tim] = nh
+        e = sz_check.errors(d); sm = sz_check.summary(d)
+        w = 'was not held by the soil zone' in e and 'moved it on before the coupled exchange' in e and 'negative recharge not held' in sm
+        print('  R17 %s: not held %.0f m3, shortfall %.3g m3, warning and run total %s' % (tim, nh, r['shortfall'], 'present' if w else 'MISSING'))
+        g &= good and nh > 0 and w
+    if len(vols) == 2:
+        # (the term is not a LAGGED artefact: AFTER books it too; the volumes differ here, where the soil is drained only in part)
+        print('  R17: not held with AFTER %.0f m3, with LAGGED %.0f m3 (both booked: %s)' % (vols['AFTER'], vols['LAGGED'], 'ok' if min(vols.values()) > 0 else 'FAIL'))
+        g &= min(vols.values()) > 0
+    res.append(('R17 negative recharge not held booked apart', g))
+
+    g = True
+    for tag, conf in (('R18', False), ('R18c', True)):
+        cfg = dict(DRY2, physical=False, init_depth=1.0, aq_thick=2.0, extra_soil={'GR4J_X2': 60.0, 'GR4J_X3': 150.0},
+                   phi0=(200.0, 200.0), **({'aq_layers': [('TO_BEDROCK', 'CONFINED_AQUIFER')]} if conf else {}))
+        gd = case(tag + '_gen', **dict(cfg, extra_proc='', extra_soil=None)); ok, txt = sz_check.run(gd)   # (MODFLOW's files)
+        if not ok: print('  %s: generated run FAILED\n%s' % (tag, txt[-600:])); g = False; continue
+        e = sz_check.ext_case(gd, os.path.join(W, tag + '_ext'), cfg, newton=False); ok, txt = sz_check.run(e)
+        if not ok: print('  %s: existing-model run FAILED\n%s' % (tag, txt[-600:])); g = False; continue
+        b = sz_check.outputs(e)[0]; lost = float(b['recharge not applied by MODFLOW [m3/d]'].sum())
+        err = sz_check.errors(e); good, r = ident(e)
+        if not conf:
+            w = 'not applied by MODFLOW' in err and 'without MODFLOW supplying it' in err and 'neither water balance' in err
+            gg = good and lost < 0 and w
+            print('  R18: recharge not applied %.0f m3 (negative), warning %s' % (lost, 'ok' if w else 'MISSING'))
+        else:
+            w = 'confined cells (ICELLTYPE 0) never dry' in err
+            gg = good and lost == 0 and w
+            print('  R18c: recharge not applied %.3g m3 (0), warning naming confined cells %s' % (lost, 'ok' if w else 'MISSING'))
+        g &= gg
+    res.append(('R18 recharge not applied without NEWTON (R18c confined)', g))
+
+    d = case('R19_richards3', extra_rvg=vz('RICHARDS', 3), **dict(DR2, init_depth=1.8)); ok, txt = sz_check.run(d); g = False
+    if ok:
+        good, r = ident(d, skip=('neg_unheld',)); b = sz_check.outputs(d)[0]
+        g = good and r['mf6_not_conv'] == 0 and 'far outside' not in sz_check.errors(d)
+        print('  R19: %d steps, MODFLOW unconverged %d, far heads %s' % (len(b), r['mf6_not_conv'], 'none' if 'far outside' not in sz_check.errors(d) else 'REPORTED'))
+    else: print('  R19: run FAILED\n' + txt[-600:])
+    res.append(('R19 column upflow limited by the source cell', g))
+
+    SIB = dict(nhru=1, hru_w=800.0, width=100.0, aq_thick=2.0, init_depth=1.8, rain=5.0, days=30, slope=0.02, perc=5.0,
+               extra_proc=GR['extra_proc'] + BL, extra_soil=GRX)
+    g = True
+    for tim in (('AFTER',) if QUICK else ('AFTER', 'LAGGED')):
+        d = case('R20_sib_%s' % tim.lower(), extra_rvg=':SoilZoneExchangeTiming %s\n' % tim, **SIB); ok, txt = sz_check.run(d)
+        if not ok: print('  R20 %s: run FAILED\n%s' % (tim, txt[-600:])); g = False; continue
+        good, r = ident(d, skip=('neg_unheld',))
+        b, sx, _ = sz_check.outputs(d)
+        nh = b['negative recharge the soil zone did not hold [m3]'].values
+        left = sx.groupby('time [d]')['soil-zone water [mm]'].sum().values
+        held = [left[i] for i in range(min(len(nh), len(left))) if nh[i] > 0]
+        tiny = int(((nh > 0) & (nh < 1e-9)).sum())
+        gg = good and len(held) > 0 and all(x <= 1e-9 for x in held) and tiny == 0
+        print('  R20 %s: not held %.1f m3 on %d steps, largest soil water left on them %.3g mm, round-off bookings %d -> %s'
+              % (tim, nh.sum(), len(held), max(held) if held else 0.0, tiny, 'ok' if gg else 'FAIL'))
+        g &= gg
+    res.append(('R20 not held only where the HRU holds nothing', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

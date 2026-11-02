@@ -20,7 +20,8 @@ def audit(run,dt=1.0):
     uz=uzs.sum()
     if 'recharge delay storage [m3]' in b:
         s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]+uzs.iloc[0]
-    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej-uz)/max(rr,1)
+    lost=b['recharge not applied by MODFLOW [m3/d]'].sum()*dt if 'recharge not applied by MODFLOW [m3/d]' in b else 0.0   #existing model without NEWTON
+    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej-uz-lost)/max(abs(rr),1)   #(step 1 unchecked with a delay store: s0 is back-computed)
     R['recharge delay store at end [m3]']=st
     flows=b['MF6 recharge [m3/d]']+b['storage release [m3/d]']-b['seepage to Raven [m3/d]']+b['river leakage to aquifer [m3/d]']\
           -b['aquifer discharge to rivers [m3/d]']-b['water-table ET [m3/d]']+b['wells actual [m3/d]']+b['GHB [m3/d]']+b['CHD [m3/d]']
@@ -41,8 +42,16 @@ def audit(run,dt=1.0):
         for c in ('capillary rise to soil zone [m3]','capillary rise from the water table [m3]','lagged-exchange debt [m3]'):
             if c in b: szn=szn+b[c]
         if 'specified heads to soil zone [m3/d]' in b: szn=szn+(b['specified heads to soil zone [m3/d]']-b['soil zone to specified heads [m3/d]'])*dt
-        R['soil zone: applied - rejected - net exchange - shortfall (rel)']=float((b['soil-zone exchange applied to Raven [m3]']-b['rejected recharge [m3]']-szn-b['soil-zone shortfall [m3]']).abs().sum()
-            /max((b['soil-zone exchange applied to Raven [m3]'].abs()+b['rejected recharge [m3]']+szn.abs()).sum(),1))
+        nh=b['negative recharge the soil zone did not hold [m3]'] if 'negative recharge the soil zone did not hold [m3]' in b else 0.0   #(a negative recharge's cut no store held)
+        R['soil zone: applied - rejected - net exchange - shortfall (rel)']=float((b['soil-zone exchange applied to Raven [m3]']-b['rejected recharge [m3]']-szn-b['soil-zone shortfall [m3]']-nh).abs().sum()
+            /max((b['soil-zone exchange applied to Raven [m3]'].abs()+b['rejected recharge [m3]'].abs()+szn.abs()).sum(),1))
+        if 'unsaturated zone storage [m3]' in b:   #the unsaturated columns' storage balance, from step 1 when the summary gives the start
+            sm=(o+'GWModelSummary.txt'); m0=re.search(r'^\s*unsaturated storage\s*:\s*(\S+) m3 at the start',open(sm).read(),re.M) if os.path.exists(sm) else None
+            vs=b['unsaturated zone storage [m3]']; dv=vs.diff()
+            if m0: dv.iloc[0]=vs.iloc[0]-float(m0.group(1))
+            r=(dv-b['unsaturated zone inflow [m3]']+b['capillary rise to soil zone [m3]']+b['unsaturated zone to aquifer [m3]'])[0 if m0 else 1:]
+            R['unsaturated columns: storage change - inflow + rise + outflow (rel)']=float(r.abs().sum()/max((b['unsaturated zone inflow [m3]'].abs()+b['unsaturated zone to aquifer [m3]'].abs()).sum(),1))
+            R['unsaturated columns: step 1 checked']=bool(m0)
         R['soil zone: shortfall [m3]']=float(b['soil-zone shortfall [m3]'].sum())
         R['soil zone: overflow [m3]']=float(b['soil-zone overflow [m3]'].sum())
         R['soil zone: interface not converged (steps)']=int((b['interface converged']==0).sum())
@@ -88,7 +97,7 @@ def audit(run,dt=1.0):
     # Raven_errors.txt: in the output folder, or (ensemble members, runs audited from their case folder) next to it
     up=os.path.dirname(o.rstrip('/')); cand=[o+'Raven_errors.txt',up+'/Raven_errors.txt',up+'/out/Raven_errors.txt',up+'/output/Raven_errors.txt']
     ef=[f for f in cand if os.path.exists(f)]
-    if ef: e=open(ef[0]).read(); R['unconverged-guard warnings']=e.count('unconverged step'); R['ERROR lines']=len(re.findall(r'^ERROR',e,re.M))
+    if ef: e=open(ef[0]).read(); R['unconverged-guard warnings']=e.count('(MODFLOW unconverged): discharge returned to Raven limited')+e.count('of discharge to Raven withheld'); R['ERROR lines']=len(re.findall(r'^ERROR',e,re.M))
     return R
 if __name__=='__main__':
     if len(sys.argv)<2: sys.exit('usage: python3 tools_audit.py OUTPUT_FOLDER [OUTPUT_FOLDER ...]')
