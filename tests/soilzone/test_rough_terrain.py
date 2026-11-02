@@ -169,7 +169,11 @@ def _ext_geometry(d, S, meta):
             lo, la = rm.ll_np([p[0] for p in pts], [p[1] for p in pts]); s = list(dem.sample(lo, la)); s = [x for x in s if np.isfinite(x)]
         samples[ic] = s if s else None
         high[ic] = max(list(v5) + s) if (len(v5) or s) else top[ic]
-    return dict(ncpl=ncpl, ov=ov, top=top, botm=botm, idomain=idm, samples=samples, high=high, nlay=botm.shape[0])
+    cov = np.zeros(ncpl)
+    for k in range(len(polys)):
+        for ic, A in ov[k].items(): cov[ic] += A
+    covered = [cov[ic] >= S['min_cover'] * cellP[ic].area for ic in range(ncpl)]   # (:MinCellCoverage applies to existing models too)
+    return dict(ncpl=ncpl, ov=ov, top=top, botm=botm, idomain=idm, samples=samples, high=high, nlay=botm.shape[0], covered=covered)
 
 def run_case(name, S, method='NONE', vz_classes=1, keep=False, none_exf=None, days=None, extra_rvg=''):
     """builds, runs and checks one case; returns the result dict (status by decide())"""
@@ -222,9 +226,8 @@ def check(d, S, meta, res, none_exf):
     # finite
     for f in sorted(os.listdir(o)):
         if f.endswith('.csv'):
-            t = pd.read_csv(os.path.join(o, f), low_memory=False)
-            v = t.select_dtypes(include=[np.number]).to_numpy(float)
-            if v.size and not np.all(np.isfinite(v)): F.append('non-finite values in %s' % f)
+            if re.search(r'(^|,)\s*[-+]?(nan|inf|infinity)\s*(,|$)', open(os.path.join(o, f)).read(), re.I | re.M):
+                F.append('non-finite values in %s' % f)
     # identities
     r = sz_check.checks(d); res['ident'] = {k: r[k] for k in LIM if k in r}
     for k, lim in LIM.items():
@@ -255,7 +258,7 @@ def check(d, S, meta, res, none_exf):
         newton = True
     else:
         G = _ext_geometry(d, S, meta)
-        G['top_node'] = [int(np.argmax(idm[:, ic] > 0)) if (idm[:, ic] > 0).any() else -1 for ic in range(ncpl)]
+        G['top_node'] = [int(np.argmax(idm[:, ic] > 0)) if ((idm[:, ic] > 0).any() and G['covered'][ic]) else -1 for ic in range(ncpl)]
         newton = S['ext']['newton']
     tn = G['top_node']
     def ztop(ic):
@@ -320,7 +323,10 @@ def check(d, S, meta, res, none_exf):
             c = pd.read_csv(os.path.join(o, cf[0]), header=None, skiprows=2)
             hdr = pd.read_csv(os.path.join(o, cf[0]), header=None, nrows=1).iloc[0].tolist()
             ids = [int(float(x)) for x in hdr[2:] if str(x) not in ('nan', '')]
-            rch = {round(float(row[0]), 6): dict(zip(ids, [float(x) for x in row[2:2 + len(ids)]])) for _, row in c.iterrows()}
+            cum = {round(float(row[0]), 6): np.array([float(x) for x in row[2:2 + len(ids)]]) for _, row in c.iterrows()}
+            rch, last = {}, np.zeros(len(ids))   # (the custom output holds the running total [mm]: the step's recharge is its change)
+            rtol = {}
+            for t in sorted(cum): rch[t] = dict(zip(ids, cum[t] - last)); rtol[t] = dict(zip(ids, 1e-5 * np.abs(cum[t]) + 1e-6)); last = cum[t]
         one = {k: (len(L) == 1 and abs(sum(a for _, a in L) - meta['areas'][k]) < 1e-6 * meta['areas'][k]) for k, L in enumerate(links)}
         chd_hru = set()
         if S['family'] == 'gen':
@@ -348,19 +354,20 @@ def check(d, S, meta, res, none_exf):
                         f0, f1 = closure(h0c, zbs[(k, ic)], S['ds']), closure(h1, zbs[(k, ic)], S['ds'])
                         lo += a * min(f0, f1); hi += a * max(f0, f1)
                     lo /= A; hi /= A
-                    ferr = max(ferr, lo - Fr, Fr - hi)
+                    if max(lo - Fr, Fr - hi) > ferr: ferr = max(lo - Fr, Fr - hi); res['F_where'] = 'day %g HRU %d: F %.4f, closure %.4f-%.4f' % (t, k + 1, Fr, lo, hi)
                 if method == 'NONE' and rch is not None and k not in chd_hru:
                     R = rch.get(tt, {}).get(k + 1); rj = row['rejected recharge [mm]']
                     if R is not None:
-                        rej_over = max(rej_over, rj - max(R, 0.0) - 1e-6 * abs(R) - 1e-9)
+                        tl = rtol[tt][k + 1]   # (6 significant digits of the running total)
+                        rej_over = max(rej_over, rj - max(R, 0.0) - tl)
                         if rj > 1e-9 and Fr <= 0.0: rej_nof = max(rej_nof, rj)
-                        if one[k] and R > 0: rej_eq = max(rej_eq, abs(rj - Fr * R) - 1e-6 * R - 1e-9)
+                        if one[k] and R > 0: rej_eq = max(rej_eq, abs(rj - Fr * R) - tl)
             tprev = float(t)
         res['F_err'] = max(ferr, 0.0)
         if fbad > 1e-12: F.append('saturated fraction outside [0, 1] by %.3g' % fbad)
         if wbad > 1e-6: F.append('soil water outside [0, capacity] by %.3g mm' % wbad)
         if negs > 1e-9: F.append('negative rejected recharge or overflow (%.3g mm)' % negs)
-        if method in FTOL and res['F_err'] > FTOL[method]: F.append('saturated fraction differs from the closure by %.4f (limit %g)' % (res['F_err'], FTOL[method]))
+        if method in FTOL and res['F_err'] > FTOL[method]: F.append('saturated fraction differs from the closure by %.4f (limit %g; %s)' % (res['F_err'], FTOL[method], res.get('F_where')))
         if rej_over > 0: F.append('rejected recharge exceeds the HRU recharge by up to %.3g mm' % rej_over)
         if rej_nof > 0: F.append('rejected recharge %.3g mm on an HRU with no saturated fraction' % rej_nof)
         if rej_eq > 0: F.append('rejected recharge differs from F x recharge on one-cell HRUs by up to %.3g mm' % rej_eq)
@@ -491,7 +498,7 @@ def flat_rejection(keep=False):
     g = flopy.mf6.utils.MfGrdFile(o + '/mf6/gwf.dis.grb'); idm = np.array(g.modelgrid.idomain).reshape(-1)
     hf = flopy.utils.HeadFile(o + '/mf6/gwf.hds'); H = {round(t, 6): hf.get_data(totim=t).reshape(-1) for t in hf.get_times()}
     ic = dict(zip(b['time [d]'].round(6), b['interface converged'] != 0)); worst = 0.0
-    rr = dict(zip(b['time [d]'].round(6), b['Raven recharge [m3/d]'])); rj = dict(zip(b['time [d]'].round(6), b['rejected recharge [m3]']))
+    rr = dict(zip(b['time [d]'].round(6), b['Raven recharge [m3/d]'] - b['recharge onto CHD cells [m3/d]']));   # (the share onto the specified-head toe is not rejected by F) rj = dict(zip(b['time [d]'].round(6), b['rejected recharge [m3]']))
     res['steps'] = len(b); res['outer'] = int(b['outer iterations'].sum()); res['iface_nc'] = int((b['interface converged'] == 0).sum()); res['mf6_nc'] = int((b['converged'] == 0).sum())
     prev = None
     for _, row in s.iterrows():
@@ -630,7 +637,7 @@ def main():
     else:
         seeds = range(1, n + 1)
     t0 = time.time(); results = []
-    print('rough-terrain suite: methods %s, %d depth class(es), seeds %s-%s, family %s; %s' % (','.join(methods), K, seeds[0], seeds[-1], a.family, sz_check.tc.RAVEN))
+    print('rough-terrain suite: methods %s, %d depth class(es), seeds %s, family %s; %s' % (','.join(methods), K, ('%d-%d' % (seeds[0], seeds[-1])) if len(seeds) else 'none', a.family, sz_check.tc.RAVEN))
     if not a.noreg:
         print('regression cases'); results += run_regression(K, a.keep, methods=methods)
     print('seeds')
