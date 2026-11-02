@@ -66,4 +66,22 @@ no NEWTON). `--make-cases` rewrites them. They are regression cases by construct
 originals), not byte-for-byte the originals.
 
 ## 5. Results on the rebuilt base (Raven_v3h.exe, before the kin/lag/cls/integ merges)
-See the worker report; filled in after the default run below.
+Default run (400 seeds + regression, NONE and RICHARDS; 815 runs, 400 s): 235 failures, 4 known (XFAIL); layers 5.0e-8 m,
+bases 5.0e-8 m everywhere; justified stops: 7 outcrop seeds and g178 (MODFLOW alone repeats the divergence); 100 existing
+models, 6 without NEWTON. Quick run with all four methods (KINEMATIC/LAG still the hooks' pass-through placeholders): 180
+runs (as the original quick suite), 29 failures (NONE 18, RICHARDS 10, LAG 1). The failures are rebuild gaps of the base,
+each against a files_spec item (to be closed by the other workers' merges; the suite is the test):
+1. Saturated fraction off the closure (121 NONE runs, R2, R10, R20): ~95 of them vanish when the closure leaves out the
+   clip of the sample bases at the top cell's bottom + 1 mm, i.e. SZBuildEntries does not clip (files_spec 2.1, R3 c2.2);
+   the rest are converged steps whose F (at the connection head) is far from the closure at MODFLOW's head: the round-9
+   connection test and "rejection follows the converged head" (files_spec 2.2 SZIterate; R1: rejected share 0.081 above
+   the closure).
+2. vz_identity 1.2e-8 to 5.6e-6 in 66 RICHARDS runs: either the column balance or sz_check's v2 formula (final sz_check
+   scaling, R1 item 16 / R7 g1.6) -- to check after the merge.
+3. Rejected recharge above recharge + columns' storage in 42 RICHARDS runs (R6, R12): the columns' hand-back rules
+   (files_spec 2.7, v3 audit R1 item 12).
+4. Column water tables up to 30 m above NONE's (8 runs, g5): column injection into cells filled to the base.
+5. Existing models without NEWTON run instead of stopping (files_spec 2.9): rch_identity 1 (recharge not applied is not
+   booked), e356 heads 56 km above the land with NONE.
+6. Interface unconverged on > 5 % of steps (17 runs), MODFLOW balance error up to 4.3 % (4 runs), one shortfall on a
+   converged step (g86 NONE, 0.029 m3).
