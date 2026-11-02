@@ -145,6 +145,13 @@ def _links(S, meta, G):
         out.append([(ic, A) for ic, A in G['ov'][k].items() if G['top_node'][ic] >= 0 and ic not in chd])
     return out
 
+def _chd_links(S, meta, G):
+    """per HRU: [(cell, overlap area)] of its links on specified-head cells (generated cases). GWSoilExchange.csv's saturated
+    fraction includes these columns at the fixed head (rule: the fraction goes with the rejected recharge, which
+    includes them), so the closure includes them the same way"""
+    chd = set(meta.get('chd_cells', [])) if S['family'] == 'gen' else set()
+    return [[(ic, A) for ic, A in G['ov'][k].items() if G['top_node'][ic] >= 0 and ic in chd] for k in range(len(meta['polys']))]
+
 def _ext_geometry(d, S, meta):
     """the geometry of an existing model as written (rough_ext.py), with the DEM samples Raven takes in each cell"""
     from shapely.geometry import Polygon
@@ -264,6 +271,7 @@ def check(d, S, meta, res, none_exf):
     def ztop(ic):
         return top[ic] if tn[ic] == 0 else bot[tn[ic] - 1, ic]
     links = _links(S, meta, G)
+    flinks = [L + C for L, C in zip(links, _chd_links(S, meta, G))]   # (the saturated fraction's links: specified heads included, X5)
     Dk = meta['Dk']
     # base
     if s is not None:
@@ -279,7 +287,7 @@ def check(d, S, meta, res, none_exf):
     # link closures
     zbs = {}
     deep = False
-    for k, L in enumerate(links):
+    for k, L in enumerate(flinks):
         for ic, a in L:
             bl = bot[tn[ic], ic]
             if S['family'] == 'gen':
@@ -348,8 +356,9 @@ def check(d, S, meta, res, none_exf):
                 wbad = max(wbad, -row['soil-zone water [mm]'], row['soil-zone water [mm]'] - row['soil-zone capacity [mm]'] * (1 + 1e-9))
                 negs = max(negs, -row['rejected recharge [mm]'], -row['overflow [mm]'])
                 if L and he is not None and bconv.get(tt, False):
-                    A = sum(a for _, a in L); lo = hi = 0.0
-                    for ic, a in L:
+                    LF = flinks[k]   # (with the columns over specified heads at the fixed head, as Raven reports F: X5)
+                    A = sum(a for _, a in LF); lo = hi = 0.0
+                    for ic, a in LF:
                         h1 = he[tn[ic], ic]; h0c = hs[tn[ic], ic] if hs is not None else h0[ic]
                         f0, f1 = closure(h0c, zbs[(k, ic)], S['ds']), closure(h1, zbs[(k, ic)], S['ds'])
                         lo += a * min(f0, f1); hi += a * max(f0, f1)
