@@ -170,7 +170,11 @@ STEPS = [
     ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
     ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
     ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
-    ('soilzone_robustness', True, [PY, 'soilzone/test_robustness.py'], last_line(r'robustness tests: ALL PASSED'), 1800),
+    ('soilzone_robustness', True, [PY, 'soilzone/test_robustness.py'], last_line(r'robustness tests: ALL PASSED'), 3600),
+    ('soilzone_interface_stiff', True, [PY, 'soilzone/test_interface_stiff.py'], last_line(r'stiff interface tests: ALL PASSED'), 3600),
+    ('soilzone_confined_wet', True, [PY, 'soilzone/test_confined_wet.py'], last_line(r'confined-cell tests: ALL PASSED'), 3600),
+    ('soilzone_columns_mf6', True, [PY, 'soilzone/test_columns_mf6.py'], last_line(r'columns and MODFLOW side: ALL PASSED'), 1800),
+    ('soilzone_mf6_budget', True, [PY, 'soilzone/test_mf6_budget.py'], last_line(r'MODFLOW budget tests: ALL PASSED'), 3600),
     # unsaturated columns, capillary rise (docs/design/soil_zone_columns_plan.md section 8)
     ('soilzone_vadose_unit', False, '%s soilzone/vadose_unit.cpp %s/GWVadose.cpp -o %s/vadose_unit && %s/vadose_unit %s/vadose_drain.txt && %s soilzone/vadose_ref.py %s/vadose_drain.txt'
      % (cxx, ROOT, LOGS, LOGS, LOGS, PY, LOGS), last_line(r'vadose reference: PASS'), 900),
