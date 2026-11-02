@@ -1,0 +1,36 @@
+% Soil zone: outputs, run totals and messages (final behaviour)
+\section{Soil zone: outputs, run totals and messages}\label{app:szv3}
+\paragraph{\cmd{GWBudget.csv}.} With \cmd{:SoilZone PHYSICAL} after ``surface-store gains withheld'': ``negative recharge the soil
+zone did not hold [m$^3$]''; for an existing model without \cmd{NEWTON}, last: ``recharge not applied by MODFLOW [m$^3$/d]''
+(signed: negative where a negative recharge was taken out of \cmd{GROUNDWATER} without MODFLOW supplying it). ``MF6 balance error
+[\%]'' divides by the gross flow (Section~\ref{sec:szbooks3}). Every row is stamped with the end of its step.
+
+\paragraph{Run totals} (appended to \cmd{GWModelSummary.txt} at the end): time steps and MODFLOW-unconverged steps; with
+soil-zone links the interface-unconverged steps, the columns' substeps (and Newton iterations except with \cmd{LAG}), the outer
+iterations and steps in which drained columns were kept 1~mm above their bottoms; with an interface iteration the
+supply-limited link updates and the largest take beyond the free water, and the connection-test drops (link updates, steps,
+and those followed by a plain update); the negative recharge cut and the part not held (only when not zero); for an existing
+model without \cmd{NEWTON} the recharge not applied (always written, also 0).
+
+\paragraph{Messages.} Per-step warnings name the step by its end (``in the step ending \emph{date}'', with the time for
+sub-daily steps), the first ten of each kind.
+\begin{itemize}
+\item ``soil-zone interface did not converge in the step ending \emph{D} (\ldots; continuing with MODFLOW's flows)'', with the
+soil-level change and its link, or the failing supply or connection test.
+\item ``MODFLOW 6 heads are not finite in the step ending \emph{D} (the solve diverged): \ldots'' (stop).
+\item ``MODFLOW 6 head \emph{h} m in cell (\emph{l r c}) in the step ending \emph{D} lies far outside the model's elevations
+(\ldots) and the step did not converge: the solve diverged \ldots'' or ``\ldots with MODFLOW's residual \emph{r} m$^3$/d,
+\emph{p} \% of the gross flow \emph{G} m$^3$/d (more than 1 \%): its heads are wrong \ldots'' (stops); ``\ldots in a step
+MODFLOW did not converge, but its last outer iteration moved the head only \ldots'' and ``\ldots in a converged step'' (warnings).
+\item ``\ldots m$^3$ of the negative recharge the top cells could not supply was not held by the soil zone \ldots''.
+\item ``\ldots m$^3$ of Raven's recharge was not applied by MODFLOW (a model without NEWTON) on \emph{n} column(s) whose cells are
+all inactive (dry) and \emph{m} column(s) whose highest active cell is a specified head \ldots''.
+\item ``:SoilZone PHYSICAL needs an existing model that uses the Newton-Raphson formulation \ldots'' (stop).
+\item ``MODFLOW 6 stopped the run during \emph{call}: \emph{the error report of mfsim.lst}'' (stop: an input error MODFLOW finds
+inside its library, e.g. \cmd{LINEAR\_ACCELERATION CG} with \cmd{NEWTON}).
+\item ``the existing model has no specific yield (no STO package or SY); 0.2 is assumed for the soil-zone checks, the release
+limits and the unsaturated columns''; ``the existing model's specific yield (STO SY) is below 0.01 in \emph{n} of its \emph{m}
+active cells \ldots''.
+\item ``:SoilZone PHYSICAL with :SolverMaxOuterIterations \emph{n}'' / ``with OUTER\_MAXIMUM \emph{n} in the model's IMS file
+(MODFLOW's MXITER): \ldots a limit below 20 leaves many steps unconverged''.
+\end{itemize}

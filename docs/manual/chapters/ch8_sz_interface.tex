@@ -1,0 +1,24 @@
+% Soil zone: interface, MODFLOW side and negative recharge tests (quick mode, MODFLOW 6.8.1)
+\section{Soil zone: the interface and the MODFLOW side}\label{sec:vsoilzone3integ}
+Five scripts test the final interface iteration, drained columns, far heads, negative recharge and MODFLOW's budget
+(\cmd{tests/soilzone}, quick mode \cmd{RAVEN\_TEST\_QUICK=1}); every run also checks the identities of \cmd{sz\_check} at their
+standard limits. Numbers are those of the quick mode.
+\begin{longtable}{P{0.13\linewidth}P{0.42\linewidth}P{0.36\linewidth}}\toprule\hdr Test & Case & Result\\\midrule\endhead
+S1 & low-$K_v$ top layer ($K_v$ 0.5~mm/d), wet spell from 3~m deep; columns from 1.5~m & every step converged; 4.0 (NONE) and 5.9 (RICHARDS) outer iterations per step (before the term: 170 to 350); $F$ up to 1, column inflow 6\,530~m$^3$\\
+S2 & $S_y$ 0.02, one base point per cell, rising water into a drying soil (kink drain) & converged; 4.4 / 6.0 outer iterations per step\\
+S3 & explicit coupling over a 0.8~m top layer, egg-crate slope, specified head & no shortfall\\
+S4 & \cmd{:SoilZoneIteration} 1 and 2 & 400 / 20 (NONE) and 400 / 60 (RICHARDS) supply-limited updates; largest take beyond the free water $2\cdot10^{-13}$~m$^3$/d\\
+S5 & S4 with constant percolation and PET 5~mm/d from 1~m & take $2\cdot10^{-13}$~m$^3$/d\\
+S6 & outer-iteration limit 1, iteration 0 and 1 & explicit; outputs identical\\
+S7 & limits 2 and 3 & 6 of 10 steps converged (those without exchange); no ``no change \ldots to compare with''\\
+S8 & band\_e43, LAG, three classes & with the rough-terrain suite (skipped without it)\\
+W1--W3 & confined layer below its bottom, generated and existing (ICELLTYPE from memory) & every step converged, no column kept wet\\
+W5 & case Dc (existing, ICELLTYPE 1/0/1, ICONVERT 1, 20\,\% slope, dry then 30~mm/d) & 43 of 43 steps, 0 unconverged\\
+W7 & confined model with a 10$^4$~m$^3$/d well, far heads that converge; W7c limit 3 & warned once; W7c completes, 8 MODFLOW-unconverged steps carried on, pumped head within 0.9\,\% of the default run, every warning's percentage equal to GWBudget's\\
+W9, W10 & the same with limits 2 and 1 & stop: residual 2\,\% of the gross flow / the solve moved the head 1\,241~m; messages name head, cell (1 2 2), residual and causes\\
+W12 & existing model with an inactive top layer, limit 2 & every interface warning names layer 2\\
+M1--M4 & drained columns kept wet; a column delivers its inflow; CONCEPTUAL against the hooks build; missing summary line & kept in 5 outer iterations; outflow 1.02 of the inflow; byte-identical except the balance-error \%\\
+N1--N7 (R14--R20) & negative recharge (\cmd{PERC\_GR4JEXCH}): split, cut by the top cell, hand-back, not held, existing model without \cmd{NEWTON} (confined variant), column upflow, sibling columns & identities at round-off; cut 437\,045~m$^3$; not held 3\,793 (LAGGED) / 2\,870 (AFTER)~m$^3$; not applied $-408\,000$~m$^3$, 0 with confined cells; not held only where the HRU's soil is empty (334~m$^3$)\\
+B1--B7 & steady existing model without STO (converged and OUTER\_MAXIMUM 3), gross flow, hourly dates, specified head under a dry cell, \cmd{:SoilZoneClasses 3}, audit guard counts & balance error $6\cdot10^{-12}$; residual equals the list file's IN$-$OUT within $1.3\cdot10^{-8}$ of the gross flow; gross flow equals TOTAL IN$+$TOTAL OUT within $5\cdot10^{-10}$; dates with times; warning names 2 columns over specified heads; no round-off as not held; guard counts 12 and 2\\\bottomrule
+\end{longtable}
+Liard (test T7, 365 days, \cmd{:SoilZone PHYSICAL}): 0 unconverged steps, 3\,509 outer iterations (3\,467 before the iterated interface).
