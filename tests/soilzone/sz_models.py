@@ -7,6 +7,8 @@ make_case(d, **cfg) writes a complete model in folder d:
   (`perc_type`, default PERC_CONSTANT at `perc` mm/d; PERC_GAWSER_CONSTRAIN drains only water above field capacity),
   time step `timestep` d (daily forcing), one unconfined aquifer layer (Sy, Kh, Kv, thickness to bedrock), optional fixed head at the
   downslope end, :SoilZone PHYSICAL SOIL[0] SOIL[1] (or CONCEPTUAL with physical=False).
+  dem_fn(x, y) [m]: optional relief added to the planar land (irregular "amorphous" ground; default None: the plane, unchanged);
+  dem_res: DEM raster columns (default 200).
 """
 import os, json, math
 
@@ -35,7 +37,7 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
               rain=10.0, perc=10.0, days=60, Sy=0.2, Kh=10.0, Kv=1.0, aq_thick=20.0,
               init_depth=2.0, chd=None, physical=True, smooth=0.5, subgrid=5,
               iteration=None, pet=0.0, steady=None, extra_rvg='', perc_type='PERC_CONSTANT', timestep=1.0,
-              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None):
+              soil_b=None, soil_psia=None, aq_b=None, aq_psia=None, dem_fn=None, dem_res=None):
     os.makedirs(d, exist_ok=True)
     L = nhru * hru_w
     # HRU polygons, centred on (LON0, LAT0): Raven's grid origin snaps to whole cells around that centre, so with
@@ -48,7 +50,7 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         feats.append({"type": "Feature", "properties": {"HRU_ID": k + 1}, "geometry": {"type": "Polygon", "coordinates": [ring]}})
     json.dump({"type": "FeatureCollection", "features": feats}, open(os.path.join(d, 'hru.geojson'), 'w'))
     # DEM raster (ESRI ASCII, lon/lat), fine enough to resolve the slope inside cells
-    ncol, nrow = 200, 20
+    ncol, nrow = (200, 20) if dem_res is None else (int(dem_res), 20)   # dem_res: DEM columns (irregular land needs a finer raster)
     lonA, latA = ll(xs - 0.05 * L, ys - 0.5 * width); lonB, latB = ll(xs + 1.05 * L, ys + 1.5 * width)
     cs = (lonB - lonA) / ncol
     nrow = max(2, int(math.ceil((latB - latA) / cs)))
@@ -57,8 +59,12 @@ def make_case(d, nhru=1, hru_w=200.0, width=200.0, cell=100.0, slope=0.0, z0=100
         for r in range(nrow):
             row = []
             for c in range(ncol):
-                x = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)[0]
-                row.append('%.4f' % (z0 - slope * (x - xs)))
+                if dem_fn is None:
+                    x = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)[0]
+                    row.append('%.4f' % (z0 - slope * (x - xs)))
+                else:   # irregular land: dem_fn(x, y) [m] added to the plane (x, y projected, origin at the strip's centre)
+                    x, y = xy(lonA + (c + 0.5) * cs, latA + (nrow - r - 0.5) * cs)
+                    row.append('%.4f' % (z0 - slope * (x - xs) + dem_fn(x, y)))
             f.write(' '.join(row) + '\n')
     # .rvh
     with open(os.path.join(d, 'm.rvh'), 'w') as f:

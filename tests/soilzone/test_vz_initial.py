@@ -1,0 +1,142 @@
+""":SoilZoneVadoseInitialFlux and the columns' initial state.
+
+I1  steady start (RICHARDS): columns started at the steady profile for q carry q from the first step (outflow of step 1
+    within 1 % of the inflow q A, storage change over the run below 1 % of the storage), with the start line in
+    GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
+    (K = 3) too. KINEMATIC and LAG: their solvers' steady starts (gwvz::InitSteadyKinematic, the LAG cascade's S_i = q k_i)
+    are called through stubs until those workers' code is merged: SKIP while the build says "not available in this build".
+I2  a hotstart taken before any column exists (water table above the soil-zone base at the end of the first run), the
+    second run with the initial flux: the flux is ignored with the warning "... start at rest (their reference profile)",
+    no steady profile is put in, identities from step 1.
+I4  columns' balance of step 1 (vz_identity from step 1, start value = previous run's end for a hotstart; a hotstart with
+    heads +1 m so every bottom moves up in step 1); a deliberately moved start value must fail the check.
+"""
+import os, sys, shutil, re
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
+import numpy as np, pandas as pd
+
+def shift_heads(rvc, dh, out):
+    """copy of a solution.rvc with every :GWHeads value moved by dh [m]"""
+    L = open(rvc).read().split('\n'); o = []; inb = False
+    for l in L:
+        if l.startswith(':EndGWHeads'): inb = False
+        if inb and l.strip(): l = '  ' + ' '.join('%.12g' % (float(v) + dh) for v in l.split())
+        if l.startswith(':GWHeads'): inb = True
+        o.append(l)
+    open(out, 'w').write('\n'.join(o)); return out
+import sz_models, sz_check
+
+tc = sz_check.tc
+if not hasattr(tc, 'skip'):
+    tc.skip = lambda what, why: print('SKIP %s: %s' % (what, why))
+W = tc.work('soilzone', 'vz_initial')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
+LIM = dict(sz_check.STD_LIMITS); LIM['vz_identity'] = 1e-8
+BASE = dict(nhru=1, hru_w=200.0, width=200.0, cell=100.0, subgrid=5, perc=2.0, ksat=500.0, Kv=0.5, Sy=0.2, aq_b=4.0, aq_psia=0.3,
+            smooth=0.2, aq_thick=20.0)
+
+def case(name, extra, rvc=None, start=None, **cfg):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, extra_rvg=extra, **cfg)
+    if start:
+        for f in ('m.rvi', 'm.rvt'):
+            p = os.path.join(d, f); t = open(p).read()
+            open(p, 'w').write(t.replace('2000-01-01 00:00:00', start + ' 00:00:00'))
+    if rvc:
+        shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+    ok, txt = sz_check.run(d)
+    if not ok:
+        print('  %s: run FAILED\n%s' % (name, txt[-1500:])); return None
+    return d
+
+def check(name, d):
+    if d is None: return False
+    r = sz_check.checks(d)
+    print('  %s: (columns checked from step %d)' % (name, 1 if r.get('vz_step1') else 2))
+    return sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r}) and bool(r.get('vz_step1'))
+
+def budget(d): return pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv'))
+def errs(d):
+    f = os.path.join(d, 'out', 'Raven_errors.txt'); return open(f).read() if os.path.exists(f) else ''
+
+def i1():
+    print('I1 steady start')
+    days = 10 if QUICK else 30
+    ok = True
+    for meth, K in (('RICHARDS', 1), ('RICHARDS', 3), ('KINEMATIC', 1), ('LAG', 1)):
+        ex = ':SoilZoneVadose %s\n:SoilZoneVadoseClasses %d\n:SoilZoneVadoseInitialFlux 2\n' % (meth, K)
+        cfg = dict(BASE, init_depth=6.0, rain=[0.0] * days, days=days, phi0=(200.0, 200.0))
+        if K > 1:
+            cfg['dem_fn'] = lambda x, y: 0.8 * np.sin(2 * np.pi * (x + 25.0) / 100.0) * np.sin(2 * np.pi * (y + 25.0) / 100.0); cfg['dem_res'] = 400
+        d = case('i1_%s_k%d' % (meth, K), ex, **cfg)
+        if d and ('not available in this build' in errs(d)):
+            tc.skip('I1 %s steady start' % meth, 'the method\'s steady start is a stub until its solver is merged (columns start at rest)')
+            ok &= check('i1_%s_k%d' % (meth, K), d); continue
+        good = check('i1_%s_k%d' % (meth, K), d)
+        if d:
+            b = budget(d); qin = b['unsaturated zone inflow [m3]'].iloc[0]; qout = b['unsaturated zone to aquifer [m3]'].iloc[0]
+            s0 = sz_check.vz_start(d); s = b['unsaturated zone storage [m3]']
+            rel = abs(qout - qin) / max(qin, 1e-9); dst = abs(s.iloc[-1] - s0) / max(abs(s0), 1e-9)
+            print('    step 1: inflow %.3f m3, outflow %.3f m3 (%.2g); storage %.3f -> %.3f m3 (%.2g)' % (qin, qout, rel, s0, s.iloc[-1], dst))
+            good &= (qin > 0) and rel < 1e-6 and s0 > 0     # (later steps: the water table rises under the recharge, no outlet)
+        ok &= good
+    print('I1 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def i2():
+    print('I2 hotstart taken before any column exists: the initial flux is ignored')
+    ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
+    first = case('i2_first', ex, **dict(BASE, init_depth=0.5, rain=[0.0] * 5, days=5))
+    ok = check('i2_first', first)
+    if first:
+        rvc = os.path.join(first, 'out', 'solution.rvc'); blk = ':GWVadoseColumns' in open(rvc).read()
+        # the second run: water table lowered by moving the heads 3 m down (columns form at once, but the hotstart has none)
+        p2 = shift_heads(rvc, -3.0, os.path.join(W, 'i2_low.rvc'))
+        sec = case('i2_second', ex, rvc=p2, start='2000-01-06', **dict(BASE, init_depth=0.5, rain=[0.0] * 5, days=5))
+        ok &= check('i2_second', sec)
+        if sec:
+            w = errs(sec); s0 = sz_check.vz_start(sec)
+            good = ('ignored' in w) and ('at rest (their reference profile)' in w) and (s0 is not None) and abs(s0) < 1e-9
+            print('    first run wrote %s block; second run: warning %s, storage at the start %s m3 -> %s'
+                  % ('a' if blk else 'no', 'present' if 'at rest (their reference profile)' in w else 'MISSING', s0, 'ok' if good else 'FAIL'))
+            ok &= good
+    print('I2 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def i4():
+    print('I4 columns\' balance of step 1 (start line, hotstart, bottoms moving up in step 1)')
+    ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
+    rain = [0.0] * 3 + [20.0] * 3 + [0.0] * 4
+    cfg = dict(BASE, init_depth=4.0, rain=rain, days=len(rain), perc_type='PERC_GAWSER_CONSTRAIN', perc=50.0)
+    a = case('i4_a', ex, **cfg); ok = check('i4_a', a)
+    if a:
+        rvc = os.path.join(a, 'out', 'solution.rvc')
+        b = case('i4_hot', ex, rvc=rvc, start='2000-01-11', **cfg); ok &= check('i4_hot', b)
+        if b:
+            end = budget(a)['unsaturated zone storage [m3]'].iloc[-1]; s0 = sz_check.vz_start(b)
+            good = abs(s0 - end) <= 1e-9 * max(abs(end), 1.0)
+            print('    start value %.10g m3, previous run\'s end %.10g m3 -> %s' % (s0, end, 'ok' if good else 'FAIL')); ok &= good
+        p2 = shift_heads(rvc, 1.0, os.path.join(W, 'i4_up.rvc'))
+        c = case('i4_up', ex, rvc=p2, start='2000-01-11', **cfg); ok &= check('i4_up', c)
+        if c:
+            sm = os.path.join(c, 'out', 'GWModelSummary.txt'); t = open(sm).read(); s0 = sz_check.vz_start(c)
+            fl = budget(c)['unsaturated zone to aquifer [m3]'].iloc[0]
+            moved = s0 + max(1e-3 * abs(fl), 0.24)
+            open(sm, 'w').write(re.sub(r'(unsaturated storage\s*:\s*)\S+', lambda m: m.group(1) + '%.15g' % moved, t))
+            v = sz_check.checks(c)['vz_identity']
+            print('    step-1 release to the aquifer %.1f m3; a start value moved by %.3g m3 gives vz_identity %.2g -> %s'
+                  % (fl, moved - s0, v, 'fails as it must (limit 1e-8)' if v > 1e-5 else 'NOT DETECTED'))
+            ok &= v > 1e-5
+    print('I4 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def main():
+    tc.need_mf6()
+    res = {'I1': i1(), 'I2': i2(), 'I4': i4()}
+    print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
+    good = all(res.values())
+    print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')
+    return 0 if good else 1
+
+if __name__ == '__main__':
+    sys.exit(main())

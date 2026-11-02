@@ -14,7 +14,8 @@ run(d) runs Raven in folder d; checks(d) returns a dict of the identities of pla
                    / (sum of the magnitudes of those terms, at least 1 m3), per step
   shortfall        total soil-zone shortfall [m3]
   vz_identity      (:SoilZoneVadose RICHARDS) max |storage change - inflow + capillary rise + outflow| of the unsaturated
-                   columns / max(1 m3, flows), from the second step (the recharge identity then includes the columns)
+                   columns / max(1 m3, flows), from the first step when GWModelSummary.txt gives the storage at the start
+                   (vz_start; res['vz_step1']), else from the second (the recharge identity then includes the columns)
 """
 import os, sys, subprocess
 import numpy as np, pandas as pd
@@ -36,6 +37,15 @@ def outputs(d):
     w = pd.read_csv(os.path.join(o, 'WatershedStorage.csv'))
     return b, s, w
 
+def vz_start(d):
+    """the unsaturated columns' storage at the start of the run [m3] (GWModelSummary.txt: "unsaturated storage   : V m3 at
+    the start"), or None (no such line: no columns)"""
+    import re
+    f = os.path.join(d, 'out', 'GWModelSummary.txt')
+    if not os.path.exists(f): return None
+    m = re.search(r'^\s*unsaturated storage\s*:\s*(\S+) m3 at the start', open(f).read(), re.M)
+    return float(m.group(1)) if m else None
+
 def checks(d, dt=1.0):
     b, s, w = outputs(d)
     res = {}
@@ -51,8 +61,12 @@ def checks(d, dt=1.0):
     if 'unsaturated zone inflow [m3]' in b:   # :SoilZoneVadose RICHARDS: recharge passes through the unsaturated columns
         ident = ident - b['unsaturated zone inflow [m3]'] + b['unsaturated zone to aquifer [m3]']
         vzs = b['unsaturated zone storage [m3]']
-        vzr = (vzs.diff() - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]'])[1:]
-        res['vz_identity'] = float((vzr.abs() / (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + vzs.abs() * 1e-9).clip(lower=1.0)[1:]).max()) if len(vzr) else 0.0
+        s0 = vz_start(d)                      # (the start value: the first step is checked too; without it from the second step)
+        res['vz_step1'] = s0 is not None
+        i0 = 0 if s0 is not None else 1
+        dS = vzs.diff(); dS.iloc[0] = vzs.iloc[0] - (s0 if s0 is not None else vzs.iloc[0])
+        vzr = (dS - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]'])[i0:]
+        res['vz_identity'] = float((vzr.abs() / (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + vzs.abs() * 1e-9).clip(lower=1.0)[i0:]).max()) if len(vzr) else 0.0
     gross = rr.abs() + (b['MF6 recharge [m3/d]'] * dt).abs() + (rej.abs() if hasattr(rej, 'abs') else 0.0) + (b['recharge onto CHD cells [m3/d]'] * dt).abs() + dl.abs()
     if 'unsaturated zone inflow [m3]' in b: gross = gross + b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs()
     res['rch_identity'] = float((ident.abs() / gross.clip(lower=1.0)).max())   # (by the terms' magnitudes, at least 1 m3: dry steps have no recharge)
