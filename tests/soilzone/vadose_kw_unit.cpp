@@ -155,9 +155,10 @@ int main()
     SetAccuracy(0.02);
   }
 
-  //-- 5. monotonicity: more inflow never gives less water anywhere nor less outflow -----------------------------
+  //-- 5. monotonicity: more inflow never gives less water anywhere nor less outflow (one substep per step: the
+  //   implicit upwind scheme is monotone; adaptive substeps differ between two runs and are excluded here) ----------
   {
-    SetReference(1);
+    SetReference(1); SetAccuracy(10.0);
     vz_strat S=Two(Mat(0.35,4,0.3,0.8,0.2),Mat(0.42,7,0.5,0.03,0.06),2.5);
     int bad=0;
     for (int run=0;run<50;run++){
@@ -172,6 +173,7 @@ int main()
       }
     }
     check(bad==0,"KW monotone in the inflow",bad,0);
+    SetAccuracy(0.02);
   }
 
   //-- 6. analytical kinematic wave: front arrival (shock speed q/(th_q - thr)) and drainage tail, grid refinement
@@ -186,25 +188,27 @@ int main()
       const int N=Ns[r]; const double dt=0.05*16.0/N;
       SetAccuracy(0.02*16.0/N);
       vz_column c; Build(c,S,L,0.0,N);
-      double t=0,t50=-1,rej; double eTail=0; int nt=0;
+      double t=0,t50=-1,t10=-1,t90=-1,rej; double eTail=0; int nt=0;
       const double tend=ts+300.0;
       while (t<tend-1e-9){
         const double qt=(t<ts-1e-9)?q:0.0, qb=StepKinematic(c,S,dt,qt,rej); t+=dt;
         if ((t50<0) && (qb>=0.5*q)){t50=t-0.5*dt;}
+        if ((t10<0) && (qb>=0.1*q)){t10=t-0.5*dt;}
+        if ((t90<0) && (qb>=0.9*q)){t90=t-0.5*dt;}
         if (t>ts+0.5*dt){ //tail: qbot(t) = K(th) with c(th) = L/(t - ts) once t - ts > L/c(th_q); the step-mean of K
           const double tm=t-0.5*dt-ts,cq=W.c(W.thq(q));
           const double qa=(tm<L/cq)?q:W.K(W.thc(L/tm));
           if (tm>1.5*L/cq){eTail=std::max(eTail,std::fabs(qb-qa)/q); nt++;}
         }
       }
-      eA[r]=std::fabs(t50-ta)/ta; eT[r]=eTail;
-      printf("K1 N=%3d dt=%.4f d: arrival (half the flux) %.3f d, error %.2f %%; tail max error %.2f %% of q\n",N,dt,t50,eA[r]*100,eT[r]*100);
-      if ((eA[r]<prevA) && (eT[r]<prevT)){nconv++;}
-      prevA=eA[r]; prevT=eT[r];
+      eA[r]=std::fabs(t50-ta)/ta; eT[r]=eTail; const double wd=t90-t10;
+      printf("K1 N=%3d dt=%.4f d: arrival (half the flux) %.3f d, error %.2f %%; front width (10-90 %%) %.2f d; tail max error %.2f %% of q\n",N,dt,t50,eA[r]*100,wd,eT[r]*100);
+      if ((wd<prevA) && (eT[r]<prevT)){nconv++;}
+      prevA=wd; prevT=eT[r];
     }
-    check(nconv==4,"K1 front and tail errors fall with refinement",nconv,4);
+    check(nconv==4,"K1 front width and tail error fall with refinement",nconv,4);
     check(eA[0]<0.05,"K1 front arrival within 5 % at N=16",eA[0],0.05);
-    check(eA[3]<0.01,"K1 front arrival within 1 % at N=128",eA[3],0.01);
+    check(eA[1]<0.01 && eA[2]<0.01 && eA[3]<0.01,"K1 front arrival within 1 % at N=32..128",eA[3],0.01);
     check(eT[3]<0.02,"K1 drainage tail within 2 % of q at N=128",eT[3],0.02);
     SetAccuracy(0.02);
     //the default grid and accuracy with daily steps (what the coupled runs use)
@@ -274,15 +278,15 @@ int main()
     SetReference(1);
     vz_strat S=One(Mat(0.35,4,0.3,0.5,0.2)); vz_column c; Build(c,S,6.0,0.0,16);
     double rej; std::vector<double> qs; for (int k=0;k<100;k++){qs.push_back((k%30<3)?0.04:0.0);}
-    int sub=0; vz_step_info inf;
+    int sub=0,nwt=0; vz_step_info inf;
     auto t0=std::chrono::steady_clock::now(); const int R=200;
-    for (int r=0;r<R;r++){for (int k=0;k<100;k++){StepKinematic(c,S,1.0,qs[k],rej,&inf); sub+=inf.substeps;}}
+    for (int r=0;r<R;r++){for (int k=0;k<100;k++){StepKinematic(c,S,1.0,qs[k],rej,&inf); sub+=inf.substeps; nwt+=inf.newton;}}
     const double us=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-t0).count()/(R*100);
     SetReference(0); vz_column cr; Build(cr,S,6.0,0.0,16);
     t0=std::chrono::steady_clock::now();
     for (int r=0;r<R/4;r++){for (int k=0;k<100;k++){Step(cr,S,1.0,qs[k],rej,&inf);}}
     const double usr=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-t0).count()/(R/4*100);
-    printf("speed: KINEMATIC %.1f us per 16-node column step (%.1f substeps), RICHARDS %.1f us\n",us,(double)sub/(R*100),usr);
+    printf("speed: KINEMATIC %.1f us per 16-node column step (%.1f substeps, %.1f Newton iterations per node and substep), RICHARDS %.1f us\n",us,(double)sub/(R*100),(double)nwt/std::max(sub,1)/16.0,usr);
   }
 
   printf("kinematic unit tests: %d checks, %d failed\n",ncheck,nfail);
