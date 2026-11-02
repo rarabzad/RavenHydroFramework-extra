@@ -405,7 +405,8 @@ rain stops. Both are computed from the soil's own retention curve, not from a fi
 
 \subsection{The unsaturated column}\label{sec:szvadose}
 With \cmd{:SoilZoneVadose RICHARDS} every exchange column whose water table lies more than
-$L_{\min}=0.05$~m below its soil-zone base gets an unsaturated column from the base $z_b$ down to the
+$L_{\min}=0.05$~m below its soil-zone base gets an unsaturated column from the base $z_b$ (the cell's mean base; with
+\cmd{:SoilZoneVadoseClasses}, one column per depth class of its DEM samples, Section~\ref{sec:vzclasses}) down to the
 water table $h$ (the head of the top active cell at the start of the step). Its water content $\theta(z,t)$ follows
 the mixed form of Richards' equation \cite{celia1990}, $z$ upward,
 \begin{equation}
@@ -464,7 +465,7 @@ table would otherwise release more from the column at each step than the last (a
 and Raven warns at start-up when $S_y$ and $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2.
 When the water table rises to within $L_{\min}$ of the base the column disappears and the
 soil zone's contact exchange (above) takes over; when it falls again the column reappears at equilibrium. The columns
-are saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}).
+are saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}; with depth classes \cmd{:GWVadoseClassColumns}).
 
 \begin{example}[: delay through a deep unsaturated zone]
 A 3-day storm of 40 mm/d on soil over a water table 6~m deep, sand with $K_s=0.5$ m/d, $b=4$, $\psi_a=0.3$~m (test P1).
@@ -472,6 +473,8 @@ Without the column the recharge reaches MODFLOW with the percolation, centroid o
 arrives spread over two weeks, peak 45\% lower, and its centroid moves to day~15.6; nothing is lost: inflow, outflow
 and storage change of the columns close to $10^{-11}$ (Figure~\ref{fig:v2delay}).
 \end{example}
+
+\input{chapters/ch4_vz_classes}
 
 \subsection{Capillary rise}\label{sec:szcaprise}
 Dry soil above a water table draws water up. In a steady upward flux $q$ (positive up) through a profile whose

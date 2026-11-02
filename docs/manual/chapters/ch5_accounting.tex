@@ -157,7 +157,7 @@ including the \cmd{.rvc}, have been read.
 \subsection{Restarting a run (hotstart)}
 At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states it contains \cmd{:GWHeads} (the head in
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
-transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
+transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), and with unsaturated columns \cmd{:GWVadoseColumns} (\cmd{:GWVadoseClassColumns} with depth classes). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
 run --- continues exactly: in the tests the restarted run matched a continuous run to within $6\times10^{-6}$ in all flows.
 
 \subsection{Ensembles}

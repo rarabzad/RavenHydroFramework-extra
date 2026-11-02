@@ -135,6 +135,8 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SoilZoneSubgrid n} & DEM points per cell side for the saturated area, $1\le n\le20$ (5)\\
 \cmd{.rvg} & \cmd{:SoilZoneOutput group} & \cmd{GWSoilExchange.csv} only for this HRU group (all soil-zone HRUs)\\
 \cmd{.rvg} & \cmd{:SoilZoneVadose NONE | RICHARDS \{$\epsilon$\} \{N\}} & unsaturated columns below the soil zone (Section~\ref{sec:szvadose}); largest content change in a substep $0<\epsilon\le0.2$, nodes $3\le N\le200$ (NONE; 0.02, 16)\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseClasses K} & unsaturated columns per exchange column, one per depth class of its DEM samples (Section~\ref{sec:vzclasses}); $1\le K\le10$ (1)\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux q} & steady start of the unsaturated columns for the flux $q\ge0$ [mm/d] on a cold start, ignored with a warning on a groundwater hotstart (0: at rest)\\
 \cmd{.rvg} & \cmd{:SoilZoneCapillaryRise ON | OFF} & capillary rise into the soil zone (Section~\ref{sec:szcaprise}) (ON with \cmd{RICHARDS}, else OFF)\\
 \cmd{.rvg} & \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & order of Raven's processes and the exchange (Section~\ref{sec:sztiming}) (\cmd{LAGGED})\\
 \cmd{.rvg} & \cmd{:SoilZoneClasses K} & Raven's processes per class of columns, $1\le K\le50$ (Section~\ref{sec:szclasses}) (1)\\
@@ -153,7 +155,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvt} & \cmd{:BoundaryHead name units} \dots & time-varying boundary head\\
 \cmd{.rvt} & \cmd{:ObservationData GW\_HEAD id units} \dots & observed heads for diagnostics\\
 \cmd{.rvc} & \cmd{:InitialGWHeads FROM\_PROFILE|DEPTH\_BELOW\_SURFACE d|ELEVATION z} & initial heads (\cmd{FROM\_PROFILE})\\
-\cmd{.rvc} & \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWSoilZoneLag} & hotstart blocks written by Raven (Section~\ref{app:hotstart})\\\bottomrule
+\cmd{.rvc} & \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag} & hotstart blocks written by Raven (Section~\ref{app:hotstart})\\\bottomrule
 \end{longtable}
 
 \section{Options}\label{app:options}
@@ -262,8 +264,9 @@ $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profi
 \cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\
 \cmd{:GWSoilZoneColumns} & \cmd{:SoilZone PHYSICAL}: HRU ID, cell (grid column number; 0 for the rest of the HRU), water of each soil-zone layer from the bottom up [mm]; a block that does not match the HRU's columns is reported and the columns start from the water table\\
 \cmd{:GWVadoseColumns} & \cmd{:SoilZoneVadose RICHARDS}: HRU ID, cell (grid column number), water table [m], water contents of the column's nodes from the top [--]\\
+\cmd{:GWVadoseClassColumns} & \cmd{:SoilZoneVadoseClasses} $K>1$: HRU ID, cell (grid column number), depth class, classes of the cell, water table [m], water contents of the class column's nodes from the top [--]\\
 \cmd{:GWSoilZoneLag} & \cmd{LAGGED} timing: HRU ID, cell, exchange of the last step into the aquifer [m$^3$/d], debt the aquifer still repays [m$^3$]\\\bottomrule
-\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning.}\\
+\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning.}\\
 \end{longtable}
 
 \section{Error messages}\label{app:errors}
