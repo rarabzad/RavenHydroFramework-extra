@@ -138,3 +138,34 @@ def same_outputs(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
             if not same_file(os.path.join(a, 'out', f), os.path.join(b, 'out', f), skip, added):
                 bad.append(f)
     return bad
+
+def ext_case(g, e, cfg, newton=True, model_edit=None):
+    """an existing-model case e from the generated run g (made with sz_models.make_case(**cfg) and run): g's MODFLOW model
+    without Raven's packages (optionally without NEWTON; model_edit(folder) may change it further) coupled by
+    :MF6Simulation with the same HRUs and soil zone (as test_sz_models_ext.roundtrip). Returns e (not run)"""
+    import re, shutil, sz_models
+    m = e + '_model'; shutil.rmtree(m, ignore_errors=True); shutil.copytree(os.path.join(g, 'out', 'mf6'), m)
+    for f in ('gwf.rch', 'gwf.drn', 'gwf.szx', 'gwf.szq', 'gwf.szd', 'gwf.szw', 'linkage.cache', 'mfsim.lst', 'gwf.lst', 'gwf.hds', 'gwf.cbc'):
+        if os.path.exists(os.path.join(m, f)): os.remove(os.path.join(m, f))
+    nam = open(os.path.join(m, 'gwf.nam')).read()
+    nam = '\n'.join(l for l in nam.split('\n') if not re.search('RCH_RAVEN|DRN_RAVEN|SZX_RAVEN|SZQ_RAVEN|SZD_RAVEN|SZW_RAVEN', l))
+    if not newton:
+        nam = re.sub(r'(?m)^\s*NEWTON.*$', '', nam)
+    open(os.path.join(m, 'gwf.nam'), 'w').write(nam)
+    if model_edit: model_edit(m)
+    shutil.rmtree(e, ignore_errors=True); sz_models.make_case(e, **cfg)
+    shutil.copy(os.path.join(g, 'out', 'mf6', 'grid_cells.geojson'), os.path.join(e, 'cells.geojson'))
+    rvg = open(os.path.join(e, 'm.rvg')).read()
+    drop = (':GridCellSize', ':SolverHeadTolerance', ':SpecifiedHeadBoundary', ':SolverMaxOuterIterations') + (() if cfg.get('physical', True) else (':LandSurface',))
+    rvg = '\n'.join(l for l in rvg.split('\n') if not l.startswith(drop))
+    rvg += '\n:MF6Simulation %s/mfsim.nam\n:MF6GridFile cells.geojson cell\n:MF6StartDate 2000-01-01\n:SeepageToRaven ON\n' % m
+    open(os.path.join(e, 'm.rvg'), 'w').write(rvg)
+    return e
+
+def errors(d):
+    p = os.path.join(d, 'out', 'Raven_errors.txt')
+    return open(p).read() if os.path.exists(p) else ''
+
+def summary(d):
+    p = os.path.join(d, 'out', 'GWModelSummary.txt')
+    return open(p).read() if os.path.exists(p) else ''
