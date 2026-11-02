@@ -422,7 +422,10 @@ $\psi_a$ = \cmd{AIR\_ENTRY\_PRESSURE} [m], $S_y$ = \cmd{SPEC\_YIELD} (Section~\r
 classes form a layered column, so a slowly permeable layer holds a perched saturated zone above it.
 
 \paragraph{Discretization.} Each column has at most $N$ finite volumes (\cmd{:SoilZoneVadose RICHARDS} $\epsilon$ $N$;
-$N=16$ by default), about 5~cm thick at both ends and growing geometrically by 1.3 towards the middle. Each Raven step
+$N=16$ by default; a column shorter than $N\times5$~cm has one per 5~cm, at least 3), growing geometrically by 1.3 from
+both ends towards the middle, to at most $1.3^8=8.2$ times the end volumes: a column of length $L$ with $N=16$ has end
+volumes of $L/48$ (5~cm for $L=2.4$~m, 21~cm for 10~m) and middle ones of $0.13L$; from $N=19$ on the extra volumes fill
+the middle at the largest thickness, about $L/(N-10)$, so raising $N$ refines the whole column. Each Raven step
 is divided into substeps, each solved by backward Euler in the mixed (mass-conservative) form with Newton's method on
 the tridiagonal system; a substep is accepted when no cell changes its content by more than $\epsilon$ (0.02 by
 default) and halved otherwise, and the next one grows by half when Newton converged quickly. Newton's updates are
@@ -472,6 +475,8 @@ Without the column the recharge reaches MODFLOW with the percolation, centroid o
 arrives spread over two weeks, peak 45\% lower, and its centroid moves to day~15.6; nothing is lost: inflow, outflow
 and storage change of the columns close to $10^{-11}$ (Figure~\ref{fig:v2delay}).
 \end{example}
+
+\input{chapters/ch4_vz_kinematic}
 
 \subsection{Capillary rise}\label{sec:szcaprise}
 Dry soil above a water table draws water up. In a steady upward flux $q$ (positive up) through a profile whose

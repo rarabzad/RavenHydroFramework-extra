@@ -88,7 +88,7 @@ def k1():
                         os.path.join(src, 'GWVadoseKW.cpp'), '-o', exe], capture_output=True, text=True)
     if c.returncode:
         print('  compile FAILED\n' + c.stderr[-2000:]); return False
-    r = subprocess.run([exe], capture_output=True, text=True, timeout=1800)
+    r = subprocess.run([exe, os.path.join(W, 'kw_wave.txt')], capture_output=True, text=True, timeout=1800)
     print('\n'.join('  ' + l for l in r.stdout.strip().split('\n')))
     ok = (r.returncode == 0) and ('checks, 0 failed' in r.stdout)
     print('  -> %s' % ('ok' if ok else 'FAIL'))

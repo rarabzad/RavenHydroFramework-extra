@@ -1,5 +1,6 @@
 // Unit tests of the KINEMATIC unsaturated column (GWVadoseKW.cpp) and of the column library parts it relies on
 // (GWVadose.cpp: reference ths - Sy in Build/MoveBottom/RelStorage, the capped grid, the inactive-column contract).
+// Run: vadose_kw_unit [series.txt] (writes the K1 bottom-flux series for make_vz_kinematic_figures.py)
 // Build: g++ -O2 -std=c++11 -I<src> vadose_kw_unit.cpp <src>/GWVadose.cpp <src>/GWVadoseKW.cpp -o vadose_kw_unit
 // Prints "kinematic unit tests: N checks, 0 failed" when everything holds; "K1 ..." lines carry the numbers the manual
 // quotes (front arrival and drainage tail against the analytical kinematic wave, with grid refinement).
@@ -45,8 +46,9 @@ static std::vector<double> OldGrid(double L,int Nmax)
   return dz;
 }
 
-int main()
+int main(int argc,char **argv)
 {
+  FILE *wave=(argc>1)?fopen(argv[1],"w"):0;   //(the K1 bottom-flux series for the manual figure: N, t, qbot, analytic)
   //-- 1. the grid: N = 3..18 bit for bit as before, from N = 19 the cap (1.3^8) fills the middle ----------------------
   {
     SetReference(0); vz_strat S=One(Mat(0.35,4,0.3,1.0,0.2));
@@ -192,6 +194,11 @@ int main()
       const double tend=ts+300.0;
       while (t<tend-1e-9){
         const double qt=(t<ts-1e-9)?q:0.0, qb=StepKinematic(c,S,dt,qt,rej); t+=dt;
+        if (wave && (r==0 || r==3)){
+          const double tm=t-0.5*dt,cq=W.c(W.thq(q));
+          const double qa=(tm<ta)?0.0:((tm<ts+L/cq)?q:W.K(W.thc(L/(tm-ts))));
+          fprintf(wave,"%d %.6f %.10g %.10g\n",N,tm,qb,qa);
+        }
         if ((t50<0) && (qb>=0.5*q)){t50=t-0.5*dt;}
         if ((t10<0) && (qb>=0.1*q)){t10=t-0.5*dt;}
         if ((t90<0) && (qb>=0.9*q)){t90=t-0.5*dt;}
@@ -289,6 +296,7 @@ int main()
     printf("speed: KINEMATIC %.1f us per 16-node column step (%.1f substeps, %.1f Newton iterations per node and substep), RICHARDS %.1f us\n",us,(double)sub/(R*100),(double)nwt/std::max(sub,1)/16.0,usr);
   }
 
+  if (wave){fclose(wave);}
   printf("kinematic unit tests: %d checks, %d failed\n",ncheck,nfail);
   return nfail?1:0;
 }
