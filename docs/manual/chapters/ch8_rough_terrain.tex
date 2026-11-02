@@ -1,7 +1,4 @@
 % Verification on rough terrain (tests/soilzone/test_rough_terrain.py, rough_models.py, rough_ext.py, rough_cases/).
-% (--methods NONE,RICHARDS,KINEMATIC,LAG, then the same with --vzclasses 3); remove this comment and \providecommand{\tbd}
-% when they are filled (no \tbd in the released manual).
-\providecommand{\tbd}[1]{\textcolor{red}{\textbf{[#1]}}}
 \section{Verification on rough terrain}\label{sec:vrough}
 The tests of Section~\ref{sec:vsoilzone} use planar hillslopes. Real ground is irregular: slopes change within a cell,
 the land holds pits, closed depressions, cliffs and ridges, the DEM is finer or coarser than the grid and may end inside
@@ -77,13 +74,48 @@ too when it replays a stored case.
 
 \subsection{Results}
 Table~\ref{tab:vroughres} summarizes the suite's 400 default seeds run with each of the four methods
+(\cmd{--methods NONE,RICHARDS,KINEMATIC,LAG}, 1\,620 runs with the regression cases; the script's default runs
+\cmd{NONE} and \cmd{RICHARDS} only). No run failed and none was a known failure. Every run that completed (1\,567 of
+1\,620) closed all balances within the limits above (largest values: recharge identity $4.5\times10^{-10}$, soil-zone
+identity $9.9\times10^{-10}$, unsaturated-zone identity $4.6\times10^{-10}$, MODFLOW $7.7\times10^{-6}$ of the recharge,
+Raven $10^{-11}$~mm; largest shortfall $4\times10^{-14}$). The independent geometry agreed everywhere: layers to
+$5\times10^{-8}$~m, bases to $5\times10^{-8}$~m. On converged steps the saturated fraction agreed with the closure to
+0.0022 with \cmd{NONE} (limit 0.02); with a column method it is reported (largest difference 0.0027 with \cmd{RICHARDS}
+and \cmd{LAG}, 0.0020 with \cmd{KINEMATIC}).
 \begin{table}[!htbp]\centering
-\caption{Run times depend on the machine and its load.}\label{tab:vroughres}\small
+\caption{Rough-terrain suite, default seeds and regression cases, one depth class.
+Run times depend on the machine and its load (the rerun shared two cores with another test suite).}\label{tab:vroughres}\small
 \begin{tabular}{P{0.36\linewidth}P{0.13\linewidth}P{0.13\linewidth}P{0.13\linewidth}P{0.13\linewidth}}\toprule\hdr
  & \cmd{NONE} & \cmd{RICHARDS} & \cmd{KINEMATIC} & \cmd{LAG}\\\midrule
-\bottomrule
+runs & 407 & 408 & 401 & 404\\
+completed / justified stops & 393 / 14 & 395 / 13 & 388 / 13 & 391 / 13\\
+known failures / failures & 0 / 0 & 0 / 0 & 0 / 0 & 0 / 0\\
+time steps of completed runs & 25\,753 & 25\,809 & 25\,350 & 25\,528\\
+steps with the interface unconverged & 0 & 0 & 0 & 0\\
+steps with MODFLOW unconverged & 0 & 0 & 0 & 0\\
+runs with the water table $>5$~m above the land; largest & 44; 94.2~m & 43; 94.2~m & 40; 94.2~m & 42; 94.2~m\\
+MODFLOW outer iterations per step (mean) & 6.34 & 5.83 & 5.70 & 7.20\\
+mean run time [s] & 0.16 & 0.22 & 0.18 & 0.19\\\bottomrule
 \end{tabular}
 \end{table}
+The justified stops are the outcrop cases (g14, g33, g58, g61, g162, g223, g266), the existing models without
+\cmd{NEWTON} (e36, e96, e200, e256, e316, e356: 6 of the 100 existing models, the others use it; with \cmd{NONE} also
+the regression case R17, which tests this stop), and stops that MODFLOW alone repeats (none). The run counts differ
+between the methods because the regression cases run with one method each. Water tables far above the land occur where
+the land is steep and the top layer's vertical conductivity low: the largest, 94.2~m, is seed g274 (slope 16\,\%,
+150~m cells, $K_v=0.0047$~m/d) with every method, \cmd{NONE} included, so it comes from the aquifer model, not from the
+columns (\cmd{--case 274}). No column method lifts such a water table over \cmd{NONE}'s (largest difference 0.0~m at
+the 0.1~m resolution of the report); the column methods have fewer such runs than \cmd{NONE}. With
+\cmd{:SoilZoneVadoseClasses 3} (\cmd{--vzclasses 3}, the same 1\,620 runs) the suite gives 0 failures and 0 known
+failures, with the same completed runs and justified stops, no unconverged step, the same balance limits (largest
+MODFLOW identity $8.3\times10^{-6}$), 0.0031 as the largest reported difference of the saturated fraction (\cmd{LAG}),
+44, 43, 41 and 43 runs (\cmd{NONE}, \cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}) with the water table more than 5~m above the land (largest 94.2~m, g274, as
+with one class; the column methods lift it by at most 0.1~m over \cmd{NONE}'s), 5.72, 5.61 and 7.13 outer iterations per
+step (\cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}) and mean run times of 0.34, 0.22 and 0.23~s. R20 holds the closure to
+0.0001 with three classes (0.0002 with one class; limit 0.004). The water table of R20's \cmd{LAG} run with three
+classes differs from that with one class by at most 0.35~m: it is lower by up to 0.16~m during the first two weeks of the
+rain (the upper classes' longer columns hold more of the rain on its way down), and higher by up to 0.35~m late in the
+dry spell that follows the rain (day 67, as they release it).
 
 \begin{table}[!htbp]\centering
 \caption{Problems the rough-terrain suite found and their regression cases.}\label{tab:vroughprob}\small
