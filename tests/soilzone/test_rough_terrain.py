@@ -498,7 +498,8 @@ def flat_rejection(keep=False):
     g = flopy.mf6.utils.MfGrdFile(o + '/mf6/gwf.dis.grb'); idm = np.array(g.modelgrid.idomain).reshape(-1)
     hf = flopy.utils.HeadFile(o + '/mf6/gwf.hds'); H = {round(t, 6): hf.get_data(totim=t).reshape(-1) for t in hf.get_times()}
     ic = dict(zip(b['time [d]'].round(6), b['interface converged'] != 0)); worst = 0.0
-    rr = dict(zip(b['time [d]'].round(6), b['Raven recharge [m3/d]'] - b['recharge onto CHD cells [m3/d]']));   # (the share onto the specified-head toe is not rejected by F) rj = dict(zip(b['time [d]'].round(6), b['rejected recharge [m3]']))
+    rr = dict(zip(b['time [d]'].round(6), b['Raven recharge [m3/d]'] - b['recharge onto CHD cells [m3/d]']))   # (the share onto the specified-head toe is not rejected by F)
+    rj = dict(zip(b['time [d]'].round(6), b['rejected recharge [m3]']))
     res['steps'] = len(b); res['outer'] = int(b['outer iterations'].sum()); res['iface_nc'] = int((b['interface converged'] == 0).sum()); res['mf6_nc'] = int((b['converged'] == 0).sum())
     prev = None
     for _, row in s.iterrows():
@@ -604,14 +605,28 @@ def parse_case(c, vz_classes):
         sd = int(c[1:]); return 'e%d' % sd, rm.gen_spec(sd, 'ext'), meth, None
     sd = int(c); fam = rm.family_of(sd); return '%s%d' % (fam[0], sd), rm.gen_spec(sd, fam), meth, None
 
+def selftest():
+    """the XFAIL rule on constructed results: a known-pattern failure alone is XFAIL; with a regression
+    case's own failure added after run_case, FAIL; a shortfall is never XFAIL"""
+    base = dict(name='c', method='LAG', notes=[], family='ext', deep_links=True)
+    a = decide(dict(base, fails=['unconverged steps: interface on 9 of 60']))
+    b = dict(base, fails=['unconverged steps: interface on 9 of 60'], F_err=0.51); decide(b); b = regression_checks(b, 'R20_band_e43')
+    c = decide(dict(base, fails=['shortfall 3 m3 on a step whose interface converged']))
+    d = decide(dict(base, fails=['unconverged steps: interface on 9 of 60'], deep_links=False))
+    ok = (a['status'], b['status'], c['status'], d['status']) == ('XFAIL', 'FAIL', 'FAIL', 'FAIL')
+    print('selftest: known pattern alone %s; with R20\'s own failure %s; shortfall %s; pattern without its condition %s -> %s'
+          % (a['status'], b['status'], c['status'], d['status'], 'ok' if ok else 'FAIL'))
+    return ok
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--quick', action='store_true'); ap.add_argument('--full', action='store_true')
     ap.add_argument('--methods', default='NONE,RICHARDS'); ap.add_argument('--vzclasses', type=int, default=1)
     ap.add_argument('--seeds', default=None); ap.add_argument('--family', default='both'); ap.add_argument('--keep', action='store_true')
-    ap.add_argument('--case', default=None); ap.add_argument('--noreg', action='store_true'); ap.add_argument('--make-cases', action='store_true')
+    ap.add_argument('--case', default=None); ap.add_argument('--noreg', action='store_true'); ap.add_argument('--make-cases', action='store_true'); ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.make_cases: make_cases(); return 0
+    if a.selftest: return 0 if selftest() else 1
     sz_check.tc.need_mf6()
     methods = [m.strip().upper() for m in a.methods.split(',') if m.strip()]
     for m in methods:
