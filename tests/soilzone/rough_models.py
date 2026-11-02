@@ -441,7 +441,7 @@ def build(d, S, method='NONE', vz_classes=1, extra_rvg='', days=None):
                 json.dump({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "Polygon", "coordinates": [ring]}}]},
                           open(os.path.join(d, 'edge.geojson'), 'w'))
                 rvg_body += ':SpecifiedHeadBoundary EDGE edge.geojson HEAD %.6f\n' % h
-                meta['chd_head'] = h; meta['chd_side'] = side
+                meta['chd_head'] = h; meta['chd_side'] = side; meta['chd_cells'] = [int(i) for i in sel]
     raven_files(d, S, polys, soilof, aqof, Dk, method, vz_classes, extra_rvg, days, rvg_body)
     json.dump(dict(spec=S, meta=meta), open(os.path.join(d, 'case.json'), 'w'))
     return meta
