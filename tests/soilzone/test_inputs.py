@@ -14,6 +14,13 @@ I7 groundwater lines and blocks in the .rvc of a run without :GroundwaterModel a
    and Raven's initial conditions after them still apply.
 I8 a :SurfaceWaterExchange on a soil-zone layer of a soil-zone HRU is refused (that layer already exchanges with the
    aquifer through the soil zone)
+I9 a damaged :GWHeads header in the .rvc: a negative count (":GWHeads -1 2 2") and a huge one (":GWHeads
+   100000 100000 100000") stop the run with a clear message (ExitGracefully: "counts must be positive"), not an uncaught
+   exception (std::length_error / std::bad_alloc, "terminate called").
+I10 :StartTime of the .rvc (Raven core, ParseInitialConditionFile.cpp): the offset of the run's start from the
+   start of the run that wrote the file is computed from the run's real start date (it read an end date that was never
+   set). A run without :GroundwaterModel (the I7 model, 2 days) from an .rvc with :StartTime under valgrind: no
+   "uninitialised value" in ParseInitialConditionsFile / TimeDifference (SKIP when valgrind is not installed).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -115,6 +122,43 @@ def main():
     open(p, 'a').write('\n:HRUGroup ALLH\n  %s\n:EndHRUGroup\n' % ', '.join(ids))
     ok, txt = sz_check.run(d)
     res.append(('I8 surface exchange on a soil-zone layer refused', (not ok) and 'exchanges with the aquifer through the soil zone already' in (txt + errors(d))))
+    # I9: a damaged :GWHeads header
+    good = ok0
+    if ok0:
+        t0 = open(os.path.join(d0, 'out', 'solution.rvc')).read()
+        for k, hdr in (('neg', ':GWHeads -1 2 2'), ('huge', ':GWHeads 100000 100000 100000')):
+            t = re.sub(r':GWHeads +\d+ +\d+ +\d+', hdr, t0, count=1)
+            d = case('I9_%s' % k, days=2)
+            open(os.path.join(d, 'm.rvc'), 'w').write(t)
+            for f in ('m.rvi', 'm.rvt'):
+                edit(os.path.join(d, f), '2000-01-01 00:00:00', '2000-01-06 00:00:00')
+            ok, txt = sz_check.run(d)
+            msg = 'counts must be positive' in (txt + errors(d))
+            crash = ('terminate called' in txt) or ('bad_alloc' in txt) or ('length_error' in txt)
+            print('  I9 %s: %s, message %s%s' % (hdr, 'stopped' if not ok else 'RAN', 'present' if msg else 'MISSING', ', CRASH' if crash else ''))
+            good &= (not ok) and msg and not crash
+    res.append(('I9 damaged :GWHeads header: clear error', good))
+
+    # I10: :StartTime of the .rvc under valgrind
+    import shutil as _sh, subprocess
+    if _sh.which('valgrind') is None:
+        sz_check.tc.skip('I10 :StartTime under valgrind', 'valgrind is not installed') if hasattr(sz_check.tc, 'skip') else print('SKIP I10: valgrind is not installed')
+    else:
+        d = case('I10', physical=False, days=2)
+        edit(os.path.join(d, 'm.rvi'), ':GroundwaterModel MODFLOW6\n', '')
+        p = os.path.join(d, 'm.rvc'); t = open(p).read()
+        open(p, 'w').write(':StartTime 1999-12-01 00:00:00\n:TimeStamp 2000-01-01 00:00:00\n' + t)
+        os.makedirs(os.path.join(d, 'out'), exist_ok=True)
+        r = subprocess.run(['valgrind', '--error-exitcode=0', sz_check.tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True,
+                           env=sz_check.tc.ENV, timeout=1800)
+        log = r.stdout + r.stderr
+        uninit = [l for l in log.split('\n') if 'uninitialised' in l]
+        blk = re.findall(r'(?:Conditional jump|Use of uninitialised)[^\n]*\n(?:==\d+==[^\n]*\n){1,6}', log)
+        here = [x for x in blk if ('TimeDifference' in x) or ('ParseInitialConditions' in x)]
+        good = ('Successful Simulation' in log) and not here
+        print('  I10: valgrind: %d "uninitialised" reports, %d in TimeDifference / ParseInitialConditionsFile -> %s'
+              % (len(uninit), len(here), 'ok' if good else 'FAIL'))
+        res.append(('I10 :StartTime of the .rvc: no uninitialised read', good))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)
