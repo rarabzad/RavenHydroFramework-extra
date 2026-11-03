@@ -17,6 +17,13 @@ L3  layered aquifer: the column crosses SAND (3 m) over a FINE class of the same
 L4  hotstart continuity: 60 + 60 days from the first run's solution.rvc (:GWVadoseColumns) equal 120 days in one go.
 L5  existing-model round trip (as X1 of test_sz_models_ext.py) with LAG: the generated model's MODFLOW files coupled as an
     existing model give the same flows (relative 1e-3) and identities.
+L6  the cell-room release cap of a rising water table (VZStep): one flat HRU, Sy 0.02
+    well below the drainable porosity (0.078), LAG 1000 (columns full to theta_s by :SoilZoneVadoseInitialFlux 10, so the
+    inflow passes straight through and the column's loss of storage is its release), 5 mm/d from 6 m deep: the water table
+    rises about 2 m per step into a nearly full top cell. A rising water table releases at most min(int Sy dz over the
+    rise, int Sy dz over [h, min(z_b, z_top)]), the second being the room the top cell has left above the water table.
+    Checked: on every step the column survives its release (storage loss) is at most S_y A (z_top - h) for the head h it
+    started from, and on at least one step that room is what limits it (release within 0.1 % of it; without the room cap that step releases 2269 m3 against a room of 1626 m3); identities.
 S   speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from U).
 B   byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the T2/T3 hillslope,
     RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change ; out/*.csv and solution.rvc compared byte for byte except the diagnostic column
@@ -328,10 +335,35 @@ def test_b():
     return ok
 
 
+def test_l6():
+    print('L6 a water table rising into a nearly full top cell releases at most the room the cell has left (LAG 1000, Sy 0.02)')
+    Sy, A = 0.02, 200.0 * 200.0
+    d = run('l6_room', nhru=1, hru_w=200.0, init_depth=6.0, aq_thick=20.0, rain=5.0, perc=20.0, days=6, Sy=Sy, Kv=0.5,
+            aq_b=4.0, aq_psia=0.3, extra_rvg=':SoilZoneVadose LAG 1000\n:SoilZoneVadoseInitialFlux 10\n')
+    if not d:
+        return False
+    ok, _ = check(d, 'l6_room')
+    b = budget(d); s = pd.read_csv(os.path.join(d, 'out', 'GWSoilExchange.csv'))
+    wt, zb = s['water table [m]'].values, s['soil-zone base [m]'].values        # (flat land: the top cell's top is the base)
+    st = b['unsaturated zone storage [m3]'].values
+    rel = (b['unsaturated zone to aquifer [m3]'] - b['unsaturated zone inflow [m3]']).values   # (full columns pass their inflow on)
+    worst, bound = 0.0, 0
+    for n in range(1, len(b)):
+        if not (st[n] > 0.0):
+            continue                                                             # (the column vanished: rule (ii) instead)
+        room = Sy * A * max(zb[n] - wt[n - 1], 0.0)
+        worst = max(worst, rel[n] - room)
+        if room > 1.0 and rel[n] > 0.999 * room:
+            bound += 1
+        print('    step %d: head %.3f m, room %.1f m3, release %.1f m3' % (n + 1, wt[n - 1], room, rel[n]))
+    good = worst <= 1e-6 * A and bound >= 1
+    print('  release beyond the room at most %.3g m3; steps limited by the room %d (at least 1) -> %s' % (worst, bound, 'ok' if good else 'FAIL'))
+    return ok and good
+
 def main():
     tc.need_mf6() if hasattr(tc, 'need_mf6') else None
     res = {}
-    for name, f in (('U', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('S', test_s), ('B', test_b)):
+    for name, f in (('U', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6), ('S', test_s), ('B', test_b)):
         t0 = time.time()
         try:
             res[name] = bool(f())

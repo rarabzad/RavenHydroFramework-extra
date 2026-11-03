@@ -462,7 +462,8 @@ leaves behind, would leave a dry band next to the water table that refills from 
 diverges with explicit coupling wherever $S_y$ exceeds the drainable porosity the retention curve implies near the
 water table.) A node that the move leaves above its porosity, or drier than air-dry, is clipped and the difference
 exchanged with the aquifer. A rising water table releases at most what MODFLOW stores for that rise, $S_y\Delta h$ per
-unit area, in one step; the column's bottom then follows more slowly and releases the rest in the next steps. With
+unit area (integrated over the layers the rise crosses), in one step, and no more than the room the top cell has left
+above the water table ($S_y$ integrated from the head up to the cell's top or the column's base, whichever is lower); the column's bottom then follows more slowly and releases the rest in the next steps. With
 $S_y$ consistent with the retention curve this never binds; with $S_y$ well below the drainable porosity a rising water
 table would otherwise release more from the column at each step than the last (a feedback with gain $(\theta-\theta_{\mathrm{eq}})/S_y>1$),
 and Raven warns at start-up when $S_y$ and $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2.
