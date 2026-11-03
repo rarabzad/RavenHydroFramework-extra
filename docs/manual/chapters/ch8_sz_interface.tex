@@ -11,7 +11,7 @@ S4 & \cmd{:SoilZoneIteration} 1 and 2 & 400 / 20 (NONE) and 400 / 60 (RICHARDS) 
 S5 & S4 with constant percolation and PET 5~mm/d from 1~m & take $2\cdot10^{-13}$~m$^3$/d\\
 S6 & outer-iteration limit 1, iteration 0 and 1 & explicit; outputs identical\\
 S7 & limits 2 and 3 & 6 of 10 steps converged (those without exchange); no ``no change \ldots to compare with''\\
-S8 & band\_e43, LAG, three classes & with the rough-terrain suite (skipped without it)\\
+S8 & connection test: stored case lowkv\_g57 without rain, $d_s$ 0.5~m, 16~m deep, head tolerance 0.05~m (band\_e43 does not fire it); default limit and limit 20 & 1 drop, its next update plain; with limit 20 the warning names the connection test at HRU 1, cell (1 1 6), fraction 0.0027 against 0\\
 W1--W3 & confined layer below its bottom, generated and existing (ICELLTYPE from memory) & every step converged, no column kept wet\\
 W5 & case Dc (existing, ICELLTYPE 1/0/1, ICONVERT 1, 20\,\% slope, dry then 30~mm/d) & 43 of 43 steps, 0 unconverged\\
 W7 & confined model with a 10$^4$~m$^3$/d well, far heads that converge; W7c limit 3 & warned once; W7c completes, 8 MODFLOW-unconverged steps carried on, pumped head within 0.9\,\% of the default run, every warning's percentage equal to GWBudget's\\

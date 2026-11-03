@@ -66,17 +66,25 @@ S7  outer-iteration limits of 2 and 3 (:SolverMaxOuterIterations) on a quiet hil
     last update can follow the first outer iteration only if MODFLOW has converged by the second (limit 4) or the third
     (limit 5) outer iteration; when it has not, the step keeps one unverified update and is reported unconverged, as
     before.)
-S8  the reason of an unconverged interface: rough-suite case band_e43 (regression R20, test C9) with
-    LAG and three depth classes for 67 days, with :SoilZoneIteration 8. On 2000-03-07 the update budget runs out on an
-    update whose soil levels and total exchange are within the tolerances but whose connection head lies 2.5 m above
-    MODFLOW's head (saturated fraction 0.52 against 0 at the head: the connection test). The warning must name the connection test, its link (HRU and cell) and the two fractions, and say that the
-    soil levels and exchange are within the tolerances. The same case with the default budget, where updates follow the
-    drops: GWModelSummary.txt's run totals count the drops (connection-test drops) and the drops whose next update in the
-    step was the plain one (h_c = h: the link's bracket and last residual dropped.2; before, the
-    residual stayed and the next update could form a new bracket with the stale point). Checks: such a warning for the
-    step ending 2000-03-07 (the warning is written for the first ten unconverged steps); drops counted, none followed by
-    an update with :SoilZoneIteration 8 (the drop is on the last update), all followed by a plain one with the default
-    budget; the identities of sz_check.
+S8  the reason of an unconverged interface and the connection-test drop. The     connection test (SZIterate: a connection head further than d_s from MODFLOW's head with a different saturated
+    fraction keeps the interface unconverged and drops the link's bracket and last residual) was found on rough-suite case
+    band_e43 (R20, LAG with three depth classes); that case never fires it (no drop on any step, and
+    none in any other stored rough case, method or class count), so S8 uses a constructed case where it does fire: stored
+    case lowkv_g57 (steep slope, top layer of Kv 3.6 mm/d) with no rain, a smoothing depth d_s of 0.5 m, the water table
+    16 m deep and :SolverHeadTolerance 0.05 m, 3 days, :SoilZoneVadose NONE. On day 3 an early, unconverged MODFLOW iterate
+    lifts the head of cell (1 1 6) to within d_s of its lowest base sample while the soil zone is empty and nothing is
+    rejected (no flow depends on the connection: the soil levels and the total exchange do not change, both zero); the
+    next iterate's head falls back 1.4 m and the update that follows passes every flow test with the connection still at
+    the lifted head (saturated fraction 0.0027 against 0): only the connection test keeps the interface unconverged.
+    (The loose head tolerance makes MODFLOW accept the iterates sooner; with the default 1e-5 m the early iterates give
+    the links flow and the flow tests catch them first.) Two runs: the default outer limit, where updates follow the drop:
+    GWModelSummary.txt's run totals must count drops and every drop's next update in the step must be the plain one
+    (h_c = h); and :SolverMaxOuterIterations 20, where MODFLOW does not converge on day 3 after the drop, so the drop is the
+    step's last update: the warning for the step ending 2000-01-04 must name the connection test, its link (HRU and cell)
+    and the two fractions, and say that the soil levels and exchange are within the tolerances; drops counted, none
+    followed by an update. Disabling the test (the drop and its reset) makes both runs fail (no drop, no such warning).
+    Identities of sz_check without MODFLOW's balance error (its head tolerance is loose; with the outer limit of 20 MODFLOW
+    is unconverged on day 3).
 Checks on every run: the identities of sz_check at round-off (no shortfall), no step with the interface or MODFLOW
 unconverged (S4: the interface may be), and (S1, S2) at most ITMAX outer iterations per step on average.
 """
@@ -248,39 +256,39 @@ def s8():
     print('S8 the warning of an interface left unconverged by the connection test names that test and its link; the update after a drop is plain')
     try:
         import test_rough_terrain as T, rough_models as rm
-        S = T.load_case('band_e43')
+        S = dict(T.load_case('lowkv_g57'))
     except Exception as x:   # (the rough-terrain suite and its stored cases are not part of this test)
-        sz_check.tc.skip('S8', 'rough-terrain suite (test_rough_terrain.py, rough_cases/band_e43.json) not available: %s' % x)
+        sz_check.tc.skip('S8', 'rough-terrain suite (test_rough_terrain.py, rough_cases/lowkv_g57.json) not available: %s' % x)
         return True
-    if QUICK:
-        sz_check.tc.skip('S8', 'quick mode (67-day LAG run with three depth classes)')
-        return True
+    S.update(rain=[0.0] * 3, ds=0.5, init_depth=16.0)
     ok = True
-    for tag, extra in (('it8', ':SoilZoneIteration 8\n'), ('default', '')):
-        d = os.path.join(W, 's8_band_e43_' + tag); shutil.rmtree(d, ignore_errors=True)
-        rm.build(d, S, 'LAG', 3, days=67, extra_rvg=extra)
-        good, txt = sz_check.run(d, timeout=1800)
+    for tag, extra in (('default', ''), ('outer20', ':SolverMaxOuterIterations 20\n')):
+        d = os.path.join(W, 's8_lowkv_g57_' + tag); shutil.rmtree(d, ignore_errors=True)
+        rm.build(d, S, 'NONE', 1, days=3, extra_rvg=':SolverHeadTolerance 0.05\n' + extra)
+        good, txt = sz_check.run(d, timeout=900)
         if not good:
             print('  S8 (%s): run FAILED\n%s' % (tag, txt[-600:])); ok = False; continue
         summ = open(os.path.join(d, 'out', 'GWModelSummary.txt')).read()
         m = re.search(r'connection-test drops : (\d+) link updates on (\d+) steps .*; next update plain on (\d+),', summ)
         nd, ns, npl = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else (None, None, None)
-        if tag == 'it8':
+        if tag == 'outer20':
             e = open(os.path.join(d, 'out', 'Raven_errors.txt')).read()
-            w = [l for l in e.split('\n') if 'soil-zone interface did not converge in the step ending 2000-03-07' in l]
+            w = [l for l in e.split('\n') if 'soil-zone interface did not converge in the step ending 2000-01-04' in l]
             m = re.search(r"connection head ([-0-9.e+]+) m from MODFLOW's head at HRU (\d+) in cell \(([^)]*)\) \(saturated fraction ([-0-9.e+]+) against ([-0-9.e+]+)", w[0]) if w else None
             g = bool(m) and 'are within the tolerances' in w[0] and float(m.group(1)) > 0.5 and abs(float(m.group(4)) - float(m.group(5))) > 1e-6
-            print('  S8 (it8): warning for 2000-03-07: %s -> %s' % (w[0].split('(', 1)[1][:260] if w else 'none', 'ok' if g else 'FAIL'))
-            # (the drop is on the budget's last update: no update follows it)
+            print('  S8 (outer20): warning for 2000-01-04: %s -> %s' % (w[0].split('(', 1)[1][:260] if w else 'none', 'ok' if g else 'FAIL'))
+            # (the drop is the step's last update: MODFLOW does not converge after it, no update follows)
             g2 = nd is not None and nd > 0 and npl == 0
+            lim = {k: v for k, v in sz_check.ID_LIMITS.items() if k != 'mf6_err_rel'}
         else:
             g = True
-            # (with the default budget an update follows every drop, and it is the plain one: the link's bracket and its
-            # last residual are dropped)
+            # (an update follows every drop, and it is the plain one: the link's bracket and its last residual are
+            # dropped)
             g2 = nd is not None and nd > 0 and npl == nd
+            lim = dict(LIM); lim.pop('mf6_err_rel', None)
         print('  S8 (%s): connection-test drops %s on %s steps, next update plain on %s -> %s' % (tag, nd, ns, npl, 'ok' if g2 else 'FAIL'))
         r = sz_check.checks(d)
-        ok &= sz_check.report('S8 (%s)' % tag, r, {k: v for k, v in sz_check.ID_LIMITS.items() if k in r}) and g and g2
+        ok &= sz_check.report('S8 (%s)' % tag, r, {k: v for k, v in lim.items() if k in r}) and g and g2
     return ok
 
 if __name__ == '__main__':
