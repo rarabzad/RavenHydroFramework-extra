@@ -19,7 +19,12 @@ C6  a dried thin top cell (the water table in the cell below: SZW_RAVEN path) an
     read with K = 1: no crash, the mismatch warning, identities.
 C7  cost of K = 1, 3, 5 (timings machine-dependent).
 C8  identities below 1e-9 for KINEMATIC and LAG with K = 3 (the column machinery does not depend on the method).
-C9  band_e43 LAG K = 3 connection test: belongs to the interface iteration (GWSoilZoneModel.cpp), SKIP here.
+C9  the connection-test regression with three classes: the rough-terrain regression case R20 (band_e43,
+    an existing model whose sub-grid bases lie just above the top cell's bottom; :SoilZoneVadose LAG) run with
+    :SoilZoneVadoseClasses 3 by test_rough_terrain.py (--case rough_cases/band_e43.json:LAG --vzclasses 3, preceded by
+    its NONE run): the run passes all of the suite's checks, its saturated fraction follows the independent closure
+    within R20's limit 0.004 on converged steps (a stale connection head with depth classes gave 0.51), and it uses 3
+    classes.
 C10 a hotstart written by the same configuration whose last step dropped a class column: 2 HRUs, hummocks
     +-1.2 m, RICHARDS K = 3, a specified head at 96 m drains the water table through the class bases; a hotstart after
     n1 days (10; also 4 and 13 in the full mode) lacks a line for such a column, and the restart (12 days) builds it at
@@ -311,8 +316,22 @@ def c8():
     return ok
 
 def c9():
-    tc.skip('C9 band_e43 LAG K = 3 connection test', 'the connection test belongs to the interface iteration (GWSoilZoneModel.cpp, R20 of test_rough_terrain)')
-    return True
+    print('C9 rough-terrain regression R20 (band_e43, LAG) with three depth classes')
+    import subprocess, re
+    cmd = [sys.executable, os.path.join(HERE, 'test_rough_terrain.py'), '--case', 'rough_cases/band_e43.json:LAG', '--vzclasses', '3']
+    r = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True, env=tc.ENV, timeout=3600)
+    out = r.stdout + r.stderr
+    line = [l for l in out.split('\n') if 'R20_band_e43' in l and 'LAG' in l]
+    ferr = re.findall(r'Ferr ([0-9.]+)', line[-1]) if line else []
+    summ = re.findall(r'rough terrain: (\d+) runs, (\d+) failed', out)
+    rvg = os.path.join(tc.WORK, 'soilzone', 'rough', 'case_R20_band_e43_LAG', 'm.rvg')
+    k3 = os.path.exists(rvg) and re.search(r'^:SoilZoneVadoseClasses 3\s*$', open(rvg).read(), re.M) is not None
+    ok = (r.returncode == 0 and bool(line) and line[-1].split()[0] == 'PASS' and bool(ferr) and float(ferr[0]) <= 0.004
+          and bool(summ) and summ[-1][1] == '0' and k3)
+    print('  %s' % (line[-1].strip() if line else 'no R20 line: ' + out[-600:]))
+    print('C9 %s (saturated fraction off the closure %s, limit 0.004; runs, failed %s; :SoilZoneVadoseClasses 3 in its .rvg: %s)'
+          % ('ok' if ok else 'FAIL', ferr[0] if ferr else '?', summ[-1] if summ else '?', k3))
+    return ok
 
 def c10():
     print('C10 hotstart after a step that dropped a class column: no false mismatch warning')

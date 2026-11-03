@@ -13,9 +13,12 @@ run(d) runs Raven in folder d; checks(d) returns a dict of the identities of pla
                    - capillary rise (from the unsaturated columns and from the water table)|
                    / (sum of the magnitudes of those terms, at least 1 m3), per step
   shortfall        total soil-zone shortfall [m3]
-  vz_identity      (:SoilZoneVadose RICHARDS) max |storage change - inflow + capillary rise + outflow| of the unsaturated
-                   columns / max(1 m3, flows), from the first step when GWModelSummary.txt gives the storage at the start
-                   (vz_start; res['vz_step1']), else from the second (the recharge identity then includes the columns)
+  vz_identity      (:SoilZoneVadose RICHARDS, KINEMATIC, LAG) max |storage change - inflow + capillary rise + outflow| of
+                   the unsaturated columns, less the rounding of its five values in GWBudget.csv (half a unit in the
+                   10th significant digit of each, csv_rounding), / max(1 m3, flows), per step, from the first step when
+                   GWModelSummary.txt gives the storage at the start (vz_start; res['vz_step1']), else from the second
+                   (the recharge identity then includes the columns). (the storages were added to the scale
+                   in full, which let 2e-4 m3 per step through on a 1e4 m3 store where the CSV resolves 1e-6 m3.)
 """
 import os, sys, subprocess
 import numpy as np, pandas as pd
@@ -46,6 +49,47 @@ def vz_start(d):
     m = re.search(r'^\s*unsaturated storage\s*:\s*(\S+) m3 at the start', open(f).read(), re.M)
     return float(m.group(1)) if m else None
 
+def csv_rounding(x):
+    """half a unit in the 10th significant digit of each value (the rounding of GWBudget.csv's numbers) [same units]"""
+    a = np.abs(np.asarray(x, dtype=float))
+    with np.errstate(divide='ignore'):
+        e = np.where(a > 0, np.floor(np.log10(np.where(a > 0, a, 1.0))), -np.inf)
+    return 0.5 * np.power(10.0, e - 9)
+
+
+def vz_identity(vzs, s0, vin, vout, vcap):
+    """the unsaturated-zone identity (docstring above) of the storage after each step vzs, the storage at the start s0
+    (None: from the second step), and the step volumes in, out and capillary rise [m3] (pandas Series)"""
+    ds = vzs.diff(); sp = vzs.shift()
+    if s0 is not None: ds.iloc[0] = vzs.iloc[0] - s0; sp.iloc[0] = s0
+    vzr = ds - vin + vcap + vout
+    # scale: the step's flows (at least 1 m3); the residual less the CSV rounding of its five values (10 significant
+    # digits: a store of 12800 m3 is written to 1e-5 m3)
+    sc = (vin.abs() + vout.abs() + vcap.abs()).clip(lower=1.0).values
+    rnd = csv_rounding(vzs) + csv_rounding(sp.fillna(0.0)) + csv_rounding(vin) + csv_rounding(vout) + csv_rounding(vcap)
+    if s0 is not None: rnd[0] = rnd[0] - csv_rounding([s0])[0]      # (the start's storage comes with 15 digits)
+    k0 = 0 if s0 is not None else 1
+    v = np.clip(np.abs(vzr.values) - rnd, 0.0, None) / sc
+    return float(v[k0:].max()) if len(v) > k0 else 0.0
+
+
+def selftest_vz_identity():
+    """the unsaturated-zone identity on synthetic columns (a 9776 m3 store, 220 m3 in and out per step, written with 10
+    significant digits as GWBudget.csv does): exact books pass (CSV rounding only), a leak of 1e-4 m3 per step fails (the
+    scale with the storages added in full let it pass). Prints one line; returns True when both hold"""
+    n = 60; vin = pd.Series(np.full(n, 220.0) + 13.7 * np.sin(np.arange(n))); vout = vin.shift().fillna(200.0); vcap = pd.Series(np.zeros(n))
+    s = 9776.123456789 + np.cumsum(vin - vout - vcap)
+    r10 = lambda x: pd.Series([float('%.10g' % v) for v in x])
+    exact = vz_identity(r10(s), 9776.123456789, r10(vin), r10(vout), r10(vcap))
+    leak = vz_identity(r10(s - 1e-4 * np.arange(1, n + 1)), 9776.123456789, r10(vin), r10(vout), r10(vcap))
+    s10 = r10(s - 1e-4 * np.arange(1, n + 1)); ds = s10.diff(); sp = s10.shift(); ds.iloc[0] = s10.iloc[0] - 9776.123456789; sp.iloc[0] = 9776.123456789
+    old = float(((ds - vin + vcap + vout).abs() / (vin.abs() + vout.abs() + vcap.abs() + s10.abs() + sp.abs()).clip(lower=1.0)).max())
+    ok = exact <= 1e-8 and leak > 1e-8
+    print('vz_identity self-test: exact books %.2g, a 1e-4 m3/step leak %.2g (the old storage-scaled form %.2g) -> %s'
+          % (exact, leak, old, 'ok' if ok else 'FAIL'))
+    return ok
+
+
 def checks(d, dt=1.0):
     b, s, w = outputs(d)
     res = {}
@@ -68,12 +112,7 @@ def checks(d, dt=1.0):
         ds = vzs.diff(); sp = vzs.shift()
         if s0 is not None: ds.iloc[0] = vzs.iloc[0] - s0; sp.iloc[0] = s0
         vin, vout, vcap = b['unsaturated zone inflow [m3]'], b['unsaturated zone to aquifer [m3]'], b['capillary rise to soil zone [m3]']
-        vzr = ds - vin + vcap + vout
-        # scale: the step's flows plus the two storages (GWBudget.csv carries 10 significant digits: a store of 1e4 m3 is known
-        # to ~1e-6 m3 only, so its rounding must not fail the identity; kin/lag design notes)
-        sc = (vin.abs() + vout.abs() + vcap.abs() + vzs.abs() + sp.abs()).clip(lower=1.0)
-        k0 = 0 if s0 is not None else 1
-        res['vz_identity'] = float((vzr.abs() / sc)[k0:].max()) if len(vzr) > k0 else 0.0
+        res['vz_identity'] = vz_identity(vzs, s0, vin, vout, vcap)
     gross = rr.abs() + (b['MF6 recharge [m3/d]'] * dt).abs() + (rej.abs() if hasattr(rej, 'abs') else 0.0) + (b['recharge onto CHD cells [m3/d]'] * dt).abs() + dl.abs()
     if 'unsaturated zone inflow [m3]' in b: gross = gross + b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs()
     res['rch_identity'] = float((ident.abs() / gross.clip(lower=1.0)).max())   # (by the terms' magnitudes, at least 1 m3: dry steps have no recharge)
@@ -173,3 +212,7 @@ def errors(d):
 def summary(d):
     p = os.path.join(d, 'out', 'GWModelSummary.txt')
     return open(p).read() if os.path.exists(p) else ''
+
+
+if __name__ == '__main__':
+    sys.exit(0 if selftest_vz_identity() else 1)

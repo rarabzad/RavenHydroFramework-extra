@@ -1,8 +1,9 @@
 """Runs the whole verification suite and writes one report.
 
-    python3 run_all.py            # everything (needs the MODFLOW 6 library; about an hour on one core)
+    python3 run_all.py            # everything (needs the MODFLOW 6 library; a few hours on one core)
     python3 run_all.py --nolib    # only the checks that do not need the MODFLOW 6 library (a few minutes)
-    python3 run_all.py --quick    # everything, with smaller randomized rounds
+    python3 run_all.py --quick    # everything in quick mode: smaller randomized rounds, and every script runs with
+                                  # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds)
     python3 run_all.py --only thiem,edge    # selected steps (names as in the report)
 
 The USGS example-model steps need the MODFLOW 6 examples (mf6examples.zip from
@@ -11,6 +12,15 @@ https://github.com/MODFLOW-ORG/modflow6-examples/releases): export RAVEN_USGS_EX
 Settings come from testconfig.py (RAVEN_SRC, RAVEN_EXE, RAVEN_MF6_LIB, RAVEN_TEST_WORK). The report is written to
 <scratch>/run_all_report.md, the full output of every step to <scratch>/run_all_logs/. The exit code is the number of
 failed steps.
+
+Mode: --quick (or RAVEN_TEST_QUICK=1 in the environment) sets RAVEN_TEST_QUICK=1 for every step; otherwise every step runs
+with RAVEN_TEST_QUICK=0, its full mode, also when the variable is set to something else outside. The full mode runs the
+rough-terrain suite as the manual reports it (regression cases + 400 seeds x NONE, RICHARDS, KINEMATIC and LAG, 1,620
+runs) and again with three depth classes (--vzclasses 3).
+
+Skipped checks: a script reports a check it could not make as one line "SKIP <what>: <why>" (testconfig.skip); each step
+counts them, the report shows "PASS (k skipped)" and lists the lines, and the console summary gives the total. (Without
+RAVEN_EXE_REF the byte-identity checks against a reference build are skipped this way.)
 
 Each step is judged by what its script prints: a step passes when the script finishes without error and its own pass
 criterion holds (all cases pass, all random set-ups pass, residuals and restart deviations within the manual's limits).
@@ -30,6 +40,7 @@ for i, a in enumerate(sys.argv):
     if a == '--only' and i + 1 < len(sys.argv):
         ONLY = set(sys.argv[i + 1].split(','))
 
+tc.ENV['RAVEN_TEST_QUICK'] = '1' if QUICK else '0'     # every step in the same mode
 LOGS = os.path.join(tc.WORK, 'run_all_logs')
 os.makedirs(LOGS, exist_ok=True)
 PY = sys.executable
@@ -164,9 +175,10 @@ STEPS = [
     # :SoilZone PHYSICAL (docs/design/soil_zone_coupling_plan.md section 9)
     ('soilzone_unit', False, '%s soilzone/soilzone_unit.cpp %s/GWSoilZone.cpp -o %s/soilzone_unit && %s/soilzone_unit'
      % (cxx, ROOT, LOGS, LOGS), last_line(r'soil-zone unit tests: \d+ checks, 0 failed'), 600),
+    ('soilzone_check_selftest', False, [PY, 'soilzone/sz_check.py'], last_line(r'vz_identity self-test: .* -> ok'), 300),
     ('soilzone_spike', True, [PY, 'soilzone/spike_xmi.py'], last_line(r'spike: ALL PASSED'), 1800),
     ('soilzone_column', True, [PY, 'soilzone/test_column.py'], last_line(r'column tests: ALL PASSED'), 1800),
-    ('soilzone_hillslope', True, [PY, 'soilzone/test_hillslope.py'], last_line(r'T2/T3 hillslope: PASS'), 1800),
+    ('soilzone_hillslope', True, [PY, 'soilzone/test_hillslope.py', '--selftest'], last_line(r'T2/T3 hillslope: PASS'), 1800),
     ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
     ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
     ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
@@ -184,7 +196,10 @@ STEPS = [
     ('soilzone_vz_lag', True, [PY, 'soilzone/test_vz_lag.py'], last_line(r'LAG tests: ALL PASSED'), 1800),
     ('soilzone_vz_classes', True, [PY, 'soilzone/test_vz_classes.py'], last_line(r'vz classes tests: ALL PASSED'), 3600),
     ('soilzone_vz_initial', True, [PY, 'soilzone/test_vz_initial.py'], last_line(r'initial-state tests: ALL PASSED'), 3600),
-    ('soilzone_rough_terrain', True, [PY, 'soilzone/test_rough_terrain.py', '--quick', '--methods', 'NONE,RICHARDS,KINEMATIC,LAG'], last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
+    ('soilzone_rough_terrain', True, [PY, 'soilzone/test_rough_terrain.py'] + (['--quick'] if QUICK else []) + ['--methods', 'NONE,RICHARDS,KINEMATIC,LAG'],
+     last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
+    ('soilzone_rough_terrain_k3', True, [PY, 'soilzone/test_rough_terrain.py'] + (['--quick'] if QUICK else []) + ['--methods', 'NONE,RICHARDS,KINEMATIC,LAG', '--vzclasses', '3'],
+     last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
     ('soilzone_models_ext', True, [PY, 'soilzone/test_sz_models_ext.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
@@ -215,9 +230,12 @@ for name, needs_lib, cmd, judge, timeout in STEPS:
     ok, summary = judge(out)
     if rc != 0:
         ok, summary = False, 'exit code %d; %s' % (rc, summary)
-    status = 'PASS' if ok else 'FAIL'
+    skips = [l.strip() for l in out.split('\n') if l.strip().startswith('SKIP ')]     # testconfig.skip lines
+    status = ('PASS' if ok else 'FAIL') + (' (%d skipped)' % len(skips) if skips else '')
     print('%s  %s  (%.0f s)' % (status, summary, dt), flush=True)
     tail = '\n'.join([l for l in out.strip().split('\n') if 'Warning' not in l and 'warn(' not in l][-25:])
+    if skips:
+        tail = 'skipped checks:\n' + '\n'.join('  ' + s for s in skips) + '\n---\n' + tail
     rows.append((name, status, dt, summary, tail))
 
 # with --only, the report keeps the earlier results of the steps not run this time (each row shows when it ran)
@@ -244,5 +262,9 @@ with open(rep, 'w') as f:
     for name, status, dt, summary, tail, when in rows:
         if tail:
             f.write('\n## %s (%s)\n\n```\n%s\n```\n' % (name, status, tail))
+nskip = sum(int(re.findall(r'\((\d+) skipped\)', r[1])[0]) for r in rows if 'skipped)' in r[1])
+print('steps: %d passed, %d failed, %d not run; %d checks skipped inside passing or failing steps'
+      % (sum(1 for r in rows if r[1].startswith('PASS')), sum(1 for r in rows if r[1].startswith('FAIL')),
+         sum(1 for r in rows if r[1] == 'skipped'), nskip))
 print('report:', rep)
-sys.exit(sum(1 for r in rows if r[1] == 'FAIL'))
+sys.exit(sum(1 for r in rows if r[1].startswith('FAIL')))

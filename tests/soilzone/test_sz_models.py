@@ -1,8 +1,9 @@
 """Model tests of the soil-zone coupling (docs/design/soil_zone_columns_plan.md section 8).
 
 P1  delay through a deep unsaturated zone: a 3-day storm over a water table 6 m deep. With :SoilZoneVadose RICHARDS
-     the recharge reaching MODFLOW is later and spread out (centroid at least 3 days later, peak lower), and nothing
-     is lost: inflow = recharge to the aquifer + storage change of the columns.
+     the recharge reaching MODFLOW is later and spread out (centroid on day 6.06 +- 0.5 without the column and 15.62 +- 1
+     with it, the column's peak 0.45-0.65 of the other: the manual's 6.1 -> 15.6 days and 45 % lower), and nothing is
+     lost: inflow = recharge to the aquifer + storage change of the columns (1e-8).
 P2  capillary rise from a shallow water table (no unsaturated column) into a soil drying under PET: with
      :SoilZoneCapillaryRise ON evaporation continues from the water table; the rise falls with the water-table depth
      (0.7, 1.3, 2.5 m); without it the soil dries out and evaporation stops.
@@ -25,7 +26,8 @@ P10  upward flows out of a lower cell: a specified head in layer 2 under a dried
 P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
      HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
      than with the HRU mean (1 class).
-All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities (sz_check).
+All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities and the negative
+recharge not held at the standard limits (sz_check.ID_LIMITS), and no unconverged MODFLOW or interface step.
 """
 import os, sys, shutil, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -33,7 +35,10 @@ import numpy as np, pandas as pd
 import sz_models, sz_check
 
 W = sz_check.tc.work('soilzone', 'water_table')
-LIM = {'mf6_err_rel': 1e-5, 'raven_mb_mm': 1e-5, 'rch_identity': 1e-6, 'sz_identity': 1e-8, 'shortfall': 1e-6, 'vz_identity': 1e-5}
+# the standard limits of every soil-zone test (sz_check.ID_LIMITS: recharge identity 5e-9, soil-zone and unsaturated-zone
+# identities 1e-8, the negative recharge not held) plus the convergence counts (no unconverged MODFLOW or interface step);
+# a case that needs another limit says so where it runs (these were 1e-6 and 1e-5, 200 and 1000 times looser)
+LIM = dict(sz_check.ID_LIMITS, iface_not_conv=0, mf6_not_conv=0)
 VZ = ':SoilZoneVadose RICHARDS\n'
 
 def run(name, start=None, rvc=None, **cfg):
@@ -77,9 +82,10 @@ def P1():
     inflow, out = b['unsaturated zone inflow [m3]'].iloc[1:].sum(), b['unsaturated zone to aquifer [m3]'].iloc[1:].sum()
     st = b['unsaturated zone storage [m3]']      # (after each step: the balance from the end of the first step on)
     close = abs(inflow - out - b['capillary rise to soil zone [m3]'].iloc[1:].sum() - (st.iloc[-1] - st.iloc[0])) / max(inflow, 1.0)
-    ok = (c1 - c0 >= 3.0) and (m1.max() < 0.95 * m0.max()) and close < 1e-6
-    print('  recharge centroid day %.2f without the column, %.2f with it; peak %.0f vs %.0f m3/d; column balance %.2g -> %s'
-          % (c0, c1, m0.max(), m1.max(), close, 'ok' if ok else 'FAIL'))
+    # the manual's numbers (ch4, ch8: centroid 6.1 -> 15.6 d, peak 45 % lower) within a day and 10 %
+    ok = abs(c0 - 6.06) <= 0.5 and abs(c1 - 15.62) <= 1.0 and (0.45 <= m1.max() / m0.max() <= 0.65) and close < 1e-8
+    print('  recharge centroid day %.2f without the column (6.06 +- 0.5), %.2f with it (15.62 +- 1); peak %.0f vs %.0f m3/d (ratio %.2f, 0.45-0.65); column balance %.2g -> %s'
+          % (c0, c1, m1.max(), m0.max(), m1.max() / m0.max(), close, 'ok' if ok else 'FAIL'))
     return ok
 
 def P2():
@@ -116,7 +122,7 @@ def P3():
     rose = (wt - zb).max() > 0.0                               # the water table reached the soil zone
     fell = (zb - wt)[-1] > 0.3                                 # and fell well below it again
     collapsed = np.any(np.abs(st) < 1e-9) if rose else False  # the column vanished while it was up
-    reformed = bool(abs(st[-1]) > 0.0) or (b['unsaturated zone inflow [m3]'].iloc[-30:].abs().sum() > 0) or fell
+    reformed = bool(abs(st[-1]) > 0.0) or (b['unsaturated zone inflow [m3]'].iloc[-30:].abs().sum() > 0)   # ('or fell' made it vacuous)
     ok = rose and fell and collapsed and reformed
     print('  water table to %.2f m above the soil-zone base and back to %.2f m below; column storage min %.3g, end %.3g m3 -> %s'
           % ((wt - zb).max(), (zb - wt)[-1], np.abs(st).min(), st[-1], 'ok' if ok else 'FAIL'))

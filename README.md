@@ -68,10 +68,20 @@ fixes. Windows, Linux and macOS step by step: `examples/README.md`.
 ```
 cd tests
 python3 run_all.py --nolib     # checks that need no MODFLOW library (a few minutes)
-python3 run_all.py             # everything (about an hour)
+python3 run_all.py --quick     # everything in quick mode (RAVEN_TEST_QUICK=1 for every script; under an hour)
+python3 run_all.py             # everything in full mode (a few hours on one core)
 ```
 
-The tests find Raven in `../RavenHydroFramework`; otherwise set `RAVEN_SRC` (see `tests/README.md`).
+The tests find Raven in `../RavenHydroFramework`; otherwise set `RAVEN_SRC` (see `tests/README.md`). The C++ unit tests
+compile Raven's sources from `RAVEN_SRC`, so it must point at the Raven source even when `RAVEN_EXE` names a built Raven.
+
+From the release package (the two source archives unpacked side by side in one folder `<dir>`, which gives
+`<dir>/raven-soil-zone` and `<dir>/raven-mf6-extra`; `<pkg>` the unpacked package):
+
+```
+cd <dir>/raven-mf6-extra/tests
+RAVEN_SRC=<dir>/raven-soil-zone RAVEN_EXE=<pkg>/bin/Raven RAVEN_MF6_LIB=<pkg>/bin/libmf6.so python3 run_all.py --quick
+```
 
 ## License
 

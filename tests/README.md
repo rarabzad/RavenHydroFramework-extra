@@ -14,17 +14,26 @@ side, build Raven, and get the MODFLOW 6 library:
     pip install numpy pandas shapely pyproj flopy
 
 Optional settings (see `testconfig.py`): `RAVEN_SRC` (the Raven checkout, if not beside this one), `RAVEN_EXE`,
-`RAVEN_MF6_LIB`, `RAVEN_TEST_WORK` (scratch folder; default `tests/_work`).
+`RAVEN_MF6_LIB`, `RAVEN_TEST_WORK` (scratch folder; default `tests/_work`), `RAVEN_EXE_REF` (a reference build for the
+byte-identity checks; without it they are reported as skipped). `RAVEN_SRC` is needed whenever Raven's source is not in
+`../RavenHydroFramework`: the C++ unit tests (gridtest, geomtest, crs, soilzone_unit, the vadose units) and the CMake checks
+compile or configure it, also when `RAVEN_EXE` names a built Raven. With the release package, whose source archives
+unpack as `raven-soil-zone/` and `raven-mf6-extra/` in one folder `<dir>`:
+
+    cd <dir>/raven-mf6-extra/tests
+    RAVEN_SRC=<dir>/raven-soil-zone RAVEN_EXE=<pkg>/bin/Raven RAVEN_MF6_LIB=<pkg>/bin/libmf6.so python3 run_all.py --quick
 
 ## Everything at once
 
-    python3 run_all.py            # every test below and one report (needs the MODFLOW 6 library; about an hour on one core)
-    python3 run_all.py --quick    # the same with smaller randomized rounds
+    python3 run_all.py            # every test below and one report, full mode (needs the MODFLOW 6 library; a few hours on one core)
+    python3 run_all.py --quick    # quick mode: smaller randomized rounds, RAVEN_TEST_QUICK=1 for every script
     python3 run_all.py --nolib    # only the checks that need no MODFLOW library (a few minutes)
     python3 run_all.py --only thiem,liard_grids
 
 The report goes to `<scratch>/run_all_report.md`, the full output of every step to `<scratch>/run_all_logs/`; the exit
-code is the number of failed steps. With `--only`, the report keeps the earlier results of the other steps (each row shows
+code is the number of failed steps. A check a script could not make prints "SKIP <what>: <why>"; the step's result then
+reads "PASS (k skipped)" (or FAIL) and the report lists those lines. The full mode runs the rough-terrain suite with 400
+seeds and all four unsaturated-zone methods, and again with three depth classes (`soilzone_rough_terrain_k3`). With `--only`, the report keeps the earlier results of the other steps (each row shows
 when it ran). The report lists which steps give the numbers quoted in the manual.
 
 Every coupled test starts from the shipped Liard examples (`examples/Liard_groundwater`, `examples/Liard_existing_model`),
