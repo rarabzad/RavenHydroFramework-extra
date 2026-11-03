@@ -54,8 +54,11 @@ layer (\cmd{SZW\_RAVEN}), a restart with $K=3$ (20 + 20 days against 40: largest
 written with $K=1$ read with $K=3$ and vice versa (warning, no stop); C8: \cmd{KINEMATIC} and \cmd{LAG} with $K=3$. In all
 of them MODFLOW's balance closes and the recharge, soil-zone and column identities stay below $10^{-8}$ (C4 and C8 below
 $10^{-9}$). C7: the cost grows less than in proportion to $K$ (small test cases: 0.32, 0.49 and 0.48~s for $K=1,3,5$;
-timings depend on the machine and its load). C9 (a rough-terrain case with \cmd{LAG} and three classes) checks the
-interface's connection head (Section~\ref{ch:soilzone}) and is part of the interface tests.
+timings depend on the machine and its load). C9 runs the rough-terrain regression case R20 (\cmd{band\_e43}, an existing
+model whose sub-grid bases lie just above the top cell's bottom, \cmd{LAG}) with three classes through
+\cmd{test\_rough\_terrain.py}: it checks the interface's connection head (Section~\ref{ch:soilzone}); the saturated
+fraction follows the independent closure on converged steps within R20's limit 0.004 (0.0001; a connection head left above
+MODFLOW's head gave 0.51).
 
 \begin{figure}[!htbp]\centering
 \includegraphics[width=\linewidth]{figures/fig_vz_classes.png}

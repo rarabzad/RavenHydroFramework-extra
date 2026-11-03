@@ -127,7 +127,7 @@ drained columns leave MODFLOW's solve singular & a drained column is held 1~mm a
 an existing model without \cmd{NEWTON} whose top cells dry & a stop: \cmd{NEWTON} is required & R17\\
 divergence of \cmd{LAG} on a slowly permeable slope (g350) & & R19\\
 sub-grid bases in the 1~mm band below the lowest drain level & bases clipped at the top cell's bottom + 1~mm & R3, R20\\
-saturated fraction off the closure with three depth classes (connection head left above MODFLOW's head) & the connection test & R20, C9\\
+saturated fraction off the closure with three depth classes (connection head left above MODFLOW's head) & the connection test & R20 with \cmd{--vzclasses 3} (C9 of the depth-class tests, and the three-class rerun of \cmd{run\_all.py})\\
 slowly permeable or low-yield top cells, dried top cells, DISV models & head-dependent rejection, upward flow from a lower cell & R2, R4, R5, R7--R10, R18\\
 \bottomrule
 \end{tabular}

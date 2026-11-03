@@ -135,12 +135,12 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SoilZoneSubgrid n} & DEM points per cell side for the saturated area, $1\le n\le20$ (5)\\
 \cmd{.rvg} & \cmd{:SoilZoneOutput group} & \cmd{GWSoilExchange.csv} only for this HRU group (all soil-zone HRUs)\\
 \cmd{.rvg} & \cmd{:SoilZoneVadose NONE | RICHARDS \{$\epsilon$\} \{N\}} & unsaturated columns below the soil zone (Section~\ref{sec:szvadose}); largest content change in a substep $0<\epsilon\le0.2$, nodes $3\le N\le200$ (NONE; 0.02, 16)\\
-\cmd{.rvg} & \cmd{:SoilZoneVadoseClasses K} & unsaturated columns per exchange column, one per depth class of its DEM samples (Section~\ref{sec:vzclasses}); $1\le K\le10$ (1)\\
-\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux q} & steady start of the unsaturated columns for the recharge $q\ge0$ [mm/d] on a cold start: each column at its steady profile for the flux it receives, $(1-F)\,q$ ($F$ of its class at the initial head); a column that cannot carry it at its backed-up steady state (warning); ignored with a warning on a groundwater hotstart (0: at rest)\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseClasses K} & unsaturated columns per exchange column, one per depth class of its DEM samples (Section~\ref{sec:vzclasses}); $1\le K\le10$ (1); with \cmd{:SoilZoneVadose NONE} reported as ignored\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux q} & steady start of the unsaturated columns for the recharge $q\ge0$ [mm/d] on a cold start: each column at its steady profile for the flux it receives, $(1-F)\,q$ ($F$ of its class at the initial head); a column that cannot carry it at its backed-up steady state (warning); ignored with a warning on a groundwater hotstart and with \cmd{:SoilZoneVadose NONE} (0: at rest)\\
 \cmd{.rvg} & \cmd{:SoilZoneCapillaryRise ON | OFF} & capillary rise into the soil zone (Section~\ref{sec:szcaprise}) (ON with \cmd{RICHARDS}, else OFF)\\
 \cmd{.rvg} & \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & order of Raven's processes and the exchange (Section~\ref{sec:sztiming}) (\cmd{LAGGED})\\
 \cmd{.rvg} & \cmd{:SoilZoneClasses K} & Raven's processes per class of columns, $1\le K\le50$ (Section~\ref{sec:szclasses}) (1)\\
-\cmd{.rvg} & \cmd{:SoilZoneAquiferClass class} & existing models: \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} of the cells for the unsaturated columns (4, 0.3 m, $S_y+0.1$)\\
+\cmd{.rvg} & \cmd{:SoilZoneAquiferClass class} & existing models: \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} of the cells for the unsaturated columns (4, 0.3 m, $S_y+0.1$); reported as ignored on a model Raven builds\\
 \cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange (off)\\
 \cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT}\\
 \cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV}\\
@@ -292,6 +292,10 @@ top layer cannot be an AQUICLUDE; layer thickness must be positive & correct the
 improper format of command \dots & correct the command syntax\\
 boundary \dots\ needs a HEAD value / positive CONDUCTANCE & complete the boundary command\\
 two wells / observation wells / boundaries have the same ID or name & make IDs unique\\
+\cmd{:WellFlowRate} \emph{id} / \cmd{:BoundaryHead} \emph{name} in the .rvt file names no well / boundary & correct the ID or name (the message lists the wells or boundaries of the .rvg file)\\
+\cmd{:MF6Model}, \cmd{:MF6StartDate}, \cmd{:KeepPackages}, \cmd{:SeepageToRaven} apply only to an existing model & remove them from a model Raven builds\\
+unknown aquifer profile parameter \dots & correct the \cmd{:Attributes} name (Section~\ref{app:commands})\\
+boundary \dots: LAYERS must be ALL or TOP & correct the keyword\\
 HRU \dots\ is in two \cmd{:SurfaceWater\allowbreak Exchange} groups for the same store & one exchange per store and HRU\\
 well \dots\ is outside the active groundwater model & move the well or enlarge the coupled area\\
 \cmd{:GWHeads} does not match the groundwater grid & hotstart file from a different grid\\

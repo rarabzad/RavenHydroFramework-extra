@@ -333,7 +333,9 @@ per cell (MODFLOW's flat head). Under rain the saturated area spreads up from th
 hollows; over the hump (HRUs 3--4) and near the top (HRU 2) the cells are only partly saturated for months
 ($0<F<1$). Water moves down the slope in the aquifer: it rises into the soil of the lower cells, which fill and
 overflow to surface water (saturation-excess runoff and exfiltration). After the rain the saturated area retreats
-downslope, the hollows last. The run closes every balance of Section~\ref{ch:verification} to $10^{-9}$ or better.
+downslope, the hollows last. (In the closed aquifer of test T3 the overflow stops upslope when the rain does, but the water
+still draining from upslope seeps out at the toe for the rest of the run, about 174~m$^3$/d on day 300, as in the
+MODFLOW-only reference; T3 checks that the HRUs that drain lose their saturation and that the toe follows a recession.) The run closes every balance of Section~\ref{ch:verification} to $10^{-9}$ or better.
 
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_hillslope.png}
 \caption{Coupled hillslope with irregular land (rain 10~mm/d for 150 days, then dry). Top: land surface, soil-zone base and

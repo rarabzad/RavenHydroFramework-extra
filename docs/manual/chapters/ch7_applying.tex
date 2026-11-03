@@ -17,8 +17,9 @@ about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as be
 \begin{enumerate}
 \item Build Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch
 of \url{https://github.com/rarabzad/RavenHydroFramework}) with CMake: \cmd{cmake -S . -B build}, \cmd{cmake --build build
---config Release}. With a Fortran compiler, meson~$\geq$~1.7, ninja and git this also builds the MODFLOW~6 library from
-source; without them it downloads the official release library (Linux x86\_64, Windows x64, Apple Silicon Macs); either
+--config Release} (an optimised \cmd{Release} build by default). With a Fortran compiler, meson~$\geq$~1.7, ninja and git,
+and the MODFLOW~6 repository reachable, this also builds the MODFLOW~6 library from source; otherwise (also offline) it
+downloads the official release library (Linux x86\_64, Windows x64, Apple Silicon Macs); either
 way the library ends up next to Raven, which finds it without any setting (Section~\ref{sec:building}).
 \item If Raven was built without the library (\cmd{make} in \cmd{src/}, \cmd{src/Raven.sln}, \cmd{-DRAVEN\_MF6=OFF}, or
 the configure warned that it found no way to get it), get it (6.5 or newer; tested with 6.8.1 and 6.6.3; 6.8 or newer

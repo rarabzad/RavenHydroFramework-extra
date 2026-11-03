@@ -108,7 +108,9 @@ lives in a separate repository.
 Clone the two side by side in one folder; the tests and \cmd{get\_mf6.py} then find Raven without any setting.
 
 \section{Building}\label{sec:building}
-Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}), with \cmd{make} in
+Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}; with a
+single-configuration generator such as Unix Makefiles or Ninja, which ignores \cmd{--config}, the build type defaults to
+\cmd{Release}, \cmd{-DCMAKE\_BUILD\_TYPE=...} overrides it), with \cmd{make} in
 \cmd{src/} (links \cmd{-ldl}; for NetCDF head output add \cmd{-Dnetcdf} to \cmd{CXXFLAGS} and \cmd{-lnetcdf} to
 \cmd{LDLIBS}, as the Makefile's commented lines show), or on Windows with \cmd{src/Raven.sln}. Raven loads the MODFLOW~6
 library at run time; with CMake the build can also provide that library and put it next to the executable, chosen by
@@ -136,11 +138,28 @@ then needs a library at run time (Section~\ref{sec:getmf6}).\\\bottomrule
 \paragraph{The default.} Without \cmd{RAVEN\_MF6} the choice is made again at every configure (the cache keeps only a value
 you give): an offline option names its mode (\cmd{RAVEN\_MF6\_PATH} $\to$ \cmd{PATH}, \cmd{RAVEN\_MF6\_ZIP} $\to$
 \cmd{PREBUILT}, \cmd{RAVEN\_MF6\_SOURCE\_DIR} or \cmd{RAVEN\_MF6\_SOURCE\_URL} $\to$ \cmd{SOURCE}); otherwise \cmd{SOURCE}
-when a Fortran compiler, meson~$\geq$~1.7, ninja and git are all found; otherwise \cmd{PREBUILT} when MODFLOW releases a
-library for the platform; otherwise \cmd{OFF} with a warning that names what is missing (\cmd{-DRAVEN\_MF6=OFF} silences
-it). A default that cannot be completed (the download fails) also falls back to \cmd{OFF} with a warning, so a plain
-\cmd{cmake -S . -B build} never stops because of MODFLOW; a mode you give (or one named by an offline option) that cannot
-be completed stops with a message naming the alternatives. An option that belongs to another mode is reported as
+when a Fortran compiler, meson~$\geq$~1.7, ninja and git are all found \emph{and} the MODFLOW~6 git repository answers
+at configure time (\cmd{git ls-remote} of the release tag, at most 60~s; not needed when the clone of an earlier configure is
+already at the pinned commit); otherwise \cmd{PREBUILT} when MODFLOW releases a library for the platform; otherwise
+\cmd{OFF} with a warning that names what is missing (\cmd{-DRAVEN\_MF6=OFF} silences it). Every download the default needs
+is thus made or tested at configure time: a default that cannot be completed (offline: the repository does not answer, or
+the release zip cannot be downloaded) falls back with a warning (\cmd{SOURCE} $\to$ \cmd{PREBUILT} $\to$ \cmd{OFF}), so
+neither a plain \cmd{cmake -S . -B build} nor the build after it stops because of MODFLOW; a mode you give (or one named
+by an offline option) that cannot be completed stops with a message naming the alternatives (an explicit \cmd{SOURCE}
+clones during the build and stops there if the clone fails).
+\paragraph{The MODFLOW version.} A library older than 6.5.0 (\cmd{MF6\_MIN\_VERSION} in \cmd{src/MF6Engine.h}, the floor
+of Raven's run-time guard) stops the configure when its version is known: \cmd{RAVEN\_MF6\_VERSION} for a clone or
+download, the \cmd{meson.build} of a zip or source folder, the name of a source archive; another version than the tested
+6.8.1 gives a warning. A \cmd{PATH} library's version is known only when Raven loads it (the run-time guard).
+\paragraph{Installing.} \cmd{cmake --install} (and \cmd{cpack}) put Raven, \cmd{libmf6} and the Fortran runtime the library
+needs into one \cmd{bin} folder (\cmd{cmake/RavenMF6Bundle.cmake}): on Linux the runtime libraries \cmd{ldd} lists; on macOS
+every \cmd{libgfortran}, \cmd{libquadmath} and \cmd{libgcc\_s} the library needs directly or through another of them, with
+\cmd{@rpath} references resolved through the \cmd{LC\_RPATH} entries, every reference rewritten to \cmd{@loader\_path} and the
+edited files signed again (\cmd{codesign -f -s -}); on Windows the runtime DLLs the library imports and those they import
+(\cmd{objdump}, else \cmd{dumpbin}). A \cmd{libmf6.dll} given with a folder (\cmd{:MF6Library}, \cmd{RAVEN\_MF6\_LIB}) is
+loaded with its own folder searched first for the DLLs it needs. \cmd{cmake/RavenMF6InstallCheck.py <bin>} runs the
+installed Raven on a tiny coupled model and checks that it used the library beside it and that every Fortran runtime
+library it loaded lies in that folder (the CI job runs it after moving the install). An option that belongs to another mode is reported as
 ignored.
 
 \paragraph{Platforms without a release library.} MODFLOW~6.8.1 releases no library for Linux other than x86\_64 (e.g.\
