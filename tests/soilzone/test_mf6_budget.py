@@ -15,8 +15,18 @@ B5  an existing model without NEWTON whose specified head (layer 2) lies under a
     there is booked, the warning names "column(s) whose highest active cell is a specified head", and so does the run total.
 B6  :SoilZoneClasses 3 (Raven's wetness classes) on the sibling-column case of test_robustness R20: no round-off is booked as
     negative recharge not held.
-B7  tools_audit.py counts both guard warnings: "(MODFLOW unconverged): discharge returned to Raven limited" (CONCEPTUAL, B2)
-    and "of discharge to Raven withheld" (:SoilZone PHYSICAL, robustness R13_b1-like case).
+B7  tools_audit.py counts both guard warnings: "(MODFLOW unconverged): ... of discharge to Raven withheld for MODFLOW's
+    negative residual" (CONCEPTUAL, B2) and "of discharge to Raven
+    withheld" (:SoilZone PHYSICAL, robustness R13_b1-like case).
+B8  without :SoilZone PHYSICAL, steps MODFLOW does not converge: only MODFLOW's negative
+    residual is withheld from the discharge to Raven, nothing else is lost. The CB checker's case (4 HRUs of 400 m, slope
+    0.02, 30 mm/d for 5 days then dry, PERC_CONSTANT 20 mm/d, water table 0.2 m deep, CONCEPTUAL,
+    :SolverMaxOuterIterations 2: the first 10 steps unconverged; and 1: every step, for the limit of ten warnings): every
+    GWBudget row's residual, recharge + storage release
+    - seepage to Raven - MF6 balance error, equals max(-balance error, 0) on unconverged steps and 0 on the others; its
+    sum over the run equals the run total "discharge withheld" in GWModelSummary.txt; at most ten guard warnings, the
+    tenth saying further ones are suppressed. (The earlier cap at the step's inflow left out the storage release: row
+    residual 15284 m3/d against a balance error of -1039 m3/d on step 1, 21653 m3 lost unbooked over 10 steps.)
 """
 import os, sys, re, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -90,7 +100,7 @@ def b2():
           % (len(rows), dev, rows[0][1] if rows else 0, rows[0][2] if rows else 0, 'ok' if g else 'FAIL'))
     g3 = True   # (B3: this run holds no far head; the check runs on W7c, test_confined_wet, where the warnings are)
     a = sz_check.tc.audit.audit(e); err = sz_check.errors(e)
-    n = err.count('(MODFLOW unconverged): discharge returned to Raven limited')
+    n = err.count('(MODFLOW unconverged): discharge returned to Raven limited') + len(re.findall(r'\(MODFLOW unconverged\): \S+ m3 of discharge to Raven withheld', err))
     g7 = n > 0 and a.get('unconverged-guard warnings') == n
     print('  B7 (CONCEPTUAL): %d guard warnings, tools_audit counts %s -> %s' % (n, a.get('unconverged-guard warnings'), 'ok' if g7 else 'FAIL'))
     return g and g3 and g7
@@ -149,8 +159,42 @@ def b7():
     print('  B7 (PHYSICAL): %d guard warnings, tools_audit counts %s -> %s' % (n, a.get('unconverged-guard warnings'), 'ok' if g else 'FAIL'))
     return g
 
+def b8():
+    print('B8 without :SoilZone PHYSICAL, unconverged steps: only MODFLOW\'s negative residual withheld, booked')
+    days = 15 if QUICK else 30
+    ok = True
+    for lim in (2, 1):
+        d = os.path.join(W, 'b8_conc_mx%d' % lim); shutil.rmtree(d, ignore_errors=True)
+        sz_models.make_case(d, nhru=4, hru_w=400.0, width=400.0, cell=100.0, slope=0.02, rain=[30.0] * 5 + [0.0] * (days - 5), perc=20.0,
+                            days=days, init_depth=0.2, physical=False, Kh=5.0, Kv=0.5, extra_rvg=':SolverMaxOuterIterations %d\n' % lim)
+        good, txt = sz_check.run(d)
+        if not good:
+            print('  B8 limit %d: run FAILED\n%s' % (lim, txt[-1500:])); ok = False; continue
+        b = sz_check.outputs(d)[0]; err = sz_check.errors(d); sm = sz_check.summary(d)
+        others = [c for c in b.columns if c.endswith('[m3/d]') and any(k in c for k in ('river', 'well', 'GHB', 'CHD', 'ET', 'evapo', 'surface-store', 'reservoir'))]
+        other = float(b[others].abs().to_numpy().sum()) if others else 0.0
+        e = b['MF6 balance error [m3/d]']; unc = b['converged'] == 0
+        r = b['MF6 recharge [m3/d]'] + b['storage release [m3/d]'] - b['seepage to Raven [m3/d]'] - e      # [m3/d] the row's residual
+        want = (-e).clip(lower=0.0).where(unc, 0.0)
+        scale = 1e-8 * (b['MF6 recharge [m3/d]'].abs() + b['storage release [m3/d]'].abs() + b['seepage to Raven [m3/d]'].abs()) + 1e-4
+        dev = float(((r - want).abs() - scale).max())
+        tot = re.search(r'discharge withheld\s*:\s*(\S+) m3 on (\d+) unconverged steps', sm)
+        rows = float((r.where(unc, 0.0) * 1.0).sum())                                                # (daily steps)
+        g_tot = (tot is not None) and abs(float(tot.group(1)) - rows) <= 1e-6 * max(rows, 1.0) + 1e-3
+        nw = len(re.findall(r'\(MODFLOW unconverged\): \S+ m3 of discharge to Raven withheld', err)) + err.count('discharge returned to Raven limited')
+        nwant = int(((e < -1e-6) & unc).sum())
+        g_w = (nw == min(nwant, 10)) and ((nwant <= 10) or ('further such warnings suppressed' in err))
+        g = int(unc.sum()) >= 5 and other == 0.0 and dev <= 0.0 and g_tot and g_w
+        print('  B8 limit %d: %d unconverged steps; step 1: recharge %.1f, storage %.1f, seepage to Raven %.1f, balance error %.1f m3/d, row residual '
+              '%.1f m3/d (withheld; want %.1f); largest deviation beyond round-off %.3g m3/d; run total %s m3 (rows %.1f m3); %d guard warnings '
+              '(want %d of %d) -> %s'
+              % (lim, int(unc.sum()), b['MF6 recharge [m3/d]'].iloc[0], b['storage release [m3/d]'].iloc[0], b['seepage to Raven [m3/d]'].iloc[0], e.iloc[0],
+                 r.iloc[0], want.iloc[0], max(dev, 0.0), tot.group(1) if tot else 'MISSING', rows, nw, min(nwant, 10), nwant, 'ok' if g else 'FAIL'))
+        ok &= g
+    return ok
+
 if __name__ == '__main__':
-    names = [a.lower() for a in sys.argv[1:]] or ['b1', 'b2', 'b4', 'b5', 'b6', 'b7']
+    names = [a.lower() for a in sys.argv[1:]] or ['b1', 'b2', 'b4', 'b5', 'b6', 'b7', 'b8']
     ok = all([globals()[n]() for n in names])
     print('MODFLOW budget tests: %s' % ('ALL PASSED' if ok else 'FAILED'))
     sys.exit(0 if ok else 1)

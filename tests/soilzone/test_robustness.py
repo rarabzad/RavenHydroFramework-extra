@@ -36,6 +36,13 @@ R14 (N1) negative recharge: :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER with 
 R15 (N2) negative recharge limited by what the top cell can give: a 2 m aquifer 2.5 m deep, 40 dry days, slope 0.03, no
    specified head: the cut goes back to the soil zone (run total "negative recharge cut"); the run completes (before: head
    -10 586 m, "diverged").
+R15b a negative-recharge cut on a draining soil zone: GR4J_X2 60 mm/d imports 23.7 mm/d out of GROUNDWATER
+   over a dry top cell held by a specified head, so 8.67 mm of it is cut and taken back out of the soil zone, while the
+   wet soil (60 and 115 mm of 120 mm, field capacity 60 mm each) drains to the aquifer with HYDRAUL_COND 2000 mm/d. Each
+   HRU's soil zone is two identical cells (symmetric in y), and nothing else takes water out of it: after step 1 its water
+   is at least its field-capacity water (120 mm), as the local solve and MODFLOW's line may drain only free water; and the
+   identities. (The local solve put the cut back with Fill, a no-op for a negative volume: it saw a wetter column by the
+   cut, and the soil zone ended at 117.5 mm, drained below field capacity.)
 R16 (N3) the hand-back of a column's outputs with one depth class follows the link's own fraction:
    a RICHARDS run with negative recharge and rain; identities at round-off.
 R17 (N4) not held: the N2 import with the soil drained in the same step by :Baseflow BASE_LINEAR from SOIL[1] and SOIL[0]
@@ -300,6 +307,21 @@ def main():
         print('  R15: completes; negative recharge cut %.0f m3' % cut)
     else: print('  R15: run FAILED\n' + txt[-600:])
     res.append(('R15 negative recharge limited by the top cell', g))
+
+    d = case('R15b_cut_draining', nhru=4, hru_w=100.0, width=200.0, cell=100.0, top=0.2, H0=0.3, H1=0.3, init_depth=0.95, sfc=0.5, ksat=2000.0,
+             rain=0.0, perc=0.0, days=3, phi0=(60.0, 115.0), chd=99.0, Kh=1000.0, **GR)
+    ok, txt = sz_check.run(d); g = False
+    if ok:
+        good, r = ident(d)
+        s = pd.read_csv(os.path.join(d, 'out', 'GWSoilExchange.csv')); s1 = s[s['time [d]'] == s['time [d]'].min()]
+        cut = s1[s1['rejected recharge [mm]'] < 0]                     # (HRUs with a cut; the one over the specified head has none)
+        wfc = 2 * 0.5 * 0.3 * 0.4 * 1000.0                             # [mm] field-capacity water of the two layers
+        low = float(cut['soil-zone water [mm]'].min()) if len(cut) else float('nan')
+        g = good and len(cut) >= 2 and low >= wfc - 1e-6 and float(cut['soil zone to aquifer [m3/d]'].min()) > 0
+        print('  R15b: %d HRUs with a cut of %.2f mm; their soil-zone water after step 1 at least %.2f mm (field capacity %.0f mm) -> %s'
+              % (len(cut), -float(cut['rejected recharge [mm]'].min()) if len(cut) else 0.0, low, wfc, 'ok' if g else 'FAIL'))
+    else: print('  R15b: run FAILED\n' + txt[-600:])
+    res.append(('R15b negative-recharge cut on a draining soil zone: no drainage below field capacity', g))
 
     d = case('R16_handback_richards', extra_rvg=vz('RICHARDS'), **dict(N1, rain=15.0, init_depth=1.25)); ok, txt = sz_check.run(d); g = False
     if ok: g, r = ident(d); print('  R16: hand-back with one depth class, identities %s' % ('ok' if g else 'FAIL'))
