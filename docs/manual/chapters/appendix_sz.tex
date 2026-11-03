@@ -9,7 +9,8 @@ zone did not hold [m$^3$]''; for an existing model without \cmd{NEWTON}, last: `
 soil-zone links the interface-unconverged steps, the columns' substeps (and Newton iterations except with \cmd{LAG}), the outer
 iterations and steps in which drained columns were kept 1~mm above their bottoms; with an interface iteration the
 supply-limited link updates and the largest take beyond the free water, and the connection-test drops (link updates, steps,
-and those followed by a plain update); the negative recharge cut and the part not held (only when not zero); for an existing
+and those followed by a plain update); without \cmd{:SoilZone PHYSICAL} the discharge withheld on unconverged steps for
+MODFLOW's negative residual (only when such steps occurred); the negative recharge cut and the part not held (only when not zero); for an existing
 model without \cmd{NEWTON} the recharge not applied (always written, also 0).
 
 \paragraph{Messages.} Per-step warnings name the step by its end (``in the step ending \emph{date}'', with the time for

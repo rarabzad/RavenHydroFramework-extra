@@ -86,7 +86,7 @@ File & Change\\\midrule
 \cmd{ParsePropertyFile.cpp} & \cmd{:AquiferClasses}, \cmd{:AquiferProfiles}, \cmd{:AquiferProfile\allowbreak Parameters} (1)\\
 \cmd{ParseHRUFile.cpp}, \cmd{HydroUnits.h} & \cmd{AQUIFER\_PROFILE} stored on each HRU (1)\\
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate}, \cmd{:BoundaryHead} (1); constituent name captured before parsing (4)\\
-\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3)\\
+\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (it read an end date that was never set) (1)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor (2)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision, constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\

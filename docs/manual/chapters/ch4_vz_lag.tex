@@ -73,7 +73,8 @@ it. That state arises only from a hotstart written by another method (\cmd{:GWVa
 contents below equilibrium after evaporation or capillary rise): a moving water table remaps the excess and the
 equilibrium together, and the cascade itself never takes a node below equilibrium.
 
-\paragraph{Steady start.} With \cmd{:SoilZoneVadoseInitialFlux} $q$ the cascade starts at its steady state,
+\paragraph{Steady start.} With \cmd{:SoilZoneVadoseInitialFlux} $q$ the cascade starts at its steady state for the flux
+it receives, $(1-F)\,q$ (Section~\ref{sec:szvadose}; here written $q$),
 $S_i=\min(q\,k_i,\,S_{\max,i})$ (a full node passes everything it receives), which delivers $q$ from the first step (unit
 test U: to round-off).
 

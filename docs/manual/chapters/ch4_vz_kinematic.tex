@@ -54,8 +54,9 @@ through the column by the steady formula of Section~\ref{sec:szcaprise}, also wh
 \cmd{SPEC\_YIELD} 0 has no mobile water: its nodes stay at $\theta_s$ and pass on up to $K_s$; \cmd{POROSITY} must be
 positive in every aquifer class the columns pass through (start-up stop).
 
-\paragraph{Steady start.} For \cmd{:SoilZoneVadoseInitialFlux} $q$ the column starts at its steady profile,
-$K(\theta_i)=q$ in every node; where a deeper layer's $K_s$ is below $q$ the steady state is the backed-up one: the nodes
+\paragraph{Steady start.} For \cmd{:SoilZoneVadoseInitialFlux} $q$ the column starts at its steady profile for the
+flux it receives, $(1-F)\,q$ with $F$ the saturated fraction of its class at the initial head (as for \cmd{RICHARDS},
+Section~\ref{sec:szvadose}; here written $q$), $K(\theta_i)=q$ in every node; where a deeper layer's $K_s$ is below $q$ the steady state is the backed-up one: the nodes
 from that layer up are saturated and the top rejects the difference. On a cold start without it the columns start
 at $\theta_r$ and soak up recharge until they are wetted (below).
 

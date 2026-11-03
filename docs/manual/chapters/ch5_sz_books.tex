@@ -16,5 +16,5 @@ gross flow through the aquifer: every entry's inflow and outflow apart (recharge
 specified-head, river, drain, reservoir and evaporation entry, each soil-zone link net, every entry of the existing model's
 own packages and its mover), MODFLOW's TOTAL IN plus TOTAL OUT, at least 1~m$^3$/d, computed before the guard; it is half
 MODFLOW's PERCENT DISCREPANCY, which divides by the mean of IN and OUT. The audit tool's cumulative ratio uses signed package
-nets, a stricter figure. Its guard count counts both warnings: ``(MODFLOW unconverged): discharge returned to Raven limited''
-(without a soil zone) and ``of discharge to Raven withheld'' (\cmd{:SoilZone PHYSICAL}).
+nets, a stricter figure. Its guard count counts the warnings ``\ldots\ of discharge to Raven withheld'' (both without a soil zone, ``(MODFLOW
+unconverged): \ldots\ withheld for MODFLOW's negative residual'', and with \cmd{:SoilZone PHYSICAL}).

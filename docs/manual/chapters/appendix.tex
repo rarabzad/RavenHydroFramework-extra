@@ -136,7 +136,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SoilZoneOutput group} & \cmd{GWSoilExchange.csv} only for this HRU group (all soil-zone HRUs)\\
 \cmd{.rvg} & \cmd{:SoilZoneVadose NONE | RICHARDS \{$\epsilon$\} \{N\}} & unsaturated columns below the soil zone (Section~\ref{sec:szvadose}); largest content change in a substep $0<\epsilon\le0.2$, nodes $3\le N\le200$ (NONE; 0.02, 16)\\
 \cmd{.rvg} & \cmd{:SoilZoneVadoseClasses K} & unsaturated columns per exchange column, one per depth class of its DEM samples (Section~\ref{sec:vzclasses}); $1\le K\le10$ (1)\\
-\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux q} & steady start of the unsaturated columns for the flux $q\ge0$ [mm/d] on a cold start, ignored with a warning on a groundwater hotstart (0: at rest)\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux q} & steady start of the unsaturated columns for the recharge $q\ge0$ [mm/d] on a cold start: each column at its steady profile for the flux it receives, $(1-F)\,q$ ($F$ of its class at the initial head); a column that cannot carry it at its backed-up steady state (warning); ignored with a warning on a groundwater hotstart (0: at rest)\\
 \cmd{.rvg} & \cmd{:SoilZoneCapillaryRise ON | OFF} & capillary rise into the soil zone (Section~\ref{sec:szcaprise}) (ON with \cmd{RICHARDS}, else OFF)\\
 \cmd{.rvg} & \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & order of Raven's processes and the exchange (Section~\ref{sec:sztiming}) (\cmd{LAGGED})\\
 \cmd{.rvg} & \cmd{:SoilZoneClasses K} & Raven's processes per class of columns, $1\le K\le50$ (Section~\ref{sec:szclasses}) (1)\\
@@ -258,7 +258,7 @@ $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profi
 \toprule\hdr Block & Content\\\midrule\endfirsthead
 \caption[]{Hotstart blocks written to \cmd{solution.rvc} (continued)}\\
 \toprule\hdr Block & Content\\\midrule\endhead
-\cmd{:GWHeads nlay nrow ncol} & MODFLOW head of every cell (raw values, 12 digits); checked against the grid\\
+\cmd{:GWHeads nlay nrow ncol} & MODFLOW head of every cell (raw values, 12 digits); checked against the grid (counts that are not positive, or whose product exceeds $10^9$, stop the run with a message)\\
 \cmd{:GWRechargeStore} & HRU ID, water in the recharge-delay reservoir [m$^3$]\\
 \cmd{:GWReservoirSeepage} & subbasin ID, reservoir seepage in transit [m$^3$]\\
 \cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\

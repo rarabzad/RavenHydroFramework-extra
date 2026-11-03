@@ -179,7 +179,9 @@ practice the water table settles very close to the surface wherever the aquifer 
 store named by \cmd{:SeepageReturnTo} in each overlapping HRU --- by default the lowest soil layer \cmd{SOIL[$m$]}, and
 \cmd{SURFACE\_WATER} for HRUs without soil layers.\par\smallskip
 \textbf{Constraints/notes.} Seepage occurs only when the head is within $d_s$ of the model top; it is returned to Raven by overlap, exactly. In a step that
-does not converge, seepage (with river gains and store discharge) is limited to the step's inflow.\par\smallskip
+does not converge, MODFLOW's negative residual (more outflow booked than its inflows and storage release supply) is
+withheld from seepage, river gains and store discharge in proportion; everything else MODFLOW booked is returned
+(Section~\ref{sec:guard}).\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
 # .rvp
@@ -447,6 +449,15 @@ q_{\mathrm{bot}}=q_{\mathrm{top}}-\frac{1}{\dt}\sum_i\big(\theta_i^{n+1}-\theta_
 so the column conserves water to round-off whatever the Newton tolerance; $q_{\mathrm{bot}}A_{k,i}$ replaces the column's
 share of the recharge in \cmd{RCH\_RAVEN}. The column is solved once per Raven step, before MODFLOW's solve, with the
 water table of the start of the step.
+
+\paragraph{Steady start.} With \cmd{:SoilZoneVadoseInitialFlux} $q$ (a cold start) every column starts at the steady
+state of these finite volumes for the flux it receives in the first step, $(1-F)\,q$, $F$ the saturated fraction of its
+class at the initial head: every face carries that flux, solved node by node from the water table up (a layer whose
+$K_s$ is below the flux holds a saturated, perched zone above it). Where the flux exceeds what the column can pass with
+$\psi=0$ at its top, that profile would put positive pressure at the top; the column then starts at the backed-up steady
+state instead, for the largest flux $f$ it passes with a saturated top, and its top rejects the rest from the first step
+(Raven warns, with the number of such columns). Either way the start is steady to the solver's tolerance: the first
+step's outflow equals its inflow and the storage does not change (\cmd{test\_vz\_initial.py} I1, I5, I6).
 
 \paragraph{A moving water table.} The water table's own rise and fall is MODFLOW's: its specific yield stores and
 releases the water. The column therefore carries only what differs from the hydrostatic (equilibrium) profile above
