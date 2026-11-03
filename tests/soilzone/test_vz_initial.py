@@ -10,6 +10,15 @@ I2  a hotstart taken before any column exists (water table above the soil-zone b
     no steady profile is put in, identities from step 1.
 I4  columns' balance of step 1 (vz_identity from step 1, start value = previous run's end for a hotstart; a hotstart with
     heads +1 m so every bottom moves up in step 1); a deliberately moved start value must fail the check.
+I5  the steady start is for the flux each column receives, (1 - F) q: 2 HRUs, hummocks +-3 m, the water
+    table 3 m deep held by a specified head (F = 0.16), PERC_CONSTANT 2 mm/d, :SoilZoneVadoseInitialFlux 2, K = 1 (and
+    K = 3, where the classes with F_c > 0 have no column), RICHARDS, KINEMATIC and LAG: the columns' step-1 outflow equals
+    their inflow (1e-6), the saturated share rejected. (Started for q, the columns drained 120.0 m3 against an inflow of
+    100.8 m3 on step 1: an artificial recharge pulse.)
+I6  a RICHARDS column that cannot carry q: K_VERT 1 mm/d under :SoilZoneVadoseInitialFlux 2: the column
+    starts at its backed-up steady profile for the flux it passes (warning "cannot carry the flux"); step 1: storage
+    unchanged (1e-9 of the storage), outflow = inflow = K_VERT A, the rest rejected. (The profile for q had positive
+    pressure up to the top: step 1 drained 0.8 m3 of it, outflow 40.27 against 40.00 m3.)
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -130,9 +139,45 @@ def i4():
     print('I4 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
+def i5():
+    print('I5 steady start for the flux the columns receive, (1 - F) q')
+    ok = True
+    dem = lambda x, y: 3.0 * np.sin(2 * np.pi * (x + 25.0) / 100.0) * np.sin(2 * np.pi * (y + 25.0) / 100.0)
+    for meth, K in (('RICHARDS', 1), ('KINEMATIC', 1), ('LAG', 1)) + ((() if QUICK else (('RICHARDS', 3), ('KINEMATIC', 3), ('LAG', 3)))):
+        ex = ':SoilZoneVadose %s\n:SoilZoneVadoseInitialFlux 2\n:SoilZoneVadoseClasses %d\n' % (meth, K)
+        cfg = dict(BASE, init_depth=3.0, chd=97.0, Kh=200.0, nhru=2, rain=[0.0] * 3, days=3, phi0=(200.0, 200.0), dem_fn=dem, dem_res=400)
+        name = 'i5_%s_k%d' % (meth, K); d = case(name, ex, **cfg)
+        good = check(name, d)
+        if d:
+            b = budget(d); qin = b['unsaturated zone inflow [m3]'].iloc[0]; qout = b['unsaturated zone to aquifer [m3]'].iloc[0]
+            rej = b['rejected recharge [m3]'].iloc[0]; rel = abs(qout - qin) / max(qin, 1e-9)
+            print('    %s K=%d step 1: inflow %.4f m3, outflow %.4f m3 (%.2g), rejected %.3f m3' % (meth, K, qin, qout, rel, rej))
+            good &= qin > 0 and rel < 1e-6 and (K > 1 or rej > 0)
+        ok &= good
+    print('I5 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+def i6():
+    print('I6 RICHARDS steady start beyond the column\'s capacity: the backed-up steady profile')
+    ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
+    cfg = dict(BASE, init_depth=3.0, Kv=0.001, rain=[0.0] * 3, days=3, phi0=(200.0, 200.0))
+    d = case('i6_backed', ex, **cfg); ok = check('i6_backed', d)
+    if d:
+        b = budget(d); s0 = sz_check.vz_start(d); s1 = b['unsaturated zone storage [m3]'].iloc[0]
+        qin = b['unsaturated zone inflow [m3]'].iloc[0]; qout = b['unsaturated zone to aquifer [m3]'].iloc[0]; rej = b['rejected recharge [m3]'].iloc[0]
+        A = BASE['hru_w'] * BASE['width']; f = 0.001 * A; q = 0.002 * A               # [m3] over the 1-day step
+        w = 'cannot carry the flux of :SoilZoneVadoseInitialFlux' in errs(d)
+        good = (s0 is not None and abs(s1 - s0) <= 1e-9 * abs(s0) + 1e-6 and abs(qout - f) <= 1e-6 * f and abs(qin - f) <= 1e-6 * f
+                and abs(rej - (q - f)) <= 1e-6 * q and w)
+        print('    step 1: storage %.6f -> %.6f m3, inflow %.6f, outflow %.6f m3 (K_VERT A = %.1f), rejected %.6f m3 (want %.1f); warning %s -> %s'
+              % (s0 or 0.0, s1, qin, qout, f, rej, q - f, 'present' if w else 'MISSING', 'ok' if good else 'FAIL'))
+        ok &= good
+    print('I6 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
 def main():
     tc.need_mf6()
-    res = {'I1': i1(), 'I2': i2(), 'I4': i4()}
+    res = {'I1': i1(), 'I2': i2(), 'I4': i4(), 'I5': i5(), 'I6': i6()}
     print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
     good = all(res.values())
     print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')

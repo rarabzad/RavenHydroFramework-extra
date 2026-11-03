@@ -20,6 +20,11 @@ C6  a dried thin top cell (the water table in the cell below: SZW_RAVEN path) an
 C7  cost of K = 1, 3, 5 (timings machine-dependent).
 C8  identities below 1e-9 for KINEMATIC and LAG with K = 3 (the column machinery does not depend on the method).
 C9  band_e43 LAG K = 3 connection test: belongs to the interface iteration (GWSoilZoneModel.cpp), SKIP here.
+C10 a hotstart written by the same configuration whose last step dropped a class column: 2 HRUs, hummocks
+    +-1.2 m, RICHARDS K = 3, a specified head at 96 m drains the water table through the class bases; a hotstart after
+    n1 days (10; also 4 and 13 in the full mode) lacks a line for such a column, and the restart (12 days) builds it at
+    rest, as the continuous run does: no "do not match the columns" warning, the restart within 1e-6 of the continuous
+    run, identities. (The link's other lines made the missing one count as a mismatch.)
 All runs: the standard limits of sz_check (STD_LIMITS) plus vz_identity 1e-8.
 Quick mode (RAVEN_TEST_QUICK=1): shorter runs, C3 only terraces at K = 1, 2, 4, C7 shorter.
 """
@@ -309,7 +314,45 @@ def c9():
     tc.skip('C9 band_e43 LAG K = 3 connection test', 'the connection test belongs to the interface iteration (GWSoilZoneModel.cpp, R20 of test_rough_terrain)')
     return True
 
-TESTS = [('C1', c1), ('C2', c2), ('C3', c3), ('C4', c4), ('C5', c5), ('C6', c6), ('C7', c7), ('C8', c8), ('C9', c9)]
+def c10():
+    print('C10 hotstart after a step that dropped a class column: no false mismatch warning')
+    import re
+    ok = True
+    rain = [20.0] * 2 + [0.0] * 20
+    cfg = dict(BASE, init_depth=0.5, dem_fn=hummocks(1.2), pet=3.0, perc=40.0, Sy=0.05, chd=96.0, Kh=30.0, nhru=2)
+    full = case('c10_full', extra_rvg=vz('RICHARDS', 3), rain=rain, days=len(rain), **cfg)
+    ok &= check('c10_full', full)
+    dropped = 0
+    for n1 in ((10,) if QUICK else (4, 10, 13)):
+        first = case('c10_first_%d' % n1, extra_rvg=vz('RICHARDS', 3), rain=rain[:n1], days=n1, **cfg)
+        if not (full and first):
+            ok = False; continue
+        rvc = os.path.join(first, 'out', 'solution.rvc'); t = open(rvc).read()
+        m = re.search(r':GWVadoseClassColumns[^\n]*\n([\s\S]*?):End', t)
+        lines = [l for l in m.group(1).strip().split('\n') if l.strip()] if m else []
+        links = {tuple(l.replace(',', ' ').split()[:2]) for l in lines}
+        miss = 3 * len(links) - len(lines)                                   # (class columns of those links without a line)
+        start = '2000-01-%02d' % (n1 + 1)
+        sec = case('c10_second_%d' % n1, extra_rvg=vz('RICHARDS', 3), start=start, rvc=rvc, rain=rain[n1:], days=len(rain) - n1, **cfg)
+        # (raven_mb_mm left out of the restart: its Raven MB error starts at 0 under a GROUNDWATER store of 20 mm read from the
+        # .rvc, and WatershedStorage.csv's 6 digits of an MB error of -18.484 mm over a store of 1.5 mm give 3e-5 by the
+        # check's scale max(1, store); the continuous run checks it)
+        g = check('c10_second_%d' % n1, sec, {k: v for k, v in LIM.items() if k != 'raven_mb_mm'})
+        if sec:
+            w = warnings(sec); bad = 'do not match the columns' in w
+            a, b = budget(full).iloc[n1:].reset_index(drop=True), budget(sec)
+            cols = ['MF6 recharge [m3/d]', 'unsaturated zone storage [m3]', 'unsaturated zone to aquifer [m3]', 'rejected recharge [m3]']
+            dq = max((a[c] - b[c]).abs().max() / max(a[c].abs().max(), 1.0) for c in cols)
+            print('  n1 = %d: %d class lines for %d links (%d columns without a line); mismatch warning %s; deviation from the continuous run %.2g'
+                  % (n1, len(lines), len(links), miss, 'PRESENT' if bad else 'none', dq))
+            g &= (not bad) and dq < 1e-6
+            dropped += miss > 0
+        ok &= g
+    ok &= dropped > 0                                                        # (the case must hold the situation)
+    print('C10 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+TESTS = [('C1', c1), ('C2', c2), ('C3', c3), ('C4', c4), ('C5', c5), ('C6', c6), ('C7', c7), ('C8', c8), ('C9', c9), ('C10', c10)]
 
 def main():
     tc.need_mf6()
