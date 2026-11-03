@@ -34,6 +34,22 @@ compiler (cc), and for checks 2, 7 and 9 gfortran, meson >= 1.7, ninja and git (
 14 a wrong RAVEN_MF6_ZIP_SHA256 given after an unpinned zip was unpacked stops the configure; the right one passes and
    is named as the user's checksum; a downloaded unpinned zip (local file:// release folder): wrong SHA256 stops, right
    one passes, not called official
+15 offline default: with the source tools but an unreachable git repository the default does not pick
+   SOURCE (whose clone would fail at build time): it falls back at configure time to PREBUILT (a local file:// release
+   folder: configures with the library target) or, with no release reachable either, to OFF with a warning; a reachable
+   repository (a local git repository with the release tag) gives SOURCE (needs gfortran, meson, ninja, git)
+16 default build type: Unix Makefiles without CMAKE_BUILD_TYPE configure Release (cache and -O3 in Raven's
+   flags.make); a given -DCMAKE_BUILD_TYPE=Debug is kept
+17 version floor: RAVEN_MF6_VERSION=6.4.0 (SOURCE and PREBUILT), a zip and a source folder whose meson.build says
+   6.4.0 stop the configure naming 6.5.0 (MF6_MIN_VERSION of src/MF6Engine.h); 6.7.0 configures with a warning naming
+   the tested 6.8.1
+18 runtime bundling: macOS emulated (Mach-O dylibs linked with ld64.lld, llvm-otool and llvm-install-name-tool
+   as otool and install_name_tool, a stand-in codesign): libmf6 -> @rpath/libgfortran.5.dylib -> @rpath/libquadmath and
+   @rpath/libgcc_s, resolved through LC_RPATH, all three installed, every reference rewritten to @loader_path and every
+   edited file signed; Windows emulated (stand-in objdump, then dumpbin only): libgfortran-5.dll and the DLLs it imports
+   in turn are installed (needs clang and the LLVM 18 tools for the macOS part)
+19 messages: RAVEN_MF6_PATH given a folder keeps the ';' of "is a folder; give the library file itself"; a
+   6-digit RAVEN_MF6_ZIP_SHA256 is named as not a SHA256 (not "a damaged or different file")
 
 Prints one line per part and "cmake checks: ALL PASSED (N parts)" at the end; exit code = number of failed parts.
 """
@@ -164,7 +180,20 @@ def source_folder(d, version):
     return d
 
 
+def git_repo(d, tag):
+    """a local git repository with one commit tagged `tag` (file:// URL), standing in for MODFLOW's"""
+    os.makedirs(d, exist_ok=True)
+    open(os.path.join(d, 'meson.build'), 'w').write("project('MODFLOW 6', 'fortran', version: '%s')\n" % tag)
+    e = env_base(GIT_AUTHOR_NAME='t', GIT_AUTHOR_EMAIL='t@t', GIT_COMMITTER_NAME='t', GIT_COMMITTER_EMAIL='t@t')
+    for c in (['init', '-q'], ['add', 'meson.build'], ['commit', '-q', '-m', 'stand-in'], ['tag', tag]):
+        rc, out = run([GIT, '-C', d] + c, env=e)
+        if rc != 0:
+            raise RuntimeError('git %s: %s' % (c, out))
+    return 'file://' + d
+
+
 TOOLS = bool(GFORTRAN and MESON and NINJA and GIT)
+LLVM = '/usr/lib/llvm-18/bin'
 
 
 # ------------------------------------------------------------------------------------------------------------------
@@ -189,7 +218,7 @@ def check2():
     if not TOOLS:
         report(2, '  becomes SOURCE when the tools appear', None, 'needs gfortran, meson, ninja, git')
         return
-    rc, out = cfg(b, '-DRAVEN_MESON=' + MESON)                # meson appears
+    rc, out = cfg(b, '-DRAVEN_MESON=' + MESON, '-DRAVEN_MF6_GIT_URL=' + git_repo(os.path.join(d, 'git'), '6.8.1'))   # meson appears
     report(2, '  becomes SOURCE when the tools appear', rc == 0 and 'RAVEN_MF6: SOURCE (default' in out and has_lib_target(b),
            '' if rc == 0 else out[-300:])
 
@@ -455,8 +484,143 @@ def check14():
            '' if rc == 0 else out[-300:])
 
 
+def check15():
+    d = fresh('c15')
+    if not TOOLS:
+        report(15, 'offline default', None, 'needs gfortran, meson, ninja, git')
+        return
+    b = os.path.join(d, 'b_off')
+    rc, out = cfg(b)                                          # tools found; git and release URLs point at missing folders
+    report(15, 'tools, repository unreachable, no release: OFF with a warning at configure time',
+           rc == 0 and 'cannot be reached for tag 6.8.1' in out and 'RAVEN_MF6: SOURCE' not in out and '-DRAVEN_MF6=OFF' in out
+           and not has_lib_target(b), '' if rc == 0 else out[-300:])
+    rel = os.path.join(d, 'rel', '6.7.0')
+    os.makedirs(rel)
+    release_zip(os.path.join(rel, 'mf6.7.0_linux.zip'), '6.7.0', stub_lib(os.path.join(d, 'l.so'), 'fifteen'))
+    b = os.path.join(d, 'b_pre')
+    rc, out = cfg(b, '-DRAVEN_MF6_VERSION=6.7.0', release='file://' + os.path.join(d, 'rel'))
+    report(15, '  repository unreachable, release reachable: PREBUILT with the library target',
+           rc == 0 and 'cannot be reached for tag 6.7.0' in out and 'RAVEN_MF6: PREBUILT (default' in out and has_lib_target(b),
+           '' if rc == 0 else out[-300:])
+    rc2, out2 = run([CMAKE, '--build', b, '--target', 'raven_mf6_lib'])
+    report(15, '  ... and the build needs no network', rc2 == 0 and os.path.isfile(os.path.join(b, 'libmf6.so')), out2[-300:] if rc2 else '')
+    b = os.path.join(d, 'b_src')
+    rc, out = cfg(b, '-DRAVEN_MF6_GIT_URL=' + git_repo(os.path.join(d, 'git'), '6.8.1'))
+    report(15, '  repository reachable: SOURCE', rc == 0 and 'RAVEN_MF6: SOURCE (default' in out and 'reachable' in out
+           and has_lib_target(b), '' if rc == 0 else out[-300:])
+
+
+def check16():
+    d = fresh('c16')
+    b = os.path.join(d, 'b')
+    rc, out = cfg(b, '-G', 'Unix Makefiles', '-DRAVEN_MF6=OFF')
+    fl = os.path.join(b, 'CMakeFiles', 'Raven.dir', 'flags.make')
+    flags = open(fl).read() if os.path.exists(fl) else ''
+    report(16, 'Unix Makefiles, no CMAKE_BUILD_TYPE: Release (cache, -O3 in flags.make)',
+           rc == 0 and cache(b, 'CMAKE_BUILD_TYPE') == 'Release' and '-O3' in flags,
+           '%r %s' % (cache(b, 'CMAKE_BUILD_TYPE'), re.findall(r'CXX_FLAGS = .*', flags)))
+    b = os.path.join(d, 'b_dbg')
+    rc, out = cfg(b, '-G', 'Unix Makefiles', '-DRAVEN_MF6=OFF', '-DCMAKE_BUILD_TYPE=Debug')
+    report(16, '  -DCMAKE_BUILD_TYPE=Debug is kept', rc == 0 and cache(b, 'CMAKE_BUILD_TYPE') == 'Debug', repr(cache(b, 'CMAKE_BUILD_TYPE')))
+
+
+def check17():
+    d = fresh('c17')
+    rc, out = cfg(os.path.join(d, 'b_v'), '-DRAVEN_MF6=PREBUILT', '-DRAVEN_MF6_VERSION=6.4.0')
+    report(17, 'PREBUILT, RAVEN_MF6_VERSION=6.4.0: stops naming 6.5.0', rc != 0 and 'MODFLOW 6.4.0, older than 6.5.0' in out
+           and 'downloading' not in out, out[-200:] if rc == 0 else '')
+    if TOOLS:
+        rc, out = cfg(os.path.join(d, 'b_s'), '-DRAVEN_MF6=SOURCE', '-DRAVEN_MF6_VERSION=6.4.0')
+        report(17, '  SOURCE, RAVEN_MF6_VERSION=6.4.0: stops', rc != 0 and 'MODFLOW 6.4.0, older than 6.5.0' in out)
+    z = release_zip(os.path.join(d, 'old.zip'), '6.4.0', stub_lib(os.path.join(d, 'o.so'), 'old'))
+    rc, out = cfg(os.path.join(d, 'b_z'), '-DRAVEN_MF6_ZIP=' + z)
+    report(17, '  a zip whose meson.build says 6.4.0: stops', rc != 0 and 'MODFLOW 6.4.0, older than 6.5.0' in out, out[-200:] if rc == 0 else '')
+    rc, out = cfg(os.path.join(d, 'b_d'), '-DRAVEN_MF6_SOURCE_DIR=' + source_folder(os.path.join(d, 'src640'), '6.4.0'))
+    report(17, '  a source folder of 6.4.0: stops', rc != 0 and 'MODFLOW 6.4.0, older than 6.5.0' in out, out[-200:] if rc == 0 else '')
+    z = release_zip(os.path.join(d, 'new.zip'), '6.7.0', stub_lib(os.path.join(d, 'n.so'), 'new'))
+    rc, out = cfg(os.path.join(d, 'b_ok'), '-DRAVEN_MF6_ZIP=' + z)
+    report(17, '  6.7.0: configures, warning names the tested 6.8.1', rc == 0 and 'is MODFLOW 6.7.0; Raven\'s coupling was tested with 6.8.1' in out,
+           '' if rc == 0 else out[-300:])
+
+
+def _bundle(lib, system, name, prefix, env=None, extra=()):
+    return run([CMAKE, '-DRAVEN_MF6_BUNDLE_LIB=' + lib, '-DRAVEN_MF6_BUNDLE_SYSTEM=' + system, '-DRAVEN_MF6_BUNDLE_NAME=' + name,
+                '-DCMAKE_INSTALL_PREFIX=' + prefix] + list(extra) + ['-P', os.path.join(SRC, 'cmake', 'RavenMF6Bundle.cmake')], env=env)
+
+
+def check18():
+    d = fresh('c18')
+    clang = shutil.which('clang')
+    tools = [os.path.join(LLVM, x) for x in ('ld64.lld', 'llvm-otool', 'llvm-install-name-tool')]
+    if not clang or not all(os.path.exists(x) for x in tools):
+        report(18, 'macOS bundling (emulated)', None, 'needs clang and %s/{ld64.lld,llvm-otool,llvm-install-name-tool}' % LLVM)
+    else:
+        lld, otool, intool = tools
+        tc_ = os.path.join(d, 'gcc', 'lib'); os.makedirs(tc_); bdir = os.path.join(d, 'b'); os.makedirs(bdir)
+        src = {'q': 'int qm(void){return 1;}', 'g': 'int gs(void){return 2;}',
+               'f': 'int qm(void);int gs(void);int gf(void){return qm()+gs();}', 'm': 'int gf(void);int get_version(char*b){return gf();}'}
+        for k, s in src.items():
+            open(os.path.join(d, k + '.c'), 'w').write(s + '\n')
+            run([clang, '--target=arm64-apple-macos11', '-c', os.path.join(d, k + '.c'), '-o', os.path.join(d, k + '.o')])
+        LD = [lld, '-arch', 'arm64', '-platform_version', 'macos', '11.0', '11.0', '-dylib', '-undefined', 'dynamic_lookup']
+        q, g, f = (os.path.join(tc_, n) for n in ('libquadmath.0.dylib', 'libgcc_s.1.1.dylib', 'libgfortran.5.dylib'))
+        lib = os.path.join(bdir, 'libmf6.dylib')
+        r = [run(LD + ['-install_name', '@rpath/libquadmath.0.dylib', '-o', q, os.path.join(d, 'q.o')]),
+             run(LD + ['-install_name', '@rpath/libgcc_s.1.1.dylib', '-o', g, os.path.join(d, 'g.o')]),
+             run(LD + ['-install_name', '@rpath/libgfortran.5.dylib', '-rpath', '@loader_path', '-o', f, os.path.join(d, 'f.o'), q, g]),
+             run(LD + ['-install_name', '@rpath/libmf6.dylib', '-rpath', tc_, '-rpath', '@loader_path', '-o', lib, os.path.join(d, 'm.o'), f, g])]
+        if any(rc for rc, _ in r):
+            report(18, 'macOS bundling (emulated)', None, 'could not link the Mach-O stand-ins: ' + ' '.join(o for _, o in r)[-200:])
+        else:
+            inst = os.path.join(d, 'inst'); os.makedirs(os.path.join(inst, 'bin'))
+            shutil.copy2(lib, os.path.join(inst, 'bin'))                 # (install(PROGRAMS) puts libmf6 there first)
+            cs = os.path.join(d, 'codesign'); log = os.path.join(d, 'signed.txt')
+            open(cs, 'w').write('#!/bin/sh\necho "$4" >> %s\n' % log); os.chmod(cs, 0o755)
+            rc, out = _bundle(lib, 'Darwin', 'libmf6.dylib', inst, extra=['-DRAVEN_MF6_OTOOL=' + otool, '-DRAVEN_MF6_INSTALL_NAME_TOOL=' + intool,
+                                                                          '-DRAVEN_MF6_CODESIGN=' + cs])
+            got = sorted(os.listdir(os.path.join(inst, 'bin')))
+            report(18, 'macOS: libgfortran, and libquadmath and libgcc_s through it, installed',
+                   rc == 0 and got == ['libgcc_s.1.1.dylib', 'libgfortran.5.dylib', 'libmf6.dylib', 'libquadmath.0.dylib'], ' '.join(got) if rc == 0 else out[-300:])
+            refs = ''.join(run([otool, '-L', os.path.join(inst, 'bin', n)])[1] for n in got)
+            report(18, '  every runtime reference is @loader_path/ (none left @rpath/ or absolute)',
+                   '@loader_path/libgfortran.5.dylib' in refs and '@loader_path/libquadmath.0.dylib' in refs
+                   and not re.search(r'(@rpath/|%s/)lib(gfortran|quadmath|gcc_s)' % re.escape(tc_), refs),
+                   '' if '@loader_path/libquadmath' in refs else refs[-300:])
+            signed = sorted(os.path.basename(x) for x in open(log).read().split()) if os.path.exists(log) else []
+            report(18, '  every edited file signed again (codesign -f -s -)', signed == got, ' '.join(signed))
+    # Windows (emulated): stand-in import listers; libgfortran-5.dll imports libquadmath-0.dll and libgcc_s_seh-1.dll
+    tl = os.path.join(d, 'wtools'); fc = os.path.join(d, 'wfc'); os.makedirs(tl); os.makedirs(fc)
+    for n in ('gfortran.exe', 'libgfortran-5.dll', 'libquadmath-0.dll', 'libgcc_s_seh-1.dll'):
+        open(os.path.join(fc, n), 'w').write('stand-in\n')
+    wlib = os.path.join(d, 'libmf6.dll'); open(wlib, 'w').write('stand-in\n')
+    deps = 'case "$f" in libmf6.dll) d="KERNEL32.dll libgfortran-5.dll";; libgfortran-5.dll) d="KERNEL32.dll libquadmath-0.dll libgcc_s_seh-1.dll";; *) d="KERNEL32.dll";; esac\n'
+    open(os.path.join(tl, 'objdump'), 'w').write('#!/bin/sh\nf=${2##*/}\n' + deps + 'for x in $d; do printf "\\tDLL Name: %s\\n" $x; done\n')
+    open(os.path.join(tl, 'dumpbin'), 'w').write('#!/bin/sh\nf=${3##*/}\n' + deps +
+        'printf "Dump of file %s\\r\\n\\r\\n  Image has the following dependencies:\\r\\n\\r\\n" "$3"; for x in $d; do printf "    %s\\r\\n" $x; done; printf "\\r\\n  Summary\\r\\n"\n')
+    for x in ('objdump', 'dumpbin'): os.chmod(os.path.join(tl, x), 0o755)
+    for tool in ('objdump', 'dumpbin'):
+        if tool == 'dumpbin': os.rename(os.path.join(tl, 'objdump'), os.path.join(tl, 'objdump.off'))
+        inst = os.path.join(d, 'winst_' + tool)
+        rc, out = _bundle(wlib, 'Windows', 'libmf6.dll', inst, env=env_base(PATH=tl), extra=['-DRAVEN_MF6_BUNDLE_FC=' + os.path.join(fc, 'gfortran.exe')])
+        got = sorted(os.listdir(os.path.join(inst, 'bin'))) if os.path.isdir(os.path.join(inst, 'bin')) else []
+        report(18, '  Windows (%s): libgfortran-5.dll and the DLLs it imports installed' % tool,
+               rc == 0 and got == ['libgcc_s_seh-1.dll', 'libgfortran-5.dll', 'libquadmath-0.dll'], ' '.join(got) if rc == 0 else out[-300:])
+
+
+def check19():
+    d = fresh('c19')
+    rc, out = cfg(os.path.join(d, 'b_dir'), '-DRAVEN_MF6=PATH', '-DRAVEN_MF6_PATH=' + d)
+    report(19, 'RAVEN_MF6_PATH a folder: "is a folder; give the library file itself"', rc != 0 and 'is a folder; give the library file itself' in out,
+           re.findall(r'is a folder.{0,40}', out))
+    z = release_zip(os.path.join(d, 'z.zip'), '6.8.1', stub_lib(os.path.join(d, 'l.so')))
+    rc, out = cfg(os.path.join(d, 'b_sha'), '-DRAVEN_MF6_ZIP=' + z, '-DRAVEN_MF6_ZIP_SHA256=abc123')
+    report(19, '  6-digit RAVEN_MF6_ZIP_SHA256: "is not a SHA256 (64 hexadecimal digits"', rc != 0 and 'is not a SHA256 (64 hexadecimal digits' in out
+           and 'damaged or different file' not in out)
+
+
 CHECKS = {1: check1, 2: check2, 3: check3, 4: check4, 5: check5, 6: check6, 7: check7, 8: check8, 9: check9,
-          10: check10, 11: check11, 12: check12, 13: check13, 14: check14}
+          10: check10, 11: check11, 12: check12, 13: check13, 14: check14, 15: check15, 16: check16, 17: check17,
+          18: check18, 19: check19}
 
 # one mutation per check: (file, text in it, replacement) = the bug the check was written for
 MUTATIONS = {
@@ -480,6 +644,11 @@ MUTATIONS = {
     13: ('cmake/RavenMF6.cmake', '      elseif(_uname MATCHES "^(modflow6-)?v?', '      elseif(FALSE AND _uname MATCHES "^(modflow6-)?v?'),
     14: ('cmake/RavenMF6.cmake', '    if(_expected AND NOT _actual STREQUAL _expected)\n      message(FATAL_ERROR "RAVEN_MF6_ZIP:',
          '    if(NOT EXISTS "${_stamp}" AND _expected AND NOT _actual STREQUAL _expected)\n      message(FATAL_ERROR "RAVEN_MF6_ZIP:'),
+    15: ('cmake/RavenMF6.cmake', '    if(NOT _rmf6_git_ok)                           # offline', '    if(FALSE)'),
+    16: ('CMakeLists.txt', 'if(NOT _raven_multi_config AND NOT CMAKE_BUILD_TYPE)', 'if(FALSE)'),
+    17: ('cmake/RavenMF6.cmake', '  if(NOT "${v}" STREQUAL "" AND "${v}" VERSION_LESS RAVEN_MF6_MIN_VERSION)', '  if(FALSE)'),
+    18: ('cmake/RavenMF6Bundle.cmake', '        list(APPEND _queue "${_real}|${_n}")', '        # (dependencies of dependencies not followed)'),
+    19: ('cmake/RavenMF6.cmake', '  set(_rmf6_msg "${ARGV0}")\n', '  string(CONCAT _rmf6_msg ${ARGV})\n'),
 }
 
 
