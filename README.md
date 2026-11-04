@@ -11,13 +11,13 @@ cross an unsaturated zone (`:SoilZoneVadose RICHARDS`, `KINEMATIC` or `LAG`, wit
 dry soil draws water up from a shallow water table by capillary rise; the exchange is lagged into Raven's step to cut the
 splitting error; Raven's processes can act on classes of an HRU's columns (`:SoilZoneClasses`); and soil over specified
 heads exchanges with them exactly (manual chapter 5, "The soil zone and the water table"; reference table of the
-`:SoilZone*` commands in chapter 7; design notes in `docs/design/`).
+`:SoilZone*` commands in chapter 7).
 
 The coupling's source code is part of Raven itself (RavenHydroFramework). This repository holds everything around it:
 
 | Folder | Contents |
 |---|---|
-| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`), verification reports |
+| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`; verification in chapter 9), developer notes on the design (`design/`) |
 | `examples/` | the Liard River model with a groundwater model built by Raven, and coupled to an existing MODFLOW 6 model; step-by-step guide in `examples/README.md` |
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
@@ -57,8 +57,8 @@ For a Raven built without the library (GNU make, Visual Studio solution, `-DRAVE
 Windows x64, Apple Silicon Macs; Intel Macs only with `--version 6.6.3`).
 
 Until the coupling is merged into the Raven repository (https://github.com/CSHS-CWRA/RavenHydroFramework), use the
-`mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework, which holds the coupling with the related Raven
-fixes. Windows, Linux and macOS step by step: `examples/README.md`.
+`mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework, which holds the coupling and its changes to Raven's own
+files. Windows, Linux and macOS step by step: `examples/README.md`.
 
 ## Requirements
 
@@ -73,7 +73,7 @@ fixes. Windows, Linux and macOS step by step: `examples/README.md`.
 ```
 cd tests
 python3 run_all.py --nolib     # checks that need no MODFLOW library (a few minutes)
-python3 run_all.py --quick     # everything in quick mode (RAVEN_TEST_QUICK=1 for every script; under an hour)
+python3 run_all.py --quick     # everything in quick mode (RAVEN_TEST_QUICK=1 for every script; about half an hour)
 python3 run_all.py             # everything in full mode (about an hour on one core)
 ```
 

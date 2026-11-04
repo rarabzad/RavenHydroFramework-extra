@@ -293,7 +293,7 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
 | `:SoilZoneVadoseClasses K` | 1 | up to K unsaturated columns per exchange column, one per depth class of its DEM points (1-10); ignored (warning) with NONE |
 | `:SoilZoneVadoseInitialFlux q` | 0 | cold start: each column starts at its steady profile for the flux it receives, (1-F) q [mm/d]; ignored (warning) on a groundwater hotstart and with NONE |
 | `:SoilZoneCapillaryRise ON/OFF` | ON with an unsaturated column (RICHARDS, KINEMATIC, LAG), OFF with NONE | capillary rise from the water table (and, with RICHARDS, from the columns' top nodes) into soil-zone layers below field capacity |
-| `:SoilZoneExchangeTiming LAGGED/AFTER` | LAGGED | LAGGED: last step's exchange is lent to the soil before Raven's processes and settled after the step's exchange (splitting error scales with the change of the exchange: 0.7 cm of head on the hillslope test against 1.8 cm with AFTER); AFTER: the exchange follows Raven's processes (the basic soil zone) |
+| `:SoilZoneExchangeTiming LAGGED/AFTER` | LAGGED | LAGGED: last step's exchange is lent to the soil before Raven's processes and settled after the step's exchange (splitting error scales with the change of the exchange: 0.7 cm of head on the hillslope test against 1.8 cm with AFTER); AFTER: the exchange follows Raven's processes |
 | `:SoilZoneClasses K` | 1 | Raven's processes run on up to K wetness classes of an HRU's columns (1-50); needs `:Method ORDERED_SERIES` |
 | `:SoilZoneAquiferClass class` | b 4, psi_a 0.3 m, theta_s Sy+0.1 | existing models: retention of the cells for the unsaturated columns (conductivity and specific yield come from the model; a steady model without specific yield takes the class's SPEC_YIELD when given, else 0.2); ignored (warning) on a model Raven builds |
 
@@ -336,8 +336,8 @@ and step the soil-zone base, soil water level, water table, saturated fraction, 
 overflow, soil water and capacity, and the interface updates and change. `GWModelSummary.txt` ends with run totals
 (unconverged steps, substeps, supply-limited updates, withheld discharge, ...). `tools/plot_soilzone.py OUTPUT_FOLDER`
 plots the exchange. Manual: Section "The soil zone and the water table", the reference table of the soil-zone commands
-(chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land"; design
-notes: `docs/design/soil_zone_coupling_plan.md`, `soil_zone_columns_plan.md`, `soil_zone_*.md`.
+(chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land"; developer
+notes on the design: `docs/design/soil_zone_*.md`.
 
 ### 4.4 `.rvt`
 
@@ -466,3 +466,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   `tools/make_prt.py`, DIS/DISV grids), demand-driven wells. Frozen ground acts on recharge only through Raven's own
   processes.
 - Raven's `:Transport` (tracers, nutrients, the age tracer, temperature) is not available in a coupled run: the coupling exchanges water, not constituent mass, so a coupled run with a `:Transport` command stops with a message naming the constituent.
+- Known issues in Raven itself (also without groundwater; left to the Raven developers): channel storage in
+  `solution.rvc` can be negative in some subbasins; on the day after a reservoir has been drawn empty by a minimum flow its
+  outflow still averages in the previous release rate (most of such a reservoir's balance error); valgrind reports
+  uninitialised reads in `RVPParameterWarning` and `CVegetationClass::RecalculateRootParams` while the `.rvp` file is read.

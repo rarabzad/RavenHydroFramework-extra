@@ -1,4 +1,4 @@
-"""Columns against MODFLOW's cells (soil zone; manual "Drained columns").
+"""Columns against MODFLOW's cells (manual "Drained columns").
 
 M1  drained columns: a stiff, very low-storage hillslope drying under PET (S_y 0.001, K 5000 m/d) whose top cells dry in
     MODFLOW's iterates: KeepColumnsWet sets such columns 1 mm above their bottoms (NEWTON; columns whose active cells are all

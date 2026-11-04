@@ -42,7 +42,7 @@ def outputs(d):
 
 def vz_start(d):
     """the unsaturated columns' storage at the start of the run [m3] (GWModelSummary.txt: "unsaturated storage   : V m3 at
-    the start"), or None (no such line: no columns, or a build older than )"""
+    the start"), or None (no such line: no columns)"""
     import re
     f = os.path.join(d, 'out', 'GWModelSummary.txt')
     if not os.path.exists(f): return None
@@ -75,8 +75,8 @@ def vz_identity(vzs, s0, vin, vout, vcap):
 
 def selftest_vz_identity():
     """the unsaturated-zone identity on synthetic columns (a 9776 m3 store, 220 m3 in and out per step, written with 10
-    significant digits as GWBudget.csv does): exact books pass (CSV rounding only), a leak of 1e-4 m3 per step fails (the
-    scale with the storages added in full let it pass). Prints one line; returns True when both hold"""
+    significant digits as GWBudget.csv does): exact books pass (CSV rounding only), a leak of 1e-4 m3 per step fails (a
+    scale with the storages added in full would let it pass). Prints one line; returns True when both hold"""
     n = 60; vin = pd.Series(np.full(n, 220.0) + 13.7 * np.sin(np.arange(n))); vout = vin.shift().fillna(200.0); vcap = pd.Series(np.zeros(n))
     s = 9776.123456789 + np.cumsum(vin - vout - vcap)
     r10 = lambda x: pd.Series([float('%.10g' % v) for v in x])
@@ -132,7 +132,7 @@ def checks(d, dt=1.0):
     if 'unsaturated zone inflow [m3]' in b:   # :SoilZoneVadose RICHARDS: recharge passes through the unsaturated columns
         ident = ident - b['unsaturated zone inflow [m3]'] + b['unsaturated zone to aquifer [m3]']
         vzs = b['unsaturated zone storage [m3]']
-        s0 = vz_start(d)   # storage at the start (from step 1 when Raven writes it, until then from step 2)
+        s0 = vz_start(d)   # storage at the start (from step 1 when Raven writes it)
         res['vz_step1'] = s0 is not None
         ds = vzs.diff(); sp = vzs.shift()
         if s0 is not None: ds.iloc[0] = vzs.iloc[0] - s0; sp.iloc[0] = s0
@@ -210,7 +210,7 @@ def same_outputs(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
 def ext_case(g, e, cfg, newton=True, model_edit=None):
     """an existing-model case e from the generated run g (made with sz_models.make_case(**cfg) and run): g's MODFLOW model
     without Raven's packages (optionally without NEWTON; model_edit(folder) may change it further) coupled by
-    :MF6Simulation with the same HRUs and soil zone (as test_sz_models_ext.roundtrip). Returns e (not run)"""
+    :MF6Simulation with the same HRUs and soil zone (as test_sz_existing.roundtrip). Returns e (not run)"""
     import re, shutil, sz_models
     m = e + '_model'; shutil.rmtree(m, ignore_errors=True); shutil.copytree(os.path.join(g, 'out', 'mf6'), m)
     for f in ('gwf.rch', 'gwf.drn', 'gwf.szx', 'gwf.szq', 'gwf.szd', 'gwf.szw', 'linkage.cache', 'mfsim.lst', 'gwf.lst', 'gwf.hds', 'gwf.cbc'):

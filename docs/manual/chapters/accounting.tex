@@ -20,9 +20,14 @@ and the storage change from MODFLOW's storage package, and reports the imbalance
 where $Q^{\mathrm{sto}}$ is water released from storage and $Q^{\mathrm{sz}}$ the soil-zone exchange (packages \cmd{SZX\_RAVEN},
 \cmd{SZQ\_RAVEN} and \cmd{SZD\_RAVEN}, only with \cmd{:SoilZone PHYSICAL}; the upward flows out of a lower cell through
 \cmd{SZW\_RAVEN} are booked with the terms they belong to: the columns' upflow in $Q^{\mathrm{rch}}$, the rise and the
-debt repayment below). It is written in m$^3$/d and as a percentage of the gross flow
-(the sum of the absolute values of all terms). In the tests of Chapter~\ref{ch:verification} the worst single-day error is about $5\times10^{-6}$\% and the
-cumulative error about $10^{-10}$.
+debt repayment below). The residual is one sum for every case that knows the storage flow, the soil-zone terms included
+(a steady existing model without \cmd{STO6} has storage 0). It is written in m$^3$/d and, as \emph{MF6 balance error [\%]},
+as $100$ times the residual over the \emph{gross flow} through the aquifer: every entry's inflow and outflow apart
+(recharge per cell, storage per cell, each well, GHB, specified-head, river, drain, reservoir and evaporation entry, each
+soil-zone link net, every entry of an existing model's own packages and its mover), that is MODFLOW's TOTAL IN plus TOTAL
+OUT, at least 1~m$^3$/d. This percentage is half MODFLOW's PERCENT DISCREPANCY, which divides by the mean of IN and OUT; the
+audit tool's cumulative ratio uses signed package totals, a stricter figure. In the tests of Chapter~\ref{ch:verification}
+the worst single-day error is about $5\times10^{-6}$\% and the cumulative error about $10^{-10}$.
 
 \subsection{Raven's balance}
 Raven tracks cumulative input $I$ and output $O$ and reports $\mathrm{MB}=\left(S-S_0\right)+\left(O-I\right)$ in mm over
@@ -49,26 +54,39 @@ zone coupled, the volume applied to the soil layers in each step also satisfies
 \begin{equation}
 V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}},
 \end{equation}
-with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold; zero in all tests).
+with $V^{\mathrm{short}}$ the shortfall (water MODFLOW took that the soil zone did not hold). The shortfall is 0 whenever the
+interface converges; it can appear only on steps whose interface did not converge (most at a low outer-iteration limit).
 
-\paragraph{Soil zone.}\label{sec:accsz2} With the unsaturated columns the recharge passes through them: the first identity
-becomes
+\paragraph{The soil-zone identities.}\label{sec:accsz} With the unsaturated columns the recharge passes through them, and
+an existing model without \cmd{NEWTON} may leave recharge unapplied: the first identity becomes
 \begin{equation}
 \sum V^{\mathrm{Raven}}_{\mathrm{rch}}=\sum V^{\mathrm{MF6}}_{\mathrm{rch}}+\Delta V^{\mathrm{dl}}+\sum V^{\mathrm{CHD}}_{\mathrm{rch}}+\sum V^{\mathrm{rej}}
-+\sum\big(V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}\big),
++\sum\big(V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}\big)+\sum V_{\mathrm{not\ applied}},
 \end{equation}
+with $V_{\mathrm{not\ applied}}$ the recharge MODFLOW did not apply (signed; Section~\ref{sec:szinterface}, Existing
+models). $V^{\mathrm{rej}}$ is negative where a negative recharge was more than the top cell could give: the cut is taken back
+out of the soil zone (Section~\ref{sec:negrecharge}).
 and the columns themselves close as
 $\Delta V^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}-V^{\mathrm{uz}}_{\mathrm{cap}}$ (storage relative to the
-hydrostatic profile, Section~\ref{sec:szvadose}). The water applied to the soil zone gains the capillary rise (from the columns
+hydrostatic profile, Section~\ref{sec:szvadose}), checked from step 1 with the storage at the start that
+\cmd{GWModelSummary.txt} gives (``unsaturated storage''). The water applied to the soil zone gains the capillary rise (from the columns
 and from the water table), the exchange with specified heads and the lagged-exchange debt:
 \begin{equation}
 V^{\mathrm{sz}}_{\mathrm{applied}}=V^{\mathrm{rej}}+\left(Q^{\mathrm{sz}}_{\mathrm{out}}-Q^{\mathrm{sz}}_{\mathrm{in}}\right)\dt+V^{\mathrm{short}}
 +V^{\mathrm{uz}}_{\mathrm{cap}}+V^{\mathrm{wt}}_{\mathrm{cap}}+\left(Q^{\mathrm{chd}}_{\mathrm{out}}-Q^{\mathrm{chd}}_{\mathrm{in}}\right)\dt+V^{\mathrm{debt}},
 \end{equation}
 and MODFLOW's balance includes the rise from the water table and the debt repayment as outflows through
-\cmd{SZQ\_RAVEN} (or \cmd{SZW\_RAVEN} when they come out of a cell below a dried top cell). Each of these is a column of \cmd{GWBudget.csv}; the test suite checks all of them on every run.
+\cmd{SZQ\_RAVEN} (or \cmd{SZW\_RAVEN} when they come out of a cell below a dried top cell). The soil zone's own balance,
+per HRU over its columns, adds the cut of a negative recharge that the soil zone did not hold, $V^{nh}$:
+\begin{equation}
+\Delta W\,A/1000=W_{\mathrm{proc}}+V^{\mathrm{rej}}-\textstyle\sum q\,\dt-V^{\mathrm{ovf}}+V^{nh},
+\end{equation}
+with $\Delta W$ the change of the soil water [mm] over the area $A$, $W_{\mathrm{proc}}$ what Raven's processes moved and
+$V^{\mathrm{ovf}}$ the overflow. Each of these terms is a column of \cmd{GWBudget.csv} (Section~\ref{app:outputs}).
 
-The audit tool checks these identities, the river, seepage and store bookkeeping, and MODFLOW's balance for every run.
+The audit tool \cmd{tools\_audit.py} checks these identities, the river, seepage and store bookkeeping, and MODFLOW's
+balance for every run; its guard count counts the warnings ``\ldots\ of discharge to Raven withheld'' (without a soil zone
+``(MODFLOW unconverged): \ldots\ withheld for MODFLOW's negative residual'', and with \cmd{:SoilZone PHYSICAL}).
 
 \section{A real day of water accounts}
 \begin{example}[: 15 June 1996 in the Liard run]
@@ -121,9 +139,9 @@ The tool \cmd{tools\_audit.py} checks all of these automatically.
 
 Algorithm~\ref{alg:step} lists exactly what happens in one Raven time step of a coupled model.
 
-\begin{algorithm}[h]\caption{One coupled time step}\label{alg:step}
+\begin{algorithm}[!htbp]\caption{One coupled time step}\label{alg:step}
 \begin{algorithmic}[1]
-\State Raven: vertical and lateral processes of all HRUs; coupled HRUs' \cmd{GROUNDWATER} now holds the day's recharge
+\State Raven: vertical and lateral processes of all HRUs; coupled HRUs' \cmd{GROUNDWATER} then holds the day's recharge
 \State Complete yesterday's line of \cmd{GWBudget.csv} (river and reservoir terms are final only after routing)
 \State Recharge: delay reservoirs (Ch.~\ref{ch:recharge}); spread over cells; skip fixed-head cells
 \State MODFLOW \cmd{prepare\_time\_step}; set RCH rates
@@ -184,7 +202,8 @@ number in any groundwater block, and negative water in \cmd{:GWSoilZoneColumns},
 \subsection{Ensembles}
 Raven's ensemble modes (Monte Carlo, DDS, EnKF) run the model several times in one program run. For every member the
 groundwater model is rebuilt from scratch, MODFLOW is restarted, and its files go to that member's output folder.
-These defaults are
+Each member starts with a fresh water balance and, unless its own \cmd{.rvc} says
+otherwise, from the routing memory and reservoir states of the first run (stage, outflow, loss terms). These defaults are
 restored before the member's \cmd{.rvc} is read, so member-specific initial conditions (as used by EnKF forecasting) still
 apply; groundwater hotstart values are likewise cleared, so each member uses only its own \cmd{.rvc}, and the steady-state
 start is decided for each member separately
@@ -205,7 +224,7 @@ handed to Raven, after the withholding, so each row's residual --- recharge plus
 less the discharge, less ``MF6 balance error'' --- is the volume withheld in that step; its run total is in
 \cmd{GWModelSummary.txt} (``discharge withheld''). With \cmd{:SoilZone PHYSICAL} the withheld volume is booked per step
 in its own columns of \cmd{GWBudget.csv} (seepage and soil inflow, river gains and surface-store gains withheld). The step is
-flagged, and a warning written for the first ten such steps.
+flagged, and a warning written for the first ten such steps (test B8, Table~\ref{tab:vszinterface}).
 \item \textbf{Rivers and stores} can never lose more water than they hold (Sections~\ref{ch:rivers},\ref{ch:stores}).
 \item \textbf{Wells} cannot pump from a dry cell (\cmd{AUTO\_FLOW\_REDUCE}).
 \item \textbf{Step count}: Raven stops if it would run past MODFLOW's last step.
@@ -213,4 +232,3 @@ flagged, and a warning written for the first ten such steps.
 running MODFLOW in the wrong place.
 \end{itemize}
 
-\input{chapters/ch5_sz_books}

@@ -145,11 +145,11 @@ The 20-year daily run takes about 15 minutes on one processor core (35 seconds w
 \item \cmd{GWHRUState.csv}: depth to water under each HRU (Figure~\ref{fig:wtdepth} shows the map from \cmd{mf6/gwf.hds}).
 \item \cmd{Hydrographs.csv}: streamflow now includes groundwater discharge (Figure~\ref{fig:hydro}).
 \end{itemize}
-\begin{figure}[h]\centering\includegraphics[width=\linewidth]{figures/fig_budget.png}
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_budget.png}
 \caption{Groundwater budget of the 20-year Liard run (monthly means) and daily balance error; the dashed line is 0.1\%.}\label{fig:budget}\end{figure}
-\begin{figure}[h]\centering\includegraphics[width=0.72\linewidth]{figures/fig_wtdepth.png}
+\begin{figure}[!htbp]\centering\includegraphics[width=0.72\linewidth]{figures/fig_wtdepth.png}
 \caption{Depth to water at the last saved head.}\label{fig:wtdepth}\end{figure}
-\begin{figure}[h]\centering\includegraphics[width=\linewidth]{figures/fig_hydrograph.png}
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_hydrograph.png}
 \caption{Outflow of subbasin 43, 2003--2005, without and with groundwater (not recalibrated).}\label{fig:hydro}\end{figure}
 Without recalibration and with stand-in geometry, the Nash--Sutcliffe efficiency at gauges 10BE004, 10BE005 and 10BE010
 changes from 0.867, 0.835, 0.681 to 0.850, 0.821, 0.634. Recalibrating with flow and head data is the natural next step.
@@ -202,6 +202,7 @@ Quadtree 2 km, 500 m along rivers & 16\,276 & 108 & 0.719 / 0.858 / 0.611 & 9.49
 HRU mesh 2 km, 1 km along rivers & 14\,610 & 100 & 0.717 / 0.859 / 0.627 & 9.94 & 0.35\\
 Regular 2 km, layers by elevation & 8\,840 & 41 & 0.666 / 0.859 / 0.606 & 4.11 & 0.49\\
 \bottomrule\end{tabular}
+\par\smallskip\footnotesize MODFLOW 6.8.1 (\cmd{tests/liard\_grids.py}); run times on one core of the test machine.
 \end{table}
 Streamflow hardly changes: total seepage is nearly the same on every grid and the river exchange is a small part of the
 flow at the gauges. The net river exchange, however, depends on the size of the river cells --- 0.82 million m$^3$/d with
@@ -266,7 +267,8 @@ table and the saturated fraction $F$; \cmd{tools/plot\_soilzone.py} plots them, 
 soil-zone identity. The interface should converge on every step (\cmd{GWBudget.csv}, \emph{interface converged}).
 \end{enumerate}
 The coupling has been checked on planar and irregular hillslopes against a MODFLOW-only reference
-(Section~\ref{sec:vsoilzone1}) and on 1\,620 randomly drawn rough-terrain cases with slopes up to 30\,\%, pits, cliffs,
+(Section~\ref{sec:vszbasic}) and on 400 randomly drawn rough-terrain cases (1\,620 runs with the four unsaturated-zone methods and the
+regression cases) with slopes up to 30\,\%, pits, cliffs,
 ridges, sloping and pinching layers and DEMs coarser or finer than the grid (Section~\ref{sec:vrough}). The reference
 for every command is Table~\ref{tab:szcmds}.
 
@@ -307,7 +309,7 @@ Upland-till $K$ [m/d] & 0.2 & 2.0 & 0.149 & $-25$\%\\\bottomrule
 Table~\ref{tab:synthcal} shows the result. The objective (sum of RMSE over the four wells) fell from 14.4 m to 0.17 m (it is 0.08 m at the true values, so more runs
 would refine it further; Figure~\ref{fig:calib}). The upland-till conductivity is the hardest to identify because the
 upland heads respond weakly to it.
-\begin{figure}[h]\centering\includegraphics[width=0.8\linewidth]{figures/fig_calibration.png}
+\begin{figure}[!htbp]\centering\includegraphics[width=0.8\linewidth]{figures/fig_calibration.png}
 \caption{Synthetic calibration: objective against model runs.}\label{fig:calib}\end{figure}
 
 \section{The Ostrich input file, line by line}

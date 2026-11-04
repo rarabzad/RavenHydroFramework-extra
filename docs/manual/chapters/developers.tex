@@ -59,25 +59,24 @@ WEL (\cmd{RES\_RAVEN}) & \cmd{Q}, \cmd{HCOF}, \cmd{RHS} & reservoir seepage\\\bo
 For MODFLOW versions before 6.5 the values are written to the columns of \cmd{BOUND} instead.
 
 \section{Changes to existing Raven files}\label{sec:coreflix}
-The changes are against Raven~4.15 (v593) and are offered as independent pull requests (four so far, a fifth to follow), which merge cleanly in any
-order:
+The changes are against Raven~4.15 (v593). They form five independent groups, each offered as a pull request; the pull
+requests merge cleanly in any order:
 \begin{enumerate}
 \item \textbf{Groundwater coupling} (branch \cmd{mf6-groundwater}): the new source files and the changes below that
       concern groundwater.
 \item \textbf{Ensemble reset} (\cmd{fix-ensemble-reset}): every ensemble member starts from the routing memory and
-      reservoir states of the first run (\cmd{RestoreInitialDynamicState}); before, each member inherited the previous
-      member's.
+      reservoir states of the first run (\cmd{RestoreInitialDynamicState}) instead of inheriting the previous member's.
 \item \textbf{Reservoir balance} (\cmd{fix-reservoir-balance}): a drying reservoir books only the water available;
       reservoir stages and flows written to \cmd{solution.rvc} with 12 digits; reservoirs with absolute stages start at
       their crest when no initial condition is given; the reservoir constraint is initialised; a reservoir whose
       \cmd{:HRUID} lies in another subbasin stops with a message instead of crashing.
 \item \textbf{Observation constituent} (\cmd{fix-observation-constituent}): \cmd{:ObservationData} and
       \cmd{:ObservationWeights} for \cmd{STREAM\_CONCENTRATION} read the constituent name before the line is re-read.
-\item \textbf{Age-tracer hotstart} (to be offered as a fifth pull request): the \cmd{:StartTime} offset of a
+\item \textbf{Age-tracer hotstart}: the \cmd{:StartTime} offset of a
       hotstart reaches the age tracers. The masses keep the datum of the run that wrote the file, the age clock and the
       entry time of precipitation are shifted by the offset, and \cmd{solution.rvc} writes that datum as its
-      \cmd{:StartTime}, so a chain of hotstarts keeps one datum. (Shifting the masses instead made them negative, which
-      the advection limiter cannot carry.) Runs without an age tracer, and cold starts, are unchanged.
+      \cmd{:StartTime}, so a chain of hotstarts keeps one datum. (Shifting the masses instead would make them negative,
+      which the advection limiter cannot carry.) Runs without an age tracer, and cold starts, are unchanged.
 \end{enumerate}
 \begin{table}[!htbp]\centering
 \caption{Changes to existing Raven files (pull request in brackets).}
@@ -92,7 +91,7 @@ File & Change\\\midrule
 \cmd{ParsePropertyFile.cpp} & \cmd{:AquiferClasses}, \cmd{:AquiferProfiles}, \cmd{:AquiferProfile\allowbreak Parameters} (1)\\
 \cmd{ParseHRUFile.cpp}, \cmd{HydroUnits.h} & \cmd{AQUIFER\_PROFILE} stored on each HRU (1)\\
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate}, \cmd{:BoundaryHead} (1); constituent name captured before parsing (4)\\
-\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (it read an end date that was never set) (1), passed to the age tracers before their initial conditions are set (5)\\
+\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (1), passed to the age tracers before their initial conditions are set (5)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor (2)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision, constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\
@@ -194,7 +193,7 @@ environment variable meson itself reads), else with the compiler CMake's own che
 the \cmd{PATH}. \cmd{FC} is read directly because CMake's check ignores it with the Visual Studio generators; the
 compiler is named in the configure output and in \cmd{libmf6\_version.txt}. On Windows, gfortran from MSYS2 or
 \cmd{fortran-lang/setup-fortran} works with the Visual Studio and the Ninja generators (the continuous-integration
-workflow \cmd{.github/workflows/raven-mf6.yml} does this; it has not yet run on real Windows and macOS runners).
+workflow \cmd{.github/workflows/raven-mf6.yml} does this; it has not been run on real Windows and macOS runners).
 
 \paragraph{What ends up where.} In every mode except \cmd{OFF} the library is copied next to the Raven executable under
 its standard name (\cmd{libmf6.so}, \cmd{libmf6.dylib}, \cmd{libmf6.dll}), with \cmd{libmf6\_version.txt} beside it
@@ -215,11 +214,9 @@ kept). Any other version than 6.8.1, a library that does not report its version,
 (quoted in the message) gives one warning; outputs are otherwise unchanged. Suffixes such as \cmd{6.8.1-dev} or
 \cmd{6.8.1+abc.dirty} (a source build inside a git checkout) count as 6.8.1.
 
-\paragraph{Checks.} \cmd{tests/cmake\_checks.py} runs 19 offline configure checks of the above (60 parts) in about a
-minute, each also shown to fail on the defect it was written for (\cmd{--selftest}); checks 15--19 are those of
-Table~\ref{tab:vcmake} in Chapter~\ref{ch:verification} (offline default, default build type, version floor, runtime
-bundling for macOS and Windows emulated on Linux, messages); \cmd{tests/mf6version\_check.py} checks the
-version guard with a stand-in library. A library built from source and the official one give the same results to
+\paragraph{Checks.} \cmd{tests/cmake\_checks.py} runs 22 offline configure checks of the above in about a minute, each
+also shown to fail on the defect it guards against (\cmd{-{}-selftest}; Table~\ref{tab:vcmake}, Section~\ref{sec:vbuild});
+\cmd{tests/mf6version\_check.py} checks the version guard with a stand-in library. A library built from source and the official one give the same results to
 round-off (Section~\ref{sec:getmf6}).
 
 \section{Getting MODFLOW 6}\label{sec:getmf6}
@@ -242,7 +239,7 @@ other than x86\_64 and Windows on ARM64 (it stops and points to \cmd{cmake -DRAV
 on ARM64 a win64 zip given with \cmd{--zip} is used, with a note, for an x64 Raven running under emulation), and Intel
 Macs from MODFLOW~6.8 on (\cmd{--version 6.6.3}, the last tested release with an Intel Mac zip, or \cmd{SOURCE}). The
 default is the tested version rather than the newest release, so that a new MODFLOW release cannot change a model's
-results unnoticed; with MODFLOW~6.6, for example, the Newton option behaved differently.
+results unnoticed; with MODFLOW~6.6, for example, the Newton option behaved differently (Section~\ref{sec:mf6versions}).
 
 Raven looks for the library in this order: \cmd{:MF6Library} in the \cmd{.rvg} file; the environment variable
 \cmd{RAVEN\_MF6\_LIB}; next to the Raven executable; \cmd{lib/mf6/} beside it or one to three folders up (so
@@ -284,7 +281,7 @@ test (\cmd{tests/gridtest.cpp}), the Thiem test (\cmd{tests/thiem/}) and the ran
 \item Build with \cmd{-fsanitize=address,undefined} and run the feature tests.
 \end{enumerate}
 
-\section{Limitations and future work}\label{ch:limits}
+\section{Limitations and known issues}\label{ch:limits}
 \paragraph{Current limitations.}
 \begin{itemize}
 \item Refinement of a regular grid spans whole rows and columns; use a quadtree or HRU mesh for local refinement.
@@ -313,10 +310,19 @@ package keeps the model's stage and has no conductance (supply) limit; undefined
 taken as metres and days (set them in DIS and TDIS); monitoring wells and \cmd{GWHeads.nc} need the cell outlines
 (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not \cmd{:OverlapWeights}). Water-table ET, \cmd{:SurfaceWaterExchange} and
 \cmd{:ReservoirExchange} work as with a generated model.
-\item Raven's channel-storage bookkeeping (\cmd{:ChannelStorage} in \cmd{solution.rvc}) can be negative in some subbasins; this
-already happens in Raven~4.1.1 without groundwater (17 subbasins of the Liard model) and is left unchanged here, as it belongs
-to Raven's routing, not to the coupling.
-
+\end{itemize}
+\paragraph{Known issues in Raven itself.} The following belong to Raven's own code, behave the same without groundwater, and
+are left to the Raven developers:
+\begin{itemize}
+\item Raven's channel-storage bookkeeping (\cmd{:ChannelStorage} in \cmd{solution.rvc}) can be negative in some subbasins
+(17 subbasins of the Liard model without groundwater).
+\item Reservoir routine: on the day after a reservoir has been drawn empty by a minimum flow, the outflow still averages in
+the release rate at the end of the previous day, although the lake is empty; this makes up most of such a reservoir's balance
+error (Section~\ref{sec:behaviour}, Reservoirs that run dry).
+\item valgrind reports uninitialised reads in base Raven when it reads the \cmd{.rvp} file: in \cmd{RVPParameterWarning}
+(called from \cmd{ParseClassPropertiesFile}; three contexts) and in \cmd{CVegetationClass::RecalculateRootParams} (two
+contexts; 23 errors in the short run of test I10). The coupling's own code and the hotstart code show none
+(Section~\ref{sec:codeaudit}).
 \end{itemize}
 \paragraph{Not available.}
 Groundwater transport (MODFLOW~6 GWT) linked to Raven constituents; particle tracking (PRT) during the run (offline tracking

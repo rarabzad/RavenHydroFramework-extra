@@ -34,7 +34,7 @@ import tempfile
 import urllib.request
 import zipfile
 
-TESTED = '6.8.1'    # the version the coupling was verified with (docs/VERIFICATION_REPORT_MF6.8.1.md)
+TESTED = '6.8.1'    # the version the coupling was verified with (manual, chapter "Verification")
 REPO = 'MODFLOW-ORG/modflow6'
 HERE = os.path.dirname(os.path.abspath(__file__))
 ADDON = os.path.dirname(HERE)                         # the RavenHydroFramework-extra repository

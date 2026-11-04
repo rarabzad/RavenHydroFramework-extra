@@ -41,7 +41,7 @@ its base in the last step) has no line; the restart builds it at rest, as the co
 this is not a mismatch (\cmd{test\_vz\_classes.py} C10).
 
 \paragraph{Verification} (\texttt{tests/soilzone/test\_vz\_classes.py}; Figure~\ref{fig:vzclasses}). C1: with $K=1$
-the outputs are byte-identical to a build without the classes (\cmd{NONE}, and \cmd{RICHARDS} where the water table does
+the outputs are byte-identical to a build without depth classes (\cmd{NONE}, and \cmd{RICHARDS} where the water table does
 not reach, within a step, ground unsaturated at its start; elsewhere the hand-back of rule (i), Section~\ref{sec:szvadose},
 is the only difference), the diagnostic column \emph{interface change} left out. C2: a cell with hummocks of $\pm2.5$~m
 whose mean base is 3~cm above the water table: with $K=1$ no water passes through a column; with $K=3$ 949~m$^3$ pass

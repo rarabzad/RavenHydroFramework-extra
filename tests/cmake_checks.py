@@ -21,13 +21,13 @@ for its first part; otherwise those parts are skipped).
    RAVEN_MF6_SOURCE_DIR -> SOURCE), an option of another mode is reported as ignored, an unpinned zip is used with a
    warning (h5.6)
  7 meson gets the Fortran compiler of FC: FC = a renamed link W/fc/myfc while CMake's own check names another compiler;
-   that path is in mf6_source-cfgcmd.txt (h5.7.4: fails when the FC lines are removed)
+   that path is in mf6_source-cfgcmd.txt (h5.7: fails when the FC lines are removed)
  8 a meson whose --version is not readable is named as such (default and explicit SOURCE) (h5.8)
  9 a staged install (DESTDIR, absolute and relative) of a gfortran-built library gets libgfortran.so.5 (h5.8)
 10 no git (CMAKE_DISABLE_FIND_PACKAGE_Git, GIT_EXECUTABLE NOTFOUND): the default falls back naming git (10a), explicit
    SOURCE stops naming git (10b), SOURCE with RAVEN_MF6_SOURCE_URL needs no git (10c)
 11 an unpinned RAVEN_MF6_ZIP replaced by another (same name) is unpacked again; a third configure does not unpack
-   (a sentinel file put into mf6/prebuilt survives) (i5.2)
+   (a sentinel file put into mf6/prebuilt survives)
 12 Windows target (emulated: CMAKE_SYSTEM_NAME=Windows, CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY): AMD64 takes
    mf6.8.1_win64.zip, ARM64 with PREBUILT stops ("no library for Windows ARM64"), ARM64 by default falls back to OFF (i5.3)
 13 package version 6.7.2 from RAVEN_MF6_SOURCE_URL .../v6.7.2.tar.gz, and the info line of an unpinned zip

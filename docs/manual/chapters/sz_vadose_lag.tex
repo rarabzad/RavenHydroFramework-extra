@@ -50,7 +50,7 @@ the default 16 nodes to 15\% for 50 and 10\% for 100; columns shorter than $N\ti
 
 \paragraph{The step.} Each Raven step is divided into $n$ equal substeps no longer than the shortest residence time,
 $n=\min\big(\max(\lceil\dt/\min_ik_i\rceil,1),50\big)$ (computed in floating point and clamped before it is made an
-integer: a tiny residence time, with 200 nodes or \cmd{LAG 1e-6}, would overflow an integer). In
+integer, so that a tiny residence time, with 200 nodes or \cmd{LAG 1e-6}, cannot overflow it). In
 each substep every node, top down, is solved exactly with the constant inflow its upper neighbour released in that
 substep,
 \begin{equation}
@@ -143,4 +143,4 @@ through the columns into the soil zone and falling again), L3 (a column across t
 most the room the cell has left), L7 (a column leak of $10^{-5}$ or $10^{-4}$~m$^3$ per step written into a run's
 \cmd{GWBudget.csv} fails the script's checks: every run is checked with the column identity of \cmd{sz\_check} from
 the first step), S (cost) and B
-(\cmd{NONE}, \cmd{RICHARDS} and \cmd{CONCEPTUAL} runs byte-identical to a build without \cmd{LAG}).
+(\cmd{NONE}, \cmd{RICHARDS} and \cmd{CONCEPTUAL} runs byte-identical to a reference build, \cmd{RAVEN\_EXE\_REF}).

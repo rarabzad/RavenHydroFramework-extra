@@ -1,4 +1,4 @@
-% Positions of the water table relative to the soil zone and what carries the water in each (soil zone)
+% Positions of the water table relative to the soil zone and what carries the water in each
 \begin{tikzpicture}[font=\sffamily\scriptsize,x=1mm,y=1mm,
   soil/.style={fill=brown!18,draw=brown!60!black,line width=0.4pt},
   unsat/.style={fill=yellow!10,draw=none},
@@ -7,7 +7,7 @@
   base/.style={brown!60!black,dashed,line width=0.6pt},
   up/.style={-{Stealth[length=1.8mm]},line width=0.8pt,teal!70!black},
   dn/.style={-{Stealth[length=1.8mm]},line width=0.8pt,orange!85!black},
-  lab/.style={align=center,text width=27mm,inner sep=1pt}]
+  lab/.style={align=center,text width=23mm,inner sep=1pt}]
 % one panel: x offset #1, water-table elevation #2 (land 60, soil base 48, soil layers 48-54-60)
 \newcommand{\panel}[2]{%
   \fill[sat] (#1,0) rectangle (#1+26,#2);
@@ -21,7 +21,7 @@
 \panel{0}{14}
 \draw[wt] (0,14) -- (26,14); \fill[blue!70!black] (21,14) -- ++(-1.4,2.2) -- ++(2.8,0) -- cycle;
 \draw[dn] (4,47) -- (4,17); \node[lab,text width=13mm,align=left,anchor=west] at (5,36) {Richards column: delay, spreading};
-\draw[up] (21,27) -- (21,49.5); \node[lab,text width=9mm,align=center] at (20.5,22.5) {rise from the column};
+\draw[up] (22,17) -- (22,49.5); \node[lab,text width=12mm,align=right,anchor=east] at (20.8,23) {rise from the column};
 % (b) just below the soil base
 \panel{30}{45}
 \draw[wt] (30,45) -- (56,45); \fill[blue!70!black] (51,45) -- ++(-1.4,2.2) -- ++(2.8,0) -- cycle;
@@ -32,11 +32,11 @@
 \fill[sat] (60,48) rectangle (86,52); \draw[wt] (60,52) -- (86,52); \fill[blue!70!black] (81,52) -- ++(-1.4,2.2) -- ++(2.8,0) -- cycle;
 \draw[up] (66,52.5) -- (66,58.5);
 \draw[{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]},line width=0.8pt,violet] (73,44) -- (73,51);
-\node[lab] at (73,32) {saturated soil exchanges with the aquifer (Robin interface); recharge rejected on saturated ground; rise into the layer above};
+\node[lab] at (73,28) {saturated soil exchanges with the aquifer (Robin interface); recharge rejected on saturated ground; rise into the layer above};
 % (d) at the land surface
 \panel{90}{60}
 \fill[sat] (90,48) rectangle (116,60); \draw[wt] (90,60) -- (116,60);
-\node[lab] at (103,32) {full soil zone overflows to SURFACE\_WATER: rain and exfiltration run off the same day};
+\node[lab] at (103,32) {full soil zone overflows to SURFACE\_\-WATER: rain and exfiltration run off the same day};
 % (e) specified head
 \panel{120}{50}
 \fill[sat] (120,48) rectangle (146,50); \draw[wt,dash pattern=on 3pt off 1.5pt] (120,50) -- (146,50);

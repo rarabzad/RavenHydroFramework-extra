@@ -1,5 +1,5 @@
 % Verification on rough terrain (tests/soilzone/test_rough_terrain.py, rough_models.py, rough_ext.py, rough_cases/).
-\section{Verification on rough terrain}\label{sec:vrough}
+\section{Rough terrain}\label{sec:vrough}
 The tests of Section~\ref{sec:vsoilzone} use planar hillslopes. Real ground is irregular: slopes change within a cell,
 the land holds pits, closed depressions, cliffs and ridges, the DEM is finer or coarser than the grid and may end inside
 it, and the MODFLOW layers slope, thin out and pinch against bedrock. The rough-terrain suite
@@ -63,10 +63,11 @@ and no recharge, for the run's duration; the stop is justified only if those hea
 than $10^6$~m within the outer iterations. A column held 1~mm above its bottom (Section~\ref{sec:drained}) is reported,
 not a failure.
 
-\paragraph{Regression cases.} Twenty cases run first (R1--R20): R1 is a flat hillslope (the configuration of P3
-without columns), on which an interface that passed as converged with the saturated fraction of an earlier iterate
-rejected 15\,\% of the recharge where the closure at the step's heads allows at most 5\,\%; R2--R20 are stored cases
-(\cmd{rough\_cases/*.json}, each with its spec and the meta data the checks use) for the problems the suite found. Each has
+\paragraph{Regression cases.} Twenty cases run first (R1--R20, Table~\ref{tab:vroughprob}): R1 is a flat hillslope (the
+configuration of P3 without columns) on which the rejection must follow the converged head: with the saturated fraction of
+an earlier iterate it would reject 15\,\% of the recharge where the closure at the step's heads allows at most 5\,\%;
+R2--R20 are stored cases (\cmd{rough\_cases/*.json}, each with its spec and the meta data the checks use) of the hardest
+situations the suite draws. Each has
 its own checks besides the above: R6, R11--R13 and R19 must complete (no stop at all), and R20 (stored existing model e43,
 \cmd{LAG}) must hold the saturated fraction to the closure within 0.004 with any method: its land lies in
 places within the 1~mm band above the top cell's bottom, where no sub-grid base may lie. \cmd{--case} applies these checks
@@ -84,7 +85,7 @@ $5\times10^{-8}$~m, bases to $5\times10^{-8}$~m. On converged steps the saturate
 and \cmd{LAG}, 0.0020 with \cmd{KINEMATIC}).
 \begin{table}[!htbp]\centering
 \caption{Rough-terrain suite, default seeds and regression cases, one depth class.
-Run times depend on the machine and its load (the rerun shared two cores with another test suite).}\label{tab:vroughres}\small
+Run times depend on the machine and its load (two cores shared with another test suite).}\label{tab:vroughres}\small
 \begin{tabular}{P{0.36\linewidth}P{0.13\linewidth}P{0.13\linewidth}P{0.13\linewidth}P{0.13\linewidth}}\toprule\hdr
  & \cmd{NONE} & \cmd{RICHARDS} & \cmd{KINEMATIC} & \cmd{LAG}\\\midrule
 runs & 407 & 408 & 401 & 404\\
@@ -118,16 +119,17 @@ rain (the upper classes' longer columns hold more of the rain on its way down), 
 dry spell that follows the rain (day 67, as they release it).
 
 \begin{table}[!htbp]\centering
-\caption{Problems the rough-terrain suite found and their regression cases.}\label{tab:vroughprob}\small
+\caption{The regression cases of the rough-terrain suite: the situation each one stores and the part of the coupling that
+handles it. They run first in the suite.}\label{tab:vroughprob}\small
 \begin{tabular}{P{0.47\linewidth}P{0.33\linewidth}P{0.11\linewidth}}\toprule\hdr
-Problem & Correction & Case\\\midrule
-rejection with the saturated fraction of an earlier iterate on a converged step & rejection follows the converged head & R1\\
-columns inject water into cells filled to the soil-zone base (heads up to 170~m above the land) & the columns' hand-back and the heads check & R14--R16\\
-drained columns leave MODFLOW's solve singular & a drained column is held 1~mm above its bottom once per step (and once more on any later solve in that step) & R6, R11--R13\\
-an existing model without \cmd{NEWTON} whose top cells dry & a stop: \cmd{NEWTON} is required & R17\\
-divergence of \cmd{LAG} on a slowly permeable slope (g350) & & R19\\
+Situation & Handled by & Case\\\midrule
+rejection on a converged step & the rejection follows the converged head & R1\\
+columns over cells filled to the soil-zone base & the columns' hand-back and the heads check & R14--R16\\
+drained columns, which would leave MODFLOW's solve singular & a drained column is held 1~mm above its bottom once per step (and once more on any later solve in that step) & R6, R11--R13\\
+an existing model without \cmd{NEWTON} whose top cells dry & a start-up stop: \cmd{NEWTON} is required & R17\\
+\cmd{LAG} on a slowly permeable slope (g350), which must complete & the \cmd{LAG} cascade (Section~\ref{sec:szvadoselag}) & R19\\
 sub-grid bases in the 1~mm band below the lowest drain level & bases clipped at the top cell's bottom + 1~mm & R3, R20\\
-saturated fraction off the closure with three depth classes (connection head left above MODFLOW's head) & the connection test & R20 with \cmd{--vzclasses 3} (C9 of the depth-class tests, and the three-class rerun of \cmd{run\_all.py})\\
+the saturated fraction with three depth classes (a connection head away from MODFLOW's head) & the connection test (Section~\ref{sec:szinterface}) & R20, also with three depth classes (C9)\\
 slowly permeable or low-yield top cells, dried top cells, DISV models & head-dependent rejection, upward flow from a lower cell & R2, R4, R5, R7--R10, R18\\
 \bottomrule
 \end{tabular}

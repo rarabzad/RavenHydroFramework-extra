@@ -131,7 +131,7 @@ def c1():
     rain = [0.0] * 5 + [30.0] * 3 + [0.0] * (12 if QUICK else 32)
     cases = [('plan', dict(BASE, init_depth=4.0, rain=rain, days=len(rain))),
              ('hum', dict(BASE, init_depth=1.6, rain=rain, days=len(rain), dem_fn=hummocks(1.0)))]
-    # RICHARDS on the hummocky case differs from the hooks build by design wherever the water table reaches, during a step,
+    # RICHARDS on the hummocky case differs from a build without rule (i) by design wherever the water table reaches, during a step,
     # ground that was unsaturated at its start (rule (i): the columns' outputs there go back to the soil zone): compared, reported, not required identical against a pre-rule reference (C1_STRICT=1 does)
     ok = True
     for nm, cfg in cases:

@@ -258,7 +258,7 @@ int main()
     vector<double> tg={0.5*(c[0][0]+c[1][0]),0.5*(c[0][1]+c[1][1])+20.0};                   //20 mm of rain on the top layer
     double o=Distribute(L2,c,w,tg);
     check(close(o,10.0) && close(c[1][1],L2[1].phifc+20.0) && c[0][1]==L2[1].phimax,"Distribute: rain on a full column overflows, not moved to the dry one",o,10.0); }
-  //-- edge cases found by the checks
+  //-- edge cases
   { vector<sz_layer> L2=TwoLayers(); vector<double> p={L2[0].phimax+10.0,0.0}; double tot0=p[0]+p[1];
     double o=Fill(L2,p,10.0); check(close(p[0]+p[1]+o,tot0+10.0),"Fill keeps water above capacity in an overfull layer",p[0]+p[1]+o,tot0+10.0); }
   { vector<sz_layer> L3(3); L3[0]={200,100,1}; L3[1]={0,0,0}; L3[2]={200,100,1}; vector<double> p={200,0,150};

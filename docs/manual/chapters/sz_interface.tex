@@ -1,4 +1,4 @@
-% Soil zone: interface iteration, negative recharge and the MODFLOW side
+% The soil-zone interface iteration in detail, negative recharge and the MODFLOW side
 \subsection{The interface iteration in detail}\label{sec:szinterface}
 
 \paragraph{Schedule.} After each of the first $n_{\mathrm{early}}=\min(5,\max(1,n_{\max}/5))$ outer iterations the interface
@@ -19,8 +19,8 @@ q_{\mathrm{rej}}(h)=s\,(h_c-h),\qquad s=\max\Big(R_lF'(h_c),\ \frac{R_l\big(F(h^
 \end{equation}
 $h^*$ the head MODFLOW returned last (a GHB of head $h_c$ and conductance $s$, merged with the exchange's GHB). MODFLOW's own
 iteration then sees that more recharge is rejected as its head rises (over a top layer with $K_v<0.01$~m/d, confined above
-its top, the recharge is otherwise a valve of very high gain: the interface failed on 10 to 100\,\% of the steps of test S1
-with 170 to 350 outer iterations per step; now 4 to 6). The term is booked with the exchange, so mass is exact. On a link
+its top, the recharge is otherwise a valve of very high gain; with the term the interface of test S1 converges in 4 to 6 outer
+iterations per step). The term is booked with the exchange, so mass is exact. On a link
 whose unsaturated column carries the step the saturated share is rejected with the fraction of the start of the step $F_0$;
 the water the column gives back to the soil zone on ground that saturated since then (rule (i)) follows the connection head
 and is in the term, $R_q\min(\max(F(h)-F_0,0),1-F_0)$ with $R_q$ the column's outputs over $1-F_0$ (everything when $F_0=1$;

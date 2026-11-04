@@ -25,26 +25,24 @@ S3  explicit coupling (:SoilZoneIteration 0) over a thin top layer (0.8 m) on a 
 S4  S3 with a tiny interface budget (:SoilZoneIteration 1 and 2, NONE and RICHARDS): the last update the budget allows
     (with :SoilZoneIteration 1 the first update after MODFLOW has converged, with 2 the second) is supply-limited, with the
     rejection's linear term active on wet links. Line and term together may not take more than the column holds down to
-    the lowest head the cell can reach (the term was capped down to the top cell's bottom only and on
-    top of the line's cap; with the checker's instrumentation the base build's last updates could take up to 792 m3/d
-    beyond a column's free water at that head; no step of these runs reaches that head, so the shortfall was 0 on both
-    builds). Raven reports the largest such take in GWModelSummary.txt ("supply-limited updates"), which must be 0
-    (within 1e-6 m3/d). The runs with a budget of 1 and RICHARDS with 2 must make supply-limited updates
-    (1120, 1120 and 40); NONE with a budget of 2 makes none, so its take check is vacuous there and the run
+    the lowest head the cell can reach. Raven reports the largest such take in GWModelSummary.txt ("supply-limited updates"), which must be 0
+    (within 1e-6 m3/d); a build without that report line fails the check. The runs with a budget of 1 and RICHARDS
+    with 2 must make supply-limited updates (1120, 1120 and 40); NONE with a budget of 2 makes none, so its take check is vacuous there and the run
     checks the identities and the shortfall only. What the count does and does not show: it counts every link of every
     supply-limited update, whether or not the limit lowered that link's slope (1120 = 56 steps x 20 links: every step's
     last update), so a non-zero count shows that the limited update was made, not that the limit acted. With NONE the
     interface converges on that update in every step (no unconverged interface step), and the runs with budgets 1 and 2
-    give identical outputs (v3m11: every CSV byte-identical): the limit does not change this case's result, and the NONE
+    give identical outputs (every CSV byte-identical): the limit does not change this case's result, and the NONE
     run with a budget of 1 checks only that the supply-limited update keeps the identities, makes no shortfall and
     reports no take beyond the free water; the test prints whether the two NONE runs' outputs are identical (reported,
     not checked: a change there is not a failure). Checks: the identities, no shortfall, that take; the interface may be
-    unconverged on some steps (frozen after the budget's updates; on v3m11 RICHARDS 2 steps with a budget of 1 and 1
+    unconverged on some steps (frozen after the budget's updates; RICHARDS 2 steps with a budget of 1 and 1
     with 2, NONE none), which is only reported.
 S5  S4's :SoilZoneIteration 1 with a constant percolation of 5 mm/d and PET 5 mm/d from 1 m deep: on the last update the rejection term's slope was capped by its own rejected recharge only; where the free
     water left after the exchange line's take was smaller (the line's own cap then 0) line and term together took up to
     0.35 m3/d more than the column held at the lowest head. The reported take must be 0 (within 1e-6 m3/d), with
-    supply-limited updates made.
+    supply-limited updates made (a build without the report line fails the check). Without the cap on the term the
+    reported take is 0.35 m3/d; no head reaches that level, so the shortfall is 0 either way.
 S6  S3 with an outer-iteration limit of 1 (:SolverMaxOuterIterations 1), :SoilZoneIteration 0 and 1: one outer iteration leaves no interface update, so both are explicit coupling; with :SoilZoneIteration 1 every
     step was reported as an unconverged interface (56 of 56). Checks: the interface converged on every step and the two
     runs' outputs identical (MODFLOW itself is unconverged on such steps, its balance error that of one outer iteration:
@@ -66,9 +64,10 @@ S7  outer-iteration limits of 2 and 3 (:SolverMaxOuterIterations) on a quiet hil
     last update can follow the first outer iteration only if MODFLOW has converged by the second (limit 4) or the third
     (limit 5) outer iteration; when it has not, the step keeps one unverified update and is reported unconverged, as
     before.)
-S8  the reason of an unconverged interface and the connection-test drop. The     connection test (SZIterate: a connection head further than d_s from MODFLOW's head with a different saturated
-    fraction keeps the interface unconverged and drops the link's bracket and last residual) was found on rough-suite case
-    band_e43 (R20, LAG with three depth classes); that case never fires it (no drop on any step, and
+S8  the reason of an unconverged interface and the connection-test drop. The
+    connection test (SZIterate: a connection head further than d_s from MODFLOW's head with a different saturated
+    fraction keeps the interface unconverged and drops the link's bracket and last residual) guards rough-suite case
+    band_e43 (R20, LAG with three depth classes); that case does not fire it (no drop on any step, and
     none in any other stored rough case, method or class count), so S8 uses a constructed case where it does fire: stored
     case lowkv_g57 (steep slope, top layer of Kv 3.6 mm/d) with no rain, a smoothing depth d_s of 0.5 m, the water table
     16 m deep and :SolverHeadTolerance 0.05 m, 3 days, :SoilZoneVadose NONE. On day 3 an early, unconverged MODFLOW iterate
@@ -79,7 +78,7 @@ S8  the reason of an unconverged interface and the connection-test drop. The    
     (The loose head tolerance makes MODFLOW accept the iterates sooner; with the default 1e-5 m the early iterates give
     the links flow and the flow tests catch them first.) Two runs: the default outer limit, where updates follow the drop:
     GWModelSummary.txt's run totals must count drops and every drop's next update in the step must be the plain one
-    (h_c = h); and :SolverMaxOuterIterations 20, where MODFLOW does not converge on day 3 after the drop, so the drop is the
+    (h_c = h: a kept residual could form a new bracket with the stale point); and :SolverMaxOuterIterations 20, where MODFLOW does not converge on day 3 after the drop, so the drop is the
     step's last update: the warning for the step ending 2000-01-04 must name the connection test, its link (HRU and cell)
     and the two fractions, and say that the soil levels and exchange are within the tolerances; drops counted, none
     followed by an update. Disabling the test (the drop and its reset) makes both runs fail (no drop, no such warning).
@@ -257,7 +256,7 @@ def s8():
     try:
         import test_rough_terrain as T, rough_models as rm
         S = dict(T.load_case('lowkv_g57'))
-    except Exception as x:   # (the rough-terrain suite and its stored cases are not part of this test)
+    except Exception as x:   # (the stored rough-terrain cases are not present)
         sz_check.tc.skip('S8', 'rough-terrain suite (test_rough_terrain.py, rough_cases/lowkv_g57.json) not available: %s' % x)
         return True
     S.update(rain=[0.0] * 3, ds=0.5, init_depth=16.0)
@@ -283,7 +282,7 @@ def s8():
         else:
             g = True
             # (an update follows every drop, and it is the plain one: the link's bracket and its last residual are
-            # dropped)
+            # dropped, so no new bracket starts from a stale residual)
             g2 = nd is not None and nd > 0 and npl == nd
             lim = dict(LIM); lim.pop('mf6_err_rel', None)
         print('  S8 (%s): connection-test drops %s on %s steps, next update plain on %s -> %s' % (tag, nd, ns, npl, 'ok' if g2 else 'FAIL'))

@@ -18,9 +18,8 @@ I8 a :SurfaceWaterExchange on a soil-zone layer of a soil-zone HRU is refused (t
 I9 a damaged :GWHeads header in the .rvc: a negative count (":GWHeads -1 2 2") and a huge one (":GWHeads
    100000 100000 100000") stop the run with a clear message (ExitGracefully: "counts must be positive"), not an uncaught
    exception (std::length_error / std::bad_alloc, "terminate called").
-I10 :StartTime of the .rvc (Raven core, ParseInitialConditionFile.cpp): the offset of the run's start from the
-   start of the run that wrote the file is computed from the run's real start date (it read an end date that was never
-   set). A run without :GroundwaterModel (the I7 model, 2 days) from an .rvc with :StartTime under valgrind: no
+I10 :StartTime of the .rvc: the offset of the run's start from the
+   start of the run that wrote the file is computed from the run's real start date. A run without :GroundwaterModel (the I7 model, 2 days) from an .rvc with :StartTime under valgrind: no
    "uninitialised value" in ParseInitialConditionsFile / TimeDifference (SKIP when valgrind is not installed).
 I11 a :BoundaryHead or :WellFlowRate time series that names no boundary or well: ":BoundaryHead NOPE"
    beside a specified-head boundary EDGE, and ":WellFlowRate 7" when the only well is 1, stop the run naming the series
@@ -33,13 +32,14 @@ I13 messages: a missing .rvg file is named in Raven_errors.txt ("Cannot find or 
    with a missing value names the :Wells table (not ":EndWells").
 I14 age tracer across a hotstart (Raven core; no :GroundwaterModel): a 2-layer soil model with :Transport AGE, 20 days
    continuous against 7 + 7 + 6 days chained through solution.rvc: the ages of every store (Ages.csv) and of the outflow
-   (AGEPollutographs.csv) equal the continuous run's within 1e-3 d (the .rvc carries 6 digits). Each solution.rvc carries
+   (AGEPollutographs.csv) equal the continuous run's within 2e-4 d plus 1e-5 of the age (Ages.csv writes 6 significant digits;
+   the largest difference is 1e-4 d). Each solution.rvc carries
    :StartTime, the start of the run that wrote it, and, when the datum of its entry times is earlier (the restarted
    parts), :AgeTracerDatum 2000-01-01.
 I15 the same across year boundaries: a chain 1999-12-25 (7 d), 2000-01-01 (7 d), 2000-01-08 (6 d) against 20 days in one
    run, and a multi-year chain 1998-12-20 (400 d), 2000-01-24 (380 d) against 780 days (full mode; quick: 1998-12-20
    (12 d), 1999-01-01 (400 d), 2000-02-05 (8 d) against 420 days). Every part runs, the ages equal the continuous run's
-   within 1e-3 d, and :AgeTracerDatum is the chain's first start written as a valid date (1999-12-25, 1998-12-20).
+   within 2e-4 d plus 1e-5 of the age, and :AgeTracerDatum is the chain's first start written as a valid date (1999-12-25, 1998-12-20).
 I16 an age-tracer run started from the solution.rvc of a spin-up run without the tracer (30 days, then 5 days with
    :Transport AGE): the file holds no age-tracer masses, so the initial water has age 0 (soil and groundwater ages 0 at
    the start, below 1.01 d after the first day), as in Raven without the coupling; the run's solution.rvc has no
@@ -68,6 +68,15 @@ def case(name, **kw):
 
 def edit(path, old, new):
     t = open(path).read(); assert old in t, (path, old); open(path, 'w').write(t.replace(old, new))
+
+AGE_TOL, AGE_REL = 2e-4, 1e-5   # I14, I15: 2e-4 d plus the 6 significant digits Ages.csv writes (1e-5 of the age)
+
+def age_diff(a, b):
+    """largest |a - b| of two age columns [d], and whether any difference exceeds AGE_TOL + AGE_REL |a|"""
+    import pandas as pd
+    a = pd.to_numeric(a, errors='coerce'); b = pd.to_numeric(b, errors='coerce'); d = (a - b).abs()
+    v = d.max(); over = bool((d > AGE_TOL + AGE_REL * a.abs()).any())
+    return float(0.0 if pd.isna(v) else v), over
 
 def errors(d):
     p = os.path.join(d, 'out', 'Raven_errors.txt')
@@ -274,22 +283,22 @@ def main():
     for i, (start, n) in enumerate((('2000-01-01', 7), ('2000-01-08', 7), ('2000-01-15', 6))):
         d, ok = age_case('I14_part%d' % (i + 1), n, start if i else None, prev)
         good &= ok; chain.append((d, 7 * i)); prev = os.path.join(d, 'out', 'solution.rvc')
-    worst = {}; st = []
+    worst = {}; st = []; over = False
     if good:
         c = pd.read_csv(os.path.join(dc, 'out', 'Ages.csv')); cp = pd.read_csv(os.path.join(dc, 'out', 'AGEPollutographs.csv'))
         for d, t0 in chain:
             b = pd.read_csv(os.path.join(d, 'out', 'Ages.csv')); bp = pd.read_csv(os.path.join(d, 'out', 'AGEPollutographs.csv'))
             cc = c[c['time[d]'] >= t0].reset_index(drop=True).iloc[:len(b)]; ccp = cp.iloc[t0:t0 + len(bp)].reset_index(drop=True)
             for col in [x for x in b.columns if x.endswith('[d]') and x != 'time[d]']:
-                v = (pd.to_numeric(cc[col], errors='coerce') - pd.to_numeric(b[col], errors='coerce')).abs().max()
-                worst[col] = max(worst.get(col, 0.0), float(0.0 if pd.isna(v) else v))
+                v, o = age_diff(cc[col], b[col]); over |= o
+                worst[col] = max(worst.get(col, 0.0), v)
             for col in [x for x in bp.columns if x.endswith('[d]') and not x.startswith('time')]:
-                v = (pd.to_numeric(ccp[col], errors='coerce') - pd.to_numeric(bp[col], errors='coerce')).abs().max()
-                worst['outflow ' + col] = max(worst.get('outflow ' + col, 0.0), float(0.0 if pd.isna(v) else v))
+                v, o = age_diff(ccp[col], bp[col]); over |= o
+                worst['outflow ' + col] = max(worst.get('outflow ' + col, 0.0), v)
             sol = open(os.path.join(d, 'out', 'solution.rvc')).read(); m = re.search(r':AgeTracerDatum (\S+)', sol)
             st.append((sol.split('\n')[0].strip(), m.group(1) if m else None))
         want = [(':StartTime 2000-01-%02d' % (1 + t0), None if t0 == 0 else '2000-01-01') for _, t0 in chain]
-        good = bool(worst) and max(worst.values()) < 1e-3 and all(s[0].startswith(w[0]) and s[1] == w[1] for s, w in zip(st, want))
+        good = bool(worst) and not over and all(s[0].startswith(w[0]) and s[1] == w[1] for s, w in zip(st, want))
     print('  I14: largest age difference to the continuous run by store: %s; :StartTime and :AgeTracerDatum of the solution.rvc files: %s'
           % (', '.join('%s %.3g d' % (k, v) for k, v in worst.items()), st))
     res.append(('I14 age tracer: restarts equal the continuous run', good))
@@ -311,7 +320,7 @@ def main():
         if not ok: print('  %s: run FAILED %s' % (name, txt[-400:].replace('\n', ' | ')))
         return d, ok
     def chain(tag, d0, parts):
-        ntot = sum(parts); dc, ok = age2('%s_cont' % tag, d0, ntot, d0, ntot); good = ok; prev = None; t0 = 0; worst = 0.0; datums = []
+        ntot = sum(parts); dc, ok = age2('%s_cont' % tag, d0, ntot, d0, ntot); good = ok; prev = None; t0 = 0; worst = 0.0; datums = []; over = False
         c = pd.read_csv(os.path.join(dc, 'out', 'Ages.csv')) if ok else None
         for i, n in enumerate(parts):
             st = (datetime.date(*map(int, d0.split('-'))) + datetime.timedelta(days=t0)).isoformat()
@@ -319,11 +328,11 @@ def main():
             if not ok: break
             b = pd.read_csv(os.path.join(d, 'out', 'Ages.csv')); cc = c[c['time[d]'] >= t0].reset_index(drop=True).iloc[:len(b)]
             for col in [x for x in b.columns if x.endswith('[d]') and x != 'time[d]']:
-                v = (pd.to_numeric(cc[col], errors='coerce') - pd.to_numeric(b[col], errors='coerce')).abs().max()
-                worst = max(worst, float(0.0 if pd.isna(v) else v))
+                v, o = age_diff(cc[col], b[col]); over |= o
+                worst = max(worst, v)
             prev = os.path.join(d, 'out', 'solution.rvc'); t0 += n
             m = re.search(r':AgeTracerDatum (\S+)', open(prev).read()); datums.append(m.group(1) if m else None)
-        g = good and worst < 1e-3 and datums[0] is None and all(x == d0 for x in datums[1:])
+        g = good and not over and datums[0] is None and all(x == d0 for x in datums[1:])
         print('  I15 chain %s %s: parts run %s, largest age difference %.3g d, :AgeTracerDatum of the parts %s -> %s' % (d0, parts, good, worst, datums, 'ok' if g else 'FAIL'))
         return g
     g1 = chain('I15_ye', '1999-12-25', (7, 7, 6))

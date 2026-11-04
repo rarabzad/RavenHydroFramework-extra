@@ -1,4 +1,4 @@
-"""Robustness of :SoilZone PHYSICAL (cases found by the code inspections).
+"""Robustness of :SoilZone PHYSICAL (hard cases).
 
 R1 stiff flat column: drainable porosity 0.02 against S_y = 0.25 and a high conductance; the water table rises to the
    base and the soil zone fills. The interface and MODFLOW converge on every step in few updates (a connection that
@@ -20,7 +20,7 @@ R9 hotstart columns that cannot hold the .rvc layer split (wet columns with a fu
    redistribution 50 mm over the HRU).
 R10 water rising into a thin soil on a steep, low-storage hillslope with an update budget of 1 and in explicit mode:
    the boundary MODFLOW keeps never takes more from a column than it holds (no shortfall). A slope kept at the secant
-   to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns (4100 m3 created with a budget of 1, 7900 m3 in explicit mode).
+   to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns.
 R11 explicit mode on the R2 hillslope (ten HRUs) gives the iterated run's total outflow within 3%: the kept boundary
    neither reverses nor lifts water from below the contact (a line there was 30-50% off).
 R12 explicit mode with 15 outer iterations where water rises into cells that are dry at the head of linearization
@@ -32,10 +32,10 @@ R13 a stiff, very low-storage hillslope with an update budget of 1 and 12 outer 
 R14 (N1) negative recharge: :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER with GR4J_X2 3 mm/d (Raven's processes take water
    out of GROUNDWATER) on an egg-crate hillslope, NONE and RICHARDS (all methods in the full mode, and three depth classes): it
    is never split by the saturated fraction, all of it goes to MODFLOW; identities and Raven's balance at round-off (a
-   negative rejection booked with Fill created water in the soil).
+   negative rejection booked with Fill would create water in the soil).
 R15 (N2) negative recharge limited by what the top cell can give: a 2 m aquifer 2.5 m deep, 40 dry days, slope 0.03, no
-   specified head: the cut goes back to the soil zone (run total "negative recharge cut"); the run completes (before: head
-   -10 586 m, "diverged").
+   specified head: the cut goes back to the soil zone (run total "negative recharge cut"); the run completes (without the limit the head
+   diverges, to -10 586 m).
 R15b a negative-recharge cut on a draining soil zone: GR4J_X2 60 mm/d imports 23.7 mm/d out of GROUNDWATER
    over a dry top cell held by a specified head, so 8.67 mm of it is cut and taken back out of the soil zone, while the
    wet soil (60 and 115 mm of 120 mm, field capacity 60 mm each) drains to the aquifer with HYDRAUL_COND 2000 mm/d. Each

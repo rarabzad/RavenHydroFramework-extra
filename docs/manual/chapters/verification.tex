@@ -1,0 +1,443 @@
+\chapter{Verification}\label{ch:c8}\label{ch:verification}
+This chapter describes how the coupling is tested and what the tests show. The tests are grouped by topic
+(Table~\ref{tab:vapproach}); every one of them is part of the test suite in \cmd{tests/} and is repeated by one command
+(Section~\ref{sec:runtests}).
+
+\begin{plain}
+Before anyone relies on a model, it must be shown to be right. The coupling is tested in several independent ways:
+automatic checks that no water is created or lost, comparisons with exact textbook solutions, comparisons with independent
+software, hundreds of random test set-ups, checks of every file Raven writes for MODFLOW, deliberately wrong input, and
+checks of the code itself with compilers and memory checkers.
+\end{plain}
+
+\begin{table}[!htbp]\centering
+\caption{Verification approaches.}\label{tab:vapproach}
+\begin{tabularx}{\linewidth}{P{0.27\linewidth}Y P{0.13\linewidth}}\toprule\hdr
+Approach & What it shows & Section\\\midrule
+Models without groundwater & identical results to Raven 4.15, apart from the documented differences in Raven itself & \ref{sec:regression}\\
+Automatic checks of every run & exact water accounting on both sides; MODFLOW's balance & \ref{sec:audit}\\
+Behaviour tests & pumping, drying, restarts, ensembles and every exchange behave as expected & \ref{sec:behaviour}\\
+Independent checks & geometry against standard libraries; flows against MODFLOW's own budget; grid and time-step invariance & \ref{sec:independent}\\
+Model files and faulty input & every MODFLOW input file Raven writes; faulty and unusual input & \ref{sec:mf6files}\\
+Randomized testing & hundreds of random set-ups combining every option & \ref{sec:fuzz}\\
+Grid types & geometry, format cross-checks, analytical solution, lakes, restarts and randomized tests for every grid & \ref{sec:vgrids}\\
+Existing models & projections, units, round trip, overlap weights, restarts, safeguards, USGS example models, MODFLOW versions & \ref{sec:vexisting}\\
+Soil zone & the water table in every position, the interface, unsaturated columns, inputs, robustness & \ref{sec:vsoilzone}\\
+Rough terrain & randomly drawn irregular land with every unsaturated-zone method & \ref{sec:vrough}\\
+Build and code & CMake integration, compilers, static analysis, memory and undefined-behaviour sanitizers & \ref{sec:vbuild}, \ref{sec:codeaudit}\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Models without groundwater}\label{sec:regression}
+The coupling is built on Raven~4.15. Models without groundwater were run with the unmodified Raven~4.15 and with the
+coupled code, both built with NetCDF:
+\begin{itemize}
+\item the Liard model (20 years, with its hotstart and with a cold-started age tracer): all outputs identical byte for byte;
+\item the benchmark models distributed with Raven (\cmd{benchmarking/\_InputFiles}): the eleven that run give identical
+      outputs, except that Lake of the Woods, whose reservoir in basin~44 dries out on 45 days, books less evaporation on
+      those days (Table~\ref{tab:ravendiff}). Its hydrographs and reservoir stages are identical; its cumulative balance
+      error falls from 5.44 to 4.97~mm, and its \cmd{solution.rvc} carries the reservoir stages with 12 digits. The other
+      fourteen benchmark set-ups stop with the same input error in both builds (a missing \cmd{.rvt} file, wilting point
+      above field capacity), as they do in the unmodified Raven~4.15.
+\end{itemize}
+The coupled code includes a few corrections to Raven itself (Section~\ref{sec:coreflix}). They change the results of
+models without groundwater only in the cases of Table~\ref{tab:ravendiff}; every other output of such a model is
+byte-identical to Raven~4.15. Raven~4.15 prints its closing message (\emph{Exiting Gracefully}) to the error stream; the test
+scripts read both streams.
+
+\begin{table}[!htbp]\centering
+\caption{Where a model without groundwater differs from Raven~4.15.}\label{tab:ravendiff}
+\begin{tabularx}{\linewidth}{P{0.3\linewidth}Y}\toprule\hdr
+Case & Behaviour of the coupled code\\\midrule
+Reservoirs with absolute stages and no initial stage & start at the crest (not at 0~m, far below the lake bed); also on an ensemble reset\\
+A reservoir that dries out & books only the water it has (evaporation and seepage); under a minimum or override flow it books the evaporation the outflow formula removed, and no seepage\\
+Reservoir state in \cmd{solution.rvc} & stage and flows with 12 digits\\
+A reservoir whose \cmd{:HRUID} lies in another subbasin & stops with a message\\
+Ensembles & every member starts from the first run's balance, routing memory and reservoir states, then reads its own \cmd{.rvc}\\
+Age tracer started from a hotstart file & the ages continue from the run that wrote the file; \cmd{solution.rvc} keeps the datum of the first run of a chain (\cmd{:AgeTracerDatum}; tests I14--I16, Table~\ref{tab:vszinputs})\\
+\cmd{:rvg\_Filename} & the path is taken relative to the \cmd{.rvi}; a line without a file name stops the run\\
+\cmd{:ObservationData}, \cmd{:ObservationWeights} with a constituent & the constituent name is read correctly\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Automatic checks of every run}\label{sec:audit}
+The tool \cmd{tools\_audit.py}, shipped with the example, checks any output folder for:
+\begin{enumerate}
+\item \textbf{recharge:} $\left(\sum V^{\mathrm{Raven}}-\sum V^{\mathrm{MF6}}-\Delta V^{\mathrm{dl}}-\sum V^{\mathrm{CHD}}\right)/\sum V^{\mathrm{Raven}}$,
+with the soil-zone terms of Section~\ref{sec:accsz} when \cmd{:SoilZone PHYSICAL} is used;
+\item \textbf{MODFLOW's balance:} cumulative imbalance relative to the gross flow, and the worst single step;
+\item \textbf{convergence:} steps that failed to converge;
+\item \textbf{seepage, rivers and surface stores:} the volume applied to Raven against MODFLOW's flow, including carried river losses;
+\item \textbf{reservoirs:} the seepage sent to MODFLOW each step against the volume that left the lake the step before, and
+      the volume MODFLOW took against the volume sent;
+\item \textbf{Raven's balance:} the largest mass-balance error in \cmd{Watershed\allowbreak Storage.csv};
+\item \textbf{outputs:} finite heads, contiguous end-of-step dates, a $t=0$ row for monitoring wells.
+\end{enumerate}
+Table~\ref{tab:audit} gives the results for the behaviour tests of Section~\ref{sec:behaviour}.
+
+\input{tables/run_checks}
+
+\section{Behaviour tests}\label{sec:behaviour}
+\begin{table}[!htbp]\centering
+\caption{Behaviour tests.}\label{tab:behaviour}
+\begin{tabularx}{\linewidth}{P{0.19\linewidth}P{0.27\linewidth}Y}\toprule\hdr
+Test & Set-up & Result\\\midrule
+Full Liard model & 20 years, 85 coupled HRUs, 3\,252 active columns & recharge exact; MODFLOW residual $10^{-10}$; no failed step; Raven balance 0.52 mm\\
+Pumping & 100\,000 m$^3$/d well, 5 years & 93\% delivered; seasonal drawdown 0.8--8 m in the pumped cell, none 12 km away; 91--98\% of the water captured from rivers (Figure~\ref{fig:pumping})\\
+Monitoring wells & synthetic heads with 5 cm noise & RMSE 4.9 cm; NSE 0.991--0.9997\\
+Fixed-head lake & 9 cells & heads held exactly; recharge on them redistributed\\
+Restart & 1 + 1 years against 2 years & flows within $6\times10^{-6}$ (Figure~\ref{fig:hotstart})\\
+Ensembles & 2 Monte Carlo members, every option on & members identical to each other and to a single run\\
+Drying and rewetting & valley aquifer starting dry & 26 wet areas merge into 2 and split with the seasons (Figure~\ref{fig:conn}); one rewetting step of 1\,826 does not converge and is flagged\\
+Wetlands and lakes & 1\,903 exchange cells & water removed from Raven equals MODFLOW's leakage exactly\\
+Reservoir & 50 km$^2$ lake on a coupled HRU & seepage delivered each day equals Raven's seepage of the day before\\
+Soil-less HRUs & glacier HRUs coupled & seepage goes to surface water; balance unchanged\\
+Other features & \cmd{:rvg\_Filename}, NetCDF, linkage cache, calibration & file found; NetCDF equals the binary heads within $10^{-4}$ m; cached run identical; DDS recovers gravel $K$ and $S_y$ within 5\%\\\bottomrule
+\end{tabularx}
+\end{table}
+
+The reservoir and ensemble rows are repeated by \cmd{tests/behaviour\_check.py}: a 50~km$^2$ lake with seepage on the
+largest coupled HRU of subbasin~52, with a pumping well, for two years --- the seepage MODFLOW receives each day equals the
+volume that left the lake the day before (difference 0), all of it is delivered, and MODFLOW's residual is
+$1.7\times10^{-11}$; and the same set-up as a two-member ensemble --- both members identical to the single run
+(difference 0).
+
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_pumping.png}
+\caption{Pumping test: drawdown at the monitoring wells (left) and where the pumped water comes from (right).}\label{fig:pumping}\end{figure}
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_hotstart.png}
+\caption{Restart: the second year of a continuous run (solid) and of a run restarted from \cmd{solution.rvc} (dashed).}\label{fig:hotstart}\end{figure}
+\begin{figure}[!htbp]\centering\includegraphics[width=0.9\linewidth]{figures/fig_connectivity.png}
+\caption{Drying and rewetting: number of separate wet areas in the top layer (black) and wet fraction of the valley aquifer (blue).}\label{fig:conn}\end{figure}
+
+\paragraph{Reservoirs that run dry.} In a 20-year test with a reservoir deliberately drawn empty by a minimum flow, the
+reservoir's balance error is 13.7 million m$^3$: 1\,072 of its 1\,086 dry days balance exactly. Almost all of the rest
+falls on the day after the reservoir empties, when the outflow still averages in the release rate at the end of the
+previous day although the lake is empty. This lies in Raven's own reservoir routine, not in the coupling
+(Section~\ref{ch:limits}, known issues).
+
+\section{Independent checks}\label{sec:independent}
+\subsection{Geometry against standard libraries}
+The geometry functions are compiled into a stand-alone test and compared with widely used libraries (Table~\ref{tab:geom}).
+\begin{table}[!htbp]\centering
+\caption{Geometry functions against independent libraries.}\label{tab:geom}
+\begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
+Function & Reference & Largest difference\\\midrule
+Polygon clipping and area (400 random, mostly concave polygons) & shapely & $1.3\times10^{-10}$\\
+Equal-area projection (300 points over the Liard region) & pyproj (same sphere) & $5\times10^{-7}$ m\\
+Projection round trip & -- & exact\\
+Bilinear raster sampling with a no-data cell (200 points) & independent code & $4\times10^{-7}$\\
+GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\
+\cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
+\cmd{:InputCRS}: UTM GeoJSON polygons and lines read back in lon/lat & pyproj (PROJ) & $1.1\times10^{-11}$ degrees\\
+\cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Projected input files.} The Liard example with every geometry and raster input converted to UTM zone 10
+(\cmd{tests/crs\_inputs.py}, PROJ through pyproj, \cmd{:InputCRS EPSG:32610}) gives the same grid as the example in
+longitude/latitude: the same active columns and cells, river, boundary and well cells, polygon areas within
+$8\times10^{-12}$ and HRU--cell overlaps within $1.1\times10^{-9}$ of a cell; without rasters the hydrographs agree to the
+printed digits and the groundwater budget within $2\times10^{-8}$ over 120 days. With the DEM and bedrock resampled to
+300~m UTM grids the model top differs by 0.018~m on average (the resampling) and the hydrographs by $10^{-3}$. Projected
+files without \cmd{:InputCRS}, files in another projection and wells given by \cmd{X} and \cmd{Y} without \cmd{:InputCRS}
+stop the run with a message naming \cmd{:InputCRS}.
+
+\paragraph{A layer that starts dry.} The start-up warning for a layer that starts dry (\cmd{tests/dry\_start.py}) names
+layer~2 of the Liard model with \cmd{INITIAL\_HEAD\_DEPTH} 25~m (2\,794 cells), and is absent with a steady-state start
+and for the example as shipped, whose outputs equal those of the reference build.
+
+\paragraph{Budget file and particle tracking.} With \cmd{:WriteGWBudgetFile} (\cmd{tests/budget\_file.py}, the Liard
+example with a pumping well) MODFLOW's budget file holds \cmd{FLOW-JA-FACE}, the specific discharge, the saturation and
+every package at every step, and its package totals equal \cmd{GWBudget.csv} within $4\times10^{-10}$; \cmd{gwf.porosity}
+holds each cell's class porosity. The solution is the same with and without the option, and without it the \cmd{mf6}
+folder equals the reference build's. \cmd{tools/make\_prt.py} runs MODFLOW~6 PRT on these files through the library:
+eight particles around the well, tracked forward and backward, move in opposite directions.
+
+\subsection{Exchanged flows against MODFLOW's own budget}
+MODFLOW writes its own volume budget in its list file. For runs covering every package, every flow the coupling exchanged
+is compared with MODFLOW's figure for the same step, read by package name (\cmd{tests/budget\_xcheck.py};
+Table~\ref{tab:listcheck}); the differences are at the printing precision of the list file. The check fails when it
+compares nothing.
+\begin{table}[!htbp]\centering
+\caption{Coupler flows against MODFLOW's list-file budget.}\label{tab:listcheck}
+\begin{tabularx}{\linewidth}{P{0.25\linewidth}Y P{0.2\linewidth}}\toprule\hdr
+Run & Packages compared & Largest difference\\\midrule
+20-year Liard & recharge, drains, rivers, storage & $6.2\times10^{-7}$\\
+Pumping and boundaries & + wells, general-head boundaries & $6.9\times10^{-7}$\\
+Fixed head and delay & + fixed heads & $6.1\times10^{-8}$\\
+Wetland exchange & + store exchange & $1.1\times10^{-7}$\\
+Reservoir & + reservoir seepage & $2.6\times10^{-7}$\\
+Drying & + water-table ET & $4.1\times10^{-8}$\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Grid size and time step}
+The accounts stay exact for any cell size and time step (Table~\ref{tab:invariance}; subbasin 52, one year). The first
+rows use a head tolerance of 0.01~m; with it the worst single step on 4~km cells is 0.47\% of the flow, and the default
+tolerance of 0.00001~m brings it down to 0.002\%.
+\begin{table}[!htbp]\centering
+\caption{Invariance to cell size and time step.}\label{tab:invariance}
+\begin{tabular}{lrlrr}\toprule\hdr
+Set-up & Active columns & Recharge & Worst step & Raven balance\\\midrule
+1 km cells & 2\,147 & exact & 0.029\% & 0.456 mm\\
+2 km cells & 545 & exact & 0.092\% & 0.456 mm\\
+4 km cells & 142 & exact & 0.47\% & 0.456 mm\\
+4 km cells, default tolerance & 142 & exact & 0.002\% & 0.456 mm\\
+2 km cells, half-day steps & 545 & exact & 0.059\% & 0.219 mm\\\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Model files and faulty input}\label{sec:mf6files}
+Raven writes every MODFLOW input file, and \cmd{grid\_cells.geojson}, before it loads the MODFLOW library; in the
+existing-model mode it also copies the model and prepares the simulation, time and name files first. Almost everything
+except the solve itself can therefore be checked without MODFLOW, by pointing \cmd{RAVEN\_MF6\_LIB} at a file that does not
+exist: the run then stops, with a message, just after the files are written. The checks of this section use this, and
+run again with the library where it matters.
+
+\paragraph{MODFLOW input files.} \cmd{tests/mf6files\_check.py} builds 16 set-ups over every grid type, rotation,
+refinement, layers by elevation, aquicludes, boundaries, wells, lakes and imported cells, and checks the files Raven
+writes: FloPy reads every model; cells are valid and do not overlap; the grid origin and rotation agree with the cell file
+(0.5~m); DISV and DISU vertices are right; DISU connections are symmetric; face angles agree with the vertices
+(1\textdegree); no vertical connection passes through an aquiclude; drains lie inside the top cell; boundary polygons
+select the right cells. All 127 checks pass.
+
+\paragraph{Faulty and unusual input.} Thirty-nine faulty or unusual set-ups of the Liard model check the messages
+(Table~\ref{tab:faulty}): every error stops the run with a message that names the problem --- no crash --- and every
+tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
+MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
+renumbering, the original model untouched). All 53 behave as required.
+\begin{table}[!htbp]\centering
+\caption{Response to faulty or unusual input.}\label{tab:faulty}
+\begin{tabularx}{\linewidth}{Y P{0.4\linewidth}}\toprule\hdr
+Input & Response\\\midrule
+Missing HRU file or ID field; unknown profile or class; malformed class row & stops; names the file, field, profile or row\\
+Aquiclude as top layer; zero layer thickness; value out of range ($K\le0$, $S_y>1$, negative delay, \dots) & stops; names the parameter\\
+Process draining \cmd{GROUNDWATER} in a coupled HRU; no process feeding it & stops; names the process and HRU\\
+Wrong library path; missing raster; well outside the model & stops; names the path, file or well\\
+Duplicate IDs or names; two exchanges on one store; boundary without \cmd{HEAD} & stops; names the item\\
+Malformed groundwater command in \cmd{.rvg}, \cmd{.rvt} or \cmd{.rvc} & stops; names the command\\
+Hotstart heads for a different grid; cells larger than the HRUs & stops; explains the mismatch\\
+Monitoring well outside the model; unknown \cmd{.rvg} command & runs with a warning\\
+\cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Randomized testing}\label{sec:fuzz}
+A test driver (\cmd{tests/fuzz\_grids.py}) builds random but valid set-ups of the subbasin-52 model, drawing every option
+at random: grid type (regular, rotated and refined, quadtree, HRU mesh, imported cells, layers by elevation), rotation,
+refinement and XT3D, cell size (1--3 km), minimum coverage, one-day or half-day steps, conductivities, initial depth,
+seepage leakance and smoothing, water-table ET, recharge delay, steady-state start, wetland exchange, 0--2 pumping wells,
+monitoring wells, a general-head boundary, a fixed-head area and a coupled reservoir. Every run is checked independently of
+the audit tool: exact recharge, seepage, river, store and reservoir identities; MODFLOW's balance (every converged step
+below 0.1\%, cumulative below $10^{-4}$); Raven's balance below 1 mm; agreement with MODFLOW's list file; and, for about a
+third of the set-ups, a restart that must reproduce the continuous run (every flow within $10^{-4}$ of its largest value in
+the run).
+
+With MODFLOW 6.8.1, three rounds of 24 (72 set-ups: 10 regular, 11 rotated and refined, 16 quadtree, 15 HRU mesh,
+6 imported, 14 with layers connected by elevation; 49 with a reservoir; 20 with a restart comparison, largest deviation
+$3.1\times10^{-6}$) and two rounds of 12 that always have a reservoir and lake refinement (24 set-ups, 6 with a restart) all
+pass every check, including MODFLOW's list-file budget and the reservoir identity. The optional fully implicit XT3D can
+fail to converge where cells dry and rewet (in one random set-up on 38 of 45 days, with exact accounts on the converged
+days and the safeguard limiting the exchange on the others); it is therefore off by default.
+
+\section{Grid types}\label{sec:vgrids}
+\begin{plain}
+Every kind of grid is checked in four ways: its cells cover the area exactly with no gaps or overlaps; two different ways of
+handing the same cells to MODFLOW give the same answer; the answer matches an exact textbook solution and gets closer to it
+as the cells get smaller; and a restarted run matches a continuous one.
+\end{plain}
+Every grid option is verified the same way as the default grid, plus the checks below.
+
+\paragraph{Geometry of the grids.} A stand-alone test (\cmd{tests/gridtest.cpp}) checks every generator: cells tile the
+domain exactly (area sums equal to $10^{-15}$), neighbours are symmetric, each cell's perimeter equals its shared faces plus
+the domain edge, Voronoi connections are exactly orthogonal, quadtree neighbours differ by one level at most, clipping
+handles concave cells and lattices of cocircular seeds, and grids survive the linkage cache bit for bit.
+
+\paragraph{Two formats, one answer.} The quadtree cells were run once as DISV (MODFLOW computes the geometry) and once
+imported as DISU (the coupler computes connection lengths, face widths and directions): all flows agree to $6\times10^{-7}$ and
+water tables to 0.3 mm. A regular grid written as DISU gives heads identical to DIS. Solving the coupler's DISU equations
+independently in Python reproduces MODFLOW's heads to $3\times10^{-8}$ m.
+
+\paragraph{Analytical solution.} A textbook case has an exact answer to compare with: a single well pumping from an aquifer
+whose water level is held fixed all around, far away (the \emph{Thiem} solution). Close to the well the water level falls in
+a known way with distance. A well pumping 5\,000 m$^3$/d from a confined aquifer ($T=500$ m$^2$/d) inside a
+20 km square with fixed heads on its edge should give the Thiem profile $h=A+\frac{Q}{2\pi T}\ln r$. The slope fitted to
+all cells between four cell sizes and 3 km from the well is compared with $Q/(2\pi T)$ in Table~\ref{tab:thiem}: every grid
+converges to the analytical value as its cells shrink, and the solutions are symmetric around the well (slopes in the four
+directions within 0.6\%).
+
+\begin{table}[!htbp]\centering
+\caption{Thiem test: error of the fitted slope $\partial h/\partial\ln r$ (\cmd{tests/thiem}, MODFLOW 6.8.1; every run
+checked, none with a failed step).}\label{tab:thiem}
+\begin{tabular}{lrrr}\toprule\hdr
+Grid & Coarse & Medium & Fine\\\midrule
+Regular, 500 / 250 / 125 m & +0.60\% & +0.04\% & +0.01\%\\
+Regular 250 m, rotated 17\textdegree & & +0.03\% & \\
+Regular 1 km refined to 125 m at the wells & & +1.01\% & \\
+Quadtree, base 1\,000 / 500 / 250 m, 62.5 m at the wells & +0.80\% & +0.59\% & +0.26\%\\
+Imported cells (the 250 m quadtree) & & & +0.25\%\\
+HRU mesh, 500 / 250 m (250 m with XT3D) & +0.57\% & +0.29\% & $-$0.06\%\\\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Lakes.} A reservoir with seepage to the aquifer was placed on the largest coupled HRU of subbasin~52 and each
+refinable grid (3~km cells) was refined around it with \cmd{LAKES} (\cmd{tests/lake\_test.py}). The median size of the
+cells touching the lake falls from 3\,000 to 750~m (rotated regular grid), from 3\,000 to 375~m (quadtree) and from 1\,210 to
+490~m (HRU mesh); a \cmd{POLYGONS} file with the same outline gives the same mesh. The water accounts stay exact (MODFLOW
+residual below $1.2\times10^{-11}$), and the reservoir's seepage reaches MODFLOW exactly one step after it leaves the lake
+(sent $=$ previous step's volume in transit to $1.6\times10^{-10}$; delivered $=$ sent); MODFLOW's own list-file budget shows
+the same reservoir seepage.
+
+\paragraph{Restarts.} For every grid type a 60-day run is compared with a 30-day run restarted from its
+\cmd{solution.rvc} (\cmd{tests/restart\_test.py}: subbasin-52 model with 3~km cells, a pumping well and half-day steps):
+regular $9.9\times10^{-7}$, rotated and refined $1.9\times10^{-7}$, quadtree $4.4\times10^{-7}$, HRU mesh $1.9\times10^{-7}$,
+layers by elevation $8.3\times10^{-8}$, with exact water accounting in all.
+
+\paragraph{Randomized testing.} The randomized set-ups of Section~\ref{sec:fuzz} draw the grid type at random; their
+restart criterion scales each day's difference by the flow's largest value in the run, as the existing-model tests do.
+
+\section{Coupling an existing model}\label{sec:vexisting}
+\begin{plain}
+The existing-model mode is tested on a MODFLOW model built independently of Raven. It is also tested on a copy of that
+model in feet and seconds, which must give the same answers; on a model that Raven built itself and then read back in, which
+must reproduce Raven's own run; with restarts; with deliberately wrong input, which must be caught; with random set-ups;
+and with two models of the USGS example collection. In every run no water is created or lost.
+\end{plain}
+The existing-model mode is tested on the synthetic Liard model of Chapter~\ref{ch:existing} (a rotated UTM grid, four
+layers, monthly stress periods, wells, rivers and a head boundary), built independently of Raven
+(\cmd{tests/existing/make\_ext\_model.py}), and on a feet/seconds copy of it. Every run keeps the water accounts exact:
+Raven's recharge reaches MODFLOW exactly, the MODFLOW residual including the model's own packages is about
+$2\times10^{-11}$, seepage and river exchange balance to $10^{-11}$, and no step fails.
+
+\begin{table}[!htbp]\centering
+\caption{Existing-model mode: tests and results.}\label{tab:vexisting}
+\begin{tabularx}{\linewidth}{P{0.42\linewidth}Y}\toprule\hdr
+Test & Result\\\midrule
+Built-in projections against PROJ (9 systems, 18\,000 points) & largest difference 3 micrometres\\
+Cell outlines from MODFLOW (\cmd{:MF6CRS}) against a cell file & recharge identical; other flows within $3.5\times10^{-7}$\\
+Feet and seconds against metres and days & recharge identical; other flows within $4.6\times10^{-6}$\\
+Round trip: a Raven-generated model re-imported & recharge identical; outlet flow within $1.7\times10^{-6}$\\
+\cmd{:OverlapWeights} (computed in UTM) against cell outlines & recharge identical; seepage within $4.5\times10^{-7}$, rivers within $4\times10^{-6}$\\
+Restarts (inside a stress period; before a change of well rates) & within $1.4\times10^{-7}$; the renumbered well data switch on the right date\\
+Water-table ET, surface-store and reservoir exchange (\cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}), metres/days and feet/seconds, 120 days (\cmd{tests/existing/ext\_exchanges.py}) & accounts exact (MODFLOW residual below $4\times10^{-11}$); each package's flows in MODFLOW's budget file and list file equal \cmd{GWBudget.csv} (within $4\times10^{-10}$; the list file to its printed digits); water-table ET at most 5\% of the unmet PET on any day; feet/seconds: the exchanged flows within $10^{-7}$, the other columns within $2\times10^{-5}$ (one step of 120 days; the two models are solved separately to the same tolerance); a restart with reservoir seepage in transit within $3\times10^{-7}$; a kept EVT package with \cmd{EXTINCTION\_DEPTH} refused\\
+Later starts (\cmd{ext\_inputs.py}, \cmd{restart\_ext.py}): TDIS and water-mover rows in \cmd{OPEN/CLOSE} files; wells driven by a TS6 series, restarted between two of its entries; 6-hour steps restarted at 12:00 & identical to the runs with the rows inline; within $4.2\times10^{-7}$ and $2.3\times10^{-6}$ of the continuous runs; \cmd{TAS6} refused\\
+Safeguards (14 faulty set-ups, \cmd{guards.py}) & every one stops with a message naming the problem\\
+Randomized set-ups (units, link, stream mapping, seepage, ET kept or taken over, coverage, restarts; \cmd{fuzz\_ext.py}); checked with the audit identities and MODFLOW's own budget file & 20 of 20 pass, 6 with a restart (within $2.7\times10^{-7}$); MODFLOW's saved flows of Raven's packages agree to $10^{-10}$\\
+Sanitizers (AddressSanitizer, UndefinedBehaviorSanitizer) on the coupling's code: both units, all three links, seepage off, restarts & no error\\\bottomrule
+\end{tabularx}
+\end{table}
+The test model allows 300 outer iterations. Its metres/days version needs 288 of them in its first (steady-state)
+period, and the feet/seconds version a few more, so one feet/seconds set-up does not converge on that step while its twin
+does; every later step takes the same number of iterations in both, and with 500 iterations both converge on every step.
+The weights test shows why the overlaps are normalised per HRU: the weights were computed in the model's projection, whose
+areas differ from Raven's by about 0.5\% at this latitude, and the recharge volumes still agree exactly. In the two-year
+example the stream package loses about 3.8 million m$^3$/d to the aquifer; the small headwater reaches cannot always supply
+their share, so up to 106 million m$^3$ of river loss is carried from step to step at times --- all of it supplied by the end
+of the run, as the accounting requires.
+
+\subsection{USGS example models}\label{sec:usgs}
+Two models of the USGS MODFLOW~6 example collection (\cmd{mf6examples.zip}) are coupled as existing models with
+\cmd{:OverlapWeights}. They are not georeferenced, so the Liard HRUs of subbasin~52 are laid over each model's active cells,
+with \cmd{.rvh} areas equal to their zones so that Raven's recharge depths become the same depths on the model
+(\cmd{tests/existing/usgs\_sagehen.py}, \cmd{usgs\_capture.py}).
+
+\paragraph{Sagehen Creek} (a real watershed in the Sierra Nevada: 73$\times$81 cells of 90~m, one convertible layer,
+Newton, a steady-state day and 398 daily periods, an unsaturated-zone package (UZF) whose rejected infiltration and
+groundwater discharge the water mover (MVR) sends to streams (SFR), land-surface drains also moved to SFR, three specified
+heads). Raven takes over the UZF package, so its recharge replaces the model's infiltration, and removes the 3\,375 movers
+that name it from the working copy. The recharge identity, the river bookkeeping and the seepage returned are exact in every
+case; the water the model's packages pass to the mover is part of MODFLOW's balance. MODFLOW's cumulative residual is
+$8.5\times10^{-7}$ with the model's own loose solver (\cmd{OUTER\_DVCLOSE} 0.03~m, \cmd{INNER\_RCLOSE} 1\,000~m$^3$/d),
+$2.8\times10^{-10}$ with a tight solver, and $1.3\times10^{-11}$ with Raven's seepage drains beside the model's own. A
+restart at day~200, inside the daily periods (the mover renumbered), reproduces the continuous run to $3.3\times10^{-8}$.
+Keeping the UZF package beside Raven's recharge (recharge counted twice, the user's choice) runs with exact accounts; one
+day of the snowmelt peak misses the tight tolerance and is flagged. The drains as Raven's stream package are refused,
+because the mover already sends their water to SFR.
+
+\paragraph{Stream capture} (a steady-state model: 40$\times$20 cells of 250~m, time in seconds, one stress period of one
+second, a river, six pumping wells, specified heads). Raven recognises the steady-state model and stretches its period over
+the 60-day run, so each day is a steady-state solution; the storage column stays zero. The river carries its exchange to
+Raven's reaches (subbasin of the dominant HRU); recharge identity and river bookkeeping are exact, MODFLOW's residual is
+$2.8\times10^{-9}$, and a restart at day~30 reproduces the continuous run to $1.0\times10^{-7}$. With the model's own
+tolerance of $10^{-8}$~m and 100 outer iterations, four days do not converge; they are flagged and the accounts on the
+other days are exact. The Liard seepage leakance of 1/d lets the water table of this thin, flat-topped aquifer reach the land
+surface on the wettest days, where MODFLOW's Newton solver does not converge on two of them; 0.01/d, suited to its
+conductivity of about $7\times10^{-5}$~m/s, converges every day.
+
+\subsection{MODFLOW versions}\label{sec:mf6versions}
+Every test of \cmd{tests/run\_all.py} has been run with MODFLOW~6.8.1 and~6.6.3. Raven writes the \cmd{NEWTON} option
+without its \cmd{UNDER\_RELAXATION} keyword (Section~\ref{ch:mf6}): with that keyword MODFLOW~6.6.3 resets a head that falls
+below the cell bottom, the Newton change of a drying thin aquitard cell repeats unchanged at every iteration, and the default
+Liard grid fails to converge on 295 of 344 days. Without it, every step passes with both versions with the same numbers: the
+Liard grid table agrees to the last digit shown. For existing models Raven reads the library's version and warns when a model
+uses the keyword with a version before~6.8.
+
+\input{chapters/verification_soilzone}
+\input{chapters/verification_rough}
+
+\section{Build checks}\label{sec:vbuild}
+\cmd{tests/cmake\_checks.py} runs 22 offline configure checks of Raven's CMake integration of MODFLOW~6
+(Section~\ref{sec:building}) in about a minute, without compiling Raven (Table~\ref{tab:vcmake}). \cmd{-{}-selftest} puts
+the defect each check guards against back into a copy of the source and shows that the check then fails.
+\cmd{tests/mf6version\_check.py} checks Raven's run-time version guard with a stand-in library, and
+\cmd{tests/mf6lib\_check.py} how \cmd{tools/get\_mf6.py} chooses the release for each platform and where Raven finds the
+library. The installed folder is checked by \cmd{cmake/RavenMF6InstallCheck.py}: it runs the installed Raven on a tiny coupled
+model and checks that it used the library beside it and that every Fortran runtime library it loaded lies in that folder.
+
+\begin{longtable}{P{0.07\linewidth}P{0.86\linewidth}}
+\caption{CMake checks (\cmd{tests/cmake\_checks.py}).}\label{tab:vcmake}\\
+\toprule\hdr Check & What is checked\\\midrule\endfirsthead
+\caption[]{CMake checks (continued).}\\
+\toprule\hdr Check & What is checked\\\midrule\endhead
+1 & the default on Linux aarch64 without the source tools falls back to \cmd{OFF} with a warning naming \cmd{-DRAVEN\_MF6=OFF}; the configure succeeds\\
+2 & that default survives a reconfigure and becomes \cmd{SOURCE} when the tools appear and the repository answers\\
+3 & run path: the library from the build tree and from a moved install (\cmd{\$ORIGIN})\\
+4 & \cmd{PATH} mode installs a symbolic link or a renamed library as \cmd{libmf6.so}\\
+5 & \cmd{libmf6\_version.txt} and the package name (unknown for \cmd{PATH}, the \cmd{meson.build} version for zips and sources)\\
+6 & offline options name their mode; options of another mode are reported as ignored; an unpinned zip is warned about\\
+7 & meson gets the Fortran compiler of \cmd{FC}\\
+8 & a meson whose version cannot be read is named as such\\
+9 & a staged install (\cmd{DESTDIR}) gets \cmd{libgfortran.so.5}\\
+10 & without git the default falls back, \cmd{SOURCE} stops naming git, and \cmd{RAVEN\_MF6\_SOURCE\_URL} needs none\\
+11 & a replaced zip is unpacked again, an unchanged one is not\\
+12 & Windows AMD64 and ARM64 (emulated)\\
+13 & the package version from a \cmd{v6.7.2.tar.gz} source URL; an unpinned zip is ``not checked''\\
+14 & a wrong \cmd{RAVEN\_MF6\_ZIP\_SHA256} stops the configure (local and downloaded zips)\\
+15 & offline default: with the source tools but an unreachable git repository the default falls back at configure time to \cmd{PREBUILT} (a local release folder: the library target builds without network) or, with no release either, to \cmd{OFF} with a warning; a reachable repository gives \cmd{SOURCE}\\
+16 & a single-configuration generator without \cmd{CMAKE\_BUILD\_TYPE} configures \cmd{Release} (\cmd{-O3 -DNDEBUG}); a given \cmd{Debug} is kept\\
+17 & a MODFLOW version below 6.5.0 as \cmd{RAVEN\_MF6\_VERSION} (\cmd{SOURCE} and \cmd{PREBUILT}), in a zip's or a source folder's \cmd{meson.build} or in an archive name stops the configure naming 6.5.0; 6.7.0 configures with a warning naming 6.8.1\\
+18 & runtime bundling, emulated on Linux: macOS with Mach-O stand-ins (\cmd{@rpath} chains resolved through \cmd{LC\_RPATH}, every reference rewritten to \cmd{@loader\_path}, every edited file signed); Windows with stand-in \cmd{objdump} and \cmd{dumpbin} (the DLLs \cmd{libgfortran-5.dll} imports installed)\\
+19 & messages for a folder given as \cmd{RAVEN\_MF6\_PATH} and for a SHA-256 that is not 64 hex digits\\
+20 & \cmd{PATH} mode on Linux: a gfortran-built library without a run path gets \cmd{\$ORIGIN} from \cmd{patchelf} and loads the runtime installed beside it; without \cmd{patchelf} a warning says that it loads the system's runtime; a library that has \cmd{\$ORIGIN} is left as it is\\
+21 & \cmd{RAVEN\_MF6=OFF} (given, and as the default's fallback): the configure says that \cmd{cmake --install} installs Raven alone, and the install does so with a message\\
+22 & the default's offline fallback to \cmd{OFF} with the source tools installed names the network; without meson the warning asks for the source tools\\\bottomrule
+\end{longtable}
+\noindent Real macOS and Windows systems are not part of these checks: the bundling there is emulated.
+
+\section{Code checks}\label{sec:codeaudit}\label{sec:sanitizer}
+\begin{itemize}
+\item \textbf{Review:} line-by-line reading of the coupling's files and of every changed Raven file --- units, signs,
+indices, order of operations, and that each volume is applied once on each side.
+\item \textbf{Compilers and static analysis:} GCC and Clang, unoptimised and optimised: no warnings with \cmd{-Wall -Wextra
+-Wshadow} in the coupling's files (with and without NetCDF); none from cppcheck and clang-tidy. A Windows build (MinGW) run
+under Wine gives the Linux results to rounding.
+\item \textbf{Sanitizers:} complete builds with AddressSanitizer and UndefinedBehaviorSanitizer, run on random set-ups covering
+every option, an ensemble and a restart, on one random set-up of every grid type, on the faulty-input set-ups of
+Section~\ref{sec:mf6files}, on seven reservoir and ensemble cases and on three years of the Liard model: no memory error and
+no undefined behaviour. The only reported leaks are allocated inside the MODFLOW library.
+\item \textbf{valgrind:} a hotstart with \cmd{:StartTime} (test I10, Table~\ref{tab:vszinputs}) reads no uninitialised value
+in the hotstart code. valgrind reports uninitialised reads in two routines of Raven itself that the coupling does not touch
+(Section~\ref{ch:limits}, known issues).
+\end{itemize}
+
+\section{Running the tests}\label{sec:runtests}
+\cmd{python3 tests/run\_all.py} runs every test of this chapter (the unit tests, the file and input checks, the Thiem,
+restart, lake and grid tests, the budget cross-check, both randomized harnesses, the existing-model tests, the soil-zone tests
+of Section~\ref{sec:vsoilzone} and the rough-terrain suite: in full mode 400 seeds with all four unsaturated-zone methods,
+1\,620 runs, and the same again with three depth classes) and writes one report; \cmd{-{}-nolib} runs only the checks that
+need no MODFLOW library, and \cmd{-{}-quick} uses smaller randomized rounds and runs every script in its quick mode
+(\cmd{RAVEN\_TEST\_QUICK=1}: shorter cases, for example the rough-terrain suite 40 seeds and the Liard soil-zone run T7 30 days
+instead of 365; each script's header lists its quick mode). A check a script cannot make (for example a byte-identity check
+without a reference build, \cmd{RAVEN\_EXE\_REF}) is reported as skipped: the step reads ``PASS (k skipped)'' and the report
+lists the skipped checks. The two USGS example steps run only when \cmd{RAVEN\_USGS\_EXAMPLES} points at the MODFLOW~6 examples.
+\cmd{tests/README.md} lists every script and what it checks.

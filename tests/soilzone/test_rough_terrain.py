@@ -71,7 +71,7 @@ FTOL = {'NONE': 0.02}   # saturated fraction against the independent closure on 
 EXF = 5.0           # [m] water table above the highest land sample of its cell (column methods; more than 1 m above NONE's)
 EXF_NONE = 1.0      # [m] allowance above the NONE run's largest
 GEO_TOL = 1e-6      # [m] layers and bases against the independent construction (MODFLOW's files carry 10 digits)
-KNOWN = {}          # open problems by case name
+KNOWN = {}          # open problems by case name (none)
 KNOWN_PATTERNS = [  # (what, regex of a failure, condition on the run's result)
     ('interface unconverged where land lies below the top cell\'s bottom', r'^unconverged steps: interface',
      lambda r: r.get('deep_links', False))]
@@ -148,7 +148,7 @@ def _links(S, meta, G):
 
 def _chd_links(S, meta, G):
     """per HRU: [(cell, overlap area)] of its links on specified-head cells (generated cases). GWSoilExchange.csv's saturated
-    fraction includes these columns at the fixed head (rule: the fraction goes with the rejected recharge, which
+    fraction includes these columns at the fixed head (the fraction goes with the rejected recharge, which
     includes them), so the closure includes them the same way"""
     chd = set(meta.get('chd_cells', [])) if S['family'] == 'gen' else set()
     return [[(ic, A) for ic, A in G['ov'][k].items() if G['top_node'][ic] >= 0 and ic in chd] for k in range(len(meta['polys']))]

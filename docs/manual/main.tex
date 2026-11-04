@@ -47,6 +47,7 @@
 \setcounter{secnumdepth}{3}
 \setcounter{tocdepth}{1}
 \makeatletter\patchcmd{\l@chapter}{\addvspace{1.0em \@plus\p@}}{\addvspace{0.45em \@plus\p@}}{}{}\makeatother
+\makeatletter\renewcommand*\l@section{\@dottedtocline{1}{1.5em}{2.9em}}\makeatother   % room for section numbers such as 10.11 and A.15
 % ---- tables: small type, ragged-right columns, air between rows, shaded header row
 \renewcommand{\arraystretch}{1.25}
 \setlength{\tabcolsep}{5pt}
@@ -86,7 +87,7 @@
 \vspace{4pt}
 {\large Principal Scientist, Hazen and Sawyer\par}
 \vspace{2cm}
-{\large September 2026\par}
+{\large November 2026\par}
 \vspace{1.2cm}
 {\footnotesize\color{gray!70!black}\copyright\ 2026 Rezgar Arabzadeh. This manual is licensed under the Creative Commons Attribution 4.0
 International License (CC BY 4.0), \url{https://creativecommons.org/licenses/by/4.0/}.\par}
@@ -95,16 +96,16 @@ International License (CC BY 4.0), \url{https://creativecommons.org/licenses/by/
 \begingroup\small\tableofcontents\endgroup
 \cleardoublepage
 \pagenumbering{arabic}
-\input{chapters/ch1_intro}
-\input{chapters/ch2_concepts}
-\input{chapters/ch3_building}
-\input{chapters/ch4_existing}
-\input{chapters/ch4_exchanges}
-\input{chapters/ch5_accounting}
-\input{chapters/ch6_reference}
-\input{chapters/ch7_applying}
-\input{chapters/ch8_verification}
-\input{chapters/ch9_developers}
+\input{chapters/intro}
+\input{chapters/concepts}
+\input{chapters/building}
+\input{chapters/existing_model}
+\input{chapters/exchanges}
+\input{chapters/accounting}
+\input{chapters/inputs_outputs}
+\input{chapters/applying}
+\input{chapters/verification}
+\input{chapters/developers}
 \appendix
 \input{chapters/appendix}
 \cleardoublepage\phantomsection\addcontentsline{toc}{chapter}{Bibliography}

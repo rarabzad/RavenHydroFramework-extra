@@ -1,4 +1,4 @@
-"""Figures of the soil zone (manual Sections 4.3.x and 8): from the outputs of tests/soilzone (run the suite first,
+"""Figures of the soil zone (manual, "The soil zone and the water table" and "Verification"): from the outputs of tests/soilzone (run the suite first,
 or set RAVEN_TEST_WORK to its scratch folder). Usage: python3 make_sz_figures.py"""
 import os, sys, numpy as np, pandas as pd, matplotlib
 matplotlib.use('Agg')

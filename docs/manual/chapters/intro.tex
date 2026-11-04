@@ -64,7 +64,7 @@ The user works only with Raven's familiar text files:
 \item marks which HRUs have groundwater underneath (\cmd{AQUIFER\_PROFILE} in the \cmd{.rvh} file);
 \item describes the aquifer materials and their layering (\cmd{.rvp} file);
 \item gives the map of HRUs (a GeoJSON file) and, optionally, land-surface and bedrock maps, rivers, wells,
-monitoring wells and boundaries (a new \cmd{.rvg} file);
+monitoring wells and boundaries (the \cmd{.rvg} file, which the coupling adds to Raven's inputs);
 \item switches the coupling on (\cmd{:GroundwaterModel MODFLOW6} in the \cmd{.rvi} file).
 \end{enumerate}
 Raven then does everything else automatically: it lays a grid over the HRUs, works out how much of each HRU lies in
@@ -198,7 +198,7 @@ drains, wells and boundaries.
 \item \textbf{Water handed back.} Groundwater that seeps out at the land surface is added to a Raven store of the HRUs
 above; groundwater that discharges to rivers is added to the river inflow of the subbasin; river losses are taken from
 the river; wetland and lake exchanges change those Raven stores.
-\item \textbf{Raven's river day.} Raven routes water down the river network, now including the groundwater
+\item \textbf{Raven's river day.} Raven routes water down the river network, including the groundwater
 contributions. Reservoirs compute their seepage using the aquifer head beneath them.
 \item \textbf{Accounts.} Both models update their water balances, and the groundwater outputs are written.
 \end{enumerate}
@@ -213,8 +213,8 @@ from time series.
 \item \textbf{Generic.} Nothing is specific to a basin; any Raven model can couple any subset of its HRUs.
 \item \textbf{Exact accounting.} Every exchanged volume is computed once and applied identically on both sides.
 \item \textbf{No surprise for existing users.} Models without groundwater give bit-for-bit the same results as
-Raven~4.15 (the version this coupling is built on), except where a correction to Raven itself applies: models with
-reservoirs, ensembles and age-tracer runs started from a hotstart file (Section~\ref{sec:regression}). Raven still builds
+Raven~4.15 (the version this coupling is built on), except in the few cases where the coupled code corrects Raven
+itself: models with reservoirs, ensembles and age-tracer runs started from a hotstart file (Table~\ref{tab:ravendiff}). Raven still builds
 and runs without MODFLOW installed.
 \end{enumerate}
 
@@ -244,12 +244,12 @@ better choice for fast screening, very large ensembles, or basins without a sign
 \section{What changes for an existing Raven model}
 \begin{itemize}
 \item Nothing, unless \cmd{:GroundwaterModel MODFLOW6} is added: results stay bit-for-bit identical to Raven~4.15,
-except for the corrections made to Raven itself (Section~\ref{sec:regression}): models with reservoirs (absolute-stage
+except where the coupled code corrects Raven itself (Table~\ref{tab:ravendiff}): models with reservoirs (absolute-stage
 reservoirs without an initial stage start at their crest, a drying reservoir books only the water it has, and
 \cmd{solution.rvc} carries stages and flows with 12 digits), ensembles (every member starts from the first run's state)
 and age-tracer runs started from a hotstart file (the ages continue from the run that wrote the file).
 \item With the coupling on, coupled HRUs lose their conceptual deep-groundwater behaviour (their \cmd{GROUNDWATER} store
-becomes a pass-through), and their baseflow now comes from the aquifer via seepage and river exchange.
+becomes a pass-through), and their baseflow comes from the aquifer via seepage and river exchange.
 \item Run times increase: the 20-year Liard run (3\,252 active columns) takes about 15 minutes instead of 35 seconds on one processor core.
 \end{itemize}
 

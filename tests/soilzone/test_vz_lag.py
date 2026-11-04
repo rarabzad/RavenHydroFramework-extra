@@ -7,7 +7,7 @@ U   unit tests (vadose_lag_unit.cpp against GWVadose.cpp and GWVadoseLag.cpp): t
     to [1, 50] before the int cast), steady start S_i = min(q k_i, Smax_i), Erlang response of equal reservoirs, N_eff of
     the grid; then the impulse responses of grid columns (one material, sand over loam) against the exact convolution of
     the exponentials (matrix exponential of the cascade, computed here) and the mean travel time sum k_i (= t_m L).
-L1  storm over a deep water table (6 m; P1 of test_sz_models.py): NONE, RICHARDS, LAG 2, LAG 4 and LAG (derived t_m): the
+L1  storm over a deep water table (6 m; P1 of test_water_table.py): NONE, RICHARDS, LAG 2, LAG 4 and LAG (derived t_m): the
     recharge reaching MODFLOW is later and lower with LAG, more so with a longer travel time; identities at round-off.
 L2  a water table rising through the columns into the soil zone and falling again (P3 with LAG): columns collapse and
     re-form; identities hold throughout.
@@ -15,7 +15,7 @@ L3  layered aquifer: the column crosses SAND (3 m) over a FINE class of the same
     (derived t_m 18 against 10.3 d/m) on a sloping hillslope; each node uses its own material's travel time (the recharge
     arrives later than over SAND alone); identities.
 L4  hotstart continuity: 60 + 60 days from the first run's solution.rvc (:GWVadoseColumns) equal 120 days in one go.
-L5  existing-model round trip (as X1 of test_sz_models_ext.py) with LAG: the generated model's MODFLOW files coupled as an
+L5  existing-model round trip (as X1 of test_sz_existing.py) with LAG: the generated model's MODFLOW files coupled as an
     existing model give the same flows (relative 1e-3) and identities.
 L6  the cell-room release cap of a rising water table (VZStep): one flat HRU, Sy 0.02
     well below the drainable porosity (0.078), LAG 1000 (columns full to theta_s by :SoilZoneVadoseInitialFlux 10, so the
@@ -29,7 +29,7 @@ L7  the leak check: the L1 storm with LAG 2 passes, and the same outputs with a 
     script's checks.
 S   speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from U).
 B   byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the T2/T3 hillslope,
-    RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change ; out/*.csv and solution.rvc compared byte for byte except the diagnostic column
+    RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change; out/*.csv and solution.rvc compared byte for byte except the diagnostic column
     `interface change [m]`. Without RAVEN_EXE_REF B prints SKIP (never "ok").
 Identities use the standard limits (sz_check.STD_LIMITS) and sz_check's column identity
 (sz_check.vz_identity: scaled by the step's flows, less the CSV rounding of its values) from step 1: every run must give
@@ -229,7 +229,7 @@ def test_l4():
 
 
 def test_l5():
-    print('L5 existing-model round trip with LAG (as X1 of test_sz_models_ext.py)')
+    print('L5 existing-model round trip with LAG (as X1 of test_sz_existing.py)')
     cfg = dict(CFG); cfg.update(init_depth=3.0, aq_b=4.0, aq_psia=0.3, extra_rvg=':SoilZoneVadose LAG 2\n:SoilZoneAquiferClass SAND\n')
     g = run('l5_gen', **cfg)
     if not g:

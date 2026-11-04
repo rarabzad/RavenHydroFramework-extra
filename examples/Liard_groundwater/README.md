@@ -77,7 +77,7 @@ these warnings disappear; treat them in your own model as a sign that the polygo
 The original package was built for Raven 2.9.1; for Raven 4.x, Windows `\` paths were changed to `/` and
 `DEP_THRESHHOLD` was renamed `DEP_THRESHOLD`.
 
-## 4. Results you should see (final check)
+## 4. Results you should see (tools_audit.py)
 Recharge transferred exactly; MODFLOW cumulative balance residual ~3e-6 of gross flow; worst day 0.04%;
 every step converged; no river asked for more water than it carried; Raven balance error 0.52 mm.
 NSE at gauges 10BE004 / 10BE005 / 10BE010: 0.850 / 0.821 / 0.634 (uncoupled 0.867 / 0.835 / 0.681;

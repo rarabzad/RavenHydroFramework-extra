@@ -20,7 +20,7 @@ B7  tools_audit.py counts both guard warnings: "(MODFLOW unconverged): ... of di
     negative residual" (CONCEPTUAL, B2) and "of discharge to Raven
     withheld" (:SoilZone PHYSICAL, robustness R13_b1-like case).
 B8  without :SoilZone PHYSICAL, steps MODFLOW does not converge: only MODFLOW's negative
-    residual is withheld from the discharge to Raven, nothing else is lost. The CB checker's case (4 HRUs of 400 m, slope
+    residual is withheld from the discharge to Raven, nothing else is lost. The case (4 HRUs of 400 m, slope
     0.02, 30 mm/d for 5 days then dry, PERC_CONSTANT 20 mm/d, water table 0.2 m deep, CONCEPTUAL,
     :SolverMaxOuterIterations 2: the first 10 steps unconverged; and 1: every step, for the limit of ten warnings): every
     GWBudget row's residual, recharge + storage release

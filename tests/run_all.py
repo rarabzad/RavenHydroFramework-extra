@@ -194,10 +194,10 @@ STEPS = [
     ('soilzone_confined_wet', True, [PY, 'soilzone/test_confined_wet.py'], last_line(r'confined-cell tests: ALL PASSED'), 3600),
     ('soilzone_columns_mf6', True, [PY, 'soilzone/test_columns_mf6.py'], last_line(r'columns and MODFLOW side: ALL PASSED'), 1800),
     ('soilzone_mf6_budget', True, [PY, 'soilzone/test_mf6_budget.py'], last_line(r'MODFLOW budget tests: ALL PASSED'), 3600),
-    # unsaturated columns, capillary rise (docs/design/soil_zone_columns_plan.md section 8)
+    # the water table in every position: unsaturated columns, capillary rise, timing, classes, specified heads
     ('soilzone_vadose_unit', False, '%s soilzone/vadose_unit.cpp %s/GWVadose.cpp -o %s/vadose_unit && %s/vadose_unit %s/vadose_drain.txt && %s soilzone/vadose_ref.py %s/vadose_drain.txt'
      % (cxx, ROOT, LOGS, LOGS, LOGS, PY, LOGS), last_line(r'vadose reference: PASS'), 900),
-    ('soilzone_models', True, [PY, 'soilzone/test_sz_models.py'], last_line(r'soil-zone model tests: ALL PASSED'), 3600),
+    ('soilzone_water_table', True, [PY, 'soilzone/test_water_table.py'], last_line(r'water-table tests: ALL PASSED'), 3600),
     # :SoilZoneVadose KINEMATIC (docs/design/soil_zone_kinematic.md)
     ('soilzone_vz_kinematic', True, [PY, 'soilzone/test_vz_kinematic.py'], last_line(r'kinematic tests: ALL PASSED'), 3600),
     ('soilzone_vz_lag', True, [PY, 'soilzone/test_vz_lag.py'], last_line(r'LAG tests: ALL PASSED'), 1800),
@@ -207,7 +207,7 @@ STEPS = [
      last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
     ('soilzone_rough_terrain_k3', True, [PY, 'soilzone/test_rough_terrain.py'] + (['--quick'] if QUICK else []) + ['--methods', 'NONE,RICHARDS,KINEMATIC,LAG', '--vzclasses', '3'],
      last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
-    ('soilzone_models_ext', True, [PY, 'soilzone/test_sz_models_ext.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
+    ('soilzone_existing', True, [PY, 'soilzone/test_sz_existing.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py'] + ([] if QUICK else ['365']), last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
 

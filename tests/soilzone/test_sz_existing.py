@@ -1,4 +1,4 @@
-"""Soil zone with an existing MODFLOW 6 model (docs/design/soil_zone_columns_plan.md section 6), and columns over
+"""The soil zone with an existing MODFLOW 6 model (docs/design/soil_zone_columns_plan.md section 6), and columns over
 specified heads (section 5).
 
 X1  round trip: the T2/T3 hillslope run with :SoilZone PHYSICAL; its MODFLOW model (without Raven's packages) is then
@@ -27,7 +27,7 @@ import numpy as np, pandas as pd
 import sz_models, sz_check
 from test_hillslope import CFG, RAIN
 
-W = sz_check.tc.work('soilzone', 'v2ext')
+W = sz_check.tc.work('soilzone', 'sz_existing')
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 SHORT = dict(days=120, rain=RAIN[:120]) if QUICK else {}   # (quick mode: the round trips' length)
 LIM = dict(sz_check.ID_LIMITS)   # (the standard limits of the identities: recharge 5e-9, soil zone and unsaturated zone 1e-8)
@@ -193,7 +193,7 @@ def main():
            roundtrip('x2', feet=True, **SHORT),
            roundtrip('x3', ':SoilZoneVadose RICHARDS\n:SoilZoneAquiferClass SAND\n:SoilZoneClasses 3\n',
                      chd=94.8, aq_b=4.0, aq_psia=0.3, init_depth=3.0, soil_b=5.0, soil_psia=200.0, pet=2.0, **SHORT),
-           roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8, **SHORT)]   # (capillary arrays unsized with the rise off)
+           roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8, **SHORT)]   # (capillary arrays sized with the rise off)
     res += [outputs_x3(), stops_x6(), sy_x7(), sy_x8()]
     print('soil-zone existing-model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)

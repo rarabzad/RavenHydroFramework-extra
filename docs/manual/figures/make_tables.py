@@ -36,4 +36,4 @@ out=[r'\begin{table}[!htbp]\centering',
 for n in names:
     out.append(n+' & '+' & '.join(fn(R[n].get(key)) if R[n].get(key) is not None else '--' for _,key,fn in cols)+r'\\')
 out.append(r'\bottomrule\end{tabular}\end{table}')
-open('/home/claude/deliver/3_overleaf_manual/tables/run_checks.tex','w').write('\n'.join(out)+'\n'); print('table runs:',names)
+open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'tables', 'run_checks.tex'),'w').write('\n'.join(out)+'\n'); print('table runs:',names)

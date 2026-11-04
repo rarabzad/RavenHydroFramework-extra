@@ -1,4 +1,4 @@
-""":SoilZoneVadoseInitialFlux and the columns' initial state.
+""":SoilZoneVadoseInitialFlux and the columns' initial state (I1-I6).
 
 I1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes

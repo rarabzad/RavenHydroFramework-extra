@@ -1,11 +1,10 @@
-"""Drained columns, confined cells and heads far outside the model (soil zone; manual "Drained columns", "Existing
+"""Drained columns, confined cells and heads far outside the model (manual "Drained columns", "Existing
 models").
 
 W1  a confined layer below its bottom: 5 HRUs on a 5 % slope, 1 m of sand over a CONFINED_AQUIFER layer, no rain, the water
     table 25 m deep. A column with an active confined cell is never "drained" (MODFLOW keeps the confined cell's full
     transmissivity at any head): every step converges and no column is kept wet (the GWModelSummary.txt run-total line is
-    required; a missing line fails). NONE (all methods in the full mode). (a reset each outer
-    iteration left 10 of 10 steps unconverged at 500 outer iterations.)
+    required; a missing line fails). NONE (all methods in the full mode).
 W2  the same with 5 mm/d of rain, 15 m deep.
 W3  the W1 model as an existing model (MODFLOW's ICELLTYPE 0 read from its memory, NPF): the same.
 W4  rough-terrain regression cases: SKIP (permanent; the regression cases R1-R20 run in test_rough_terrain.py, run_all steps

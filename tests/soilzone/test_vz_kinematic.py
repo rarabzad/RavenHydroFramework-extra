@@ -15,9 +15,8 @@ K4  layered aquifer, 3 m of sand over clay (Kv 4 mm/d, Sy 0.05), water table 6 m
     sand to the soil zone (the release across layers); KINEMATIC and RICHARDS (the RICHARDS run is counted, not
     informational); all identities.
 K5  hotstart continuity: 60 + 60 days from solution.rvc (:GWVadoseColumns) equal 120 days in one go.
-K6  existing-model round trip (test_sz_models_ext.roundtrip with KINEMATIC and :SoilZoneAquiferClass).
-K7  speed: run times of NONE, RICHARDS and KINEMATIC on a hillslope over a deep water table; returns the runs' results
-, the times are reported only.
+K6  existing-model round trip (test_sz_existing.roundtrip with KINEMATIC and :SoilZoneAquiferClass).
+K7  speed: run times of NONE, RICHARDS and KINEMATIC on a hillslope over a deep water table; returns the runs' results, the times are reported only.
 K8  byte-identity of NONE, RICHARDS and CONCEPTUAL against the reference build RAVEN_EXE_REF (out/*.csv and
     solution.rvc, without the diagnostic column `interface change [m]`); SKIP without a reference.
 Every run: the standard limits (sz_check.STD_LIMITS, and sz_check's column identity vz_identity 1e-8 from step 1: the
@@ -207,9 +206,9 @@ def k5():
 
 def k6():
     print('K6 existing-model round trip with KINEMATIC columns')
-    import test_sz_models_ext
-    test_sz_models_ext.W = W
-    ok = test_sz_models_ext.roundtrip('k6', KW + ':SoilZoneAquiferClass SAND\n', aq_b=4.0, aq_psia=0.3, init_depth=3.0)
+    import test_sz_existing
+    test_sz_existing.W = W
+    ok = test_sz_existing.roundtrip('k6', KW + ':SoilZoneAquiferClass SAND\n', aq_b=4.0, aq_psia=0.3, init_depth=3.0)
     for lab in ('gen', 'ext'):   # the standard limits (roundtrip reports its own, looser ones)
         d = os.path.join(W, 'k6_' + lab)
         if os.path.exists(os.path.join(d, 'out', 'GWBudget.csv')):

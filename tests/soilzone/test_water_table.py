@@ -1,4 +1,5 @@
-"""Model tests of the soil-zone coupling (docs/design/soil_zone_columns_plan.md section 8).
+"""The water table in every position relative to the soil zone: unsaturated columns, capillary rise, timing, classes and
+specified heads (manual, Verification, "The water table in every position").
 
 P1  delay through a deep unsaturated zone: a 3-day storm over a water table 6 m deep. With :SoilZoneVadose RICHARDS
      the recharge reaching MODFLOW is later and spread out (centroid on day 6.06 +- 0.5 without the column and 15.62 +- 1
@@ -12,20 +13,20 @@ P3  a water table that rises through the unsaturated column into the soil zone (
 P4  restart: 60 + 60 days from the first run's solution.rvc (with its :GWVadoseColumns block) equal 120 days in one go.
 P5  :SoilZoneExchangeTiming LAGGED on the T2/T3 hillslope: heads closer to the MODFLOW-only reference than with AFTER
      (the splitting error of Raven's processes ahead of the exchange); a restart with the :GWSoilZoneLag block is exact.
+P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
+     HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
+     than with the HRU mean (1 class).
 P7  columns over specified heads: the hillslope with a fixed head 0.2 m below the land surface at its toe; the soil
      over the fixed head exchanges with it (both ways over the run), its recharge goes there, and the identities hold;
      a restart from the first half (columns over the head included in :GWSoilZoneColumns) is exact.
-P8  restart with column classes on a steep slope (round-off decided whether the classes applied):
+P8  restart with column classes on a steep slope (round-off must not decide whether the classes apply):
      3 classes, unsaturated columns, a specified-head toe; 25 + 25 days equal 50 days.
 P9  capillary rise across the shortest column (5 cm): the rise from a column just longer than 5 cm equals
      the rise from the water table just below it and the rise without columns (within 10 %); it is implicit in the
      drawdown it causes, so a water table near the soil base with a thin top layer that dries does not oscillate.
-P10  upward flows out of a lower cell: a specified head in layer 2 under a dried thin top layer supplies
+P10 upward flows out of a lower cell: a specified head in layer 2 under a dried thin top layer supplies
      the rise (booked as specified head to soil zone, MODFLOW's balance closes); a thin lowest wet cell under strong rise
      is not pumped dry (no MODFLOW non-convergence), with and without unsaturated columns.
-P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
-     HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
-     than with the HRU mean (1 class).
 All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities and the negative
 recharge not held at the standard limits (sz_check.ID_LIMITS), and no unconverged MODFLOW or interface step.
 Quick mode (RAVEN_TEST_QUICK=1): P4 runs 30 + 30 days against 60 (one storm in each part) instead of 60 + 60 against
@@ -40,7 +41,7 @@ W = sz_check.tc.work('soilzone', 'water_table')
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 # the standard limits of every soil-zone test (sz_check.ID_LIMITS: recharge identity 5e-9, soil-zone and unsaturated-zone
 # identities 1e-8, the negative recharge not held) plus the convergence counts (no unconverged MODFLOW or interface step);
-# a case that needs another limit says so where it runs (these were 1e-6 and 1e-5, 200 and 1000 times looser)
+# a case that needs another limit says so where it runs
 LIM = dict(sz_check.ID_LIMITS, iface_not_conv=0, mf6_not_conv=0)
 VZ = ':SoilZoneVadose RICHARDS\n'
 
@@ -69,7 +70,7 @@ def budget(d):
 def storage(d):
     return pd.read_csv(os.path.join(d, 'out', 'WatershedStorage.csv'))
 
-def P1():
+def p1():
     print('P1 delay through a deep unsaturated zone')
     rain = [0.0] * 10 + [40.0] * 3 + [0.0] * 77
     cfg = dict(nhru=1, hru_w=200.0, init_depth=6.0, aq_thick=20.0, rain=rain, days=len(rain), perc=50.0, ksat=500.0, Kv=0.5, Sy=0.2,
@@ -91,7 +92,7 @@ def P1():
           % (c0, c1, m1.max(), m0.max(), m1.max() / m0.max(), close, 'ok' if ok else 'FAIL'))
     return ok
 
-def P2():
+def p2():
     print('P2 capillary rise from a shallow water table')
     ok = True; loss = {}
     for depth in (0.7, 1.3, 2.5):
@@ -111,7 +112,7 @@ def P2():
         ok &= good
     return ok
 
-def P3():
+def p3():
     print('P3 a water table rising through the column into the soil zone and falling again')
     rain = [0.0] * 5 + [30.0] * 40 + [0.0] * 135
     cfg = dict(nhru=1, hru_w=400.0, init_depth=3.0, chd=97.0, aq_thick=20.0, rain=rain, days=len(rain), perc=30.0, ksat=300.0, Kh=1.0, Kv=0.3,
@@ -125,13 +126,13 @@ def P3():
     rose = (wt - zb).max() > 0.0                               # the water table reached the soil zone
     fell = (zb - wt)[-1] > 0.3                                 # and fell well below it again
     collapsed = np.any(np.abs(st) < 1e-9) if rose else False  # the column vanished while it was up
-    reformed = bool(abs(st[-1]) > 0.0) or (b['unsaturated zone inflow [m3]'].iloc[-30:].abs().sum() > 0)   # ('or fell' made it vacuous)
+    reformed = bool(abs(st[-1]) > 0.0) or (b['unsaturated zone inflow [m3]'].iloc[-30:].abs().sum() > 0)
     ok = rose and fell and collapsed and reformed
     print('  water table to %.2f m above the soil-zone base and back to %.2f m below; column storage min %.3g, end %.3g m3 -> %s'
           % ((wt - zb).max(), (zb - wt)[-1], np.abs(st).min(), st[-1], 'ok' if ok else 'FAIL'))
     return ok
 
-def P4():
+def p4():
     print('P4 restart of the unsaturated columns')
     rain = ([0.0] * 10 + [40.0] * 3 + [0.0] * 17) * 4
     cfg = dict(nhru=1, hru_w=200.0, init_depth=6.0, aq_thick=20.0, perc=50.0, ksat=500.0, Kv=0.5, Sy=0.2, aq_b=4.0, aq_psia=0.3,
@@ -185,7 +186,7 @@ def reference(d, name):
     sz_reference.build(d, rd, RAIN, CFG['H0'], CFG['H1'], CFG['n'], CFG['sfc'], CFG['ksat'], sz_check.tc.MF6LIB)
     return rd
 
-def P5():
+def p5():
     print('P5 lagged exchange timing')
     from test_hillslope import RAIN
     da, _ = hill('e_after', ':SoilZoneExchangeTiming AFTER\n')
@@ -215,7 +216,7 @@ def P5():
     print('  restart: :GWSoilZoneLag written %s; max deviation exchange %.2g, heads %.2g m -> %s' % (has, dq, dh, 'ok' if ok2 else 'FAIL'))
     return ok and ok2
 
-def P6():
+def p6():
     print('P6 column classes')
     lag = ':SoilZoneExchangeTiming LAGGED\n'
     d10, _ = hill('f_10hru', lag)
@@ -235,7 +236,7 @@ def P6():
           % (e1[0], e5[0], ek[0], same, 'ok' if ok else 'FAIL'))
     return ok
 
-def P7():
+def p7():
     print('P7 columns over specified heads')
     from test_hillslope import RAIN
     d, _ = hill('g_chd', '', chd=94.8)
@@ -254,7 +255,7 @@ def P7():
     print('  soil zone to the head %.0f m3/d-days, from it %.0f; restart deviation %.2g -> %s' % (out, inn, dq, 'ok' if ok else 'FAIL'))
     return ok
 
-def P8():
+def p8():
     print('P8 restart with column classes')
     rain = ([0.0] * 5 + [30.0] * 5) * 5
     cfg = dict(nhru=4, hru_w=200.0, slope=0.05, subgrid=5, chd=59.9, init_depth=1.0, perc=40.0, ksat=400.0, Kv=0.5, Sy=0.15, pet=6.0,
@@ -278,7 +279,7 @@ def thin_top(d, layers):
     s = 'AQ, %d, ' % (len(layers) + 1) + ''.join('SAND, %g, AQUIFER, ' % h for h in layers) + 'SAND, TO_BEDROCK, AQUIFER'
     t2 = t.replace('AQ, 1, SAND, TO_BEDROCK, AQUIFER', s); assert t2 != t; open(p, 'w').write(t2)
 
-def P9():
+def p9():
     print('P9 capillary rise across the shortest column')
     cfg = dict(nhru=1, hru_w=200.0, rain=0.0, days=3, perc=1.0, ksat=400.0, Kv=0.5, Sy=0.15, soil_b=5.0, soil_psia=200.0, aq_b=4.0,
                aq_psia=0.3, pet=4.0, phi0=(20.0, 20.0))
@@ -325,7 +326,7 @@ def run_layers(name, layers, **cfg):
     r = sz_check.checks(d, dt=cfg.get('timestep', 1.0)); print('  %s:' % name)
     return d if sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r}) else None
 
-def P10():
+def p10():
     print('P10 upward flows out of a lower cell')
     ok = True
     base = dict(nhru=1, hru_w=200.0, rain=0.0, days=20, perc=1.0, ksat=400.0, Kv=0.5, Sy=0.15, soil_b=5.0, soil_psia=200.0, aq_b=4.0,
@@ -370,8 +371,8 @@ def P10():
     return ok and good and good2
 
 def main():
-    res = [f() for f in (P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)]
-    print('soil-zone model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
+    res = [f() for f in (p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)]
+    print('water-table tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 
 if __name__ == '__main__':

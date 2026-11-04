@@ -145,7 +145,7 @@ outside the ranges given stop the run with a message.
 \cmd{:SoilZoneVadoseClasses K} & 1 & unsaturated columns per exchange column, one per depth class of its DEM points, $1\le K\le10$ (Section~\ref{sec:vzclasses})\\
 \cmd{:SoilZoneVadoseInitialFlux q} & 0 & on a cold start, every unsaturated column starts at its steady profile for the flux it receives, $(1-F)\,q$, $q\ge0$ [mm/d]; 0: at rest (reference profile); ignored on a groundwater hotstart\\
 \cmd{:SoilZoneCapillaryRise ON | OFF} & \cmd{ON} with \cmd{RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG}; \cmd{OFF} with \cmd{NONE} & capillary rise from the water table (and, with \cmd{RICHARDS}, from the columns' top nodes) into soil-zone layers below field capacity (Section~\ref{sec:szcaprise})\\
-\cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & \cmd{LAGGED} & \cmd{LAGGED}: last step's exchange is lent to the soil zone before Raven's processes and settled after the step's exchange; \cmd{AFTER}: the exchange follows Raven's processes (the basic soil zone order) (Section~\ref{sec:sztiming})\\
+\cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & \cmd{LAGGED} & \cmd{LAGGED}: last step's exchange is lent to the soil zone before Raven's processes and settled after the step's exchange; \cmd{AFTER}: the exchange follows Raven's processes (Section~\ref{sec:sztiming})\\
 \cmd{:SoilZoneClasses K} & 1 & Raven's processes run on up to $K$ wetness classes of each HRU's soil-zone columns, $1\le K\le50$; needs \cmd{:Method ORDERED\_SERIES} (Section~\ref{sec:szclasses})\\
 \cmd{:SoilZoneAquiferClass class} & $b$ 4, $\psi_a$ 0.3~m, $\theta_s$ $S_y+0.1$ & existing models only: the aquifer class whose \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} and \cmd{POROSITY} the unsaturated columns use (conductivity and specific yield come from the model; a steady model without specific yield takes the class's \cmd{SPEC\_YIELD} when given, else 0.2; Section~\ref{sec:szexisting})\\\bottomrule
 \end{longtable}
@@ -224,6 +224,7 @@ GHB, CHD [m$^3$/d] & boundary flows (positive into the aquifer)\\
 surface-store leakage / discharge [m$^3$/d], applied [m$^3$] & wetland and lake exchange\\
 reservoir seepage sent, delivered [m$^3$/d], awaiting delivery [m$^3$] & reservoir exchange\\
 reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that a drying cell could not supply; taken back from the water reaching the subbasin in the same step (normally 0)\\
+other model packages [m$^3$/d] & with an existing model: net flow of the model's own packages (wells, boundaries, \dots), positive into the aquifer\\
 soil zone to aquifer, aquifer to soil zone [m$^3$/d] & \cmd{:SoilZone PHYSICAL}: soil-zone exchange, each direction\\
 rejected recharge, soil-zone overflow, exchange applied to Raven, shortfall [m$^3$] & Section~\ref{ch:soilzone}; shortfall is 0 (except on steps MODFLOW ended unconverged at a low outer-iteration limit)\\
 interface updates, converged, change [m] & soil-zone interface iteration of the step\\
@@ -254,11 +255,10 @@ File & Content\\\midrule
 \cmd{GWHeads.csv} & head at each monitoring well, from $t=0$ (missing value $-1.2345$ when the screened cell is dry)\\
 \cmd{GWConnectivity.csv} & number of separate wet areas; wet fraction of each profile\\
 \cmd{mf6/grid\_cells.geojson} & every cell as a lon/lat polygon: number, active, profile, dominant HRU, area\\
-\cmd{GWBudget.csv}, last column & with an existing model: net flow of the model's own packages (wells, boundaries, \dots) [m$^3$/d]\\
 \cmd{GWModelSummary.txt} & MODFLOW 6 library and its version, grid type and size, MODFLOW format, HRU fidelity of the cells, active and pass-through cells, profiles, river/well/boundary/store/reservoir cells, linkage per HRU (areas, fraction linked, cells), whether the linkage came from the cache\\
 \cmd{GWHeads.nc} & (optional) head(time, layer, y, x) with 2-D latitude and longitude, CF conventions\\
 \cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds}); with \cmd{:WriteGWBudgetFile} also the budget file \cmd{gwf.cbc} and \cmd{gwf.porosity}\\
-\cmd{Diagnostics.csv} & Raven's usual file, now also with \cmd{GW\_HEAD} statistics\\
+\cmd{Diagnostics.csv} & Raven's usual file, with \cmd{GW\_HEAD} statistics\\
 \cmd{Watershed\allowbreak Storage.csv} & Raven's balance; includes all exchanged water\\
 \cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag}\\\bottomrule
 \end{tabular}

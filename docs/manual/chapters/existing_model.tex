@@ -3,7 +3,7 @@
 \begin{plain}
 You give Raven your MODFLOW~6 model and tell it three things: where the model lies on the map, on what calendar date the
 model's time starts, and which of the model's packages Raven should replace --- usually recharge and evaporation, which Raven
-now supplies. Raven copies the model, makes the few changes shown in Figure~\ref{fig:workcopy}, and runs the copy together
+then supplies. Raven copies the model, makes the few changes shown in Figure~\ref{fig:workcopy}, and runs the copy together
 with the Raven model, one day at a time. Your own files are never changed.
 \end{plain}
 
@@ -128,8 +128,7 @@ formula form, cell $i$ receives $V_{k\to i}=\frac{r_k}{1000}\,10^{6}A_k\,A_{k,i}
 \caption{Sharing an HRU's water among cells. (a) The HRU's share in each cell, computed from the shapes; the shares add up to 100\%. (b) Weights that add up to only 92\% would lose 8\% of the water; Raven's shares always add up to 100\%, so every cubic metre arrives.}\label{fig:linking}
 \end{figure}
 
-In the older MODFLOW-USG coupling the weights were used as given, so the recharge volume depended on how carefully the HRUs
-were drawn. Rates passed to MODFLOW use MODFLOW's own cell areas. \cmd{GWModelSummary.txt} reports how much of the coupled
+Using the weights as given would make the recharge volume depend on how carefully the HRUs were drawn. Rates passed to MODFLOW use MODFLOW's own cell areas. \cmd{GWModelSummary.txt} reports how much of the coupled
 HRUs' area lies on active cells; a low value usually means a wrong projection or HRUs outside the model.
 
 \section{Time}\label{sec:existingtime}
@@ -261,7 +260,7 @@ Replacing a calibrated recharge package with Raven's recharge changes the model'
 budget with a run of the original model before using the results: large differences mean Raven's recharge, or the
 recharge the model was calibrated with, needs attention.
 
-\section{Current limits}\label{sec:extlimits}
+\section{Limits}\label{sec:extlimits}
 \begin{itemize}
 \item DISU models are not supported (DIS and DISV are).
 \item The stream package keeps the model's own stage and conductance: there is no conductance (supply) limit as for generated

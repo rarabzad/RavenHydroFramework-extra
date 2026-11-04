@@ -166,7 +166,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \toprule\hdr Command & Option & Effect\\\midrule\endfirsthead
 \caption[]{Options of the groundwater commands (continued)}\\
 \toprule\hdr Command & Option & Effect\\\midrule\endhead
-\cmd{:GroundwaterModel} & \cmd{NONE} & Raven as before: results identical to Raven 4.15 except for models with reservoirs, ensembles and age-tracer hotstarts, which carry the corrections of Section~\ref{sec:regression}\\
+\cmd{:GroundwaterModel} & \cmd{NONE} & Raven without groundwater: results identical to Raven 4.15 except for models with reservoirs, ensembles and age-tracer hotstarts (Table~\ref{tab:ravendiff})\\
  & \cmd{MODFLOW6} & coupled HRUs exchange water with MODFLOW 6\\
 \cmd{:InitialGWHeads} & \cmd{FROM\_PROFILE} & $z_{\mathrm{land}}-$\cmd{INITIAL\_HEAD\_DEPTH} of the column's profile\\
  & \cmd{DEPTH\_BELOW\_SURFACE d} & $z_{\mathrm{land}}-d$ everywhere\\
@@ -247,7 +247,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{interface updates}, \cmd{interface converged}, \cmd{interface change [m]} & soil-zone updates in the step, 1 if the interface converged, last change of the soil level\\
 \cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\
 \cmd{seepage and soil inflow withheld [m3]}, \cmd{river gains withheld [m3]}, \cmd{surface-store gains withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\
-\cmd{negative recharge the soil zone did not hold [m3]} & the cut of a negative recharge (Section~\ref{sec:szbooks3}) that the soil zone could not hold (0)\\
+\cmd{negative recharge the soil zone did not hold [m3]} & the cut of a negative recharge (Section~\ref{sec:negrecharge}) that the soil zone could not hold (0)\\
 \cmd{unsaturated zone inflow [m3]}, \cmd{unsaturated zone to aquifer [m3]} & \cmd{:SoilZoneVadose} other than \cmd{NONE}: water entering the unsaturated columns; water they pass to the water table (including the excess a rising water table absorbs)\\
 \cmd{capillary rise to soil zone [m3]}, \cmd{unsaturated zone storage [m3]} & (same) rise from the columns' top nodes into the soil zone (\cmd{RICHARDS}); water in the columns relative to their reference profile at the end of the step\\
 \cmd{capillary rise from the water table [m3]} & capillary rise on: rise from the water table into the soil-zone layers (Section~\ref{sec:szcaprise})\\
@@ -261,6 +261,24 @@ water and capacity [mm], interface updates and change, and with specified heads 
 exchange columns summed over the HRUs equal those of \cmd{GWBudget.csv}; Table~\ref{tab:outputs}), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
 $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profile), \cmd{GWModelSummary.txt}, \cmd{GWHeads.nc}
 (optional), \cmd{mf6/} (MODFLOW model, list files, binary heads).
+
+\paragraph{Which columns are written.} The columns appear in the order of the table, and only where they apply:
+\cmd{other model packages} with an existing model; the soil-zone columns, from \cmd{soil zone to aquifer} to \cmd{negative
+recharge the soil zone did not hold}, with \cmd{:SoilZone PHYSICAL}; the unsaturated-zone columns with a
+\cmd{:SoilZoneVadose} method; \cmd{capillary rise from the water table} with capillary rise on; the lagged-exchange columns
+with \cmd{LAGGED} timing; the specified-head columns where soil-zone columns lie over specified heads; and, last,
+\cmd{recharge not applied by MODFLOW} for an existing model without \cmd{NEWTON} (signed: negative where a negative recharge
+was taken out of \cmd{GROUNDWATER} without MODFLOW supplying it). \cmd{MF6 balance error [\%]} divides by the gross flow
+(Section~\ref{ch:balance}). Every row is stamped with the end of its step.
+
+\paragraph{Run totals.} At the end of a run Raven appends to \cmd{GWModelSummary.txt}: time steps and MODFLOW-unconverged steps; with
+soil-zone links the interface-unconverged steps, the columns' substeps (and Newton iterations except with \cmd{LAG}), the outer
+iterations and steps in which drained columns were kept 1~mm above their bottoms; with an interface iteration the
+supply-limited link updates and the largest take beyond the free water, and the connection-test drops (link updates, steps,
+and those followed by a plain update); without \cmd{:SoilZone PHYSICAL} the discharge withheld on unconverged steps for
+MODFLOW's negative residual (only when such steps occurred); the negative recharge cut and the part not held (only when not zero); for an existing
+model without \cmd{NEWTON} the recharge not applied (always written, also 0).
+
 
 \section{Hotstart blocks (\texttt{solution.rvc})}\label{app:hotstart}
 \begin{longtable}{P{0.3\linewidth}P{0.64\linewidth}}
@@ -341,6 +359,31 @@ RECHARGE\_DELAY \dots\ cannot be used with :SoilZone PHYSICAL & set \cmd{RECHARG
 the soil zone \dots\ is \dots\ m thick & list physical soil layers only (at most 20 m)\\
 Raven is running more time steps than the MODFLOW 6 simulation holds & check \cmd{:Duration} and \cmd{:TimeStep}\\\bottomrule
 \end{longtable}
+
+\section{Warnings and stops during a run}\label{app:warnings}
+Per-step warnings name the step by its end (``in the step ending \emph{date}'', with the time for
+sub-daily steps), the first ten of each kind.
+\begin{itemize}
+\item ``soil-zone interface did not converge in the step ending \emph{D} (\ldots; continuing with MODFLOW's flows)'', with the
+soil-level change and its link, or the failing supply or connection test.
+\item ``MODFLOW 6 heads are not finite in the step ending \emph{D} (the solve diverged): \ldots'' (stop).
+\item ``MODFLOW 6 head \emph{h} m in cell (\emph{l r c}) in the step ending \emph{D} lies far outside the model's elevations
+(\ldots) and the step did not converge: the solve diverged \ldots'' or ``\ldots with MODFLOW's residual \emph{r} m$^3$/d,
+\emph{p} \% of the gross flow \emph{G} m$^3$/d (more than 1 \%): its heads are wrong \ldots'' (stops); ``\ldots in a step
+MODFLOW did not converge, but its last outer iteration moved the head only \ldots'' and ``\ldots in a converged step'' (warnings).
+\item ``\ldots m$^3$ of the negative recharge the top cells could not supply was not held by the soil zone \ldots''.
+\item ``\ldots m$^3$ of Raven's recharge was not applied by MODFLOW (a model without NEWTON) on \emph{n} column(s) whose cells are
+all inactive (dry) and \emph{m} column(s) whose highest active cell is a specified head \ldots''.
+\item ``:SoilZone PHYSICAL needs an existing model that uses the Newton-Raphson formulation \ldots'' (stop).
+\item ``MODFLOW 6 stopped the run during \emph{call}: \emph{the error report of mfsim.lst}'' (stop: an input error MODFLOW finds
+inside its library, e.g. \cmd{LINEAR\_ACCELERATION CG} with \cmd{NEWTON}).
+\item ``the existing model has no specific yield (no STO package or SY); 0.2 is assumed for the soil-zone checks, the release
+limits and the unsaturated columns'' (or ``SPEC\_YIELD \emph{s} of :SoilZoneAquiferClass \emph{class} is used \ldots'' when that
+class gives \cmd{SPEC\_YIELD}); ``the existing model's specific yield (STO SY) is below 0.01 in \emph{n} of its \emph{m}
+active cells \ldots''.
+\item ``:SoilZone PHYSICAL with :SolverMaxOuterIterations \emph{n}'' / ``with OUTER\_MAXIMUM \emph{n} in the model's IMS file
+(MODFLOW's MXITER): \ldots a limit below 20 leaves many steps unconverged''.
+\end{itemize}
 
 \section{Parameter index}\label{app:paramindex}
 Every parameter, its class, and where it is used.
@@ -435,4 +478,3 @@ $V^{\mathrm{uz}}_{\mathrm{in}}$, $V^{\mathrm{uz}}_{\mathrm{to\,aq}}$, $V^{\mathr
 $z_{\mathrm{land}}$, $z_{\mathrm{top}}$, $z_{\mathrm{br}}$, $z_{\mathrm{bed}}$ & land surface, model top, bedrock, riverbed elevations & m\\\bottomrule
 \end{longtable}
 
-\input{chapters/appendix_sz}
