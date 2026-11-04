@@ -22,6 +22,7 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
 | `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`) |
+| `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles; a shallow Raven clone is completed from the upstream Raven repository first) and runs the package README's restore commands to check that each bundle clones with its whole history |
 | `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run, including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
 ## Quick start
@@ -47,7 +48,9 @@ downloads the official release library (Linux x86_64, Windows x64, Apple Silicon
 zip on disk, and `-DRAVEN_MF6=OFF` builds Raven alone. On Linux other than x86_64 (e.g. aarch64), Windows on ARM64 and
 Intel Macs MODFLOW releases no library: there, install the source tools (`-DRAVEN_MF6=SOURCE`) or use `PATH`; without
 either the configure warns and builds Raven alone. `cmake --install build` and `cpack` give one folder (package) with
-Raven, the library and the Fortran runtime it needs. Details: manual, chapter 10, "Building".
+Raven, the library and the Fortran runtime it needs (on Linux, a library built elsewhere is given the run path `$ORIGIN`
+with `patchelf` when that is installed, so that it loads the runtime beside it); a build without the library installs
+Raven alone. Details: manual, chapter 10, "Building".
 
 For a Raven built without the library (GNU make, Visual Studio solution, `-DRAVEN_MF6=OFF`):
 `python tools/get_mf6.py` puts MODFLOW 6.8.1 into `../RavenHydroFramework/lib/mf6`, where Raven finds it (Linux x86_64,

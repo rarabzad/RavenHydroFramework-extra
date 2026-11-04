@@ -448,3 +448,4 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   the existing-model chapter for the exchanges not available in this mode.
 - Not available: groundwater transport, particle tracking, demand-driven wells. Frozen ground acts on recharge only through
   Raven's own processes.
+- Raven's `:Transport` (tracers, nutrients, the age tracer, temperature) is not available in a coupled run: the coupling exchanges water, not constituent mass, so a coupled run with a `:Transport` command stops with a message naming the constituent.

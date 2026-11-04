@@ -3,6 +3,7 @@
 T1 : S_y = drainable porosity n(1-SF)(1-S_fc) = 0.2; recharge 10 mm/d -> 50 mm/d rise below the base and inside the
      soil; heads and soil level agree once connected; soil full (400 mm) on day 41; the balances close.
 T1b: S_y = 0.08 -> 125 mm/d below the base, 50 mm/d inside the soil, and a storage-consistency warning.
+Full mode: 70 days each; quick mode (RAVEN_TEST_QUICK=1): 45 days each (the soil zone is full on day 41), same checks.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -10,10 +11,12 @@ import numpy as np
 import sz_models, sz_check
 
 W = sz_check.tc.work('soilzone', 'column')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
+DAYS = 45 if QUICK else 70
 ok_all = True
 for name, Sy, below in (('T1', 0.2, 50.0), ('T1b', 0.08, 125.0)):
     d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
-    sz_models.make_case(d, days=70, Sy=Sy)
+    sz_models.make_case(d, days=DAYS, Sy=Sy)
     ok, txt = sz_check.run(d)
     print('%s: S_y=%g: run %s' % (name, Sy, 'ok' if ok else 'FAILED'))
     if not ok:

@@ -90,6 +90,31 @@ def selftest_vz_identity():
     return ok
 
 
+def leak_copy(d, dst, leak, smin=5000.0):
+    """copies run folder d to dst with a column leak put into GWBudget.csv: on every step whose 'unsaturated zone
+    storage [m3]' exceeds smin (large stores, where a storage-scaled identity is loosest) leak m3 are lost, so the
+    storage written for that step and every later one is lower by the leaks so far (written with 10 significant digits,
+    as Raven writes it; the other values keep their text). Returns the number of leaking steps"""
+    import shutil
+    shutil.rmtree(dst, ignore_errors=True); shutil.copytree(d, dst)
+    p = os.path.join(dst, 'out', 'GWBudget.csv')
+    lines = open(p).read().split('\n')
+    hdr = [h.strip() for h in lines[0].split(',')]
+    k = hdr.index('unsaturated zone storage [m3]')
+    n = 0
+    for i in range(1, len(lines)):
+        f = lines[i].split(',')
+        if len(f) <= k: continue
+        v = float(f[k])
+        if v > smin:
+            n += 1
+        if n > 0:
+            f[k] = '%.10g' % (v - leak * n)
+            lines[i] = ','.join(f)
+    open(p, 'w').write('\n'.join(lines))
+    return n
+
+
 def checks(d, dt=1.0):
     b, s, w = outputs(d)
     res = {}

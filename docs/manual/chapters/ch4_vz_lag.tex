@@ -140,5 +140,7 @@ equilibrium, inactive columns, tiny residence times, steady start, Erlang respon
 impulse responses of grid columns against the exact cascade within 1.1\%), L1 (above), L2 (a water table rising
 through the columns into the soil zone and falling again), L3 (a column across two aquifer classes on a slope), L4
 (restart 60 + 60 days against 120 days: $2\times10^{-8}$), L5 (existing-model round trip: $2.4\times10^{-4}$), L6 (a water table rising into a nearly full top cell releases at
-most the room the cell has left), S (cost) and B
+most the room the cell has left), L7 (a column leak of $10^{-5}$ or $10^{-4}$~m$^3$ per step written into a run's
+\cmd{GWBudget.csv} fails the script's checks: every run is checked with the column identity of \cmd{sz\_check} from
+the first step), S (cost) and B
 (\cmd{NONE}, \cmd{RICHARDS} and \cmd{CONCEPTUAL} runs byte-identical to a build without \cmd{LAG}).

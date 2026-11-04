@@ -17,6 +17,8 @@ R4 unsaturated columns restored as written: one HRU, water table 4 m deep, SPEC_
 reference content ths - Sy is 0, below the air-dry content of the retention curve), 20 days in one go and as 10 + 10
 days, KINEMATIC and LAG: the restart's columns start with the storage the first part ended with (GWModelSummary.txt
 against GWBudget.csv, to 1e-6 relative), and its 'unsaturated zone storage' equals the continuous run's.
+Quick mode (RAVEN_TEST_QUICK=1): the hillslope runs 120 days against 60 + 60 (the first 120 days of the same rain);
+R2-R4 are the same in both modes (seconds).
 """
 import os, sys, shutil, re, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -25,7 +27,9 @@ import sz_models, sz_check
 from test_hillslope import CFG, RAIN
 
 W = sz_check.tc.work('soilzone', 'restart')
-N1 = 150
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
+NT = 120 if QUICK else len(RAIN)   # the hillslope run: NT days against N1 + (NT - N1)
+N1 = 60 if QUICK else 150
 
 def case(name, days, rain, start=None, rvc=None):
     d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
@@ -169,14 +173,14 @@ def main():
         print('restart test: %s' % ('PASS' if (r3 and r4) else 'FAIL'))
         return r3 and r4
     r2 = ext_restart()
-    full = case('full', len(RAIN), RAIN)
+    full = case('full', NT, RAIN[:NT])
     first = case('first', N1, RAIN[:N1])
     if not (full and first):
         return False
     rvc = os.path.join(first, 'out', 'solution.rvc')
     has = ':GWSoilZoneColumns' in open(rvc).read()
     start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=N1)).isoformat()
-    second = case('second', len(RAIN) - N1, RAIN[N1:], start, rvc)
+    second = case('second', NT - N1, RAIN[N1:NT], start, rvc)
     if not second:
         return False
     cols = ['water table [m]', 'soil water level [m]', 'saturated fraction [-]', 'soil-zone water [mm]',
@@ -194,7 +198,7 @@ def main():
     # soil level, 1e-6 of the gross exchange), so a restart that perturbs the state at round-off moves each link's flow
     # within C x 1e-4 m
     flows = ('saturated fraction [-]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]')
-    good &= has and len(m) == (len(RAIN) - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
+    good &= has and len(m) == (NT - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
     print('restart test: %s' % ('PASS' if good else 'FAIL'))
     return bool(good) and r2 and r3 and r4
 

@@ -53,7 +53,8 @@ I14 & age tracer (no groundwater): 20 days against 7 + 7 + 6 days chained throug
 I15 & age-tracer chains across year boundaries: 1999-12-25 (7 + 7 + 6 days), 1998-12-20 (12 + 400 + 8 days; full mode 400 + 380) & every part runs; ages within $10^{-4}$~d of the continuous run; \cmd{:AgeTracerDatum} 1999-12-25 and 1998-12-20\\
 I16 & age tracer started from the \cmd{solution.rvc} of a 30-day spin-up without it & ages 0 at the start, 1~d after the first day; no \cmd{:AgeTracerDatum}\\
 I17 & EnKF, 3 members, one well, \cmd{:ExtraRVTFilename} with $-100$, $-200$, $-300$~m$^3$/d & each member pumps its own rate; a series naming no well stops the run\\
-I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\\bottomrule
+I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\
+I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\\bottomrule
 \end{longtable}
 
 \begin{longtable}{P{0.07\linewidth}P{0.55\linewidth}P{0.30\linewidth}}

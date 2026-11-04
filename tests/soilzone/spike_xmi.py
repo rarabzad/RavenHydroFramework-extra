@@ -7,6 +7,8 @@ Q2: are the package coefficients recomputed every outer iteration?
 Q3: is a solve() after a converged solve() a normal iteration (no error, still converged, same heads)?
 
 usage: python3 spike_xmi.py [LIBMF6 WORKDIR]   (default: the library and scratch folder of testconfig.py)
+Quick mode (RAVEN_TEST_QUICK=1) and full mode run the same case: one time step of a 3 x 3 cell model is already the
+smallest that answers Q1-Q3 (about a second).
 """
 import os, sys, shutil
 import numpy as np
@@ -20,6 +22,7 @@ else:
     import testconfig as tc
     lib, work = os.path.abspath(tc.MF6LIB), tc.work('soilzone', 'spike')
 shutil.rmtree(work, ignore_errors=True); os.makedirs(work)
+print('spike: %s mode (the same single-step case in both)' % ('quick' if os.environ.get('RAVEN_TEST_QUICK', '') == '1' else 'full'))
 
 sim = flopy.mf6.MFSimulation(sim_name='spk', sim_ws=work, exe_name='mf6')
 flopy.mf6.ModflowTdis(sim, nper=1, perioddata=[(1.0, 1, 1.0)])

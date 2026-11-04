@@ -20,7 +20,11 @@ K7  speed: run times of NONE, RICHARDS and KINEMATIC on a hillslope over a deep 
 , the times are reported only.
 K8  byte-identity of NONE, RICHARDS and CONCEPTUAL against the reference build RAVEN_EXE_REF (out/*.csv and
     solution.rvc, without the diagnostic column `interface change [m]`); SKIP without a reference.
-Every run: the standard limits (sz_check.STD_LIMITS, vz_identity 1e-8).
+Every run: the standard limits (sz_check.STD_LIMITS, and sz_check's column identity vz_identity 1e-8 from step 1: the
+start storage of the columns in GWModelSummary.txt is required, vz_step1_missing).
+K9  the leak check: the K2 storm with KINEMATIC passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3
+    per step put into "unsaturated zone storage [m3]" (on the steps above 5,000 m3, 10 significant digits) fail
+    the script's checks.
 RAVEN_TEST_QUICK=1: shorter K7.
 """
 import os, sys, shutil, subprocess, time, datetime, glob
@@ -31,7 +35,7 @@ import sz_models, sz_check
 tc = sz_check.tc
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 W = tc.work('soilzone', 'vz_kinematic')
-LIM = dict(sz_check.STD_LIMITS); LIM['vz_identity'] = 1e-8
+LIM = dict(sz_check.STD_LIMITS); LIM['vz_identity'] = 1e-8; LIM['vz_step1_missing'] = 0
 KW = ':SoilZoneVadose KINEMATIC\n'
 RI = ':SoilZoneVadose RICHARDS\n'
 REF = os.environ.get('RAVEN_EXE_REF', os.environ.get('RAVEN_REF_EXE', ''))
@@ -61,21 +65,15 @@ def run(name, start=None, rvc=None, edit=None, exe=None, **cfg):
         return None
     if exe:
         return d
-    r = sz_check.checks(d, dt=cfg.get('timestep', 1.0))
-    if 'vz_identity' in r:
-        r['vz_identity'] = vz_identity(d)
     print('  %s (%.1f s):' % (name, TIMES[name]))
-    good = sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r})
-    return d if good else None
+    return d if check(d, name, cfg.get('timestep', 1.0)) else None
 
-def vz_identity(d):
-    """the unsaturated columns' balance per step (from the second), relative to the flows and the storage itself:
-    GWBudget.csv carries 10 significant digits, so a storage of 1e4 m3 is known to 1e-6 m3 only"""
-    b = budget(d); st = b['unsaturated zone storage [m3]']
-    r = (st.diff() - b['unsaturated zone inflow [m3]'] + b['capillary rise to soil zone [m3]'] + b['unsaturated zone to aquifer [m3]'])[1:]
-    sc = (b['unsaturated zone inflow [m3]'].abs() + b['unsaturated zone to aquifer [m3]'].abs() + b['capillary rise to soil zone [m3]'].abs()
-          + st.abs()).clip(lower=1.0)[1:]
-    return float((r.abs() / sc).max()) if len(r) else 0.0
+def check(d, name, dt=1.0):
+    """the standard limits on run folder d (every run of this script)"""
+    r = sz_check.checks(d, dt=dt)
+    if 'vz_identity' in r:   # sz_check's column identity, from step 1 (the start storage of GWModelSummary.txt required)
+        r['vz_step1_missing'] = 0 if r.get('vz_step1') else 1
+    return sz_check.report(name, r, {k: v for k, v in LIM.items() if k in r})
 
 def budget(d):
     return pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv'))
@@ -215,7 +213,7 @@ def k6():
     for lab in ('gen', 'ext'):   # the standard limits (roundtrip reports its own, looser ones)
         d = os.path.join(W, 'k6_' + lab)
         if os.path.exists(os.path.join(d, 'out', 'GWBudget.csv')):
-            r = sz_check.checks(d); r['vz_identity'] = vz_identity(d); print('  k6 %s, standard limits:' % lab)
+            r = sz_check.checks(d); r['vz_step1_missing'] = 0 if r.get('vz_step1') else 1; print('  k6 %s, standard limits:' % lab)
             ok &= sz_check.report(lab, r, {k: v for k, v in LIM.items() if k in r})
     return ok
 
@@ -269,9 +267,23 @@ def k8():
         ok &= not diff
     return ok
 
+def k9():
+    print('K9 the checks of this script see a column leak (the P1 storm, KINEMATIC; GWBudget.csv altered)')
+    d = run('k9', extra_rvg=KW, rain=RAIN_A, days=len(RAIN_A), **V2A)
+    if not d:
+        return False
+    ok = True
+    for leak in (1e-5, 1e-4):
+        n = sz_check.leak_copy(d, os.path.join(W, 'k9_leak'), leak)
+        print('  leak %g m3 per step on %d steps:' % (leak, n))
+        caught = not check(os.path.join(W, 'k9_leak'), 'k9 leak %g' % leak)
+        print('  -> %s' % ('caught (ok)' if caught else 'NOT caught: FAIL'))
+        ok &= caught and n >= 5
+    return ok
+
 def main():
     res = {}
-    for k, f in (('K1', k1), ('K2', k2), ('K3', k3), ('K4', k4), ('K5', k5), ('K6', k6), ('K7', k7), ('K8', k8)):
+    for k, f in (('K1', k1), ('K2', k2), ('K3', k3), ('K4', k4), ('K5', k5), ('K6', k6), ('K7', k7), ('K8', k8), ('K9', k9)):
         try:
             res[k] = bool(f())
         except Exception as e:   # (a crash of one test is that test's failure)

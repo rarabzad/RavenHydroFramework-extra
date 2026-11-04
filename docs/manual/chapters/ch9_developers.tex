@@ -136,8 +136,9 @@ one is checked). The last two need no git.\\
 library. Offline: \cmd{-DRAVEN\_MF6\_ZIP=/path/to/mf6.8.1\_linux.zip}.\\
 \cmd{PATH} & uses a library you have: \cmd{-DRAVEN\_MF6\_PATH=/path/to/libmf6.so} (a symbolic link or a renamed file such
 as \cmd{libmf6\_663.so} or \cmd{libmf6.so.6.8.1} is fine).\\
-\cmd{OFF} & Raven alone, exactly as without this option (same compile and link commands, no install rules). A coupled model
-then needs a library at run time (Section~\ref{sec:getmf6}).\\\bottomrule
+\cmd{OFF} & Raven alone, with the same compile and link commands as without this option; \cmd{cmake --install}
+installs Raven alone (\cmd{bin/Raven}), and the configure and the install say so. A coupled model then needs a library
+at run time (Section~\ref{sec:getmf6}).\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -147,7 +148,8 @@ you give): an offline option names its mode (\cmd{RAVEN\_MF6\_PATH} $\to$ \cmd{P
 when a Fortran compiler, meson~$\geq$~1.7, ninja and git are all found \emph{and} the MODFLOW~6 git repository answers
 at configure time (\cmd{git ls-remote} of the release tag, at most 60~s; not needed when the clone of an earlier configure is
 already at the pinned commit); otherwise \cmd{PREBUILT} when MODFLOW releases a library for the platform; otherwise
-\cmd{OFF} with a warning that names what is missing (\cmd{-DRAVEN\_MF6=OFF} silences it). Every download the default needs
+\cmd{OFF} with a warning that names what is missing (the source tools, or, when they are installed, the network;
+\cmd{-DRAVEN\_MF6=OFF} silences it). Every download the default needs
 is thus made or tested at configure time: a default that cannot be completed (offline: the repository does not answer, or
 the release zip cannot be downloaded) falls back with a warning (\cmd{SOURCE} $\to$ \cmd{PREBUILT} $\to$ \cmd{OFF}), so
 neither a plain \cmd{cmake -S . -B build} nor the build after it stops because of MODFLOW; a mode you give (or one named
@@ -158,7 +160,11 @@ of Raven's run-time guard) stops the configure when its version is known: \cmd{R
 download, the \cmd{meson.build} of a zip or source folder, the name of a source archive; another version than the tested
 6.8.1 gives a warning. A \cmd{PATH} library's version is known only when Raven loads it (the run-time guard).
 \paragraph{Installing.} \cmd{cmake --install} (and \cmd{cpack}) put Raven, \cmd{libmf6} and the Fortran runtime the library
-needs into one \cmd{bin} folder (\cmd{cmake/RavenMF6Bundle.cmake}): on Linux the runtime libraries \cmd{ldd} lists; on macOS
+needs into one \cmd{bin} folder (\cmd{cmake/RavenMF6Bundle.cmake}): on Linux the runtime libraries \cmd{ldd} lists, and
+since Raven loads \cmd{libmf6} by its path, the installed \cmd{libmf6} must have the run path \cmd{\$ORIGIN} to load
+them: a library built by this CMake from source has it, and one without it (for example a \cmd{PATH} library built
+elsewhere) gets it from \cmd{patchelf} when that program is found; otherwise the install warns that the library loads
+the system's runtime instead of the copies beside it; on macOS
 every \cmd{libgfortran}, \cmd{libquadmath} and \cmd{libgcc\_s} the library needs directly or through another of them, with
 \cmd{@rpath} references resolved through the \cmd{LC\_RPATH} entries, every reference rewritten to \cmd{@loader\_path} and the
 edited files signed again (\cmd{codesign -f -s -}); on Windows the runtime DLLs the library imports and those they import

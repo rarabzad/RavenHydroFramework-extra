@@ -111,9 +111,12 @@ days and in feet and seconds, with an independent `:OverlapWeights` table from `
 
 The tests of `:SoilZone PHYSICAL` (manual, chapter "Verification", sections "Soil zone", "regression tests",
 "Soil zone: every position of the water table", "Soil zone" and "Verification on rough terrain"). Each script supports
-the quick mode (`RAVEN_TEST_QUICK=1`, which `run_all.py --quick` sets) and the full mode; every coupled run is checked by
-`sz_check.py` at the standard limits (`sz_check.ID_LIMITS`: recharge identity 5e-9, soil-zone and unsaturated-zone
-identities 1e-8, the negative recharge not held), MODFLOW's and Raven's balance, and no shortfall.
+the quick mode (`RAVEN_TEST_QUICK=1`, which `run_all.py --quick` sets) and the full mode: in quick mode the scripts run
+shorter cases (for example T7 30 days instead of 365, the restart hillslope 60 + 60 days instead of 150 + 150, T4 without
+the hourly step), and the scripts whose full cases take a second or two (`spike_xmi.py`, the T2/T3 hillslope) run the
+same case in both modes; each script's header lists its quick mode. Every coupled run is checked by `sz_check.py` at the
+standard limits (`sz_check.ID_LIMITS`: recharge identity 5e-9, soil-zone and unsaturated-zone identities 1e-8 from the
+first step, the negative recharge not held), MODFLOW's and Raven's balance, and no shortfall.
 
 | Script (run_all step) | Tests |
 |---|---|
@@ -124,7 +127,7 @@ identities 1e-8, the negative recharge not held), MODFLOW's and Raven's balance,
 | `test_hillslope.py --selftest` (`soilzone_hillslope`) | T2/T3: hillslope wetting and drying against a MODFLOW-only reference (`sz_reference.py`); T3 drying checks and their self-test |
 | `test_dynamics.py` (`soilzone_dynamics`) | T4 time step (1 d, 6 h, 1 h), T5 stiff contact (iterated vs explicit), SG sub-grid saturated fraction |
 | `test_restart.py` (`soilzone_restart`) | 300 d against 150 + 150 d (`:GWSoilZoneColumns`); R2 an existing model with specified heads, 10 d against 5 + 5; R3 seepage holding the lowest soil layer above capacity (no `:SoilZone PHYSICAL`); R4 KINEMATIC and LAG columns restored as written (`--r3r4`: only these two) |
-| `test_inputs.py` (`soilzone_inputs`) | I1-I18: missing HYDRAUL_COND, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart columns, `.rvc` blocks without groundwater, surface exchange on a soil layer, damaged `:GWHeads` header, `:StartTime` under valgrind, orphan `:BoundaryHead`/`:WellFlowRate`, options that do nothing, messages, age tracer across chained hotstarts; I15 chains across year boundaries; I16 age tracer from a spin-up without it; I17 EnKF members' extra `.rvt` series; I18 damaged soil-zone hotstart values |
+| `test_inputs.py` (`soilzone_inputs`) | I1-I19: missing HYDRAUL_COND, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart columns, `.rvc` blocks without groundwater, surface exchange on a soil layer, damaged `:GWHeads` header, `:StartTime` under valgrind, orphan `:BoundaryHead`/`:WellFlowRate`, options that do nothing, messages, age tracer across chained hotstarts; I15 chains across year boundaries; I16 age tracer from a spin-up without it; I17 EnKF members' extra `.rvt` series; I18 damaged soil-zone hotstart values; I19 `:Transport` in a coupled run stops |
 | `test_robustness.py` (`soilzone_robustness`) | R1-R13 cases of the code inspections (stiff column, one HRU over ten cells, explicit mode, late updates, frozen boundaries, unconverged steps), R14-R20 negative recharge (N1-N7), R15b a negative-recharge cut on a draining soil zone |
 | `test_interface_stiff.py` (`soilzone_interface_stiff`) | S1-S8: low-K_v top layer, kink drain, supply limits, tiny budgets and outer limits, the connection test |
 | `test_confined_wet.py` (`soilzone_confined_wet`) | W1-W12: confined layers below their bottoms, drained columns, heads far outside the model and the stop rule (W4, W6, W11 permanent skips) |
@@ -132,13 +135,13 @@ identities 1e-8, the negative recharge not held), MODFLOW's and Raven's balance,
 | `test_mf6_budget.py` (`soilzone_mf6_budget`) | B1-B9: MODFLOW's residual and gross flow as Raven books them, dated warnings, guard counts, B8 unconverged steps without a soil zone (only MODFLOW's negative residual withheld; the row residual is the withheld volume, also with rivers: the Liard example), B9 `GWSoilExchange.csv` per HRU sums to `GWBudget.csv` (specified heads included) |
 | `vadose_unit.cpp`, `vadose_ref.py` (`soilzone_vadose_unit`) | the Richards column against independent solutions (retention, steady infiltration, mass, perched water, drainage against a method-of-lines reference) |
 | `test_sz_models.py` (`soilzone_models`) | P1-P10: delay through a deep unsaturated zone, capillary rise, a water table through the column, restarts, LAGGED timing, classes, specified heads, the shortest column, upward flows out of a lower cell |
-| `test_vz_kinematic.py`, `vadose_kw_unit.cpp` (`soilzone_vz_kinematic`) | `:SoilZoneVadose KINEMATIC` (unit and model tests) |
-| `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (unit tests, L1-L6, cost, byte identity) |
+| `test_vz_kinematic.py`, `vadose_kw_unit.cpp` (`soilzone_vz_kinematic`) | `:SoilZoneVadose KINEMATIC` (unit and model tests); K9: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
+| `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (unit tests, L1-L6, cost, byte identity); L7: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
 | `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C11: depth classes of the unsaturated columns; C9 R20 with three classes; C10 hotstart after a dropped class column; C11 the columns' upflow and the rise from the water table share one source-cell limit |
 | `test_vz_initial.py` (`soilzone_vz_initial`) | I1, I2, I4-I6: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1 |
 | `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases R1-R20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
 | `test_sz_models_ext.py` (`soilzone_models_ext`) | X1-X8: the soil zone with an existing MODFLOW model (round trip, feet and seconds, specified heads, outputs, NEWTON required, specific yield; a steady model takes SPEC_YIELD of `:SoilZoneAquiferClass`) |
-| `test_liard_physical.py 365` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year |
+| `test_liard_physical.py [days]` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year (quick mode: 30 days) |
 
 (T6, a planned comparison with GSFLOW's Sagehen model, was not implemented; the existing-model soil zone is covered by
 X1-X8 and the existing-model cases of the rough-terrain suite.)

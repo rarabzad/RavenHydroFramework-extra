@@ -225,6 +225,8 @@ system under the coupled HRUs, including dry and rewetting cells.
 \item \textbf{What stays in Raven:} everything above the model top --- snow, canopy, soil and unsaturated zone, surface
 runoff, depressions, rivers, lakes and reservoirs --- and all HRUs without an aquifer profile.
 \item \textbf{Water density and temperature} are constant; there is no salt-water or heat transport.
+\item \textbf{No constituent transport:} the coupling exchanges water, not constituent mass, so Raven's \cmd{:Transport}
+(tracers, nutrients, the age tracer, temperature) is not available in a coupled run; the run stops with a message.
 \item \textbf{The grid} is regular (square cells, optionally rotated), a quadtree, an HRU mesh whose cells follow HRU
 boundaries, or imported cell polygons (Section~\ref{sec:gridtypes}); an existing MODFLOW~6 model keeps its own DIS or DISV
 grid (Chapter~\ref{ch:existing}). A generated model covers the cells that the coupled HRUs cover.

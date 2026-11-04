@@ -18,7 +18,11 @@ Command & Meaning\\\midrule
 \cmd{:GroundwaterModel MODFLOW6} & switches the coupling on (\cmd{NONE}: off, the default)\\
 \cmd{:rvg\_Filename file} & name of the groundwater file, relative to the \cmd{.rvi} (default \cmd{<model>.rvg})\\
 processes into \cmd{GROUNDWATER} & any process moving water into \cmd{GROUNDWATER} in a coupled HRU produces recharge; use
-\cmd{:-->Conditional HRU\_GROUP} so uncoupled HRUs keep their own baseflow\\\bottomrule
+\cmd{:-->Conditional HRU\_GROUP} so uncoupled HRUs keep their own baseflow\\
+\cmd{:Transport} & not available with \cmd{:GroundwaterModel MODFLOW6}: the coupling exchanges water only, no
+constituent mass (recharge would leave its mass in Raven's \cmd{GROUNDWATER} store, and seepage and groundwater discharge
+would return water without mass), so a coupled run with any \cmd{:Transport} command (including \cmd{AGE} and
+\cmd{TEMPERATURE}) stops with a message naming the constituent\\\bottomrule
 \end{tabular}
 \end{table}
 

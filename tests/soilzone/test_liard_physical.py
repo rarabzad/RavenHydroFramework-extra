@@ -8,6 +8,8 @@ The example's soils have a small drainable porosity n(1-S_fc) ~ 0.02 against the
 storage-consistency warning is expected), which makes the interface stiff: a hard case for the iteration.
 Checks: the run finishes, MODFLOW and the interface converge in every step, the audit identities close (recharge,
 MODFLOW residual, soil-zone exchange), no shortfall, and the soil zone takes part (rejection, exchange both ways).
+usage: python3 test_liard_physical.py [days]; without days: 365 in full mode, 30 in quick mode (RAVEN_TEST_QUICK=1:
+October 1985, the same checks; the soil zone already exchanges both ways and rejects recharge then).
 """
 import os, sys, re, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); sys.path.insert(0, os.path.dirname(HERE))
@@ -34,7 +36,11 @@ def make(d, days):
     open(p, 'a').write('\n:SoilZone PHYSICAL SOIL[0] SOIL[1]\n:SoilZoneSubgrid 5\n')
     return d
 
-def main(days=365):
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
+
+def main(days=None):
+    if days is None:
+        days = 30 if QUICK else 365
     tc.need_mf6()
     d = make(tc.work('soilzone', 'liard_physical'), days)
     msg = tc.run(d)
@@ -64,4 +70,4 @@ def main(days=365):
     return bool(good)
 
 if __name__ == '__main__':
-    sys.exit(0 if main(int(sys.argv[1]) if len(sys.argv) > 1 else 365) else 1)
+    sys.exit(0 if main(int(sys.argv[1]) if len(sys.argv) > 1 else None) else 1)
