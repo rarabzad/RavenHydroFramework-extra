@@ -50,6 +50,9 @@ I17 EnKF members with their own :ExtraRVTFilename (ENKF_OPEN_FORECAST, 3 members
 I18 damaged soil-zone hotstart values: a :GWSoilZoneColumns row with nan, one with negative water (-50 mm), and a
    :GWHeads value nan each stop the run with a message naming the block ("is not a finite number", "is negative");
    the undamaged file runs.
+I19 Raven transport in a coupled run: :Transport Nitrate (CONCEPTUAL and PHYSICAL) and :Transport AGE with
+   :GroundwaterModel MODFLOW6 stop the run naming the constituent (the coupling exchanges no constituent mass); the same
+   model without :GroundwaterModel runs with :Transport Nitrate.
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -381,6 +384,21 @@ def main():
             print('  I18 %-5s: %s' % (lab, ('runs' if ok else 'stops') + ('' if msg is None else (' with the message' if msg in txt else ' (message missing)'))))
             good &= g
     res.append(('I18 damaged soil-zone hotstart values stop the run', good))
+    # I19: Raven transport in a coupled run stops the run; without :GroundwaterModel it runs
+    good = True
+    for lab, phys, constit, coupled in (('cn', False, 'Nitrate', True), ('ca', False, 'AGE', True), ('pn', True, 'Nitrate', True),
+                                        ('nn', False, 'Nitrate', False)):
+        d = case('I19_' + lab, days=2, physical=phys)
+        tx = open(os.path.join(d, 'm.rvi')).read().replace(':EndHydrologicProcesses\n', ':EndHydrologicProcesses\n:Transport %s\n' % constit)
+        if not coupled: tx = tx.replace(':GroundwaterModel MODFLOW6\n', '')
+        open(os.path.join(d, 'm.rvi'), 'w').write(tx)
+        ok, txt = run_err(d)
+        msg = ':Transport %s cannot be used with :GroundwaterModel MODFLOW6' % constit
+        g = ((not ok) and msg in txt) if coupled else (ok and msg not in txt)
+        print('  I19 %s, :Transport %-7s%s: %s' % ('PHYSICAL' if phys else 'CONCEPTUAL', constit, '' if coupled else ' (no groundwater)',
+                                                 ('runs' if ok else 'stops') + (' with the message' if msg in txt else '')))
+        good &= g
+    res.append(('I19 :Transport with :GroundwaterModel MODFLOW6 stops', good))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

@@ -23,6 +23,8 @@ zone that is not connected to the water table passes the rain through and keeps 
 The coupled run is compared with a MODFLOW-only model in which the soil zone is a MODFLOW layer (sz_reference); with
 daily steps they differ by the splitting error of Raven's processes ahead of the exchange (see test_dynamics T4).
 Balance identities of plan §7 must close in every step.
+Quick mode (RAVEN_TEST_QUICK=1) runs the same 300-day case: the drying checks need the whole wet and dry season, and
+the run with its MODFLOW-only reference takes about ten seconds.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -72,6 +74,7 @@ def selftest(F, ovf, wt, land, base, href, out_c, tconn, drained):
     return ok
 
 def main():
+    print('T2/T3: %s mode (the same 300-day case in both)' % ('quick' if os.environ.get('RAVEN_TEST_QUICK', '') == '1' else 'full'))
     d = os.path.join(W, 'coupled'); shutil.rmtree(d, ignore_errors=True)
     sz_models.make_case(d, **CFG)
     ok, txt = sz_check.run(d)

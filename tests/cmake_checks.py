@@ -5,7 +5,8 @@
 Offline and fast (Linux; about a minute): every check configures Raven's CMake project into its own folder under
 <scratch>/cmake_checks with small stand-in libraries and zips, and never compiles Raven. Downloads point at a missing
 local folder (RAVEN_MF6_RELEASE_URL, RAVEN_MF6_GIT_URL), so nothing leaves the computer. Needs cmake >= 3.20, a C
-compiler (cc), and for checks 2, 7 and 9 gfortran, meson >= 1.7, ninja and git (otherwise those parts are skipped).
+compiler (cc), and for checks 2, 7, 9, 15 and 22 gfortran, meson >= 1.7, ninja and git (check 20: gfortran, and patchelf
+for its first part; otherwise those parts are skipped).
 
  1 Linux aarch64 (emulated: CMAKE_SYSTEM_NAME=Linux, CMAKE_SYSTEM_PROCESSOR=aarch64), no meson: the default falls back to
    OFF with a warning naming -DRAVEN_MF6=OFF, configure succeeds
@@ -50,6 +51,15 @@ compiler (cc), and for checks 2, 7 and 9 gfortran, meson >= 1.7, ninja and git (
    in turn are installed (needs clang and the LLVM 18 tools for the macOS part)
 19 messages: RAVEN_MF6_PATH given a folder keeps the ';' of "is a folder; give the library file itself"; a
    6-digit RAVEN_MF6_ZIP_SHA256 is named as not a SHA256 (not "a damaged or different file")
+
+20 PATH mode, Linux: a gfortran-built libmf6 without a run path (built outside this CMake): with patchelf the installed
+   copy gets $ORIGIN and loads the libgfortran installed beside it (ldd); without patchelf a warning says it has no run
+   path $ORIGIN and loads the system runtime; a libmf6 that has $ORIGIN is left as it is, without a warning
+21 RAVEN_MF6=OFF (explicit, and the default fallback on emulated aarch64 without meson): the configure says that
+   cmake --install installs Raven alone, and cmake --install puts bin/Raven in place with a message (a small stand-in
+   executable at the build tree's Raven path: Raven is not compiled)
+22 the default's offline fallback to OFF with the source tools installed: the warning names the network (no request to
+   install the tools); without meson the warning asks to install the source tools
 
 Prints one line per part and "cmake checks: ALL PASSED (N parts)" at the end; exit code = number of failed parts.
 """
@@ -618,9 +628,104 @@ def check19():
            and 'damaged or different file' not in out)
 
 
+def _runpath(lib):
+    """the RUNPATH/RPATH of an ELF file ('' if none)"""
+    m = re.search(r'\((?:RPATH|RUNPATH)\)[^\[]*\[([^\]]*)\]', run(['readelf', '-d', lib])[1])
+    return m.group(1) if m else ''
+
+
+def check20():
+    d = fresh('c20')
+    if not GFORTRAN or not shutil.which('readelf'):
+        report(20, 'PATH-mode libmf6 without $ORIGIN', None, 'needs gfortran and readelf')
+        return
+    f = os.path.join(d, 'f.f90')
+    open(f, 'w').write('subroutine hello() bind(c)\n  write(*,*) "hello from a Fortran library"\nend subroutine\n')
+    lib = os.path.join(d, 'libmf6.so')                    # built outside this CMake: no run path at all
+    run([GFORTRAN, '-shared', '-fPIC', '-o', lib, f])
+    if 'libgfortran.so.5' not in run(['ldd', lib])[1] or _runpath(lib):
+        report(20, 'PATH-mode libmf6 without $ORIGIN', None, 'the test library does not link libgfortran.so.5 or has a run path')
+        return
+
+    def bundle(name, patchelf):
+        prefix = os.path.join(d, name)
+        os.makedirs(os.path.join(prefix, 'bin'))
+        shutil.copy2(lib, os.path.join(prefix, 'bin', 'libmf6.so'))     # as install(PROGRAMS) puts it there
+        rc, out = _bundle(lib, 'Linux', 'libmf6.so', prefix, extra=['-DRAVEN_MF6_PATCHELF=' + patchelf])
+        return os.path.join(prefix, 'bin'), rc, flat(out)
+
+    pe = shutil.which('patchelf')
+    if pe:
+        b, rc, out = bundle('inst_pe', pe)
+        inst = os.path.join(b, 'libmf6.so')
+        ld = run(['ldd', inst])[1]
+        ok = (rc == 0 and '$ORIGIN' in _runpath(inst).split(':') and os.path.isfile(os.path.join(b, 'libgfortran.so.5'))
+              and re.search(r'libgfortran\.so\.5 => %s/libgfortran\.so\.5' % re.escape(b), ld) is not None)
+        report(20, 'patchelf: the installed libmf6 gets $ORIGIN and loads the libgfortran beside it', ok,
+               '' if ok else ('runpath %r; %s' % (_runpath(inst), ld.strip()[:300])))
+    else:
+        report(20, 'patchelf: the installed libmf6 gets $ORIGIN', None, 'patchelf not found')
+    b, rc, out = bundle('inst_nope', 'NOTFOUND')
+    report(20, '  no patchelf: warning that libmf6 has no run path $ORIGIN and loads the system runtime',
+           rc == 0 and 'CMake Warning' in out and 'has no run path $ORIGIN and patchelf was not found' in out
+           and 'libgfortran.so.5' in out, '' if rc == 0 else out[-300:])
+    lib2 = os.path.join(d, 'o', 'libmf6.so')              # built with $ORIGIN (as the SOURCE mode does): nothing to do
+    os.makedirs(os.path.dirname(lib2))
+    run([GFORTRAN, '-shared', '-fPIC', '-Wl,-rpath,$ORIGIN', '-o', lib2, f])
+    prefix = os.path.join(d, 'inst_origin')
+    os.makedirs(os.path.join(prefix, 'bin'))
+    shutil.copy2(lib2, os.path.join(prefix, 'bin', 'libmf6.so'))
+    rc, out = _bundle(lib2, 'Linux', 'libmf6.so', prefix, extra=['-DRAVEN_MF6_PATCHELF=NOTFOUND'])
+    out = flat(out)
+    report(20, '  a libmf6 that has $ORIGIN: reported, no warning', rc == 0 and 'has the run path $ORIGIN' in out
+           and 'CMake Warning' not in out, out[-300:] if rc else '')
+
+
+def _stand_in_raven(b):
+    """a small executable at the build tree's Raven path (the checks never compile Raven)"""
+    c = os.path.join(b, 'raven_stand_in.c')
+    open(c, 'w').write('int main(void){return 0;}\n')
+    run([CC, '-o', os.path.join(b, 'Raven'), c])
+
+
+def check21():
+    d = fresh('c21')
+    if not CC:
+        report(21, 'install with RAVEN_MF6=OFF', None, 'no C compiler')
+        return
+    for tag, args in (('explicit -DRAVEN_MF6=OFF', ['-DRAVEN_MF6=OFF']),
+                      ('default fallback to OFF (aarch64, no meson)', ['-DCMAKE_SYSTEM_NAME=Linux', '-DCMAKE_SYSTEM_PROCESSOR=aarch64',
+                                                                       '-DRAVEN_MESON=/nonexistent/meson'])):
+        b = os.path.join(d, 'b%d' % len(os.listdir(d)))
+        rc, out = cfg(b, *args)
+        report(21, '%s: configure says cmake --install installs Raven alone' % tag,
+               rc == 0 and 'cmake --install installs Raven alone' in out and not has_lib_target(b), '' if rc == 0 else out[-300:])
+        _stand_in_raven(b)
+        inst = os.path.join(d, 'inst_' + os.path.basename(b))
+        rc, out = run([CMAKE, '--install', b, '--prefix', inst])
+        got = sorted(os.listdir(os.path.join(inst, 'bin'))) if os.path.isdir(os.path.join(inst, 'bin')) else []
+        report(21, '  cmake --install: bin/Raven installed, with the message', rc == 0 and got == ['Raven']
+               and 'Raven installed without the MODFLOW 6 library' in out, '%s %s' % (got, flat(out)[-300:]))
+
+
+def check22():
+    d = fresh('c22')
+    if not TOOLS:
+        report(22, 'offline fallback warning', None, 'needs gfortran, meson, ninja, git')
+        return
+    rc, out = cfg(os.path.join(d, 'b_off'))                  # tools found, repository and release unreachable
+    report(22, 'offline fallback with the tools installed: the warning names the network, not the tools',
+           rc == 0 and '-DRAVEN_MF6=OFF' in out and 'install a Fortran compiler' not in out
+           and 'The source tools (Fortran compiler, meson, ninja, git) are installed' in out, out[-300:] if rc else '')
+    rc, out = cfg(os.path.join(d, 'b_aarch'), '-DCMAKE_SYSTEM_NAME=Linux', '-DCMAKE_SYSTEM_PROCESSOR=aarch64',
+                  '-DRAVEN_MESON=/nonexistent/meson')
+    report(22, '  without meson: the warning asks to install the source tools',
+           rc == 0 and 'install a Fortran compiler (gfortran or ifx), meson >= 1.7, ninja and git' in out, out[-300:] if rc else '')
+
+
 CHECKS = {1: check1, 2: check2, 3: check3, 4: check4, 5: check5, 6: check6, 7: check7, 8: check8, 9: check9,
           10: check10, 11: check11, 12: check12, 13: check13, 14: check14, 15: check15, 16: check16, 17: check17,
-          18: check18, 19: check19}
+          18: check18, 19: check19, 20: check20, 21: check21, 22: check22}
 
 # one mutation per check: (file, text in it, replacement) = the bug the check was written for
 MUTATIONS = {
@@ -649,6 +754,10 @@ MUTATIONS = {
     17: ('cmake/RavenMF6.cmake', '  if(NOT "${v}" STREQUAL "" AND "${v}" VERSION_LESS RAVEN_MF6_MIN_VERSION)', '  if(FALSE)'),
     18: ('cmake/RavenMF6Bundle.cmake', '        list(APPEND _queue "${_real}|${_n}")', '        # (dependencies of dependencies not followed)'),
     19: ('cmake/RavenMF6.cmake', '  set(_rmf6_msg "${ARGV0}")\n', '  string(CONCAT _rmf6_msg ${ARGV})\n'),
+    20: ('cmake/RavenMF6Bundle.cmake', 'set(_mf6inst "${_inst}/${RAVEN_MF6_BUNDLE_NAME}")', 'set(_mf6inst "${_inst}/nonexistent")'),
+    21: ('CMakeLists.txt', '  install(TARGETS Raven RUNTIME DESTINATION bin COMPONENT Raven)\n  if(RAVEN_MF6_MODE STREQUAL "OFF")',
+         '  if(RAVEN_MF6_MODE STREQUAL "OFF")'),
+    22: ('cmake/RavenMF6.cmake', '  set(_rmf6_tools_found ${_rmf6_tools_ok})', '  set(_rmf6_tools_found FALSE)'),
 }
 
 

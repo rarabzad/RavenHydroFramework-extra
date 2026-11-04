@@ -225,6 +225,8 @@ system under the coupled HRUs, including dry and rewetting cells.
 \item \textbf{What stays in Raven:} everything above the model top --- snow, canopy, soil and unsaturated zone, surface
 runoff, depressions, rivers, lakes and reservoirs --- and all HRUs without an aquifer profile.
 \item \textbf{Water density and temperature} are constant; there is no salt-water or heat transport.
+\item \textbf{No constituent transport:} the coupling exchanges water, not constituent mass, so Raven's \cmd{:Transport}
+(tracers, nutrients, the age tracer, temperature) is not available in a coupled run; the run stops with a message.
 \item \textbf{The grid} is regular (square cells); the model area is the part of the rectangle around the coupled HRUs
 that those HRUs cover.
 \item \textbf{Time}: both models use Raven's time step (daily or shorter). Exchanges are explicit between the models at

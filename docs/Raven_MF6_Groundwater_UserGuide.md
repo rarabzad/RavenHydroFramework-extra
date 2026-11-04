@@ -420,3 +420,4 @@ Refinement of a regular grid spans whole rows and columns; XT3D (optional, off b
 rasters in latitude/longitude (ESRI ASCII);
 river stage from the start of the step; reservoirs exchange with a one-step lag (:ReservoirExchange); groundwater transport, particle tracking, demand-driven wells and frozen-ground recharge control
 are planned extensions. (Coupling an existing MODFLOW 6 model is available: section 4.3b and `examples/Liard_existing_model/`.)
+Raven's `:Transport` (tracers, nutrients, the age tracer, temperature) is not available in a coupled run: the coupling exchanges water, not constituent mass, so a coupled run with a `:Transport` command stops with a message naming the constituent.

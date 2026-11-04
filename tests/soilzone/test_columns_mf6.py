@@ -9,6 +9,7 @@ M2  an unsaturated column under steady rain delivers its inflow to MODFLOW's top
 M3  CONCEPTUAL runs are unchanged against the reference build (RAVEN_EXE_REF; SKIP without it), apart from GWBudget's
     "MF6 balance error [%]" (gross flow redefined) and the run log.
 M4  the check of M1 fails when the GWModelSummary.txt line is missing (kept_its returns None).
+Quick mode (RAVEN_TEST_QUICK=1): M2 runs 75 days instead of 120 (the same check over its last 30 days).
 """
 import os, sys, re, shutil, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -16,6 +17,7 @@ import pandas as pd, numpy as np
 import sz_models, sz_check
 
 W = sz_check.tc.work('soilzone', 'columns_mf6')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 
 def kept_its(d):
     """outer iterations in which drained columns were kept wet (GWModelSummary.txt run totals); None when the line is missing"""
@@ -42,7 +44,7 @@ def m1():
 
 def m2():
     print('M2 an unsaturated column delivers its inflow to MODFLOW')
-    d, ok = case('m2_richards', nhru=1, hru_w=200.0, rain=2.0, days=120, perc=2.0, init_depth=4.0, aq_b=4.0, aq_psia=0.3, Kv=1.0,
+    d, ok = case('m2_richards', nhru=1, hru_w=200.0, rain=2.0, days=75 if QUICK else 120, perc=2.0, init_depth=4.0, aq_b=4.0, aq_psia=0.3, Kv=1.0,
                  extra_rvg=':SoilZoneVadose RICHARDS\n')
     if not ok: return False
     b = sz_check.outputs(d)[0].iloc[-30:]

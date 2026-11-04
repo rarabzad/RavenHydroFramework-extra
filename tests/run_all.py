@@ -3,7 +3,8 @@
     python3 run_all.py            # everything (needs the MODFLOW 6 library; about an hour on one core)
     python3 run_all.py --nolib    # only the checks that do not need the MODFLOW 6 library (a few minutes)
     python3 run_all.py --quick    # everything in quick mode: smaller randomized rounds, and every script runs with
-                                  # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds)
+                                  # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds, the
+                                  # Liard soil-zone run T7 30 days instead of 365)
     python3 run_all.py --only thiem,edge    # selected steps (names as in the report)
 
 The USGS example-model steps need the MODFLOW 6 examples (mf6examples.zip from
@@ -201,7 +202,7 @@ STEPS = [
     ('soilzone_rough_terrain_k3', True, [PY, 'soilzone/test_rough_terrain.py'] + (['--quick'] if QUICK else []) + ['--methods', 'NONE,RICHARDS,KINEMATIC,LAG', '--vzclasses', '3'],
      last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
     ('soilzone_models_ext', True, [PY, 'soilzone/test_sz_models_ext.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
-    ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py', '365'], last_line(r'T7 Liard physical: PASS'), 4 * 3600),
+    ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py'] + ([] if QUICK else ['365']), last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
 
 have_lib = bool(tc.MF6LIB) and os.path.exists(tc.MF6LIB)

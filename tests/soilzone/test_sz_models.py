@@ -28,6 +28,8 @@ P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with
      than with the HRU mean (1 class).
 All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities and the negative
 recharge not held at the standard limits (sz_check.ID_LIMITS), and no unconverged MODFLOW or interface step.
+Quick mode (RAVEN_TEST_QUICK=1): P4 runs 30 + 30 days against 60 (one storm in each part) instead of 60 + 60 against
+120; the other cases are the same in both modes (each takes about a second).
 """
 import os, sys, shutil, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -35,6 +37,7 @@ import numpy as np, pandas as pd
 import sz_models, sz_check
 
 W = sz_check.tc.work('soilzone', 'water_table')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 # the standard limits of every soil-zone test (sz_check.ID_LIMITS: recharge identity 5e-9, soil-zone and unsaturated-zone
 # identities 1e-8, the negative recharge not held) plus the convergence counts (no unconverged MODFLOW or interface step);
 # a case that needs another limit says so where it runs (these were 1e-6 and 1e-5, 200 and 1000 times looser)
@@ -133,17 +136,18 @@ def P4():
     rain = ([0.0] * 10 + [40.0] * 3 + [0.0] * 17) * 4
     cfg = dict(nhru=1, hru_w=200.0, init_depth=6.0, aq_thick=20.0, perc=50.0, ksat=500.0, Kv=0.5, Sy=0.2, aq_b=4.0, aq_psia=0.3,
                extra_rvg=VZ)
-    full, _ = run('d_full', rain=rain, days=120, **cfg)
-    first, _ = run('d_first', rain=rain[:60], days=60, **cfg)
+    n = 60 if QUICK else 120; n1 = n // 2              # n days against n1 + n1
+    full, _ = run('d_full', rain=rain[:n], days=n, **cfg)
+    first, _ = run('d_first', rain=rain[:n1], days=n1, **cfg)
     if not (full and first):
         return False
     rvc = os.path.join(first, 'out', 'solution.rvc')
     has = ':GWVadoseColumns' in open(rvc).read()
-    start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=60)).isoformat()
-    second, _ = run('d_second', start=start, rvc=rvc, rain=rain[60:], days=60, **cfg)
+    start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=n1)).isoformat()
+    second, _ = run('d_second', start=start, rvc=rvc, rain=rain[n1:n], days=n - n1, **cfg)
     if not second:
         return False
-    a, b = budget(full).iloc[60:].reset_index(drop=True), budget(second)
+    a, b = budget(full).iloc[n1:].reset_index(drop=True), budget(second)
     dq = (a['MF6 recharge [m3/d]'] - b['MF6 recharge [m3/d]']).abs().max() / a['MF6 recharge [m3/d]'].abs().max()
     ds = (a['unsaturated zone storage [m3]'] - b['unsaturated zone storage [m3]']).abs().max() / a['unsaturated zone storage [m3]'].abs().max()
     ok = has and dq < 1e-4 and ds < 1e-4

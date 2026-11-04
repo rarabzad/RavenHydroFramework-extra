@@ -24,13 +24,16 @@ L6  the cell-room release cap of a rising water table (VZStep): one flat HRU, Sy
     rise, int Sy dz over [h, min(z_b, z_top)]), the second being the room the top cell has left above the water table.
     Checked: on every step the column survives its release (storage loss) is at most S_y A (z_top - h) for the head h it
     started from, and on at least one step that room is what limits it (release within 0.1 % of it; without the room cap that step releases 2269 m3 against a room of 1626 m3); identities.
+L7  the leak check: the L1 storm with LAG 2 passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3 per
+    step put into "unsaturated zone storage [m3]" (on the steps above 5,000 m3, 10 significant digits) fail the
+    script's checks.
 S   speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from U).
 B   byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the T2/T3 hillslope,
     RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change ; out/*.csv and solution.rvc compared byte for byte except the diagnostic column
     `interface change [m]`. Without RAVEN_EXE_REF B prints SKIP (never "ok").
-Identities use the standard limits (sz_check.STD_LIMITS); vz_identity is scaled by the
-step's flows and the two storages whose difference it takes (GWBudget.csv carries 10 significant digits: a column store
-of 1e4 m3 is rounded to 1e-5 m3).
+Identities use the standard limits (sz_check.STD_LIMITS) and sz_check's column identity
+(sz_check.vz_identity: scaled by the step's flows, less the CSV rounding of its values) from step 1: every run must give
+the start storage of the columns (GWModelSummary.txt), otherwise it fails (vz_step1_missing).
 Quick mode (RAVEN_TEST_QUICK=1): shorter S and only b_hill_ric in B.
 """
 import os, sys, shutil, re, time, datetime, subprocess
@@ -47,7 +50,7 @@ if REF is None:
     REF = os.environ.get('RAVEN_EXE_REF', '') or os.environ.get('RAVEN_REF_EXE', '')   # (RAVEN_REF_EXE: the name once used)
 LIM = dict(getattr(sz_check, 'STD_LIMITS', {}))
 LIM.update({'mf6_err_rel': 1e-5, 'raven_mb_mm': 1e-5, 'rch_identity': 5e-9, 'sz_identity': 1e-8, 'shortfall': 1e-6,
-            'vz_identity': 1e-8})
+            'vz_identity': 1e-8, 'vz_step1_missing': 0})
 DIAG = list(getattr(sz_check, 'DIAGNOSTIC_COLUMNS', ['interface change [m]']))
 SKIPS = []
 STORM = [0.0] * 10 + [40.0] * 3 + [0.0] * 77
@@ -63,23 +66,10 @@ def skip(what, why):
     SKIPS.append(what)
 
 
-def vz_identity(d):
-    """column balance per step from the second step: |dS - in + cap + out| / max(1 m3, |in| + |out| + |cap| + |S0| + |S1|)"""
-    b = budget(d)
-    if 'unsaturated zone storage [m3]' not in b:
-        return None
-    s = b['unsaturated zone storage [m3]']
-    i, o, c = b['unsaturated zone inflow [m3]'], b['unsaturated zone to aquifer [m3]'], b['capillary rise to soil zone [m3]']
-    r = (s.diff() - i + c + o)[1:]
-    sc = (i.abs() + o.abs() + c.abs() + s.abs() + s.shift().abs())[1:].clip(lower=1.0)
-    return float((r.abs() / sc).max()) if len(r) else 0.0
-
-
 def check(d, name, dt=1.0):
     r = sz_check.checks(d, dt=dt)
-    v = vz_identity(d)
-    if v is not None:
-        r['vz_identity'] = v
+    if 'vz_identity' in r:   # sz_check's column identity, from step 1 (the start storage of GWModelSummary.txt required)
+        r['vz_step1_missing'] = 0 if r.get('vz_step1') else 1
     print('  %s:' % name)
     return sz_check.report(name, r, {k: x for k, x in LIM.items() if k in r}), r
 
@@ -360,10 +350,25 @@ def test_l6():
     print('  release beyond the room at most %.3g m3; steps limited by the room %d (at least 1) -> %s' % (worst, bound, 'ok' if good else 'FAIL'))
     return ok and good
 
+def test_l7():
+    print('L7 the checks of this script see a column leak (the L1 storm, LAG 2; GWBudget.csv altered)')
+    d = run('l7', extra_rvg=':SoilZoneVadose LAG 2\n', **STORM_CFG)
+    if not d:
+        return False
+    ok, _ = check(d, 'l7')
+    for leak in (1e-5, 1e-4):
+        n = sz_check.leak_copy(d, os.path.join(W, 'l7_leak'), leak)
+        print('  leak %g m3 per step on %d steps:' % (leak, n))
+        caught = not check(os.path.join(W, 'l7_leak'), 'l7 leak %g' % leak)[0]
+        print('  -> %s' % ('caught (ok)' if caught else 'NOT caught: FAIL'))
+        ok &= caught and n >= 5
+    return ok
+
 def main():
     tc.need_mf6() if hasattr(tc, 'need_mf6') else None
     res = {}
-    for name, f in (('U', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6), ('S', test_s), ('B', test_b)):
+    for name, f in (('U', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6),
+                    ('L7', test_l7), ('S', test_s), ('B', test_b)):
         t0 = time.time()
         try:
             res[name] = bool(f())

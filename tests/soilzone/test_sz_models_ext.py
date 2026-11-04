@@ -14,14 +14,18 @@ X6  start-up stops: an existing model without NEWTON (required with :SoilZone PH
 X7  specific yield of an existing model: the x1 model with a confined STO package (ICONVERT 0, no
     SY: MODFLOW holds SY 0) keeps its SY, floored at 0.01 for the release limits and the columns, with a warning naming
     the floor; the x1 model without STO assumes 0.2, the warning naming the soil-zone checks, release limits and columns.
+Quick mode (RAVEN_TEST_QUICK=1): the round trips X1-X4 (and X5-X7, which use their runs) cover the first 120 days of the
+hillslope's rain instead of all 300; the checks are the same.
 """
 import os, sys, shutil, re, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
 import numpy as np, pandas as pd
 import sz_models, sz_check
-from test_hillslope import CFG
+from test_hillslope import CFG, RAIN
 
 W = sz_check.tc.work('soilzone', 'v2ext')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
+SHORT = dict(days=120, rain=RAIN[:120]) if QUICK else {}   # (quick mode: the round trips' length)
 LIM = dict(sz_check.ID_LIMITS)   # (the standard limits of the identities: recharge 5e-9, soil zone and unsaturated zone 1e-8)
 COLS = ['MF6 recharge [m3/d]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'rejected recharge [m3]',
         'soil-zone exchange applied to Raven [m3]', 'storage release [m3/d]']
@@ -129,11 +133,11 @@ def sy_x7():
     return good
 
 def main():
-    res = [roundtrip('x1'),
-           roundtrip('x2', feet=True),
+    res = [roundtrip('x1', **SHORT),
+           roundtrip('x2', feet=True, **SHORT),
            roundtrip('x3', ':SoilZoneVadose RICHARDS\n:SoilZoneAquiferClass SAND\n:SoilZoneClasses 3\n',
-                     chd=94.8, aq_b=4.0, aq_psia=0.3, init_depth=3.0, soil_b=5.0, soil_psia=200.0, pet=2.0),
-           roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8)]   # (capillary arrays unsized with the rise off)
+                     chd=94.8, aq_b=4.0, aq_psia=0.3, init_depth=3.0, soil_b=5.0, soil_psia=200.0, pet=2.0, **SHORT),
+           roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8, **SHORT)]   # (capillary arrays unsized with the rise off)
     res += [outputs_x3(), stops_x6(), sy_x7()]
     print('soil-zone existing-model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)

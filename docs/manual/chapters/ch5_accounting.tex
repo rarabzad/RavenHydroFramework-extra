@@ -159,7 +159,7 @@ At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states 
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
 transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), and with unsaturated columns \cmd{:GWVadoseColumns} (\cmd{:GWVadoseClassColumns} with depth classes). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
 run --- continues exactly: in the tests the restarted run matched a continuous run to within $6\times10^{-6}$ in all flows.
-Three details make this hold:
+Two details make this hold:
 \begin{itemize}
 \item Without \cmd{:SoilZone PHYSICAL}, seepage is added to its target store (\cmd{:SeepageReturnTo}, by default the
 lowest soil layer) with no capacity limit, so that layer can hold more than its capacity for a while. On reading the
@@ -169,12 +169,14 @@ the value as written, so the restart carries the same water as the continuous ru
 \cmd{:GWVadoseClassColumns}), floored only at what the method can hold: the air-dry content
 $\theta(\psi=-10^5$\,m$)$ for \cmd{RICHARDS} and \cmd{LAG}, zero for \cmd{KINEMATIC} (whose reference content
 $\theta_s-S_y$ can lie below air-dry when $S_y$ is close to the porosity).
-\item With an age tracer (\cmd{:Transport AGE}), the file's tracer masses are volumes times entry times counted from a datum:
-the start of the first run of a chain of restarts. \cmd{:StartTime} in \cmd{solution.rvc} is the start of the run that
+\end{itemize}
+In Raven runs without groundwater, an age tracer (\cmd{:Transport AGE}; transport is not available in a coupled run,
+Section~\ref{ch:inputs}) is restarted as follows. The file's tracer masses are volumes times entry times counted from a
+datum: the start of the first run of a chain of restarts. \cmd{:StartTime} in \cmd{solution.rvc} is the start of the run that
 wrote it; when the datum is earlier, the file also carries \cmd{:AgeTracerDatum} with that date. A run read from the file
 counts its ages from \cmd{:AgeTracerDatum}, else from \cmd{:StartTime} when the file holds age-tracer masses; from a file
 without them (a spin-up run without the tracer) the initial water has age 0.
-\end{itemize}
+
 Damaged groundwater values in the \cmd{.rvc} stop the run with a message naming the block: a value that is not a finite
 number in any groundwater block, and negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or
 \cmd{:GWVadoseClassColumns}.

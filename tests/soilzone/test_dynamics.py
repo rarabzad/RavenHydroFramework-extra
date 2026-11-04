@@ -10,6 +10,8 @@ T5  stiffness: a thin, conductive soil-aquifer contact (C^sz/A ~ 9.5 /d against 
     one pass without iteration (`:SoilZoneIteration 0 ...`) is less accurate. Both runs conserve water exactly.
 SG  sub-grid saturated fraction (`:SoilZoneSubgrid 5`, ramp 0.5 m) on the same slope: F changes smoothly instead of
     cell by cell, the balances close and the totals stay close to the reference.
+Quick mode (RAVEN_TEST_QUICK=1): T4 runs the 1 d and 6 h steps only (the error must shrink from 1 d to 6 h, total
+outflow within 1e-3 of the reference; the hourly limits apply in full mode); T5 and SG are the same in both modes.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -18,6 +20,7 @@ import sz_models, sz_check, sz_reference
 from test_hillslope import CFG, RAIN
 
 W = sz_check.tc.work('soilzone', 'dynamics')
+QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 
 def daily(d, nh, days):
     """per-HRU daily water table, soil level, saturated fraction; daily surface outflow [m3/d]"""
@@ -58,7 +61,8 @@ def main():
     ok_all = True
     # ---------------- T4: time step, each against the reference with the same step
     runs, errs = {}, {}
-    for name, dt, nstp in (('dt_1d', 1.0, 1), ('dt_6h', 0.25, 4), ('dt_1h', 1.0 / 24.0, 24)):
+    steps = (('dt_1d', 1.0, 1), ('dt_6h', 0.25, 4)) + (() if QUICK else (('dt_1h', 1.0 / 24.0, 24),))
+    for name, dt, nstp in steps:
         d, res = run_case(name, timestep=dt)
         if d is None:
             ok_all = False; continue
@@ -72,10 +76,13 @@ def main():
         errs[name] = dict(max=float(e.max()), mean=float(e.mean()),
                           out=float(abs(runs[name]['cumout'][-1] - ref['drn'].sum()) / ref['drn'].sum()))
         print('  vs reference (same step): max %.4f m, mean %.4f m, total outflow %.2e' % (errs[name]['max'], errs[name]['mean'], errs[name]['out']))
-    if len(errs) == 3:
-        good = errs['dt_1d']['mean'] > errs['dt_6h']['mean'] > errs['dt_1h']['mean'] and errs['dt_1h']['mean'] < 0.003 \
-            and errs['dt_1h']['max'] < 0.05 and max(e['out'] for e in errs.values()) < 1e-3
-        print('T4 time step convergence to the reference: %s' % ('PASS' if good else 'FAIL')); ok_all &= good
+    if len(errs) == len(steps):
+        good = errs['dt_1d']['mean'] > errs['dt_6h']['mean'] and max(e['out'] for e in errs.values()) < 1e-3
+        if not QUICK:
+            good &= errs['dt_6h']['mean'] > errs['dt_1h']['mean'] and errs['dt_1h']['mean'] < 0.003 and errs['dt_1h']['max'] < 0.05
+        print('T4 time step convergence to the reference%s: %s' % (' (quick: 1 d and 6 h)' if QUICK else '', 'PASS' if good else 'FAIL')); ok_all &= good
+    else:
+        ok_all = False
     # ---------------- T5: stiffness, explicit vs iterated
     stiff = dict(Kv=100.0, ksat=10000.0)
     d_it, r_it = run_case('stiff_iterated', **stiff)
