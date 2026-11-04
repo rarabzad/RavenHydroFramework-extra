@@ -306,16 +306,20 @@ starts dry (Section~\ref{ch:layers}). Start from a steady state or realistic hea
 \item Between cells, soil water moves only through the aquifer (\cmd{:SoilZone PHYSICAL}); seepage faces smaller than a cell
 need smaller cells.
 \item Existing models (Chapter~\ref{ch:existing}, Section~\ref{sec:extlimits}): no DISU grids; no ATS6, several solutions or
-a non-Gregorian calendar; restarts and later starts refuse packages with time series (TS6, TAS6), TVK6/TVS6 and simulations
-with several models; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are taken as metres and days (set them in DIS and TDIS);
-monitoring wells and \cmd{GWHeads.nc} need the cell outlines (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not
-\cmd{:OverlapWeights}).
+a non-Gregorian calendar; restarts and later starts refuse time-array series (TAS6), TVK6/TVS6, simulations with several
+models and array or advanced packages with several period entries before the start (TS6 time series are shifted to Raven's
+start); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\cmd{OPEN/CLOSE} files are read); the stream
+package keeps the model's stage and has no conductance (supply) limit; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are
+taken as metres and days (set them in DIS and TDIS); monitoring wells and \cmd{GWHeads.nc} need the cell outlines
+(\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not \cmd{:OverlapWeights}). Water-table ET, \cmd{:SurfaceWaterExchange} and
+\cmd{:ReservoirExchange} work as with a generated model.
 \item Raven's channel-storage bookkeeping (\cmd{:ChannelStorage} in \cmd{solution.rvc}) can be negative in some subbasins; this
 already happens in Raven~4.1.1 without groundwater (17 subbasins of the Liard model) and is left unchanged here, as it belongs
 to Raven's routing, not to the coupling.
 
 \end{itemize}
 \paragraph{Not available.}
-Groundwater transport (MODFLOW~6 GWT) linked to Raven constituents; particle tracking (PRT) for well capture zones and
-time-of-travel zones; wells driven by Raven water demands (irrigation). Frozen ground acts on recharge only through Raven's own
+Groundwater transport (MODFLOW~6 GWT) linked to Raven constituents; particle tracking (PRT) during the run (offline tracking
+on the coupled flows is possible: \cmd{:WriteGWBudgetFile} and \cmd{tools/make\_prt.py}, Section~\ref{sec:budgetfile}; PRT
+needs DIS or DISV grids); wells driven by Raven water demands (irrigation). Frozen ground acts on recharge only through Raven's own
 processes (the coupling receives whatever they send to \cmd{GROUNDWATER}).

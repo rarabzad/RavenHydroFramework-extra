@@ -112,8 +112,8 @@ Command & Meaning (default)\\\midrule\endhead
 \cmd{:SeepageReturnTo SV} & Raven store receiving seepage (lowest soil layer; soil-less HRUs: \cmd{SURFACE\_WATER})\\
 \cmd{:RiverBedDepth m | REFERENCE\_FLOW} & riverbed depth below the DEM (\cmd{REFERENCE\_FLOW})\\
 \cmd{:GWInitialization STEADY\_STATE r} & steady-state start with recharge $r$ mm/d (off)\\
-\cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & Raven store of an HRU group $\leftrightarrow$ aquifer\\
-\cmd{:ReservoirExchange} & Raven reservoirs $\leftrightarrow$ aquifer\\
+\cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & Raven store of an HRU group $\leftrightarrow$ aquifer (also with \cmd{:MF6Simulation})\\
+\cmd{:ReservoirExchange} & Raven reservoirs $\leftrightarrow$ aquifer (also with \cmd{:MF6Simulation})\\
 \cmd{:Wells} \dots\ \cmd{:EndWells} & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT} (with \cmd{:InputCRS}: \cmd{X, Y} instead of \cmd{LATITUDE, LONGITUDE})\\
 \cmd{:ObservationWells} \dots & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV} (or \cmd{X, Y})\\
 \cmd{:GeneralHeadBoundary name file HEAD h CONDUCTANCE c \{LAYERS ALL|TOP\}} & head-dependent boundary; $c$ per cell [m$^2$/d]\\
@@ -122,6 +122,7 @@ Command & Meaning (default)\\\midrule\endhead
 \cmd{:SolverHead\allowbreak Tolerance m} & Newton head-change tolerance (0.00001 m)\\
 \cmd{:HeadSaveFrequency n} & steps between saves of the full head field (30)\\
 \cmd{:WriteNetCDFHeads} & write \cmd{GWHeads.nc} (Raven compiled with NetCDF)\\
+\cmd{:WriteGWBudgetFile} & MODFLOW budget file \cmd{mf6/gwf.cbc} and \cmd{mf6/gwf.porosity} for particle tracking (off; generated models; Section~\ref{sec:budgetfile})\\
 \cmd{:LinkageCache file} & linkage cache location (\cmd{<output>/mf6/linkage.cache})\\
 \cmd{:SoilZone CONCEPTUAL | PHYSICAL SOIL[0] \dots} & the soil zone and the water table (\cmd{CONCEPTUAL}); with \cmd{PHYSICAL} the further \cmd{:SoilZone*} commands of Table~\ref{tab:szcmds} apply\\\bottomrule
 \end{longtable}
@@ -256,12 +257,28 @@ File & Content\\\midrule
 \cmd{GWBudget.csv}, last column & with an existing model: net flow of the model's own packages (wells, boundaries, \dots) [m$^3$/d]\\
 \cmd{GWModelSummary.txt} & MODFLOW 6 library and its version, grid type and size, MODFLOW format, HRU fidelity of the cells, active and pass-through cells, profiles, river/well/boundary/store/reservoir cells, linkage per HRU (areas, fraction linked, cells), whether the linkage came from the cache\\
 \cmd{GWHeads.nc} & (optional) head(time, layer, y, x) with 2-D latitude and longitude, CF conventions\\
-\cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds})\\
+\cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds}); with \cmd{:WriteGWBudgetFile} also the budget file \cmd{gwf.cbc} and \cmd{gwf.porosity}\\
 \cmd{Diagnostics.csv} & Raven's usual file, now also with \cmd{GW\_HEAD} statistics\\
 \cmd{Watershed\allowbreak Storage.csv} & Raven's balance; includes all exchanged water\\
 \cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag}\\\bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Budget file and particle tracking}\label{sec:budgetfile}
+With \cmd{:WriteGWBudgetFile} a generated model saves MODFLOW's cell-by-cell flows: the model's name file gets
+\cmd{SAVE\_FLOWS} (every package), the NPF package \cmd{SAVE\_SPECIFIC\_DISCHARGE} and \cmd{SAVE\_SATURATION}, and the output
+control writes \cmd{mf6/gwf.cbc} at the steps it saves the heads (\cmd{:HeadSaveFrequency}). \cmd{mf6/gwf.porosity} holds the
+\cmd{POROSITY} of each cell's aquifer class in MODFLOW's array layout, written as the \cmd{GRIDDATA} block of a PRT \cmd{MIP6} file.
+Nothing else changes: without the option the \cmd{mf6} folder is the same, and with it the solution is identical.
+
+These files let MODFLOW~6's particle-tracking model (PRT) or MODPATH run on the coupled flows after the Raven run.
+\cmd{tools/make\_prt.py OUTPUT\_FOLDER [-{}-backward] [-{}-points file] [-{}-run libmf6]} builds a PRT simulation in
+\cmd{OUTPUT\_FOLDER/prt/}: release points around each well of \cmd{:Wells} (or from a file), the flow model's periods, and
+the head and budget files, reversed with FloPy for backward tracking (capture zones and times of travel). With \cmd{-{}-run}
+it runs PRT through the MODFLOW~6 library and writes \cmd{endpoints.csv} (travel time and end point of every particle). PRT
+tracks particles on DIS and DISV grids (regular and quadtree grids); for tracking through time, save the flows every step
+(\cmd{:HeadSaveFrequency 1}). An existing model keeps its own output control: add \cmd{BUDGET FILEOUT} and
+\cmd{SAVE BUDGET} to its OC file instead (Chapter~\ref{ch:existing}).
 
 \section{A complete example set-up}
 The following \cmd{.rvg} uses most options (the soil-zone commands of Table~\ref{tab:szcmds} keep their defaults except those shown); lines not needed can be deleted. With \cmd{:SoilZone PHYSICAL} the \cmd{:SurfaceWaterExchange} group must not name a soil-zone layer, and the \cmd{.rvi} takes recharge from \cmd{SOIL[1]}.

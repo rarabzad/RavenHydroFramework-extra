@@ -115,6 +115,12 @@ projection and wells given by \cmd{X} and \cmd{Y} without \cmd{:InputCRS} stop t
 \cmd{:InputCRS}. The start-up warning for a layer that starts dry (\cmd{tests/dry\_start.py}) names layer~2 of the Liard
 model with \cmd{INITIAL\_HEAD\_DEPTH} 25~m (2\,794 cells), and is absent with a steady-state start and for the example as
 shipped, whose outputs equal those of the reference build.
+With \cmd{:WriteGWBudgetFile} (\cmd{tests/budget\_file.py}, the Liard example with a pumping well) MODFLOW's budget file holds
+\cmd{FLOW-JA-FACE}, the specific discharge, the saturation and every package at every step, and its package totals equal
+\cmd{GWBudget.csv} within $4\times10^{-10}$; \cmd{gwf.porosity} holds each cell's class porosity. The solution is the same with
+and without the option, and without it the \cmd{mf6} folder equals the reference build's. \cmd{tools/make\_prt.py} runs MODFLOW~6
+PRT on these files through the library: eight particles around the well, tracked forward and backward, move in opposite
+directions.
 
 \subsection{Exchanged flows against MODFLOW's own budget}
 MODFLOW writes its own volume budget in its list file. For runs covering every package, every flow the coupling exchanged
@@ -261,6 +267,8 @@ Feet and seconds against metres and days & recharge identical; other flows withi
 Round trip: a Raven-generated model re-imported & recharge identical; outlet flow within $1.7\times10^{-6}$\\
 \cmd{:OverlapWeights} (computed in UTM) against cell outlines & recharge identical; seepage within $4.5\times10^{-7}$, rivers within $4\times10^{-6}$\\
 Restarts (inside a stress period; before a change of well rates) & within $1.4\times10^{-7}$; the renumbered well data switch on the right date\\
+Water-table ET, surface-store and reservoir exchange (\cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}), metres/days and feet/seconds, 120 days (\cmd{tests/existing/ext\_exchanges.py}) & accounts exact (MODFLOW residual below $4\times10^{-11}$); each package's flows in MODFLOW's budget file and list file equal \cmd{GWBudget.csv} (within $4\times10^{-10}$; the list file to its printed digits); water-table ET at most 5\% of the unmet PET on any day; feet/seconds: the exchanged flows within $10^{-7}$, the other columns within $2\times10^{-5}$ (one step of 120 days; the two models are solved separately to the same tolerance); a restart with reservoir seepage in transit within $3\times10^{-7}$; a kept EVT package with \cmd{EXTINCTION\_DEPTH} refused\\
+Later starts (\cmd{ext\_inputs.py}, \cmd{restart\_ext.py}): TDIS and water-mover rows in \cmd{OPEN/CLOSE} files; wells driven by a TS6 series, restarted between two of its entries; 6-hour steps restarted at 12:00 & identical to the runs with the rows inline; within $4.2\times10^{-7}$ and $2.3\times10^{-6}$ of the continuous runs; \cmd{TAS6} still refused\\
 Safeguards (14 faulty set-ups) & every one stops with a message naming the problem\\
 Randomized set-ups (units, link, stream mapping, seepage, ET kept or taken over, coverage, restarts); checked with the audit identities and MODFLOW's own budget file & 20 of 20 pass, 6 with a restart (within $2.7\times10^{-7}$); MODFLOW's saved flows of Raven's packages agree to $10^{-10}$\\
 Sanitizers (AddressSanitizer, UndefinedBehaviorSanitizer) on the coupling's code: both units, all three links, seepage off, restarts & no error\\\bottomrule

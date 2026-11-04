@@ -155,6 +155,7 @@ order where profiles meet.
 | `:SurfaceWaterExchange SV group LEAKANCE L` | none | Raven store (e.g. DEPRESSION, LAKE_STORAGE) of an HRU group exchanging with the aquifer; leakance L [1/d]; never draws more water than the store holds |
 | `:ReservoirExchange` | off | couple Raven reservoirs that have :SeepageParameters and a lake HRU (:HRUID) with an AQUIFER_PROFILE: the water table under the lake (never below the lake bed: a lake above a deep water table is disconnected) sets the reservoir's local groundwater head, and its seepage enters the aquifer the next step; stages must be absolute (:AbsoluteCrestHeight) |
 | `:WriteNetCDFHeads` | off | full head field to GWHeads.nc every :HeadSaveFrequency steps (Raven built with -Dnetcdf) |
+| `:WriteGWBudgetFile` | off | generated models: MODFLOW budget file `mf6/gwf.cbc` (every package's flows, specific discharge, saturation) every :HeadSaveFrequency steps and `mf6/gwf.porosity` (class POROSITY per cell), for offline particle tracking with `tools/make_prt.py`; the solution is unchanged |
 | `:LinkageCache file` | <output>/mf6/linkage.cache | cached HRU/grid intersection reused by later runs |
 | `:SolverMaxOuterIterations n` | 500 | Newton outer iterations per step |
 | `:SolverHeadTolerance m` | 0.00001 | Newton head-change tolerance (target); after 100 iterations MODFLOW continues with 10x this tolerance for the rest of that step (GWBudget `converged`=2) |
@@ -216,7 +217,7 @@ model intact (it works on a copy in `<output>/mf6/`).
 
 The model's files hold the layers and hydraulic properties, so profiles need no layers and no `:AquiferClasses` are
 needed: write each profile as `name, 0`. A profile then only marks the coupled HRUs and carries the exchange settings
-(`SEEPAGE_LEAKANCE`, `SEEPAGE_SMOOTHING_DEPTH`, `RECHARGE_DELAY`). Layers listed in a profile are ignored, with a warning.
+(`SEEPAGE_LEAKANCE`, `SEEPAGE_SMOOTHING_DEPTH`, `RECHARGE_DELAY`, `EXTINCTION_DEPTH`). Layers listed in a profile are ignored, with a warning.
 
 ```
 :AquiferProfiles
@@ -247,6 +248,16 @@ existing MODFLOW 6 model".
   sends water through the mover is refused (its water would be counted twice).
 - **Steady-state models** (no storage package, one stress period of any length): the period is stretched over Raven's
   run, so every Raven step is a steady-state solution; the storage column stays zero.
+- **Exchanges as in a generated model:** water-table ET (`EXTINCTION_DEPTH` > 0; Raven adds `EVT_RAVEN` at the top active
+  cells, so the model's own EVT/UZF must be taken over, not kept), `:SurfaceWaterExchange` (`SWX_RAVEN`) and
+  `:ReservoirExchange` (`RES_RAVEN`), all in the model's units. Raven warns when the model has its own LAK or SFR package
+  (the same lake must not be in both).
+- **Later starts and restarts:** stress periods already simulated are dropped and the rest renumbered; TS6 time series are
+  shifted to Raven's start (earlier entries keep negative times); TDIS and water-mover period data may sit in OPEN/CLOSE
+  files; sub-daily steps work (the start must fall on a Raven step). TAS6, TVK6/TVS6 and simulations with several models
+  stop a later start.
+- **Budget file:** the model keeps its own output control; add `BUDGET FILEOUT` and `SAVE BUDGET` to its OC file for
+  `gwf.cbc` (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN and RES_RAVEN save their flows to it). `:WriteGWBudgetFile` is for generated models.
 - Tested on USGS example models (Sagehen Creek with UZF, SFR and mover; a steady-state stream-capture model) with MODFLOW
   6.8.1 and 6.6.3: `tests/existing/usgs_sagehen.py`, `usgs_capture.py`.
 
@@ -376,7 +387,8 @@ the tracer) starts the ages at 0.
 | `GWConnectivity.csv` | saturated fraction of the top layer per profile; number of connected saturated areas |
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |
 | `GWModelSummary.txt` | MODFLOW library and version, grid, active cells, profiles, river/well/boundary cells, HRU-to-grid linkage per HRU; run totals at the end (unconverged steps, discharge withheld on unconverged steps, soil-zone counts) |
-| `mf6/` | the generated MODFLOW 6 model, list file (`mfsim.lst`) and head file (`gwf.hds`) |
+| `mf6/` | the generated MODFLOW 6 model, list file (`mfsim.lst`) and head file (`gwf.hds`); with `:WriteGWBudgetFile` also `gwf.cbc` and `gwf.porosity` |
+| `prt/` | written by `tools/make_prt.py OUTPUT [--backward] [--points file] [--run libmf6]`: a MODFLOW 6 PRT simulation on the run's flows (release points around the `:Wells`, or from a file), and after `--run` its tracks (`prt.trk.csv`) and `endpoints.csv` (travel time and end point of each particle). PRT needs DIS or DISV grids (REGULAR, QUADTREE); save the flows every step (`:HeadSaveFrequency 1`) to track through time |
 
 All rows are stamped with the date at the end of the step (with the time of day, e.g. `1985-10-01 12:00`, for sub-daily time steps). Groundwater discharge returned to Raven is
 counted as input to Raven's water balance (`WatershedStorage.csv`), recharge as output.
@@ -412,6 +424,8 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "MODFLOW 6 did not converge" | start from `:GWInitialization STEADY_STATE` or realistic `:InitialGWHeads`; raise `:SolverMaxOuterIterations`; increase `SEEPAGE_SMOOTHING_DEPTH`. Raven continues with MODFLOW's flows; on such a step only MODFLOW's negative residual is withheld from the discharge to Raven ("... m3 of discharge to Raven withheld for MODFLOW's negative residual", first ten per run; run total "discharge withheld" in `GWModelSummary.txt`) |
 | ":WellFlowRate id / :BoundaryHead name in the .rvt file names no well / boundary" | the ID or name does not match `:Wells` or a boundary of the `.rvg` (the message lists those there are) |
 | ":MF6Model ... apply only to an existing model" | `:MF6Model`, `:MF6StartDate`, `:KeepPackages`, `:SeepageToRaven` are for `:MF6Simulation` only; remove them |
+| "EXTINCTION_DEPTH > 0 ... the model keeps its EVT ... package" | water-table ET from Raven and the model's own ET would both act: list the model's EVT/UZF package in `:RavenTakesOver`, or set EXTINCTION_DEPTH 0 |
+| "uses time-array series (TAS6) ... start Raven at :MF6StartDate" | a later start cannot shift TAS6 series; start at the model's time zero |
 | ":SoilZone PHYSICAL needs an existing model that uses the Newton-Raphson formulation" | add `NEWTON` to the model's name file OPTIONS (and `LINEAR_ACCELERATION BICGSTAB` to its IMS file) |
 | "process ... sends water to GROUNDWATER in HRU ... which has no AQUIFER_PROFILE" | that water leaves the model; restrict the process with :-->Conditional |
 | well rate is zero ("has no :WellFlowRate time series") | the `:WellFlowRate` block is missing or its well ID does not match an ID in `:Wells` |
@@ -442,10 +456,13 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 - `:SoilZone PHYSICAL`: recharge comes from SOIL[M-1] by a vertical process; RECHARGE_DELAY is refused (use
   `:SoilZoneVadose LAG`); SOIL_ZONE_DEPTH is not used; the soil zone is at most 20 m thick; between cells soil water moves
   only through the aquifer.
-- Existing models (section 4.3b): no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse packages
-  with time series (TS6, TAS6), TVK6/TVS6 and simulations with several models; undefined length or time units are taken as
-  metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`; see the manual's "Current limits" of
-  the existing-model chapter for the exchanges not available in this mode.
-- Not available: groundwater transport, particle tracking, demand-driven wells. Frozen ground acts on recharge only through
-  Raven's own processes.
+- Existing models (section 4.3b): no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse
+  time-array series (TAS6), TVK6/TVS6, simulations with several models and array or advanced packages with several period
+  entries before the start (TS6 series are shifted); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
+  files are read); the stream package keeps the model's stage and has no conductance (supply) limit; undefined length or
+  time units are taken as metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`.
+  Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model.
+- Not available: groundwater transport, particle tracking during the run (offline tracking: `:WriteGWBudgetFile` and
+  `tools/make_prt.py`, DIS/DISV grids), demand-driven wells. Frozen ground acts on recharge only through Raven's own
+  processes.
 - Raven's `:Transport` (tracers, nutrients, the age tracer, temperature) is not available in a coupled run: the coupling exchanges water, not constituent mass, so a coupled run with a `:Transport` command stops with a message naming the constituent.
