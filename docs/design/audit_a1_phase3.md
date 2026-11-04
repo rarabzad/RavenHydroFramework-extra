@@ -73,4 +73,5 @@ for existing models only, NEWTON, ignored options).
 - The package's own test command (README, quick mode, unpacked archives): see "Quick run" below.
 
 ## Quick run
-QUICK_RESULT_NOTE
+The README command, run on the unpacked package archives (RAVEN_SRC=<dir>/raven-soil-zone, RAVEN_EXE and RAVEN_MF6_LIB
+of the package, extra at b4f2b7a, which differs from the final commit only by this note): 45 steps passed, 0 failed, 2 not run (usgs_sagehen, usgs_capture: no MODFLOW examples on the machine), 10 checks skipped (W4, W6, W11 permanent; 7 byte-identity checks without RAVEN_EXE_REF: M3, K8, B, C1 x4), about 29 minutes on 2 cores; rough terrain 180 + 180 runs, 0 failed; T7 PASS. Log: wt/p3/pkgtest/quick.log.
