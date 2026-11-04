@@ -27,6 +27,9 @@ below a risen water table, upflow) belong to the soil-zone column, so its classe
 turn and each has what the earlier ones left; the room of the soil-zone layers for capillary rise is shared likewise.
 With \cmd{RICHARDS} each class column gives capillary rise from its top node on its unsaturated share; where a class has
 no column (and for \cmd{KINEMATIC} and \cmd{LAG} everywhere) the rise comes from the water table to the class's own base.
+That rise takes what the source cell's limit (Section~\ref{sec:szvadose}) has left after all the class columns' draws on
+it: the water their new nodes took, the negative recharge passed through them and their bottom upflow; one cell never
+gives more than that one limit per step (test C11).
 The budget columns of the unsaturated zone (inflow, to aquifer, capillary rise, storage) sum all class columns over
 their areas $a\,a_c$, and the identities of Chapter~\ref{ch:balance} hold for them as for one column.
 

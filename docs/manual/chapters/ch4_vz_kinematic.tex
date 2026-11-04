@@ -61,8 +61,10 @@ from that layer up are saturated and the top rejects the difference. On a cold s
 at $\theta_r$ and soak up recharge until they are wetted (below).
 
 \paragraph{Restart.} \cmd{solution.rvc} holds the contents of the nodes (\cmd{:GWVadoseColumns}) with 15 significant
-digits, which is the whole state of a kinematic column: a restart continues the run exactly to that precision (test K5:
-largest relative deviation $2\times10^{-10}$ of the budget over 60 days).
+digits, which is the whole state of a kinematic column. The contents are restored as written, including those below the
+air-dry content of the retention curve (the reference $\theta_r=\theta_s-S_y$ is there when $S_y$ is close to the
+porosity), so a restart continues the run exactly to that precision (test K5: largest relative deviation
+$2\times10^{-10}$ of the budget over 60 days; \cmd{test\_restart.py} R4 with $S_y$ equal to the porosity).
 
 \paragraph{Nodes.} The grid is the capped one of Section~\ref{sec:szvadose}: with $N\le18$ it grows from 5~cm-scale
 end volumes towards the middle; from $N=19$ on the extra volumes fill the middle, so raising $N$ refines the whole

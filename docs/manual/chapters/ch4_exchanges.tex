@@ -712,7 +712,8 @@ with the column options also \emph{unsaturated zone inflow}, \emph{unsaturated z
 zone}, \emph{unsaturated zone storage}, \emph{capillary rise from the water table}, \emph{lagged-exchange debt},
 \emph{lagged-exchange repayment}, \emph{soil zone to specified heads}, \emph{specified heads to soil zone}
 (Section~\ref{sec:accsz2}); \cmd{GWSoilExchange.csv} per HRU and step: soil-zone base, soil water
-level, water table, saturated fraction, exchange, rejected recharge, overflow, soil water and capacity.
+level, water table, saturated fraction, exchange with the aquifer (and with specified heads, where the model has them,
+under the headings of \cmd{GWBudget.csv}), rejected recharge, overflow, soil water and capacity.
 \cmd{tools/plot\_soilzone.py} plots both.
 \end{refcard}
 

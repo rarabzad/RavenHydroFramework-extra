@@ -39,8 +39,8 @@ that dry out, restart files, constituent observations, the \cmd{:rvg\_Filename} 
 hotstart file. A model with a reservoir therefore does not give byte-identical outputs (an absolute-stage reservoir
 without an initial stage starts at its crest; a drying reservoir books only the water it has; \cmd{solution.rvc} carries
 its stage and flows with 12 digits), and neither does an age-tracer run started from a hotstart file: the ages of the
-hotstart continue from the run that wrote the file, the masses keep the datum of that run and \cmd{solution.rvc} writes that datum as its
-\cmd{:StartTime} (test I14 of Section~\ref{sec:vsoilzone1}). Without reservoirs, ensembles or a hotstarted age tracer,
+hotstart continue from the run that wrote the file, the masses keep the datum of the first run of the chain and \cmd{solution.rvc} writes that datum as
+\cmd{:AgeTracerDatum} when it is before the run's start (tests I14--I16 of Section~\ref{sec:vsoilzone1}). Without reservoirs, ensembles or a hotstarted age tracer,
 every output of a model without groundwater is byte-identical to Raven~4.15 (checked on the 20-year
 Liard model, its hotstart and a cold-started age tracer).
 

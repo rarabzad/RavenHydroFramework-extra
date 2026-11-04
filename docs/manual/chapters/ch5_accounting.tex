@@ -159,6 +159,25 @@ At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states 
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
 transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), and with unsaturated columns \cmd{:GWVadoseColumns} (\cmd{:GWVadoseClassColumns} with depth classes). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
 run --- continues exactly: in the tests the restarted run matched a continuous run to within $6\times10^{-6}$ in all flows.
+Three details make this hold:
+\begin{itemize}
+\item Without \cmd{:SoilZone PHYSICAL}, seepage is added to its target store (\cmd{:SeepageReturnTo}, by default the
+lowest soil layer) with no capacity limit, so that layer can hold more than its capacity for a while. On reading the
+\cmd{.rvc}, Raven cuts every state above its maximum back to the maximum; for the seepage target of a coupled HRU it keeps
+the value as written, so the restart carries the same water as the continuous run.
+\item The unsaturated columns are restored with the contents as written (\cmd{:GWVadoseColumns},
+\cmd{:GWVadoseClassColumns}), floored only at what the method can hold: the air-dry content
+$\theta(\psi=-10^5$\,m$)$ for \cmd{RICHARDS} and \cmd{LAG}, zero for \cmd{KINEMATIC} (whose reference content
+$\theta_s-S_y$ can lie below air-dry when $S_y$ is close to the porosity).
+\item With an age tracer (\cmd{:Transport AGE}), the file's tracer masses are volumes times entry times counted from a datum:
+the start of the first run of a chain of restarts. \cmd{:StartTime} in \cmd{solution.rvc} is the start of the run that
+wrote it; when the datum is earlier, the file also carries \cmd{:AgeTracerDatum} with that date. A run read from the file
+counts its ages from \cmd{:AgeTracerDatum}, else from \cmd{:StartTime} when the file holds age-tracer masses; from a file
+without them (a spin-up run without the tracer) the initial water has age 0.
+\end{itemize}
+Damaged groundwater values in the \cmd{.rvc} stop the run with a message naming the block: a value that is not a finite
+number in any groundwater block, and negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or
+\cmd{:GWVadoseClassColumns}.
 
 \subsection{Ensembles}
 Raven's ensemble modes (Monte Carlo, DDS, EnKF) run the model several times in one program run. For every member the
@@ -167,7 +186,9 @@ These defaults are
 restored before the member's \cmd{.rvc} is read, so member-specific initial conditions (as used by EnKF forecasting) still
 apply; groundwater hotstart values are likewise cleared, so each member uses only its own \cmd{.rvc}, and the steady-state
 start is decided for each member separately
-(Section~\ref{sec:coreflix}).
+(Section~\ref{sec:coreflix}). An EnKF member's own time series file (\cmd{:ExtraRVTFilename}) may give
+\cmd{:WellFlowRate} and \cmd{:BoundaryHead} series: they replace, for that member and the later ones, the series of the
+same well or boundary read before, and a series naming no well or boundary stops the run.
 
 \subsection{Safeguards}\label{sec:guard}
 \begin{itemize}
@@ -176,9 +197,12 @@ start is decided for each member separately
 (more outflow booked than the inflows and the storage release supply) is withheld from all discharge returned to Raven
 --- seepage, river gains, discharge into wetland and lake stores, and with \cmd{:SoilZone PHYSICAL} the inflow to the
 soil zone --- in proportion; what that discharge cannot cover stays in the aquifer. The withheld water is MODFLOW's
-balance error of the step (\cmd{GWBudget.csv}: recharge plus storage release plus the other inflows, less the discharge,
-less ``MF6 balance error'', is the volume withheld); without \cmd{:SoilZone PHYSICAL} its run total is in
-\cmd{GWModelSummary.txt} (``discharge withheld''), with it the withheld columns of \cmd{GWBudget.csv}. The step is
+balance error of the step. Without \cmd{:SoilZone PHYSICAL}, the discharge columns of \cmd{GWBudget.csv} on such a step
+(``seepage to Raven'', ``aquifer discharge to rivers'', ``aquifer discharge to surface stores'') give the discharge
+handed to Raven, after the withholding, so each row's residual --- recharge plus storage release plus the other inflows,
+less the discharge, less ``MF6 balance error'' --- is the volume withheld in that step; its run total is in
+\cmd{GWModelSummary.txt} (``discharge withheld''). With \cmd{:SoilZone PHYSICAL} the withheld volume is booked per step
+in its own columns of \cmd{GWBudget.csv} (seepage and soil inflow, river gains and surface-store gains withheld). The step is
 flagged, and a warning written for the first ten such steps.
 \item \textbf{Rivers and stores} can never lose more water than they hold (Sections~\ref{ch:rivers},\ref{ch:stores}).
 \item \textbf{Wells} cannot pump from a dry cell (\cmd{AUTO\_FLOW\_REDUCE}).

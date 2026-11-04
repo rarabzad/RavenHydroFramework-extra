@@ -28,6 +28,18 @@ B8  without :SoilZone PHYSICAL, steps MODFLOW does not converge: only MODFLOW's 
     sum over the run equals the run total "discharge withheld" in GWModelSummary.txt; at most ten guard warnings, the
     tenth saying further ones are suppressed. (The earlier cap at the step's inflow left out the storage release: row
     residual 15284 m3/d against a balance error of -1039 m3/d on step 1, 21653 m3 lost unbooked over 10 steps.)
+    B8 Liard: the same with rivers and surface stores taking part, the Liard example (CONCEPTUAL, rivers, lakes) with
+    :SolverMaxOuterIterations 2, 10 days (quick; 60 full): the row residual over every GWBudget column (recharge, storage
+    release, river and store leakage, wells, GHB, CHD and reservoir seepage in; seepage to Raven, discharge to rivers and
+    to surface stores, water-table ET out; less MF6 balance error) is the volume withheld: at most max(-balance error, 0)
+    on unconverged steps (all of it where the step's discharge covers it), 0 on converged ones, and its sum over the run
+    equals the run total in GWModelSummary.txt. (When the discharge columns kept MODFLOW's flows, the river share of the
+    withheld water was in no column: rows 185,896 m3 against a run total of 559,616 m3 over 60 days.)
+B9  GWSoilExchange.csv books each HRU's exchange under the headings GWBudget.csv uses: on every date, the sums over the
+    HRUs of "soil zone to aquifer", "aquifer to soil zone", "soil zone to specified heads" and "specified heads to soil
+    zone" equal GWBudget's columns of the same names. Cases: a model Raven builds whose HRU 2 lies wholly over a
+    specified-head cell column (2 HRUs of 100 m, specified head 99 m; that HRU's rows give its soil-zone base, level and
+    water table, not 0), and an existing model whose toe cells are specified heads (the B1 hillslope).
 """
 import os, sys, re, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -192,10 +204,67 @@ def b8():
               % (lim, int(unc.sum()), b['MF6 recharge [m3/d]'].iloc[0], b['storage release [m3/d]'].iloc[0], b['seepage to Raven [m3/d]'].iloc[0], e.iloc[0],
                  r.iloc[0], want.iloc[0], max(dev, 0.0), tot.group(1) if tot else 'MISSING', rows, nw, min(nwant, 10), nwant, 'ok' if g else 'FAIL'))
         ok &= g
+    return ok & b8_liard()
+
+def b8_liard():
+    days = 10 if QUICK else 60
+    tc = sz_check.tc
+    d = tc.work('soilzone', 'mf6budget', 'b8_liard_mx2')
+    tc.copy_case(tc.LIARD, d, duration=days)
+    open(os.path.join(d, 'Liard.rvg'), 'a').write('\n:SolverMaxOuterIterations 2\n')
+    msg = tc.run(d)
+    if 'Successful' not in msg:
+        print('  B8 Liard: run FAILED %s' % msg); return False
+    b = pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv')).rename(columns=lambda c: c.strip())
+    sm = open(os.path.join(d, 'out', 'GWModelSummary.txt')).read()
+    col = lambda c: b[c] if c in b else 0.0
+    inflow = ['MF6 recharge [m3/d]', 'storage release [m3/d]', 'river leakage to aquifer [m3/d]', 'wells actual [m3/d]', 'GHB [m3/d]', 'CHD [m3/d]',
+              'surface-store leakage to aquifer [m3/d]', 'reservoir seepage delivered [m3/d]']
+    outflow = ['seepage to Raven [m3/d]', 'aquifer discharge to rivers [m3/d]', 'water-table ET [m3/d]', 'aquifer discharge to surface stores [m3/d]']
+    e = b['MF6 balance error [m3/d]']; unc = b['converged'] == 0
+    r = sum(col(c) for c in inflow) - sum(col(c) for c in outflow) - e
+    scale = 1e-8 * sum(col(c).abs() for c in inflow + outflow) + 1e-3
+    want = (-e).clip(lower=0.0).where(unc, 0.0)
+    over = float((r - want - scale).max())                          # (more than withheld: never)
+    under = float((-r - scale).max())                               # (negative residual: never)
+    full = int(((r - want).abs() <= scale).sum())                    # rows where all of -balance error is withheld
+    tot = re.search(r'discharge withheld\s*:\s*(\S+) m3 on (\d+) unconverged steps', sm)
+    rows = float(r.where(unc, 0.0).sum())                           # (daily steps)
+    g_tot = (tot is not None) and abs(float(tot.group(1)) - rows) <= 1e-6 * max(rows, 1.0) + 1e-2
+    g = int(unc.sum()) >= 3 and over <= 0.0 and under <= 0.0 and full >= len(b) - 1 and g_tot
+    print('  B8 Liard (rivers, %d days, limit 2): %d unconverged steps; row residual beyond the withheld bound %.3g m3/d, below 0 %.3g m3/d; '
+          '%d of %d rows equal max(-balance error, 0); rows %.1f m3 against the run total %s m3 -> %s'
+          % (days, int(unc.sum()), max(over, 0.0), max(under, 0.0), full, len(b), rows, tot.group(1) if tot else 'MISSING', 'ok' if g else 'FAIL'))
+    return g
+
+def b9():
+    print('B9 GWSoilExchange.csv per HRU sums to GWBudget.csv, specified heads included')
+    cols = ['soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'soil zone to specified heads [m3/d]', 'specified heads to soil zone [m3/d]']
+    ok = True
+    d, good, _ = CW.run_case('b9_gen_chd', nhru=2, hru_w=100.0, width=200.0, cell=100.0, chd=99.0, init_depth=0.5, days=5, rain=20.0, perc=20.0)
+    e, good2, _ = CW.run_ext('b9_ext', HILL)
+    for tag, dd, gd in (('generated, HRU 2 over specified heads', d, good), ('existing, specified-head toe', e, good2)):
+        if not gd: ok = False; continue
+        b, s, _ = sz_check.outputs(dd)
+        miss = [c for c in cols if c not in s.columns or c not in b.columns]
+        if miss:
+            print('  B9 %s: columns missing in GWSoilExchange.csv: %s -> FAIL' % (tag, miss)); ok = False; continue
+        g = s.groupby('date')[cols].sum().reindex(b['date'])
+        dev = {c: float(((g[c].values - b[c].values) / (b[cols].abs().sum(axis=1).values + 1.0)).__abs__().max()) for c in cols}
+        chd = float(b['soil zone to specified heads [m3/d]'].abs().sum() + b['specified heads to soil zone [m3/d]'].abs().sum())
+        gg = max(dev.values()) < 1e-8 and chd > 0.0
+        if dd == d:
+            h2 = s[s['HRU_ID'] == 2]
+            okh = bool(len(h2)) and h2['soil-zone base [m]'].notna().all() and (h2['soil-zone base [m]'] > 50.0).all() and (h2['water table [m]'] > 50.0).all()
+            print('  B9 %s: HRU 2 base %.3f m, water table %.3f m -> %s' % (tag, h2['soil-zone base [m]'].iloc[0], h2['water table [m]'].iloc[0], 'ok' if okh else 'FAIL'))
+            gg &= okh
+        print('  B9 %s: specified-head exchange %.1f m3/d over the run; largest |sum over HRUs - GWBudget| / gross: %s -> %s'
+              % (tag, chd, ', '.join('%s %.2g' % (c.split(' [')[0], v) for c, v in dev.items()), 'ok' if gg else 'FAIL'))
+        ok &= gg
     return ok
 
 if __name__ == '__main__':
-    names = [a.lower() for a in sys.argv[1:]] or ['b1', 'b2', 'b4', 'b5', 'b6', 'b7', 'b8']
+    names = [a.lower() for a in sys.argv[1:]] or ['b1', 'b2', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9']
     ok = all([globals()[n]() for n in names])
     print('MODFLOW budget tests: %s' % ('ALL PASSED' if ok else 'FAILED'))
     sys.exit(0 if ok else 1)

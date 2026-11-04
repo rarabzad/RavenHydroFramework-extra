@@ -30,6 +30,12 @@ C10 a hotstart written by the same configuration whose last step dropped a class
     n1 days (10; also 4 and 13 in the full mode) lacks a line for such a column, and the restart (12 days) builds it at
     rest, as the continuous run does: no "do not match the columns" warning, the restart within 1e-6 of the continuous
     run, identities. (The link's other lines made the missing one count as a mismatch.)
+C11 one limit on the source cell: RICHARDS K = 4 under hummocks +-0.8 m, a thin aquifer (0.15 m of water above the cell
+    bottom at the start, S_y 0.05), dry soil under PET: some class columns draw water up through their bottoms while the
+    classes without a column take capillary rise from the water table. In every step the columns' upflow plus the
+    capillary rise from the water table is at most half the water the cell holds above its bottom (0.5 S_y A (h - z_bot),
+    h at the start of the step). (The rise from the water table was capped without the columns' upflow: up to twice
+    that.)
 All runs: the standard limits of sz_check (STD_LIMITS) plus vz_identity 1e-8.
 Quick mode (RAVEN_TEST_QUICK=1): shorter runs, C3 only terraces at K = 1, 2, 4, C7 shorter.
 """
@@ -372,6 +378,32 @@ def c10():
     return ok
 
 TESTS = [('C1', c1), ('C2', c2), ('C3', c3), ('C4', c4), ('C5', c5), ('C6', c6), ('C7', c7), ('C8', c8), ('C9', c9), ('C10', c10)]
+
+def c11():
+    print('C11 the columns\' upflow and the capillary rise from the water table share the source cell\'s limit')
+    days = 6 if QUICK else 15
+    thick, Sy, depth = 0.75, 0.05, 1.6
+    cfg = dict(BASE, init_depth=depth, rain=[0.0] * days, days=days, dem_fn=hummocks(0.8), pet=4.0, soil_b=5.0, soil_psia=200.0,
+               aq_thick=thick, Sy=Sy, perc=0.1, phi0=(60.0, 60.0))
+    d = case('c11_k4', extra_rvg=vz('RICHARDS', 4) + ':SoilZoneCapillaryRise ON\n', **cfg)
+    ok = check('c11_k4', d)
+    if d:
+        b = budget(d); h = pd.read_csv(os.path.join(d, 'out', 'GWHRUState.csv'))
+        hc = [c for c in h.columns if c.startswith('head_')][0]
+        bot = 100.0 - 1.0 - thick                                   # (the top cell: the soil-zone base, land - 1 m, less aq_thick)
+        hs = np.r_[100.0 - depth, h[hc].values[:-1]]                # (head at the start of each step)
+        cap = 0.5 * Sy * 200.0 * 200.0 * (hs - bot)
+        draw = (-b['unsaturated zone to aquifer [m3]']).clip(lower=0.0) + b['capillary rise from the water table [m3]']
+        both = int(((b['capillary rise from the water table [m3]'] > 0) | ((-b['unsaturated zone to aquifer [m3]']) > 0)).sum())
+        worst = float((draw / cap).max())
+        g = worst <= 1.0 + 1e-6 and both > 0 and float(draw.max()) > 0.5 * cap[0]
+        print('  C11: largest (columns\' upflow + rise from the water table) / (0.5 S_y A (h - z_bot)) over %d steps: %.4f (step 1: %.1f of %.1f m3) -> %s'
+              % (len(b), worst, draw.iloc[0], cap[0], 'ok' if g else 'FAIL'))
+        ok &= g
+    print('C11 %s' % ('ok' if ok else 'FAIL'))
+    return ok
+
+TESTS.append(('C11', c11))
 
 def main():
     tc.need_mf6()

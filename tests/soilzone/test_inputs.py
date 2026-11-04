@@ -31,11 +31,25 @@ I12 options given where they do nothing: on a model Raven builds, :SeepageToRave
    an unknown :AquiferProfileParameters attribute (INITIAL_HEAD_DEPHT) and LAYERS BOTTOM on a boundary stop the run.
 I13 messages: a missing .rvg file is named in Raven_errors.txt ("Cannot find or read .rvg file"), and a :Wells row
    with a missing value names the :Wells table (not ":EndWells").
-I14 age tracer across a hotstart (Raven core, no :GroundwaterModel): a 2-layer soil model with
-   :Transport AGE, 20 days continuous against 7 + 7 + 6 days chained through solution.rvc: the ages of every store
-   (Ages.csv) and of the outflow (AGEPollutographs.csv) equal the continuous run's within 1e-3 d (the .rvc carries 6
-   digits), and each solution.rvc carries :StartTime 2000-01-01, the datum of its entry times. Before, the offset never
-   reached the ages (each restart reported them 7 or 14 days too young).
+I14 age tracer across a hotstart (Raven core; no :GroundwaterModel): a 2-layer soil model with :Transport AGE, 20 days
+   continuous against 7 + 7 + 6 days chained through solution.rvc: the ages of every store (Ages.csv) and of the outflow
+   (AGEPollutographs.csv) equal the continuous run's within 1e-3 d (the .rvc carries 6 digits). Each solution.rvc carries
+   :StartTime, the start of the run that wrote it, and, when the datum of its entry times is earlier (the restarted
+   parts), :AgeTracerDatum 2000-01-01.
+I15 the same across year boundaries: a chain 1999-12-25 (7 d), 2000-01-01 (7 d), 2000-01-08 (6 d) against 20 days in one
+   run, and a multi-year chain 1998-12-20 (400 d), 2000-01-24 (380 d) against 780 days (full mode; quick: 1998-12-20
+   (12 d), 1999-01-01 (400 d), 2000-02-05 (8 d) against 420 days). Every part runs, the ages equal the continuous run's
+   within 1e-3 d, and :AgeTracerDatum is the chain's first start written as a valid date (1999-12-25, 1998-12-20).
+I16 an age-tracer run started from the solution.rvc of a spin-up run without the tracer (30 days, then 5 days with
+   :Transport AGE): the file holds no age-tracer masses, so the initial water has age 0 (soil and groundwater ages 0 at
+   the start, below 1.01 d after the first day), as in Raven without the coupling; the run's solution.rvc has no
+   :AgeTracerDatum.
+I17 EnKF members with their own :ExtraRVTFilename (ENKF_OPEN_FORECAST, 3 members, one well): each member's well rate is
+   its own file's (-100, -200, -300 m3/d in GWBudget.csv "wells specified"), with no "has no :WellFlowRate" warning for
+   the later members; an extra .rvt naming no well stops the member that reads it.
+I18 damaged soil-zone hotstart values: a :GWSoilZoneColumns row with nan, one with negative water (-50 mm), and a
+   :GWHeads value nan each stop the run with a message naming the block ("is not a finite number", "is negative");
+   the undamaged file runs.
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -269,11 +283,104 @@ def main():
             for col in [x for x in bp.columns if x.endswith('[d]') and not x.startswith('time')]:
                 v = (pd.to_numeric(ccp[col], errors='coerce') - pd.to_numeric(bp[col], errors='coerce')).abs().max()
                 worst['outflow ' + col] = max(worst.get('outflow ' + col, 0.0), float(0.0 if pd.isna(v) else v))
-            st.append(open(os.path.join(d, 'out', 'solution.rvc')).readline().strip())
-        good = bool(worst) and max(worst.values()) < 1e-3 and all(s.startswith(':StartTime 2000-01-01') for s in st)
-    print('  I14: largest age difference to the continuous run by store: %s; :StartTime of the solution.rvc files: %s'
+            sol = open(os.path.join(d, 'out', 'solution.rvc')).read(); m = re.search(r':AgeTracerDatum (\S+)', sol)
+            st.append((sol.split('\n')[0].strip(), m.group(1) if m else None))
+        want = [(':StartTime 2000-01-%02d' % (1 + t0), None if t0 == 0 else '2000-01-01') for _, t0 in chain]
+        good = bool(worst) and max(worst.values()) < 1e-3 and all(s[0].startswith(w[0]) and s[1] == w[1] for s, w in zip(st, want))
+    print('  I14: largest age difference to the continuous run by store: %s; :StartTime and :AgeTracerDatum of the solution.rvc files: %s'
           % (', '.join('%s %.3g d' % (k, v) for k, v in worst.items()), st))
     res.append(('I14 age tracer: restarts equal the continuous run', good))
+
+    # I15: age-tracer chains across year boundaries; I16: spin-up without the tracer
+    QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
+    import datetime
+    def age2(name, d0, ntot, start, days, rvc=None, age=True):
+        d = case(name, physical=False, days=ntot, rain=([5.0, 0.0, 12.0, 0.0, 3.0] * (ntot // 5 + 1))[:ntot], perc=2.0)
+        for f in ('m.rvi', 'm.rvt'):
+            p = os.path.join(d, f); tx = open(p).read().replace('2000-01-01 00:00:00', d0 + ' 00:00:00')
+            if f == 'm.rvi':
+                tx = tx.replace(':GroundwaterModel MODFLOW6\n', '')
+                if age: tx = tx.replace(':EndHydrologicProcesses\n', ':EndHydrologicProcesses\n:Transport AGE\n')
+                tx = re.sub(r':Duration \d+', ':Duration %d' % days, tx).replace(':StartDate ' + d0, ':StartDate ' + start)
+            open(p, 'w').write(tx)
+        if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+        ok, txt = sz_check.run(d)
+        if not ok: print('  %s: run FAILED %s' % (name, txt[-400:].replace('\n', ' | ')))
+        return d, ok
+    def chain(tag, d0, parts):
+        ntot = sum(parts); dc, ok = age2('%s_cont' % tag, d0, ntot, d0, ntot); good = ok; prev = None; t0 = 0; worst = 0.0; datums = []
+        c = pd.read_csv(os.path.join(dc, 'out', 'Ages.csv')) if ok else None
+        for i, n in enumerate(parts):
+            st = (datetime.date(*map(int, d0.split('-'))) + datetime.timedelta(days=t0)).isoformat()
+            d, ok = age2('%s_part%d' % (tag, i + 1), d0, ntot, st, n, prev); good &= ok
+            if not ok: break
+            b = pd.read_csv(os.path.join(d, 'out', 'Ages.csv')); cc = c[c['time[d]'] >= t0].reset_index(drop=True).iloc[:len(b)]
+            for col in [x for x in b.columns if x.endswith('[d]') and x != 'time[d]']:
+                v = (pd.to_numeric(cc[col], errors='coerce') - pd.to_numeric(b[col], errors='coerce')).abs().max()
+                worst = max(worst, float(0.0 if pd.isna(v) else v))
+            prev = os.path.join(d, 'out', 'solution.rvc'); t0 += n
+            m = re.search(r':AgeTracerDatum (\S+)', open(prev).read()); datums.append(m.group(1) if m else None)
+        g = good and worst < 1e-3 and datums[0] is None and all(x == d0 for x in datums[1:])
+        print('  I15 chain %s %s: parts run %s, largest age difference %.3g d, :AgeTracerDatum of the parts %s -> %s' % (d0, parts, good, worst, datums, 'ok' if g else 'FAIL'))
+        return g
+    g1 = chain('I15_ye', '1999-12-25', (7, 7, 6))
+    g2 = chain('I15_my', '1998-12-20', (12, 400, 8) if QUICK else (400, 380))
+    res.append(('I15 age-tracer chains across year boundaries', g1 and g2))
+    ds, ok1 = age2('I16_spin', '2000-01-01', 35, '2000-01-01', 30, age=False)
+    dr, ok2 = age2('I16_run', '2000-01-01', 35, '2000-01-31', 5, os.path.join(ds, 'out', 'solution.rvc'))
+    good = ok1 and ok2
+    if good:
+        a = pd.read_csv(os.path.join(dr, 'out', 'Ages.csv')); cols = [x for x in a.columns if x.endswith('[d]') and x != 'time[d]']
+        val = lambda r: pd.to_numeric(a[cols].iloc[r], errors='coerce').replace(-1.2345, float('nan')).abs().max()   # (-1.2345: no water)
+        v0 = val(0); v1 = val(1)
+        nod = ':AgeTracerDatum' not in open(os.path.join(dr, 'out', 'solution.rvc')).read()
+        good = v0 < 1e-9 and v1 < 1.01 and nod
+        print('  I16: largest age at the start %.3g d, after one day %.3g d; no :AgeTracerDatum written %s -> %s' % (v0, v1, nod, 'ok' if good else 'FAIL'))
+    res.append(('I16 age tracer from a spin-up without it: ages start at 0', good))
+
+    # I17: EnKF members' extra .rvt series
+    d = case('I17_enkf', days=3, extra_rvg=':Wells\n  :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT\n'
+             '  1, PW_1, %.6f, %.6f, 95.0, 85.0\n:EndWells\n' % (lat, lon))
+    edit(os.path.join(d, 'm.rvi'), ':StartDate', ':EnsembleMode ENSEMBLE_ENKF 3\n:StartDate')
+    open(os.path.join(d, 'm.rve'), 'w').write(':EnKFMode ENKF_OPEN_FORECAST\n:AssimilatedState SOIL[0] All\n:ForcingPerturbation TEMP_AVE DIST_NORMAL 0 0.000001 ADDITIVE\n'
+                                              ':ExtraRVTFilename extra_*.rvt\n:OutputDirectoryFormat ./out/ens_*/\n')
+    open(os.path.join(d, 'm.rvh'), 'a').write('\n:HRUGroup All\n  1\n:EndHRUGroup\n')
+    for e in (1, 2, 3):
+        os.makedirs(os.path.join(d, 'out', 'ens_%d' % e), exist_ok=True); shutil.copy(os.path.join(d, 'm.rvc'), os.path.join(d, 'out', 'ens_%d' % e, 'solution.rvc'))
+    for e, q in ((1, -100), (2, -200), (3, -300)):
+        open(os.path.join(d, 'extra_%d.rvt' % e), 'w').write(':WellFlowRate 1 m3/d\n  2000-01-01 00:00:00 1.0 3\n  %d\n  %d\n  %d\n:EndWellFlowRate\n' % (q, q, q))
+    ok, txt = run_err(d)
+    rates = []
+    for e in (1, 2, 3):
+        p = os.path.join(d, 'out', 'ens_%d' % e, 'GWBudget.csv')
+        rates.append(float(pd.read_csv(p)['wells specified [m3/d]'].iloc[0]) if os.path.exists(p) else None)
+    nw = errors(d).count('has no :WellFlowRate time series')
+    g1 = ok and rates == [-100.0, -200.0, -300.0] and nw <= 1
+    open(os.path.join(d, 'extra_2.rvt'), 'w').write(':WellFlowRate 7 m3/d\n  2000-01-01 00:00:00 1.0 3\n  -5\n  -5\n  -5\n:EndWellFlowRate\n')
+    ok2, txt2 = run_err(d)
+    g2 = (not ok2) and ':WellFlowRate 7 in the .rvt file names no well' in txt2
+    print('  I17: members\' "wells specified" %s (want -100, -200, -300), %d "no :WellFlowRate" warnings; orphan series in member 2 stops: %s -> %s'
+          % (rates, nw, g2, 'ok' if (g1 and g2) else 'FAIL'))
+    res.append(('I17 EnKF members use their own extra .rvt series', g1 and g2))
+
+    # I18: damaged soil-zone hotstart values
+    d0 = case('I18_base', days=2); ok0, _ = sz_check.run(d0)
+    good = ok0
+    if ok0:
+        sol = open(os.path.join(d0, 'out', 'solution.rvc')).read()
+        a = sol.index(':GWSoilZoneColumns'); a = sol.index('\n', a) + 1; row = sol[a:sol.index('\n', a)]
+        f = [x.strip() for x in row.split(',')]
+        a2 = sol.index(':GWHeads'); a2 = sol.index('\n', a2) + 1; b2 = sol.index(':EndGWHeads'); hv = sol[a2:b2].split()
+        for lab, t, msg in (('nan', sol.replace(row, '  ' + ', '.join(f[:2] + ['nan'] + f[3:]), 1), ':GWSoilZoneColumns: the value nan is not a finite number'),
+                            ('neg', sol.replace(row, '  ' + ', '.join(f[:2] + ['-50'] + f[3:]), 1), ':GWSoilZoneColumns: the value -50 is negative'),
+                            ('heads', sol[:a2] + ' '.join(['nan'] + hv[1:]) + '\n' + sol[b2:], ':GWHeads: the value nan is not a finite number'),
+                            ('good', sol, None)):
+            d = case('I18_' + lab, days=2); open(os.path.join(d, 'm.rvc'), 'w').write(t)
+            ok, txt = run_err(d)
+            g = ok if msg is None else ((not ok) and msg in txt)
+            print('  I18 %-5s: %s' % (lab, ('runs' if ok else 'stops') + ('' if msg is None else (' with the message' if msg in txt else ' (message missing)'))))
+            good &= g
+    res.append(('I18 damaged soil-zone hotstart values stop the run', good))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

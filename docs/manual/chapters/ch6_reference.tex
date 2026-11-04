@@ -208,7 +208,7 @@ returned to Raven [m$^3$] & seepage volume added to Raven stores\\
 outer iterations, converged & Newton iterations used; 1 target tolerance reached, 2 accepted at the relaxed tolerance, 0 not converged\\
 recharge delay storage [m$^3$] & water in delay reservoirs\\
 recharge onto CHD cells [m$^3$/d] & recharge of HRUs lying entirely on fixed-head cells\\
-river leakage to aquifer, aquifer discharge to rivers [m$^3$/d] & river exchange, each direction\\
+river leakage to aquifer, aquifer discharge to rivers [m$^3$/d] & river exchange, each direction (on a step MODFLOW did not converge, without \cmd{:SoilZone PHYSICAL}: the discharge handed to Raven, after the withholding of Section~\ref{sec:guard}; so are \emph{seepage to Raven} and \emph{aquifer discharge to surface stores})\\
 river exchange applied to Raven [m$^3$] & net volume actually added to (or taken from) Raven reaches\\
 river loss carried to next step [m$^3$] & river loss not supplied in the step, taken from the river the next step (normally 0)\\
 water-table ET [m$^3$/d] & evaporation from the water table\\
@@ -239,11 +239,11 @@ Recharge leaving Raven equals recharge entering MODFLOW; on this wet June day th
 
 \subsection{Other files}
 \begin{table}[!htbp]\centering
-\caption{Other output files.}
+\caption{Other output files.}\label{tab:outputs}
 \begin{tabular}{P{0.25\linewidth}P{0.698\linewidth}}\toprule\hdr
 File & Content\\\midrule
 \cmd{GWHRUState.csv} & per coupled HRU: overlap-weighted mean water table of its columns and mean depth to water\\
-\cmd{GWSoilExchange.csv} & \cmd{:SoilZone PHYSICAL}: per soil-zone HRU and step, soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge, overflow, soil water and capacity, interface updates and change (Section~\ref{ch:soilzone})\\
+\cmd{GWSoilExchange.csv} & \cmd{:SoilZone PHYSICAL}: per soil-zone HRU and step, soil-zone base, soil water level and water table (area means over all the HRU's soil-zone columns, those over specified-head cells included, whose water table is the specified head; empty for an HRU without a column), saturated fraction, exchange with the aquifer both ways (\emph{soil zone to aquifer}, \emph{aquifer to soil zone}: with active cells, as \cmd{GWBudget.csv} books it), rejected recharge, overflow, soil water and capacity, interface updates and change; in a model with specified heads also \emph{soil zone to specified heads} and \emph{specified heads to soil zone} (columns over specified-head cells and links whose cell is a specified head in the step, with the capillary rise a specified head supplies). Summed over the HRUs, each exchange column equals the column of the same name in \cmd{GWBudget.csv} (Section~\ref{ch:soilzone})\\
 \cmd{GWHeads.csv} & head at each monitoring well, from $t=0$ (missing value $-1.2345$ when the screened cell is dry)\\
 \cmd{GWConnectivity.csv} & number of separate wet areas; wet fraction of each profile\\
 \cmd{mf6/grid\_cells.geojson} & every cell as a lon/lat polygon: number, active, profile, dominant HRU, area\\

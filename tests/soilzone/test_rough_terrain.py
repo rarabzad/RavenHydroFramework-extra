@@ -11,7 +11,8 @@ once per unsaturated-zone method. Checks on every run:
             the bedrock raster and the profiles (manual, "Building the layers": top = land - overlap-weighted D, clipping
             at bedrock, 0.5 m minimum, pass-through cells)
   base      the soil-zone base of every HRU equals the overlap-weighted cell land surface (5x5 DEM samples, Raven's
-            bilinear rule) less its D (existing models: the top of the top active cell)
+            bilinear rule) less its D (existing models: the top of the top active cell), over all its columns, those on
+            specified-head cells included
   satfrac   with :SoilZoneVadose NONE, the saturated fraction of every HRU equals an independent sub-grid closure (the
             cell's DEM samples less D, none below 1 mm above the top cell's bottom, smoothed over d_s) at a head between the top
             cells' heads at the start and at the end of the step, on every step whose interface converged (0.02); being
@@ -277,7 +278,7 @@ def check(d, S, meta, res, none_exf):
     if s is not None:
         s0 = s[s['time [d]'] == s['time [d]'].min()].set_index('HRU_ID')
         berr = 0.0
-        for k, L in enumerate(links):
+        for k, L in enumerate(flinks):      # (the base is the area mean over all the HRU's columns, those over specified heads included)
             if not L or (k + 1) not in s0.index: continue
             A = sum(a for _, a in L)
             zb = sum(a * ((G['land'][ic] - Dk[k]) if S['family'] == 'gen' else ztop(ic)) for ic, a in L) / A

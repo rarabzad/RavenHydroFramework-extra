@@ -348,8 +348,13 @@ Raven's `solution.rvc` also contains `:GWHeads nlay nrow ncol` (the head of ever
 seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns` and `:GWVadoseClassColumns` (unsaturated columns) and
 `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
-`:GWHeads` header stops the run with a message. Using `solution.rvc` as the `.rvc`
-of the next run continues exactly where the previous run stopped.
+`:GWHeads` header, a value that is not a finite number in any of these blocks, or negative water in the soil-zone or
+unsaturated columns stops the run with a message. Using `solution.rvc` as the `.rvc`
+of the next run continues exactly where the previous run stopped: seepage held above the capacity of its target soil
+layer (without `:SoilZone PHYSICAL`) is kept, and the unsaturated columns start with the contents as written. With an age
+tracer, `:StartTime` is the start of the run that wrote the file and `:AgeTracerDatum` (when earlier) the start of the
+first run of the chain, from which the tracer's entry times count; a file without age-tracer masses (a spin-up without
+the tracer) starts the ages at 0.
 
 ## 5. Outputs
 
@@ -357,7 +362,7 @@ of the next run continues exactly where the previous run stopped.
 | --- | --- |
 | `GWBudget.csv` | per step: Raven recharge, MODFLOW recharge, seepage, storage release, balance error (m3/d and % of the gross flow), returned to Raven, outer iterations and convergence, river leakage and discharge, river exchange applied to Raven, river loss carried to next step, water-table ET, wells (specified, actual), GHB, CHD, recharge-delay storage, recharge onto CHD cells, surface-store and reservoir exchange; existing models: other model packages; soil-zone columns (section 4.3c) |
 | `GWHRUState.csv` | per coupled HRU: mean water-table head and depth below land surface |
-| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge, overflow, soil water and capacity, interface updates and change |
+| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level and water table (means over all the HRU's soil-zone columns, those over specified heads included; empty for an HRU without a column), saturated fraction, exchange with the aquifer both ways, rejected recharge, overflow, soil water and capacity, interface updates and change; with specified heads also the exchange with them both ways. Summed over the HRUs, the exchange columns equal those of `GWBudget.csv` |
 | `GWHeads.csv` | head at each observation well, starting at t = 0 (a monitoring well whose screened cell is dry reports the missing value -1.2345) |
 | `GWConnectivity.csv` | saturated fraction of the top layer per profile; number of connected saturated areas |
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |

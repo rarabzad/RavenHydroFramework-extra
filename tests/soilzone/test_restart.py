@@ -8,6 +8,15 @@ R2: the same for an existing model (the x3-style hillslope with a specified-head
 columns) run 10 days in one go and as 5 + 5 days. The restart's first step must not apply the specified-head links'
 exact exchange of the last step as a lagged source (the existing model's specified heads are known only once MODFLOW has
 read the step's period data, after the lagged source): the hotstart writes 0 for those links.
+
+R3 a coupled model without :SoilZone PHYSICAL whose lowest soil layer the groundwater seepage fills above its capacity (4
+HRUs, rain 30 mm/d for 5 days, water table 0.2 m deep, PERC_GAWSER, whose percolation depends on the soil water), 30 days
+in one go and as 12 + 18 days: the restart keeps the water above capacity (no "maximum state variable limit exceeded"
+warning), and its soil storage (WatershedStorage.csv), recharge and seepage (GWBudget.csv) equal the continuous run's.
+R4 unsaturated columns restored as written: one HRU, water table 4 m deep, SPEC_YIELD = POROSITY = 0.3 (KINEMATIC's
+reference content ths - Sy is 0, below the air-dry content of the retention curve), 20 days in one go and as 10 + 10
+days, KINEMATIC and LAG: the restart's columns start with the storage the first part ended with (GWModelSummary.txt
+against GWBudget.csv, to 1e-6 relative), and its 'unsaturated zone storage' equals the continuous run's.
 """
 import os, sys, shutil, re, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -93,7 +102,72 @@ def ext_restart(N=10, N1=5):
     print('R2 existing-model restart with specified heads: %s' % ('PASS' if good else 'FAIL'))
     return bool(good)
 
+def chain_case(name, cfg, days, start=None, rvc=None):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, **cfg)
+    for f in ('m.rvi', 'm.rvt'):
+        p = os.path.join(d, f); t = open(p).read()
+        if f == 'm.rvi': t = re.sub(r':Duration \d+', ':Duration %d' % days, t)
+        if start and f == 'm.rvi': t = t.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+        open(p, 'w').write(t)
+    if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+    ok, txt = sz_check.run(d)
+    if not ok: print('%s: run FAILED\n%s' % (name, txt[-1500:]))
+    return d if ok else None
+
+def merged_dev(a, b, cols, key='date'):
+    """largest relative deviation of the columns over the dates both files have"""
+    m = a.merge(b, on=key, suffixes=('_f', '_r'))
+    return len(m), {c: float(((m[c + '_f'] - m[c + '_r']).abs() / (m[c + '_f'].abs() + 1.0)).max()) for c in cols}
+
+def r3_clip():
+    """R3: seepage above the capacity of the lowest soil layer (no :SoilZone PHYSICAL) across a restart"""
+    cfg = dict(nhru=4, hru_w=400.0, width=400.0, cell=100.0, slope=0.02, rain=[30.0] * 5 + [0.0] * 25, perc=20.0, days=30, init_depth=0.2,
+               physical=False, Kh=5.0, Kv=0.5, perc_type='PERC_GAWSER')
+    full = chain_case('r3_full', cfg, 30); first = chain_case('r3_first', cfg, 12)
+    if not (full and first): return False
+    sec = chain_case('r3_second', cfg, 18, '2000-01-13', os.path.join(first, 'out', 'solution.rvc'))
+    if not sec: return False
+    warn = sz_check.errors(sec).count('maximum state variable limit exceeded')
+    wa = pd.read_csv(os.path.join(full, 'out', 'WatershedStorage.csv')).rename(columns=lambda c: c.strip())
+    wb = pd.read_csv(os.path.join(sec, 'out', 'WatershedStorage.csv')).rename(columns=lambda c: c.strip())
+    soil = [c for c in wa.columns if c.startswith('Soil Water')]
+    n1, d1 = merged_dev(wa, wb, soil)
+    over = float((wb[soil[-1]].iloc[0]))
+    n2, d2 = merged_dev(pd.read_csv(os.path.join(full, 'out', 'GWBudget.csv')), pd.read_csv(os.path.join(sec, 'out', 'GWBudget.csv')),
+                        ['Raven recharge [m3/d]', 'MF6 recharge [m3/d]', 'seepage to Raven [m3/d]'])
+    good = warn == 0 and n1 >= 18 and n2 >= 18 and max(d1.values()) < 1e-5 and max(d2.values()) < 1e-4
+    print('  R3 restart with the lowest soil layer above capacity (%s at the restart %.3f mm): %d "maximum state variable" warnings; '
+          'soil storage deviation %s; GWBudget %s -> %s' % (soil[-1], over, warn, ', '.join('%.2e' % v for v in d1.values()),
+                                                            ', '.join('%s %.2e' % (k.split(' [')[0], v) for k, v in d2.items()), 'ok' if good else 'FAIL'))
+    return good
+
+def r4_vz():
+    """R4: unsaturated columns restored as written (KINEMATIC reference below air-dry)"""
+    good = True
+    for meth in ('KINEMATIC', 'LAG'):
+        cfg = dict(nhru=1, rain=[10.0] * 5 + [0.0] * 15, days=20, perc=5.0, ksat=500.0, Kv=0.5, Sy=0.3, init_depth=4.0,
+                   extra_rvg=':SoilZoneVadose %s\n' % meth)
+        full = chain_case('r4_%s_full' % meth.lower(), cfg, 20); first = chain_case('r4_%s_first' % meth.lower(), cfg, 10)
+        if not (full and first): good = False; continue
+        sec = chain_case('r4_%s_second' % meth.lower(), cfg, 10, '2000-01-11', os.path.join(first, 'out', 'solution.rvc'))
+        if not sec: good = False; continue
+        c = 'unsaturated zone storage [m3]'
+        end1 = float(pd.read_csv(os.path.join(first, 'out', 'GWBudget.csv'))[c].iloc[-1]); s0 = sz_check.vz_start(sec)
+        n, dv = merged_dev(pd.read_csv(os.path.join(full, 'out', 'GWBudget.csv')), pd.read_csv(os.path.join(sec, 'out', 'GWBudget.csv')), [c])
+        g = s0 is not None and abs(s0 - end1) <= 1e-6 * max(abs(end1), 1.0) and n == 10 and dv[c] < 1e-6
+        print('  R4 %s: first part ends with %.4f m3 in the columns, the restart starts with %s m3; restart vs continuous %.2e -> %s'
+              % (meth, end1, '%.4f' % s0 if s0 is not None else 'MISSING', dv[c], 'ok' if g else 'FAIL'))
+        good &= g
+    return good
+
 def main():
+    r3 = r3_clip(); r4 = r4_vz()
+    print('R3 restart with seepage above soil capacity: %s' % ('PASS' if r3 else 'FAIL'))
+    print('R4 unsaturated columns restored as written: %s' % ('PASS' if r4 else 'FAIL'))
+    if '--r3r4' in sys.argv:          # (only these two)
+        print('restart test: %s' % ('PASS' if (r3 and r4) else 'FAIL'))
+        return r3 and r4
     r2 = ext_restart()
     full = case('full', len(RAIN), RAIN)
     first = case('first', N1, RAIN[:N1])
@@ -122,7 +196,7 @@ def main():
     flows = ('saturated fraction [-]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]')
     good &= has and len(m) == (len(RAIN) - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
     print('restart test: %s' % ('PASS' if good else 'FAIL'))
-    return bool(good) and r2
+    return bool(good) and r2 and r3 and r4
 
 if __name__ == '__main__':
     sys.exit(0 if main() else 1)

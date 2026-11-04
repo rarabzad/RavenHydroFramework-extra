@@ -254,8 +254,9 @@ Column & Meaning\\\midrule\endhead
 \cmd{recharge not applied by MODFLOW [m3/d]} & an existing model without \cmd{NEWTON}: recharge MODFLOW did not apply (dry cells, specified heads), signed\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
-water level, water table, saturated fraction, exchange both ways, rejected recharge and overflow [mm], soil water and
-capacity [mm], interface updates and change), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
+water level, water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
+water and capacity [mm], interface updates and change, and with specified heads the exchange with them both ways; the
+exchange columns summed over the HRUs equal those of \cmd{GWBudget.csv}; Table~\ref{tab:outputs}), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
 $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profile), \cmd{GWModelSummary.txt}, \cmd{GWHeads.nc}
 (optional), \cmd{mf6/} (MODFLOW model, list files, binary heads).
 
@@ -272,8 +273,9 @@ $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profi
 \cmd{:GWSoilZoneColumns} & \cmd{:SoilZone PHYSICAL}: HRU ID, cell (grid column number; 0 for the rest of the HRU), water of each soil-zone layer from the bottom up [mm]; a block that does not match the HRU's columns is reported and the columns start from the water table\\
 \cmd{:GWVadoseColumns} & \cmd{:SoilZoneVadose RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG} (interchangeable between the methods): HRU ID, cell (grid column number), water table [m], water contents of the column's nodes from the top [--]\\
 \cmd{:GWVadoseClassColumns} & \cmd{:SoilZoneVadoseClasses} $K>1$: HRU ID, cell (grid column number), depth class, classes of the cell, water table [m], water contents of the class column's nodes from the top [--]\\
-\cmd{:GWSoilZoneLag} & \cmd{LAGGED} timing: HRU ID, cell, exchange of the last step into the aquifer [m$^3$/d], debt the aquifer still repays [m$^3$]\\\bottomrule
-\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning.}\\
+\cmd{:GWSoilZoneLag} & \cmd{LAGGED} timing: HRU ID, cell, exchange of the last step into the aquifer [m$^3$/d], debt the aquifer still repays [m$^3$]\\
+\cmd{:AgeTracerDatum date time} & with an age tracer (Raven core, also without groundwater), when the datum of the tracer's entry times is before the run's start: that datum (the start of the first run of a chain of restarts); \cmd{:StartTime} is the start of the run that wrote the file\\\bottomrule
+\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning. A value that is not a finite number in any block, or negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or \cmd{:GWVadoseClassColumns}, stops the run with a message naming the block.}\\
 \end{longtable}
 
 \section{Error messages}\label{app:errors}
