@@ -166,4 +166,8 @@ docs/design/audit_a1_phase1.md). Builds compared: Raven_p1.exe (phase 1) and Rav
   Age tracer cold start (2 years): identical. Age tracer hotstart: differs (the intended change).
 
 ## Full suite
-- (results filled in below when the run ends)
+- `run_all.py` full mode (RAVEN_TEST_QUICK=0 for every step), Raven_p2.exe, MODFLOW 6.8.1, RAVEN_EXE_REF = Raven_p1.exe
+  (so the byte-identity checks K8, B, C1 ran: all byte-identical): 45 steps passed, 0 failed, 2 not run (usgs_sagehen,
+  usgs_capture: the MODFLOW examples zip is not on this machine), 3 checks skipped (W4, W6, W11 of test_confined_wet,
+  permanent skips), 2,938 s. Rough terrain 1,620 runs, 0 failed, and 1,620 with three classes, 0 failed; T7 Liard PASS;
+  cmake checks 60 parts in 19 checks.

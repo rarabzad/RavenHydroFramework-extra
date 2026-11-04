@@ -1,6 +1,6 @@
 """Runs the whole verification suite and writes one report.
 
-    python3 run_all.py            # everything (needs the MODFLOW 6 library; a few hours on one core)
+    python3 run_all.py            # everything (needs the MODFLOW 6 library; about an hour on one core)
     python3 run_all.py --nolib    # only the checks that do not need the MODFLOW 6 library (a few minutes)
     python3 run_all.py --quick    # everything in quick mode: smaller randomized rounds, and every script runs with
                                   # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds)

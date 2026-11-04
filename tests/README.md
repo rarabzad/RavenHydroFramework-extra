@@ -25,7 +25,7 @@ unpack as `raven-soil-zone/` and `raven-mf6-extra/` in one folder `<dir>`:
 
 ## Everything at once
 
-    python3 run_all.py            # every test below and one report, full mode (needs the MODFLOW 6 library; a few hours on one core)
+    python3 run_all.py            # every test below and one report, full mode (needs the MODFLOW 6 library; about an hour on one core)
     python3 run_all.py --quick    # quick mode: smaller randomized rounds, RAVEN_TEST_QUICK=1 for every script
     python3 run_all.py --nolib    # only the checks that need no MODFLOW library (a few minutes)
     python3 run_all.py --only thiem,liard_grids

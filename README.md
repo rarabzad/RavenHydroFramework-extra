@@ -69,7 +69,7 @@ fixes. Windows, Linux and macOS step by step: `examples/README.md`.
 cd tests
 python3 run_all.py --nolib     # checks that need no MODFLOW library (a few minutes)
 python3 run_all.py --quick     # everything in quick mode (RAVEN_TEST_QUICK=1 for every script; under an hour)
-python3 run_all.py             # everything in full mode (a few hours on one core)
+python3 run_all.py             # everything in full mode (about an hour on one core)
 ```
 
 The tests find Raven in `../RavenHydroFramework`; otherwise set `RAVEN_SRC` (see `tests/README.md`). The C++ unit tests
