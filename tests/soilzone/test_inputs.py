@@ -3,12 +3,13 @@
 I1 HYDRAUL_COND missing for the class of the bottom soil-zone layer: the run stops (Raven's automatic value is a
    placeholder, so the soil zone must not run on it). Classes outside the soil zone do not need it (the Liard test T7
    has such classes).
-I2 :SoilZoneIteration with only the update count (tolerances keep their defaults) is accepted.
+I2 :SoilZoneIteration with only the update count is accepted (here 0: explicit coupling, no interface update in any step;
+   the tolerances keep their defaults, which explicit coupling does not use).
 I3 :SoilZone PHYSICAL followed by :SoilZone CONCEPTUAL: the last one counts (a conceptual run, no soil-zone output,
    HYDRAUL_COND not required).
 I4 soil-zone options under CONCEPTUAL are reported as ignored.
-I5 a :GWSoilZoneColumns block that does not match the columns (one column missing) is reported, and the run starts the
-   columns from the water table.
+I5 a :GWSoilZoneColumns block that does not match the columns (one column missing) is reported (warning "do not match its
+   soil-zone columns") and the run completes; that the columns then start from the water table is not checked here.
 I6 the same block with its rows in another order is used (columns are matched by their cell).
 I7 groundwater lines and blocks in the .rvc of a run without :GroundwaterModel are skipped (each to its own end line)
    and Raven's initial conditions after them still apply.

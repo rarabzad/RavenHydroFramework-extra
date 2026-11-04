@@ -1,10 +1,11 @@
 """:SoilZoneVadoseInitialFlux and the columns' initial state.
 
-I1  steady start (RICHARDS): columns started at the steady profile for q carry q from the first step (outflow of step 1
-    within 1 % of the inflow q A, storage change over the run below 1 % of the storage), with the start line in
+I1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
-    (K = 3) too. KINEMATIC and LAG: their solvers' steady starts (gwvz::InitSteadyKinematic, the LAG cascade's S_i = q k_i)
-    are called through stubs until those workers' code is merged: SKIP while the build says "not available in this build".
+    (K = 3) too, and for KINEMATIC and LAG (gwvz::InitSteadyKinematic, the LAG cascade's S_i = q k_i). Enforced: step-1
+    outflow = inflow (1e-6) and a positive start storage; the storage change over the run is printed, not enforced (the
+    water table rises under the recharge in this closed model, so the columns shorten). A build whose steady start is a
+    stub ("not available in this build") gives SKIP.
 I2  a hotstart taken before any column exists (water table above the soil-zone base at the end of the first run), the
     second run with the initial flux: the flux is ignored with the warning "... start at rest (their reference profile)",
     no steady profile is put in, identities from step 1.

@@ -36,9 +36,12 @@ reads "PASS (k skipped)" (or FAIL) and the report lists those lines. The full mo
 seeds and all four unsaturated-zone methods, and again with three depth classes (`soilzone_rough_terrain_k3`). With `--only`, the report keeps the earlier results of the other steps (each row shows
 when it ran). The report lists which steps give the numbers quoted in the manual.
 
-Every coupled test starts from the shipped Liard examples (`examples/Liard_groundwater`, `examples/Liard_existing_model`),
-copies them into the scratch folder and edits the copies; the examples themselves are never changed. Each run is checked
-with the audit tool shipped with the example (`examples/Liard_groundwater/tools_audit.py`).
+The coupled tests of the sections below start from the shipped Liard examples (`examples/Liard_groundwater`,
+`examples/Liard_existing_model`), copy them into the scratch folder and edit the copies; the examples themselves are never
+changed. Each run is checked with the audit tool shipped with the example (`examples/Liard_groundwater/tools_audit.py`).
+The soil-zone tests (`soilzone/`, last section) instead build small synthetic models (`soilzone/sz_models.py`,
+`rough_models.py`, `rough_ext.py`) and check every run with `soilzone/sz_check.py` (except T7, which uses the Liard
+example and the audit tool).
 
 ## Unit tests (no MODFLOW needed)
 
@@ -55,7 +58,7 @@ run stops, with a message, right after that, so these checks need only Raven, Py
 
 | Script | What it checks |
 |---|---|
-| `cmake_checks.py [--src DIR] [--selftest]` | the MODFLOW 6 build integration of Raven's CMake (option `RAVEN_MF6`), offline, about a minute, no compiling of Raven: 1 Linux aarch64 default without tools falls back to OFF with a warning naming `-DRAVEN_MF6=OFF`; 2 that default survives a reconfigure and becomes SOURCE when the tools appear; 3 RPATH (private library from the build tree and a moved install, `$ORIGIN`); 4 PATH mode installs a symlinked or renamed library as `libmf6.so`; 5 `libmf6_version.txt` and package name (unknown for PATH, `meson.build` version for zips and sources); 6 offline options name the mode, other-mode options reported as ignored, unpinned zip warned; 7 meson gets `FC` (renamed link); 8 meson without a readable version named; 9 `DESTDIR` staged install gets `libgfortran.so.5`; 10 no git (default falls back, SOURCE stops, SOURCE_URL needs none); 11 replaced zip unpacked again, unchanged one not (sentinel); 12 Windows AMD64/ARM64 (emulated); 13 package version from a `v6.7.2.tar.gz` source URL, unpinned zip "not checked"; 14 a wrong `RAVEN_MF6_ZIP_SHA256` stops (local and downloaded zips). `--selftest` puts each check's bug back into a copy of the source and shows that the check then fails |
+| `cmake_checks.py [--src DIR] [--selftest]` | the MODFLOW 6 build integration of Raven's CMake (option `RAVEN_MF6`), offline, about a minute, no compiling of Raven: 1 Linux aarch64 default without tools falls back to OFF with a warning naming `-DRAVEN_MF6=OFF`; 2 that default survives a reconfigure and becomes SOURCE when the tools appear and the repository answers (a reachable stand-in repository); 3 RPATH (private library from the build tree and a moved install, `$ORIGIN`); 4 PATH mode installs a symlinked or renamed library as `libmf6.so`; 5 `libmf6_version.txt` and package name (unknown for PATH, `meson.build` version for zips and sources); 6 offline options name the mode, other-mode options reported as ignored, unpinned zip warned; 7 meson gets `FC` (renamed link); 8 meson without a readable version named; 9 `DESTDIR` staged install gets `libgfortran.so.5`; 10 no git (default falls back, SOURCE stops, SOURCE_URL needs none); 11 replaced zip unpacked again, unchanged one not (sentinel); 12 Windows AMD64/ARM64 (emulated); 13 package version from a `v6.7.2.tar.gz` source URL, unpinned zip "not checked"; 14 a wrong `RAVEN_MF6_ZIP_SHA256` stops (local and downloaded zips); 15 offline default: tools but an unreachable repository fall back at configure time to PREBUILT or OFF, a reachable one gives SOURCE; 16 single-configuration generators default to Release; 17 a MODFLOW version below 6.5.0 (as `RAVEN_MF6_VERSION`, in a zip's or source folder's `meson.build`, in an archive name) stops the configure, 6.7.0 warns; 18 runtime bundling for macOS (Mach-O stand-ins, `@rpath` chains, `@loader_path`, signing) and Windows (stand-in `objdump`/`dumpbin`, recursive DLL imports), emulated on Linux; 19 messages for a folder as `RAVEN_MF6_PATH` and a malformed SHA-256 (60 parts in 19 checks). `--selftest` puts each check's bug back into a copy of the source and shows that the check then fails |
 | `mf6version_check.py` | Raven's MODFLOW 6 version guard with a stand-in library (`mf6version_stub.c`, compiled by the script): older than 6.5.0 refused, other versions, no version and unreadable versions (quoted) one warning, 6.8.1 with suffixes silent; a real 2-day run when a library is configured |
 | `mf6lib_check.py [--unit]` | part 0 (`--unit`, no library needed): `tools/get_mf6.py` platform choice with faked platforms (Windows ARM64 and Linux aarch64 stop and point to `-DRAVEN_MF6=SOURCE`/`PATH`, `--zip` accepts win64 on Windows ARM64 with a note, Intel Mac needs `--version 6.6.3`); then getting and finding the MODFLOW 6 library: `tools/get_mf6.py --zip` unpacks a release-style zip (with version file, idempotent); Raven with no setting finds the library in `lib/mf6` one folder up and next to its executable; with none, the message lists the places searched |
 | `mf6files_check.py [OLD_RAVEN]` | 16 generated set-ups (every grid type, rotation, refinement, layers by elevation, aquicludes, boundaries, wells, lakes, imported cells): FloPy reads the model; cells valid and not overlapping; DIS origin and rotation, DISV/DISU vertices, DISU symmetry and face angles against the cell file; no vertical connection through an aquiclude; drains inside the top cell; boundary polygons select the right cells. With an older Raven as argument, also shows which input files changed |
@@ -100,3 +103,39 @@ days and in feet and seconds, with an independent `:OverlapWeights` table from `
 | `usgs_common.py` | helper: lays the Liard HRUs of subbasin 52 over an example model's active cells (:OverlapWeights) |
 | `setup_case.py DEST MODELDIR` | helper: a Liard case coupled to one of the synthetic models |
 | `run_standalone.py FOLDER` | helper: runs a MODFLOW 6 simulation through the library alone |
+
+## Soil zone (`soilzone/`)
+
+The tests of `:SoilZone PHYSICAL` (manual, chapter "Verification", sections "Soil zone", "regression tests",
+"Soil zone: every position of the water table", "Soil zone" and "Verification on rough terrain"). Each script supports
+the quick mode (`RAVEN_TEST_QUICK=1`, which `run_all.py --quick` sets) and the full mode; every coupled run is checked by
+`sz_check.py` at the standard limits (`sz_check.ID_LIMITS`: recharge identity 5e-9, soil-zone and unsaturated-zone
+identities 1e-8, the negative recharge not held), MODFLOW's and Raven's balance, and no shortfall.
+
+| Script (run_all step) | Tests |
+|---|---|
+| `soilzone_unit.cpp` (`soilzone_unit`) | the interface functions of `GWSoilZone.cpp`: filling and draining, sub-grid level and inverse, contact weights, flux derivatives, local solve, Robin slope; 20 000 random cases |
+| `sz_check.py` (`soilzone_check_selftest`) | self-test of the column identity (exact books 0; a 1e-4 m3/step leak fails) |
+| `spike_xmi.py` (`soilzone_spike`) | Q1-Q3: values written through XMI between outer iterations reach MODFLOW's solver |
+| `test_column.py` (`soilzone_column`) | T1/T1b: flat column, the water table rising into the soil zone (50 / 125 mm/d below the base, 50 inside, full on day 41) |
+| `test_hillslope.py --selftest` (`soilzone_hillslope`) | T2/T3: hillslope wetting and drying against a MODFLOW-only reference (`sz_reference.py`); T3 drying checks and their self-test |
+| `test_dynamics.py` (`soilzone_dynamics`) | T4 time step (1 d, 6 h, 1 h), T5 stiff contact (iterated vs explicit), SG sub-grid saturated fraction |
+| `test_restart.py` (`soilzone_restart`) | 300 d against 150 + 150 d (`:GWSoilZoneColumns`); R2 an existing model with specified heads, 10 d against 5 + 5 |
+| `test_inputs.py` (`soilzone_inputs`) | I1-I14: missing HYDRAUL_COND, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart columns, `.rvc` blocks without groundwater, surface exchange on a soil layer, damaged `:GWHeads` header, `:StartTime` under valgrind, orphan `:BoundaryHead`/`:WellFlowRate`, options that do nothing, messages, age tracer across chained hotstarts |
+| `test_robustness.py` (`soilzone_robustness`) | R1-R13 cases of the code inspections (stiff column, one HRU over ten cells, explicit mode, late updates, frozen boundaries, unconverged steps), R14-R20 negative recharge (N1-N7), R15b a negative-recharge cut on a draining soil zone |
+| `test_interface_stiff.py` (`soilzone_interface_stiff`) | S1-S8: low-K_v top layer, kink drain, supply limits, tiny budgets and outer limits, the connection test |
+| `test_confined_wet.py` (`soilzone_confined_wet`) | W1-W12: confined layers below their bottoms, drained columns, heads far outside the model and the stop rule (W4, W6, W11 permanent skips) |
+| `test_columns_mf6.py` (`soilzone_columns_mf6`) | M1-M4: drained columns kept wet, a column delivers its inflow, CONCEPTUAL against a reference build (`RAVEN_EXE_REF`) |
+| `test_mf6_budget.py` (`soilzone_mf6_budget`) | B1-B8: MODFLOW's residual and gross flow as Raven books them, dated warnings, guard counts, B8 unconverged steps without a soil zone (only MODFLOW's negative residual withheld) |
+| `vadose_unit.cpp`, `vadose_ref.py` (`soilzone_vadose_unit`) | the Richards column against independent solutions (retention, steady infiltration, mass, perched water, drainage against a method-of-lines reference) |
+| `test_sz_models.py` (`soilzone_models`) | P1-P10: delay through a deep unsaturated zone, capillary rise, a water table through the column, restarts, LAGGED timing, classes, specified heads, the shortest column, upward flows out of a lower cell |
+| `test_vz_kinematic.py`, `vadose_kw_unit.cpp` (`soilzone_vz_kinematic`) | `:SoilZoneVadose KINEMATIC` (unit and model tests) |
+| `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (unit tests, L1-L6, cost, byte identity) |
+| `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C10: depth classes of the unsaturated columns; C9 R20 with three classes; C10 hotstart after a dropped class column |
+| `test_vz_initial.py` (`soilzone_vz_initial`) | I1, I2, I4-I6: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1 |
+| `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases R1-R20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
+| `test_sz_models_ext.py` (`soilzone_models_ext`) | X1-X7: the soil zone with an existing MODFLOW model (round trip, feet and seconds, specified heads, outputs, NEWTON required, specific yield) |
+| `test_liard_physical.py 365` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year |
+
+(T6, a planned comparison with GSFLOW's Sagehen model, was not implemented; the existing-model soil zone is covered by
+X1-X7 and the existing-model cases of the rough-terrain suite.)

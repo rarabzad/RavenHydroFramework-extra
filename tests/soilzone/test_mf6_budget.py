@@ -8,7 +8,8 @@ B1  a steady existing model without STO6, :SoilZone PHYSICAL, converged: Raven's
 B2  the gross flow is MODFLOW's TOTAL IN + TOTAL OUT (every entry's inflow and outflow apart; a well taking 1e4 m3/d resupplied
     by a specified head gave 1 m3/d with signed package sums): a CONCEPTUAL existing model with a well and OUTER_MAXIMUM 2:
     100 x residual / "MF6 balance error [%]" equals the list file's TOTAL IN + TOTAL OUT on the steps with a residual.
-B3  the far-head warning quotes GWBudget's percentage (test_confined_wet.far_warnings) on the B2 run.
+B3  the far-head warning quotes GWBudget's percentage: checked in test_confined_wet W7c/W9, where far heads occur (the B2 run
+    holds none; B3 is reported here as passed by reference).
 B4  an hourly run: the per-step warnings are dated by the end of the step with its time, as GWBudget.csv ("in the step ending
     2000-01-01 01:00").
 B5  an existing model without NEWTON whose specified head (layer 2) lies under a dry top cell: recharge MODFLOW does not apply
