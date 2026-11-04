@@ -163,7 +163,9 @@ classes. Export that polygon layer, keeping the HRU ID used in the \cmd{.rvh}:
 ogr2ogr -f GeoJSON -t_srs EPSG:4326 my_hrus.geojson my_hrus.shp
 \end{lstlisting}
 \end{minipage}\par\smallskip
-(or, in QGIS, \emph{Export $\rightarrow$ Save Features As}, format GeoJSON, CRS EPSG:4326). Check that every HRU with an
+(or, in QGIS, \emph{Export $\rightarrow$ Save Features As}, format GeoJSON, CRS EPSG:4326). A layer in a projection may also be
+exported as it is (\cmd{ogr2ogr -f GeoJSON my\_hrus.geojson my\_hrus.shp}) and its projection given by \cmd{:InputCRS} in the
+\cmd{.rvg} file (Section~\ref{sec:inputcrs}). Check that every HRU with an
 \cmd{AQUIFER\_PROFILE} appears in the file; \cmd{GWModelSummary.txt} lists, per HRU, its polygon area, its area in the \cmd{.rvh}
 and the fraction linked to active cells.
 \subsection{Maps}
@@ -174,10 +176,13 @@ gdalwarp -t_srs EPSG:4326 -tr 0.005 0.005 -r bilinear dem.tif dem_lonlat.tif
 gdal_translate -of AAIGrid dem_lonlat.tif dem_lonlat.asc
 \end{lstlisting}
 \end{minipage}\par\smallskip
-Use a raster resolution finer than the model cells (each model cell averages 25 samples). Both maps must use the same
-vertical datum, as must well screens, monitoring wells, boundary heads and reservoir stages.
+Use a raster resolution finer than the model cells (each model cell averages 25 samples). A projected raster can be used
+without warping: \cmd{gdal\_translate -of AAIGrid dem.tif dem.asc} and \cmd{:InputCRS} with its projection
+(Section~\ref{sec:inputcrs}); all input files then use that projection. Both maps must use the same vertical datum, as must
+well screens, monitoring wells, boundary heads and reservoir stages; the only automatic check is the start-up stop for a
+coupled reservoir whose stages lie below the aquifer under its lake.
 \subsection{River lines}
-Any line layer of the river network in longitude/latitude. A field with the Raven subbasin ID is optional; without it, each
+Any line layer of the river network in longitude/latitude (or in the projection of \cmd{:InputCRS}). A field with the Raven subbasin ID is optional; without it, each
 river piece is assigned to the subbasin of the HRU that dominates its grid cell.
 \subsection{Aquifer information}
 Layer thicknesses and materials come from borehole logs, geological maps or regional hydrogeological studies. Start with one or
@@ -212,9 +217,9 @@ quadtree with 500 m river cells, because its refinement spans whole rows and col
 \subsection{Checklist}
 \begin{enumerate}
 \item \textbf{HRU polygons.} Export the HRU polygons from your GIS or BasinMaker as GeoJSON in longitude/latitude
-(EPSG:4326), with a field holding the HRU ID used in the \cmd{.rvh} file.
-\item \textbf{Maps.} A DEM and a bedrock (or aquifer-base) elevation map as ESRI ASCII grids in longitude/latitude, in the same
-vertical datum. River lines as GeoJSON.
+(EPSG:4326), or in their projection with \cmd{:InputCRS}, with a field holding the HRU ID used in the \cmd{.rvh} file.
+\item \textbf{Maps.} A DEM and a bedrock (or aquifer-base) elevation map as ESRI ASCII grids in longitude/latitude (or in the
+projection of \cmd{:InputCRS}), in the same vertical datum. River lines as GeoJSON.
 \item \textbf{Profiles.} Group your HRUs by the aquifer beneath them and write one profile per group; set
 \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh}.
 \item \textbf{Recharge.} Decide which Raven flux is recharge (usually percolation from the deepest soil store) and send it
@@ -341,7 +346,9 @@ Check the row and column of each response in your own \cmd{Diagnostics.csv}; the
 \begin{tabular}{P{0.36\linewidth}P{0.588\linewidth}}\toprule\hdr
 Message or symptom & Cause and remedy\\\midrule
 ``cannot load MODFLOW 6 library'' & run \cmd{python tools/get\_mf6.py} of RavenHydroFramework-extra, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB} to the full path of \cmd{libmf6}; the message lists the places searched\\
-Raven stops during initialization without a Raven message & MODFLOW rejected its input; read \cmd{<output>/mf6/mfsim.lst}\\
+``MODFLOW 6 stopped the run during \dots'' & MODFLOW found an input error inside its library; the message (also in \cmd{Raven\_errors.txt}) quotes the error report of \cmd{<output>/mf6/mfsim.lst}\\
+``GeoJSON file \dots\ is in EPSG:\emph{n}'' / ``\dots\ outside the longitude/latitude range'' & a projected input file: give \cmd{:InputCRS} (Section~\ref{sec:inputcrs})\\
+``layer \dots\ starts dry'' (warning) & the initial heads leave a whole layer dry; start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or \cmd{:InitialGWHeads}\\
 ``HRU \dots\ has an AQUIFER\_PROFILE but no polygon'' & HRU IDs in the GeoJSON do not match the \cmd{.rvh}; check the ID field name\\
 ``does not overlap any active groundwater cell'' & the HRU is too small for the grid or sits where bedrock is at the surface; reduce \cmd{:GridCellSize} or \cmd{:MinCellCoverage}, or check the bedrock map\\
 ``polygon area \dots\ differs from .rvh AREA'' & information only; volumes are always consistent\\
@@ -371,6 +378,9 @@ possible loss at its share of the reach's flow.
 \cmd{:StartDate} set to the end of the first run.
 \paragraph{How fine should the grid be?} Fine enough that valleys and well spacings span two or three cells
 (Section~\ref{ch:grid}). Coarser grids run faster.
+\paragraph{Does frozen ground limit recharge?} Recharge is whatever Raven's processes send to \cmd{GROUNDWATER}, so frozen
+ground acts on it through Raven's own process choices (a \cmd{:FrozenGround} process, infiltration and percolation methods
+that respond to frozen soil); the coupling adds no frozen-ground control of its own.
 \paragraph{How long a spin-up do I need?} Start from a steady state with the long-term mean recharge, then check that
 \emph{storage release} in \cmd{GWBudget.csv} averages near zero over the first years; large, slow aquifers may need decades.
 \paragraph{Can I see the head everywhere, not only at wells?} Yes: \cmd{mf6/gwf.hds} (MODFLOW binary, readable with FloPy)

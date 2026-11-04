@@ -106,8 +106,9 @@ depth ($d_x=2$ m).}\label{fig:curves}\end{figure}
 \begin{refcard}{recharge}
 \textbf{Sources/sinks.} Moves water from \cmd{GROUNDWATER} of each coupled HRU to the aquifer (MODFLOW RCH package \cmd{RCH\_RAVEN}, top cell of each
 active column), optionally through the recharge-delay store (internal to the coupling, saved in \cmd{solution.rvc}).\par\smallskip
-\textbf{Constraints/notes.} In a coupled HRU \cmd{GROUNDWATER} is a pass-through: no Raven process may draw water from it (start-up error). Recharge is
-never negative. The volume of each HRU is conserved exactly; recharge of HRUs lying wholly on fixed-head cells is reported
+\textbf{Constraints/notes.} In a coupled HRU \cmd{GROUNDWATER} is a pass-through: no Raven process may draw water from it (start-up error). A
+process that moves water into it may return a negative flux (e.g.\ \cmd{PERC\_GR4JEXCH}): a negative recharge, taken out of the
+aquifer (Section~\ref{sec:negrecharge}). The volume of each HRU is conserved exactly; recharge of HRUs lying wholly on fixed-head cells is reported
 separately.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
@@ -135,8 +136,11 @@ Raven's \cmd{GROUNDWATER} storage shows each day's recharge (mm) of every HRU.
 \end{refcard}
 
 \subsection{Common questions}
-\textit{Can recharge be negative?} Only if a Raven process removes water from \cmd{GROUNDWATER}, which is forbidden in coupled
-HRUs; recharge is therefore never negative. \textit{Does recharge depend on the water table?} Not directly --- Raven decides
+\textit{Can recharge be negative?} Yes, when a process that moves water into \cmd{GROUNDWATER} returns a negative flux, such
+as the GR4J exchange \cmd{PERC\_GR4JEXCH} with a positive \cmd{GR4J\_X2} (processes that take water out of \cmd{GROUNDWATER}
+are refused in coupled HRUs). The negative recharge is taken out of the top active cells under the HRU. Without
+\cmd{:SoilZone PHYSICAL} it is not limited by what those cells hold (a warning, once per run); with it, it is limited to what
+the top cell can still give and the rest is taken back out of the soil zone (Section~\ref{sec:negrecharge}). \textit{Does recharge depend on the water table?} Not directly --- Raven decides
 it. If the water table reaches the surface, the extra water returns immediately as seepage (Section~\ref{ch:seepage}), which
 acts as ``rejected recharge''. With \cmd{:SoilZone PHYSICAL} rejection is explicit: recharge falling on saturated ground stays in
 the soil (Section~\ref{ch:soilzone}).
@@ -638,7 +642,8 @@ when given (the DEM's points about their mean in the cell; with an \cmd{:Overlap
 outlines, one point per cell). The soil--aquifer conductance and the storage check use the model's own vertical
 conductivity (\cmd{K33}, else \cmd{K}) and specific yield of the top active cell; unsaturated columns take the
 conductivity and specific yield of every layer from the model, and $b$, $\psi_a$ and $\theta_s$ from
-\cmd{:SoilZoneAquiferClass} (Section~\ref{app:commands}). Heads, conductances and rates are converted from the model's
+\cmd{:SoilZoneAquiferClass} (Section~\ref{app:commands}). A steady model (no storage package) has no specific yield: the
+\cmd{SPEC\_YIELD} of \cmd{:SoilZoneAquiferClass} is used when the class gives it, otherwise 0.2. Heads, conductances and rates are converted from the model's
 length and time units. A generated soil-zone model coupled again as an existing model reproduces the generated run
 within the interface tolerances, also in feet and seconds (tests X1--X4).
 The model must use MODFLOW's \cmd{NEWTON} formulation (Raven stops at start-up otherwise, naming the name file to edit;
@@ -664,7 +669,8 @@ the new physics, and MODFLOW's solve remains the larger part.
 through WEL \cmd{SZW\_RAVEN}); returns rejected recharge to the columns and sends overflow to \cmd{SURFACE\_WATER}.\par\smallskip
 \textbf{Constraints/notes.} Recharge must come from \cmd{SOIL[$M-1$]}; every soil-zone layer needs a positive thickness and
 drainable porosity, and the class of \cmd{SOIL[$M-1$]} needs \cmd{HYDRAUL\_COND}. \cmd{RECHARGE\_DELAY} must be 0 for
-soil-zone HRUs. Works with an existing model (\cmd{:MF6Simulation}; Section~\ref{sec:szexisting}). With the default
+soil-zone HRUs; \cmd{:SoilZoneVadose LAG} (Section~\ref{sec:szvadoselag}) delays recharge through a deep unsaturated zone instead
+(only below the soil zone, so recharge on saturated ground is still rejected). Works with an existing model (\cmd{:MF6Simulation}; Section~\ref{sec:szexisting}). With the default
 \cmd{LAGGED} timing the splitting error of Raven's processes ahead of the exchange scales with the change of the
 exchange between steps (hillslope test: 0.7 cm mean head difference at daily steps; 1.8 cm with \cmd{AFTER}).
 Capillary rise needs \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} of the soil classes (Raven estimates them from the

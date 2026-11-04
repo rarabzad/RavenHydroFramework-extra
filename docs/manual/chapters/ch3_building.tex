@@ -134,8 +134,8 @@ HRUs in that cell, the HRU receives $10\,000\times0.85/4.0=2\,125$ m$^3$, i.e.\ 
 
 \section{Preparing the geometry}
 \subsection{What the HRU GeoJSON must contain}
-A \cmd{FeatureCollection} of \cmd{Polygon} or \cmd{MultiPolygon} features in longitude/latitude (EPSG:4326), each with a
-property holding the HRU ID of the \cmd{.rvh} file. Holes are allowed. Several features may share an ID (their areas add up).
+A \cmd{FeatureCollection} of \cmd{Polygon} or \cmd{MultiPolygon} features in longitude/latitude (EPSG:4326), or in the
+projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}), each with a property holding the HRU ID of the \cmd{.rvh} file. Holes are allowed. Several features may share an ID (their areas add up).
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
 {"type":"FeatureCollection","features":[
@@ -146,7 +146,7 @@ property holding the HRU ID of the \cmd{.rvh} file. Holes are allowed. Several f
 \end{minipage}\par\smallskip
 Only HRUs with an \cmd{AQUIFER\_PROFILE} need polygons; others may be present and are ignored.
 \subsection{Raster maps}
-ESRI ASCII grids in longitude/latitude, for example:
+ESRI ASCII grids in longitude/latitude (or in the projection of \cmd{:InputCRS}, Section~\ref{sec:inputcrs}), for example:
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
 ncols 125
@@ -160,6 +160,38 @@ NODATA_value -9999
 \end{minipage}\par\smallskip
 Values are interpolated bilinearly between raster cell centres, ignoring no-data cells; each model cell takes the mean of
 $5\times5$ such samples. Points more than one raster cell outside the map count as no-data.
+\subsection{Projected input files (\texttt{:InputCRS})}\label{sec:inputcrs}
+Most GIS data are projected (UTM, Albers, Lambert). Instead of reprojecting them to longitude/latitude, give their
+projection once in the \cmd{.rvg} file:
+\begin{lstlisting}
+:InputCRS EPSG:32610                                   # UTM zone 10 N (WGS84)
+:InputCRS ALBERS 50 58.5 45 -126 1000000 0 GRS80       # or by parameters (here BC Albers, EPSG:3005)
+\end{lstlisting}
+The grammar is that of \cmd{:MF6CRS} (Section~\ref{sec:mf6crs}): the EPSG codes 326xx and 327xx (UTM, WGS84), 269xx (UTM, NAD83),
+3005, 5070, 3978, 3347 and ESRI:102001, or \cmd{TMERC}, \cmd{ALBERS} and \cmd{LCC} by their parameters, on the WGS84 or GRS80
+ellipsoid. The projection applies to every geometry and raster input file: \cmd{:HRUGeometry}, \cmd{:RiverGeometry},
+\cmd{:GridFile}, the files of \cmd{:GridRefinement LINES} and \cmd{POLYGONS}, the boundary files of
+\cmd{:GeneralHeadBoundary} and \cmd{:SpecifiedHeadBoundary}, \cmd{:LandSurface} and \cmd{:BedrockSurface} (also for the
+soil zone's DEM samples), and for an existing model \cmd{:MF6GridFile}. Each vertex is converted to longitude/latitude as
+it is read, and each raster is sampled in its own coordinates (the bilinear interpolation above, in metres), so a
+projected DEM is used as it is, without resampling. Wells and monitoring wells may then be given by \cmd{X} and \cmd{Y}
+(metres, in the same projection) instead of \cmd{LATITUDE} and \cmd{LONGITUDE}. Everything Raven writes stays in
+longitude/latitude (\cmd{grid\_cells.geojson}, \cmd{GWHeads.nc}), and \cmd{GWModelSummary.txt} names the projection.
+
+Input files whose coordinates do not match these settings are recognised where possible, and the run stops with a message:
+\begin{itemize}
+\item a GeoJSON file whose \cmd{"crs"} member names a projected EPSG code (as GDAL writes it,
+\cmd{urn:ogc:def:crs:EPSG::32610}) needs \cmd{:InputCRS} with that projection; a file whose \cmd{"crs"} member names
+another built-in projection than \cmd{:InputCRS}, or longitude/latitude (EPSG:4326, CRS84, NAD83), is refused;
+\item without \cmd{:InputCRS}, a GeoJSON file with coordinates outside $\pm360^\circ$ / $\pm90^\circ$, or a raster whose
+extent lies outside them, is refused (projected metres read as degrees);
+\item a well given by \cmd{X} and \cmd{Y} needs \cmd{:InputCRS}.
+\end{itemize}
+A file without a \cmd{"crs"} member is taken to be in the projection of \cmd{:InputCRS} when it is given, so with
+\cmd{:InputCRS} every input file must be projected (a code not built in, given by its parameters, cannot be compared with a
+file's \cmd{"crs"} member and is accepted). The equal-area projection Raven lays its grid in
+(Section~\ref{ch:grid}) is not changed by \cmd{:InputCRS}: the same HRU polygons given in longitude/latitude or in UTM give
+the same grid and the same overlaps (within $10^{-9}$ of a cell area in the Liard test, Chapter~\ref{ch:verification}).
 \subsection{Choosing the cell size}
 The number of active columns is roughly the coupled area divided by $\Delta^2$: for the Liard example's 13\,000 km$^2$,
 $\Delta=2$ km gives about 3\,300 columns, $\Delta=1$ km about 13\,000, $\Delta=500$ m about 52\,000. Run time grows roughly in
@@ -237,7 +269,7 @@ in its main HRU (typically above 99\%).
 
 \subsection{Imported cells}
 With \cmd{:GridType FILE} and \cmd{:GridFile cells.geojson ID\_FIELD} the cells are the polygons of a GeoJSON file in
-longitude/latitude, one single-ring polygon per cell, numbered by the ID field (default \cmd{CELL\_ID}). Cells may be
+longitude/latitude or in the projection of \cmd{:InputCRS}, one single-ring polygon per cell, numbered by the ID field (default \cmd{CELL\_ID}). Cells may be
 concave, and a cell side may be shared with several smaller cells (T-junctions): neighbours are found wherever edges of two
 cells lie on the same line --- within 0.1\% of the edge length, because a straight edge drawn in one map projection bends
 slightly in another --- and overlap. A face made of several pieces gets their total length and their average position and
@@ -245,7 +277,7 @@ direction. Repeated vertices, which GIS exports often contain, are removed first
 connection lengths, face widths and face directions computed from the polygons. Imported cells need not be orthogonal; for strongly non-orthogonal cells consider
 \cmd{:FlowCorrection XT3D\_RHS} and check the convergence in \cmd{GWBudget.csv}.
 
-\subsection{Connecting layers by elevation}
+\subsection{Connecting layers by elevation}\label{sec:layerconn}
 In a layered grid a cell connects sideways only to the cell with the same layer number. When neighbouring columns have
 different profiles --- a gravel layer thinning out next to a till, say --- the same layer number can mean different
 materials at different elevations. \cmd{:LayerConnection ELEVATION} writes the grid as DISU and connects every pair of
@@ -380,8 +412,10 @@ $10^{-5}$), $S_y$ (\cmd{SPEC\_YIELD}, default 0.1) and porosity (\cmd{POROSITY},
 calculations; MODFLOW's flow calculation does not use it).
 
 \begin{watch}
-MODFLOW connects layer $\ell$ of one column sideways only to layer $\ell$ of its neighbours. Where two profiles meet,
-list their layers in the same geological order, otherwise, for example, a gravel layer may connect to a clay layer.
+By default (\cmd{:LayerConnection INDEX}) MODFLOW connects layer $\ell$ of one column sideways only to layer $\ell$ of its
+neighbours. Where two profiles meet, list their layers in the same geological order, otherwise, for example, a gravel layer
+may connect to a clay layer; or use \cmd{:LayerConnection ELEVATION} (Section~\ref{sec:layerconn}), which connects the
+cells whose elevations overlap. (An existing model keeps its own connections.)
 \end{watch}
 
 \subsection{Initial heads}
@@ -393,6 +427,12 @@ where $d_0$ is the profile's \cmd{INITIAL\_HEAD\_DEPTH} (or the value given by \
 file), and $z_{\mathrm{low},i}$ is the bottom of the lowest active cell. With \cmd{:InitialGWHeads ELEVATION z}, $z$ replaces $z_{\mathrm{land},i}-d_0$ (still at least 0.1 m above the lowest active cell bottom).
 A hotstart (\cmd{:GWHeads} in the \cmd{.rvc}) overrides all of this cell by cell. Optionally, a steady-state
 calculation replaces these first guesses (Section~\ref{sec:init}).
+When $d_0$ is larger than the layers above the water table are thick, a whole layer can start dry. Raven checks this at
+start-up (cold start without a steady-state period, or hotstart heads): a layer whose active convertible cells all start at
+or below their bottom gets one warning naming the layer and a line ``dry at the start'' in \cmd{GWModelSummary.txt}.
+MODFLOW then has to rewet the whole layer in the first steps, which can take many iterations or leave some of them
+unconverged; start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or
+\cmd{:InitialGWHeads}. Confined layers (\cmd{CONFINED\_AQUIFER}) never dry and are not checked.
 
 \subsection{The generated MODFLOW files}
 Raven writes a standard MODFLOW~6 simulation to \cmd{<output>/mf6/}: \cmd{mfsim.nam} (simulation), \cmd{sim.tdis}

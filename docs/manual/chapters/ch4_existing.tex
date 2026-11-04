@@ -63,7 +63,7 @@ Raven needs to know which grid cells lie under each HRU. MODFLOW model files do 
 user supplies that information in one of three ways (give exactly one). Each coupled HRU is then linked to the top active
 cell of every column it overlaps.
 
-\paragraph{\cmd{:MF6CRS} (recommended).} The user names the model's map projection, usually as a standard EPSG code. Raven
+\paragraph{\cmd{:MF6CRS} (recommended).}\label{sec:mf6crs} The user names the model's map projection, usually as a standard EPSG code. Raven
 reads the cell outlines from the model itself (column and row widths, origin and rotation for DIS grids; the cell corners for
 DISV grids) and places them on the map with that projection (Figure~\ref{fig:placing}).
 \begin{figure}[!htbp]\centering\includegraphics[width=0.95\linewidth]{figures/fig_placing.pdf}
@@ -90,7 +90,8 @@ Any other projection of these three kinds is given by its parameters:
 The built-in formulas (Karney's series for Transverse Mercator, Snyder's for the conics) agree with the PROJ library to a few
 micrometres (Section~\ref{sec:vexisting}). The small datum difference between NAD83 and WGS84 (about a metre) is ignored.
 
-\paragraph{\cmd{:MF6GridFile}.} A GeoJSON file of the top-layer cells in longitude/latitude, numbered by an ID field
+\paragraph{\cmd{:MF6GridFile}.} A GeoJSON file of the top-layer cells in longitude/latitude (or in the projection of
+\cmd{:InputCRS}, Section~\ref{sec:inputcrs}, which also applies to \cmd{:HRUGeometry} and \cmd{:LandSurface}), numbered by an ID field
 (default \cmd{CELL\_ID}) from 1 to the number of cells in a layer, as exported by GIS software. Raven checks that there is one
 polygon per cell and that the polygons are the model's cells in the model's order. A map projection scales areas and turns
 directions slightly, so Raven allows one common scale and one common rotation, and nothing else:
@@ -243,7 +244,7 @@ Replacing a calibrated recharge package with Raven's recharge changes the model'
 budget with a run of the original model before using the results: large differences mean Raven's recharge, or the
 recharge the model was calibrated with, needs attention.
 
-\section{Current limits}
+\section{Current limits}\label{sec:extlimits}
 DISU models, water-table ET from Raven (the model's own ET package can be kept), surface-store and reservoir exchanges, and
 the conductance limit of generated river cells are not available in this mode; the stream package's stage comes from the
 model. Restarts after the model's time zero need daily or longer Raven time steps.

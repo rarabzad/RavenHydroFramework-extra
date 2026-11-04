@@ -85,9 +85,10 @@ Command & Meaning (default)\\\midrule\endfirsthead
 \caption[]{Commands in the \cmd{.rvg} file (continued).}\\
 \toprule\hdr
 Command & Meaning (default)\\\midrule\endhead
-\cmd{:HRUGeometry file \{ID field\}} & HRU polygons, GeoJSON in lon/lat; ID field (\cmd{HRU\_ID}). \textbf{Required.}\\
+\cmd{:HRUGeometry file \{ID field\}} & HRU polygons, GeoJSON in lon/lat (or \cmd{:InputCRS}); ID field (\cmd{HRU\_ID}). \textbf{Required.}\\
 \cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically\\
-\cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat (HRU \cmd{ELEVATION})\\
+\cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat or \cmd{:InputCRS} (HRU \cmd{ELEVATION})\\
+\cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file; wells may then be given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
 \cmd{:BedrockSurface file} & bedrock elevation, same format (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
 \cmd{:GridCellSize m} & cell size (1000 m)\\
 \cmd{:MinCellCoverage f} & fraction of a cell that coupled HRUs must cover (0.25)\\
@@ -109,8 +110,8 @@ Command & Meaning (default)\\\midrule\endhead
 \cmd{:GWInitialization STEADY\_STATE r} & steady-state start with recharge $r$ mm/d (off)\\
 \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & Raven store of an HRU group $\leftrightarrow$ aquifer\\
 \cmd{:ReservoirExchange} & Raven reservoirs $\leftrightarrow$ aquifer\\
-\cmd{:Wells} \dots\ \cmd{:EndWells} & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT}\\
-\cmd{:ObservationWells} \dots & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV}\\
+\cmd{:Wells} \dots\ \cmd{:EndWells} & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT} (with \cmd{:InputCRS}: \cmd{X, Y} instead of \cmd{LATITUDE, LONGITUDE})\\
+\cmd{:ObservationWells} \dots & table: ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV} (or \cmd{X, Y})\\
 \cmd{:GeneralHeadBoundary name file HEAD h CONDUCTANCE c \{LAYERS ALL|TOP\}} & head-dependent boundary; $c$ per cell [m$^2$/d]\\
 \cmd{:SpecifiedHeadBoundary name file HEAD h \{LAYERS ALL|TOP\}} & fixed-head boundary\\
 \cmd{:SolverMax\allowbreak OuterIterations n} & Newton iterations per step (500)\\
@@ -141,11 +142,12 @@ outside the ranges given stop the run with a message.
 \cmd{:SoilZoneCapillaryRise ON | OFF} & \cmd{ON} with \cmd{RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG}; \cmd{OFF} with \cmd{NONE} & capillary rise from the water table (and, with \cmd{RICHARDS}, from the columns' top nodes) into soil-zone layers below field capacity (Section~\ref{sec:szcaprise})\\
 \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & \cmd{LAGGED} & \cmd{LAGGED}: last step's exchange is lent to the soil zone before Raven's processes and settled after the step's exchange; \cmd{AFTER}: the exchange follows Raven's processes (the basic soil zone order) (Section~\ref{sec:sztiming})\\
 \cmd{:SoilZoneClasses K} & 1 & Raven's processes run on up to $K$ wetness classes of each HRU's soil-zone columns, $1\le K\le50$; needs \cmd{:Method ORDERED\_SERIES} (Section~\ref{sec:szclasses})\\
-\cmd{:SoilZoneAquiferClass class} & $b$ 4, $\psi_a$ 0.3~m, $\theta_s$ $S_y+0.1$ & existing models only: the aquifer class whose \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} and \cmd{POROSITY} the unsaturated columns use (conductivity and specific yield come from the model; Section~\ref{sec:szexisting})\\\bottomrule
+\cmd{:SoilZoneAquiferClass class} & $b$ 4, $\psi_a$ 0.3~m, $\theta_s$ $S_y+0.1$ & existing models only: the aquifer class whose \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} and \cmd{POROSITY} the unsaturated columns use (conductivity and specific yield come from the model; a steady model without specific yield takes the class's \cmd{SPEC\_YIELD} when given, else 0.2; Section~\ref{sec:szexisting})\\\bottomrule
 \end{longtable}
 The soil classes of the soil-zone layers need \cmd{POROSITY}, \cmd{FIELD\_CAPACITY} $<1$, and, for the bottom layer,
 \cmd{HYDRAUL\_COND} [mm/d]; capillary rise uses their \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} [mm]. Recharge must leave the
-soil zone from \cmd{SOIL[$M-1$]} into \cmd{GROUNDWATER}, and \cmd{RECHARGE\_DELAY} must be 0 for soil-zone HRUs. The
+soil zone from \cmd{SOIL[$M-1$]} into \cmd{GROUNDWATER}, and \cmd{RECHARGE\_DELAY} must be 0 for soil-zone HRUs (a delay through a
+deep unsaturated zone: \cmd{:SoilZoneVadose LAG}, Section~\ref{sec:szvadoselag}). The
 aquifer profile parameter \cmd{SEEPAGE\_SMOOTHING\_DEPTH} is the contact depth $d_s$ of the soil zone (below 0.1~m a
 warning); \cmd{SOIL\_ZONE\_DEPTH} and \cmd{SEEPAGE\_LEAKANCE} are not used for soil-zone HRUs.
 The block commands take one row per item, for example:

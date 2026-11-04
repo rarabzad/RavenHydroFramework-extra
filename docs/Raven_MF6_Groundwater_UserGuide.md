@@ -141,9 +141,10 @@ order where profiles meet.
 
 | Command | Default | Meaning |
 | --- | --- | --- |
-| `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat) |
+| `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat or `:InputCRS`) |
 | `:RiverGeometry file {subbasin field}` | none | river lines; without a field, each piece belongs to the subbasin of the dominant HRU in its cell |
-| `:LandSurface file` | HRU ELEVATION | DEM, ESRI ASCII grid in lon/lat; averaged over each cell |
+| `:LandSurface file` | HRU ELEVATION | DEM, ESRI ASCII grid in lon/lat or `:InputCRS`; averaged over each cell |
+| `:InputCRS EPSG:code` or `TMERC\|ALBERS\|LCC ...` | lon/lat | projection of every geometry and raster input file (grammar of `:MF6CRS`); wells may then be given by X, Y |
 | `:BedrockSurface file` | DEFAULT_BEDROCK_DEPTH | bedrock elevation raster, same format |
 | `:GridCellSize m` | 1000 | base cell size [m] of the grid |
 | `:MinCellCoverage f` | 0.25 | fraction of a cell covered by coupled HRUs needed to activate it |
@@ -158,8 +159,8 @@ order where profiles meet.
 | `:SolverMaxOuterIterations n` | 500 | Newton outer iterations per step |
 | `:SolverHeadTolerance m` | 0.00001 | Newton head-change tolerance (target); after 100 iterations MODFLOW continues with 10x this tolerance for the rest of that step (GWBudget `converged`=2) |
 | `:HeadSaveFrequency n` | 30 | steps between saves of the full head field (`mf6/gwf.hds`) |
-| `:Wells` table | none | NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT [m]; rates from `.rvt` |
-| `:ObservationWells` table | none | NAME, LATITUDE, LONGITUDE, SCREEN_ELEV [m] |
+| `:Wells` table | none | NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT [m] (with `:InputCRS`: X, Y [m] instead of LATITUDE, LONGITUDE); rates from `.rvt` |
+| `:ObservationWells` table | none | NAME, LATITUDE, LONGITUDE (or X, Y), SCREEN_ELEV [m] |
 | `:GeneralHeadBoundary name file HEAD h CONDUCTANCE c {LAYERS ALL\|TOP}` | none | head-dependent boundary; c per cell [m2/d] |
 | `:SpecifiedHeadBoundary name file HEAD h {LAYERS ALL\|TOP}` | none | fixed-head boundary |
 
@@ -181,6 +182,14 @@ cells is spread over the HRU's other cells.
 Well pumping is split over the screened layers by transmissivity; MODFLOW's AUTO_FLOW_REDUCE lowers
 pumping as a cell dries (GWBudget.csv reports specified and actual rates).
 
+**Projected inputs.** `:InputCRS EPSG:32610` (or another built-in code: UTM 326xx/327xx and NAD83 269xx, 3005, 5070,
+3978, 3347, ESRI:102001; or `TMERC`, `ALBERS`, `LCC` by their parameters) says that every GeoJSON and raster input file
+(`:HRUGeometry`, `:RiverGeometry`, `:GridFile`, refinement and boundary files, `:LandSurface`, `:BedrockSurface`, and
+`:MF6GridFile` for an existing model) is in that projection; rasters are sampled in their own coordinates, without
+resampling. Raven stops on a GeoJSON file whose `"crs"` member names a projection other than `:InputCRS` (or a projected
+one without it, or lon/lat with it), and, without `:InputCRS`, on coordinates or raster extents outside the lon/lat range.
+Outputs stay in lon/lat.
+
 ### 4.3a Grid options (`.rvg`)
 
 | Command | Meaning (default) |
@@ -189,7 +198,7 @@ pumping as a cell dries (GWBudget.csv reports specified and actual rates).
 | `:GridRotation deg` | rotation of regular and quadtree grids, counterclockwise (0) |
 | `:GridRefinement RIVERS s` / `WELLS s` | cells of size `s` [m] along rivers / around wells and monitoring wells |
 | `:GridRefinement LAKES 250` | finer cells in and around every reservoir's lake HRU (outline from `:HRUGeometry`) |
-| `:GridRefinement LINES file s` / `POLYGONS file s` | cells of size `s` along lines / in and around polygons (GeoJSON, lon/lat) |
+| `:GridRefinement LINES file s` / `POLYGONS file s` | cells of size `s` along lines / in and around polygons (GeoJSON, lon/lat or `:InputCRS`) |
 | `:GridFile cells.geojson ID` | imported cells (one single-ring polygon per cell), with `:GridType FILE` |
 | `:QuadtreeMaxLevel n` | maximum halvings of `:GridCellSize` (from the refinement sizes) |
 | `:FlowCorrection AUTO\|XT3D\|XT3D_RHS\|NONE` | XT3D conductance tensor; `AUTO` = off (XT3D can slow convergence where cells dry and rewet) |
@@ -221,7 +230,7 @@ needed: write each profile as `name, 0`. A profile then only marks the coupled H
 | `:MF6Model name` | the GWF model to couple, if the simulation holds several |
 | `:MF6StartDate yyyy-mm-dd` | calendar date of the model's time zero (Raven may start later: restarts) |
 | `:MF6CRS EPSG:32610` | projection of the model's coordinates; Raven reads the cell outlines from the model. Built in: UTM (EPSG 326xx/327xx, NAD83 269xx), 3005, ESRI:102001, 5070, 3978, 3347, or `TMERC`/`ALBERS`/`LCC` parameters |
-| `:MF6GridFile cells.geojson CELL_ID` | alternative: top-layer cell polygons (lon/lat), checked against MODFLOW's cell areas |
+| `:MF6GridFile cells.geojson CELL_ID` | alternative: top-layer cell polygons (lon/lat or `:InputCRS`), checked against MODFLOW's cell areas |
 | `:OverlapWeights ... :EndOverlapWeights` | alternative: `[HRU ID] [cell] [A_overlap/A_cell]` rows (MODFLOW-USG coupling format) |
 | `:RavenTakesOver p ...` / `:KeepPackages p ...` | every recharge, ET or UZF package must be declared one way or the other |
 | `:StreamPackage p {AUX name / DOMINANT_HRU}` | RIV/DRN/GHB package whose flows go to Raven's reaches (subbasin from an auxiliary variable, default SUBBASIN) |
@@ -275,15 +284,15 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
 | `:SoilZoneCapillaryRise ON/OFF` | ON with an unsaturated column (RICHARDS, KINEMATIC, LAG), OFF with NONE | capillary rise from the water table (and, with RICHARDS, from the columns' top nodes) into soil-zone layers below field capacity |
 | `:SoilZoneExchangeTiming LAGGED/AFTER` | LAGGED | LAGGED: last step's exchange is lent to the soil before Raven's processes and settled after the step's exchange (splitting error scales with the change of the exchange: 0.7 cm of head on the hillslope test against 1.8 cm with AFTER); AFTER: the exchange follows Raven's processes (the basic soil zone) |
 | `:SoilZoneClasses K` | 1 | Raven's processes run on up to K wetness classes of an HRU's columns (1-50); needs `:Method ORDERED_SERIES` |
-| `:SoilZoneAquiferClass class` | b 4, psi_a 0.3 m, theta_s Sy+0.1 | existing models: retention of the cells for the unsaturated columns (conductivity and specific yield come from the model); ignored (warning) on a model Raven builds |
+| `:SoilZoneAquiferClass class` | b 4, psi_a 0.3 m, theta_s Sy+0.1 | existing models: retention of the cells for the unsaturated columns (conductivity and specific yield come from the model; a steady model without specific yield takes the class's SPEC_YIELD when given, else 0.2); ignored (warning) on a model Raven builds |
 
 - Recharge must leave the soil zone from its bottom layer (`:Percolation ... SOIL[1] GROUNDWATER` here).
 - Each soil-zone layer needs a positive thickness, `POROSITY` and `FIELD_CAPACITY` < 1 (drainable porosity); the soil
   class of the bottom soil-zone layer needs `HYDRAUL_COND` [mm/d], which with `K_VERT` of the top aquifer layer sets
   the soil-aquifer conductance. Capillary rise uses `CLAPP_B` and `AIR_ENTRY_PRESSURE` [mm] of the soil classes.
   `SEEPAGE_SMOOTHING_DEPTH` sets how smoothly a point comes into contact (through that depth below its base) and
-  saturates; keep it at 0.1-0.5 m (below 0.1 m a warning). `RECHARGE_DELAY` must be 0 for soil-zone HRUs;
-  `SOIL_ZONE_DEPTH` and `SEEPAGE_LEAKANCE` are not used for them. A soil zone thicker than 20 m stops the run, over 5 m
+  saturates; keep it at 0.1-0.5 m (below 0.1 m a warning). `RECHARGE_DELAY` must be 0 for soil-zone HRUs
+  (`:SoilZoneVadose LAG` delays recharge below the soil zone instead); `SOIL_ZONE_DEPTH` and `SEEPAGE_LEAKANCE` are not used for them. A soil zone thicker than 20 m stops the run, over 5 m
   gives a warning.
 - The soil zone of each HRU is kept per overlapping cell (columns, saved in `solution.rvc` as `:GWSoilZoneColumns`);
   Raven's `SOIL[m]` holds their mean. Where the water table is in the soil, recharge is rejected (stays in the soil),
@@ -411,12 +420,31 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "soil-zone interface did not converge" | rare; raise `:SoilZoneIteration` or `:SolverMaxOuterIterations` (keep it at 20 or more), increase `SEEPAGE_SMOOTHING_DEPTH`, or shorten the time step |
 | warning "m3 that MODFLOW took from the soil zone was not in it" | `:SoilZone PHYSICAL` on steps whose interface did not converge (mostly at a low `:SolverMaxOuterIterations`): raise it (default 500; keep it at 20 or more) |
 | warning "... ignored" for a `:SoilZone*` command | the command has no effect here (without `:SoilZone PHYSICAL`; depth classes or initial flux with `:SoilZoneVadose NONE`; `:SoilZoneAquiferClass` on a model Raven builds) |
-| "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone |
+| "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone; for a delay through a deep unsaturated zone use `:SoilZoneVadose LAG` |
+| "GeoJSON file ... is in EPSG:n" / "... outside the longitude/latitude range" / "well ... is given by X and Y" | a projected input file: give `:InputCRS` with its projection (all input files in that projection) |
+| warning "layer ... starts dry" | the initial heads leave a whole layer dry (INITIAL_HEAD_DEPTH deeper than the layers above); start from `:GWInitialization STEADY_STATE`, a smaller INITIAL_HEAD_DEPTH or `:InitialGWHeads` |
 | warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
 
 ## 9. Limitations
 
-Refinement of a regular grid spans whole rows and columns; XT3D (optional, off by default) costs more per iteration and can slow convergence;
-rasters in latitude/longitude (ESRI ASCII);
-river stage from the start of the step; reservoirs exchange with a one-step lag (:ReservoirExchange); groundwater transport, particle tracking, demand-driven wells and frozen-ground recharge control
-are planned extensions. (Coupling an existing MODFLOW 6 model is available: section 4.3b and `examples/Liard_existing_model/`.)
+- Refinement of a regular grid spans whole rows and columns (use QUADTREE or HRU_MESH for local refinement); XT3D
+  (optional, off by default) costs more per iteration and can slow convergence.
+- Inputs are GeoJSON and ESRI ASCII grids, in lon/lat or in one projection given by `:InputCRS` (Transverse Mercator,
+  Albers, Lambert conformal conic); imported grid cells are single-ring polygons. DEM, bedrock, reservoir stages, boundary
+  heads and well screens must share one vertical datum (only a reservoir below its aquifer is detected).
+- By default layer l connects sideways only to layer l of the neighbouring columns; `:LayerConnection ELEVATION` connects
+  overlapping cells (an existing model keeps its own connections).
+- River stage comes from Raven's depth at the start of the step; reservoirs exchange with a one-step lag
+  (`:ReservoirExchange`); both are exactly accounted.
+- A layer that starts completely dry can leave the first steps unconverged; Raven warns at start-up ("layer ... starts dry").
+- MODFLOW stops the program on invalid input; Raven copies the error report of `mf6/mfsim.lst` into its message and
+  `Raven_errors.txt`.
+- `:SoilZone PHYSICAL`: recharge comes from SOIL[M-1] by a vertical process; RECHARGE_DELAY is refused (use
+  `:SoilZoneVadose LAG`); SOIL_ZONE_DEPTH is not used; the soil zone is at most 20 m thick; between cells soil water moves
+  only through the aquifer.
+- Existing models (section 4.3b): no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse packages
+  with time series (TS6, TAS6), TVK6/TVS6 and simulations with several models; undefined length or time units are taken as
+  metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`; see the manual's "Current limits" of
+  the existing-model chapter for the exchanges not available in this mode.
+- Not available: groundwater transport, particle tracking, demand-driven wells. Frozen ground acts on recharge only through
+  Raven's own processes.

@@ -61,7 +61,7 @@ cell): first the rejection's term ($s(h_c-z_{\mathrm{low}})$ at most the head-de
 the line leaves), then the line with what the term leaves. \cmd{GWModelSummary.txt} reports the number of such link updates
 and the largest take beyond the free water (0 up to round-off).
 
-\paragraph{Negative recharge.} A process that takes water out of \cmd{GROUNDWATER} (e.g. \cmd{PERC\_GR4JEXCH SOIL[1]
+\paragraph{Negative recharge.}\label{sec:negrecharge} A process that takes water out of \cmd{GROUNDWATER} (e.g. \cmd{PERC\_GR4JEXCH SOIL[1]
 GROUNDWATER} with a positive \cmd{GR4J\_X2}) gives a negative recharge. On an HRU with a soil zone it is never split by $F$: all
 of it is taken from MODFLOW (through the column on a column link), at most what the top cell can still give in the step
 (half its water above its bottom under the link, less what the columns, the capillary rise and the repayment of a lagged
@@ -90,7 +90,8 @@ member).
 
 \paragraph{Existing models.} \cmd{:SoilZone PHYSICAL} needs an existing model with \cmd{NEWTON} (start-up stop naming the name
 file; MODFLOW then needs \cmd{LINEAR\_ACCELERATION BICGSTAB}). A model without a storage package is steady state: storage 0,
-$S_y=0.2$ assumed (a warning) for the soil-zone checks, the release limits and the columns; with one, \cmd{SY} is taken as
+$S_y$ taken from \cmd{SPEC\_YIELD} of \cmd{:SoilZoneAquiferClass} when that class gives it, otherwise 0.2 (a warning naming
+the value either way) for the soil-zone checks, the release limits and the columns; with one, \cmd{SY} is taken as
 MODFLOW holds it, also where it is 0 (common with \cmd{ICONVERT} 0, all of the model included), floored at 0.01 for the
 release limits and the columns, with a warning counting the cells below 0.01: such a model's outputs are unchanged. The warning
 about an outer-iteration limit below 20 is written once MODFLOW's limit is known (\cmd{OUTER\_MAXIMUM} for an existing model).

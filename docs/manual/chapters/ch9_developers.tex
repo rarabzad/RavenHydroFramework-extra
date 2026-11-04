@@ -283,21 +283,33 @@ test (\cmd{tests/gridtest.cpp}), the Thiem test (\cmd{tests/thiem/}) and the ran
 \begin{itemize}
 \item Refinement of a regular grid spans whole rows and columns; use a quadtree or HRU mesh for local refinement.
 \item XT3D (optional) makes each iteration more expensive and can slow the Newton method badly where cells dry and rewet; it is off by default.
-\item Imported grid files must hold one single-ring polygon per cell in longitude/latitude.
-\item Maps must be ESRI ASCII grids in longitude/latitude; the same vertical datum must be used for DEM, bedrock,
-reservoir stages and wells.
-\item Layer $\ell$ connects sideways only to layer $\ell$ of neighbouring columns.
+\item Imported grid files must hold one single-ring polygon per cell (MODFLOW cells have no holes).
+\item Input files are GeoJSON and ESRI ASCII grids, in longitude/latitude or in one projection given by \cmd{:InputCRS}
+(Section~\ref{sec:inputcrs}: Transverse Mercator, Albers and Lambert conformal conic on WGS84 or GRS80; other projections
+must be converted first, and other raster formats such as GeoTIFF exported to ESRI ASCII).
+\item DEM, bedrock, reservoir stages, boundary heads and well screens must use one vertical datum; the only automatic check
+is the stop for a coupled reservoir whose stages lie below the aquifer under its lake.
+\item By default layer $\ell$ connects sideways only to layer $\ell$ of neighbouring columns; \cmd{:LayerConnection ELEVATION}
+connects the cells whose elevations overlap (Section~\ref{sec:layerconn}); an existing model keeps its own connections.
 \item River stage uses Raven's channel depth at the start of the step; reservoir seepage reaches the aquifer one step
 later (both exactly accounted).
-\item A layer that starts completely dry can cause isolated non-converged steps; start from a steady state or realistic
-heads.
-\item MODFLOW stops the program on invalid input (Fortran \cmd{stop}); the reason is in \cmd{mf6/mfsim.lst}.
+\item A layer that starts completely dry can cause isolated non-converged steps; Raven warns at start-up when a whole layer
+starts dry (Section~\ref{ch:layers}). Start from a steady state or realistic heads.
+\item MODFLOW stops the program on invalid input (Fortran \cmd{stop}); Raven copies the error report of
+\cmd{mf6/mfsim.lst} into its message and \cmd{Raven\_errors.txt}.
+\item Between cells, soil water moves only through the aquifer (\cmd{:SoilZone PHYSICAL}); seepage faces smaller than a cell
+need smaller cells.
+\item Existing models (Chapter~\ref{ch:existing}, Section~\ref{sec:extlimits}): no DISU grids; no ATS6, several solutions or
+a non-Gregorian calendar; restarts and later starts refuse packages with time series (TS6, TAS6), TVK6/TVS6 and simulations
+with several models; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are taken as metres and days (set them in DIS and TDIS);
+monitoring wells and \cmd{GWHeads.nc} need the cell outlines (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not
+\cmd{:OverlapWeights}).
 \item Raven's channel-storage bookkeeping (\cmd{:ChannelStorage} in \cmd{solution.rvc}) can be negative in some subbasins; this
 already happens in Raven~4.1.1 without groundwater (17 subbasins of the Liard model) and is left unchanged here, as it belongs
 to Raven's routing, not to the coupling.
 
 \end{itemize}
-\paragraph{Planned extensions.}
+\paragraph{Not available.}
 Groundwater transport (MODFLOW~6 GWT) linked to Raven constituents; particle tracking (PRT) for well capture zones and
-time-of-travel zones; wells driven by Raven water demands (irrigation); frozen-ground control of recharge from Raven's soil
-temperature; importing an existing hand-built MODFLOW~6 model instead of generating one.
+time-of-travel zones; wells driven by Raven water demands (irrigation). Frozen ground acts on recharge only through Raven's own
+processes (the coupling receives whatever they send to \cmd{GROUNDWATER}).

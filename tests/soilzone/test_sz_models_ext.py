@@ -14,6 +14,10 @@ X6  start-up stops: an existing model without NEWTON (required with :SoilZone PH
 X7  specific yield of an existing model: the x1 model with a confined STO package (ICONVERT 0, no
     SY: MODFLOW holds SY 0) keeps its SY, floored at 0.01 for the release limits and the columns, with a warning naming
     the floor; the x1 model without STO assumes 0.2, the warning naming the soil-zone checks, release limits and columns.
+X8  a steady existing model (the x7 model without STO) with :SoilZoneAquiferClass: the class's SPEC_YIELD (0.1) replaces
+    the 0.2 (warning naming it; the Sy/drainable-porosity range of GWModelSummary.txt halves; identities hold); a class
+    without SPEC_YIELD keeps 0.2 (the outputs of the x7 run without a class, byte for byte); with RAVEN_EXE_REF the x7 run
+    without a class is byte-identical to the reference build (otherwise SKIP).
 """
 import os, sys, shutil, re, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -128,13 +132,65 @@ def sy_x7():
         good &= ok2
     return good
 
+def sy_ratio(d):
+    m = re.search(r'Sy/drainable porosity (\S+) to (\S+)', open(os.path.join(d, 'out', 'GWModelSummary.txt')).read())
+    return (float(m.group(1)), float(m.group(2))) if m else None
+
+def same_outputs(a, b, skip=('GWModelSummary.txt', 'Raven_errors.txt')):
+    import filecmp
+    pa, pb = os.path.join(a, 'out'), os.path.join(b, 'out')
+    return [f for f in sorted(os.listdir(pa)) if not os.path.isdir(os.path.join(pa, f)) and f not in skip
+            and not (os.path.exists(os.path.join(pb, f)) and filecmp.cmp(os.path.join(pa, f), os.path.join(pb, f), shallow=False))]
+
+def sy_x8():
+    """X8: a steady existing model (no STO) takes SPEC_YIELD of :SoilZoneAquiferClass when the class gives it"""
+    e0 = os.path.join(W, 'x7_nosto_ext'); r0 = sy_ratio(e0)
+    if r0 is None:
+        print('  X8: the x7 run without STO is missing -> FAIL'); return False
+    good = True
+    for case, cls, want in (('class', '  SYCLASS, 50, 1, 1.0E-5, 0.1, 0.3\n', 'SPEC_YIELD 0.1 of :SoilZoneAquiferClass SYCLASS is used for the soil-zone checks'),
+                            ('nosy', None, '0.2 is assumed for the soil-zone checks, the release limits and the unsaturated columns')):
+        e = os.path.join(W, 'x8_%s_ext' % case); shutil.rmtree(e, ignore_errors=True); shutil.copytree(e0, e, ignore=shutil.ignore_patterns('out'))
+        rvp = open(os.path.join(e, 'm.rvp')).read()
+        if cls:
+            rvp = rvp.replace(':EndAquiferClasses', cls.rstrip('\n') + '\n:EndAquiferClasses', 1)
+        else:    # a second block whose class has no SPEC_YIELD
+            rvp = rvp.replace(':EndAquiferClasses\n', ':EndAquiferClasses\n:AquiferClasses\n  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, POROSITY\n'
+                              '  :Units, m/d, m/d, 1/m, none\n  NOSY, 50, 1, 1.0E-5, 0.3\n:EndAquiferClasses\n', 1)
+        open(os.path.join(e, 'm.rvp'), 'w').write(rvp)
+        open(os.path.join(e, 'm.rvg'), 'a').write('\n:SoilZoneAquiferClass %s\n' % ('SYCLASS' if cls else 'NOSY'))
+        ok, txt = sz_check.run(e)
+        err = open(os.path.join(e, 'out', 'Raven_errors.txt')).read() if os.path.exists(os.path.join(e, 'out', 'Raven_errors.txt')) else ''
+        r = sy_ratio(e) if ok else None
+        if cls:
+            ok2 = ok and want in err and r is not None and abs(r[0] - 0.5 * r0[0]) < 1e-3 * r0[0] and abs(r[1] - 0.5 * r0[1]) < 1e-3 * r0[1]
+            detail = 'Sy/drainable porosity %s (without the class %s)' % (r, r0)
+        else:
+            diffs = same_outputs(e0, e) if ok else ['(run failed)']
+            ok2 = ok and want in err and r == r0 and not diffs
+            detail = 'Sy/drainable porosity %s; outputs %s' % (r, 'identical to x7' if not diffs else 'differ: ' + ', '.join(diffs))
+        print('  X8 %s: run %s, warning %s, %s -> %s' % (case, 'completed' if ok else 'FAILED', 'present' if want in err else 'missing', detail, 'ok' if ok2 else 'FAIL'))
+        if ok:
+            rr = sz_check.checks(e); ok2 &= sz_check.report('x8 ' + case, rr, {k: v for k, v in LIM.items() if k in rr})
+        good &= ok2
+    if sz_check.tc.REF:   # the run without a class, reference build
+        e = os.path.join(W, 'x8_ref_ext'); shutil.rmtree(e, ignore_errors=True); shutil.copytree(e0, e, ignore=shutil.ignore_patterns('out'))
+        os.makedirs(os.path.join(e, 'out'), exist_ok=True)
+        subprocess.run([sz_check.tc.REF, 'm', '-o', 'out/'], cwd=e, capture_output=True, text=True, env=sz_check.tc.ENV)
+        diffs = same_outputs(e0, e); ok2 = not diffs
+        print('  X8 reference: x7 run without a class against RAVEN_EXE_REF: %s -> %s' % ('identical' if ok2 else 'differ: ' + ', '.join(diffs), 'ok' if ok2 else 'FAIL'))
+        good &= ok2
+    else:
+        sz_check.tc.skip('X8: x7 run without a class against the reference build')
+    return good
+
 def main():
     res = [roundtrip('x1'),
            roundtrip('x2', feet=True),
            roundtrip('x3', ':SoilZoneVadose RICHARDS\n:SoilZoneAquiferClass SAND\n:SoilZoneClasses 3\n',
                      chd=94.8, aq_b=4.0, aq_psia=0.3, init_depth=3.0, soil_b=5.0, soil_psia=200.0, pet=2.0),
            roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8)]   # (capillary arrays unsized with the rise off)
-    res += [outputs_x3(), stops_x6(), sy_x7()]
+    res += [outputs_x3(), stops_x6(), sy_x7(), sy_x8()]
     print('soil-zone existing-model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 

@@ -48,7 +48,7 @@ example and the audit tool).
 | Test | What it checks | Run |
 |---|---|---|
 | `gridtest.cpp` | every grid generator: cells tile the domain, neighbours symmetric, Voronoi faces orthogonal, quadtree balanced, concave and cocircular clipping, cache round trip | `g++ -std=c++11 -O2 -I$RAVEN_SRC/src gridtest.cpp $RAVEN_SRC/src/GWGrid.cpp $RAVEN_SRC/src/GWGeometry.cpp -o gridtest && ./gridtest` |
-| `geomtest.cpp` + `geomtest_check.py` | polygon clipping against shapely, the equal-area projection against PROJ, bilinear raster sampling | `g++ -std=c++11 -O2 -I$RAVEN_SRC/src geomtest.cpp $RAVEN_SRC/src/GWGeometry.cpp -o geomtest && python3 geomtest_check.py` |
+| `geomtest.cpp` + `geomtest_check.py` | polygon clipping against shapely, the equal-area projection against PROJ, bilinear raster sampling; `:InputCRS`: a UTM raster sampled at lon/lat points and UTM GeoJSON polygons and lines read back in lon/lat against PROJ, and the files refused (a projected `"crs"` member without `:InputCRS`, another projection, a lon/lat file with `:InputCRS`, projected coordinates or a projected raster without `:InputCRS`) | `g++ -std=c++11 -O2 -I$RAVEN_SRC/src geomtest.cpp $RAVEN_SRC/src/GWGeometry.cpp -o geomtest && python3 geomtest_check.py` |
 
 ## Checks without MODFLOW
 
@@ -62,6 +62,7 @@ run stops, with a message, right after that, so these checks need only Raven, Py
 | `mf6version_check.py` | Raven's MODFLOW 6 version guard with a stand-in library (`mf6version_stub.c`, compiled by the script): older than 6.5.0 refused, other versions, no version and unreadable versions (quoted) one warning, 6.8.1 with suffixes silent; a real 2-day run when a library is configured |
 | `mf6lib_check.py [--unit]` | part 0 (`--unit`, no library needed): `tools/get_mf6.py` platform choice with faked platforms (Windows ARM64 and Linux aarch64 stop and point to `-DRAVEN_MF6=SOURCE`/`PATH`, `--zip` accepts win64 on Windows ARM64 with a note, Intel Mac needs `--version 6.6.3`); then getting and finding the MODFLOW 6 library: `tools/get_mf6.py --zip` unpacks a release-style zip (with version file, idempotent); Raven with no setting finds the library in `lib/mf6` one folder up and next to its executable; with none, the message lists the places searched |
 | `mf6files_check.py [OLD_RAVEN]` | 16 generated set-ups (every grid type, rotation, refinement, layers by elevation, aquicludes, boundaries, wells, lakes, imported cells): FloPy reads the model; cells valid and not overlapping; DIS origin and rotation, DISV/DISU vertices, DISU symmetry and face angles against the cell file; no vertical connection through an aquiclude; drains inside the top cell; boundary polygons select the right cells. With an older Raven as argument, also shows which input files changed |
+| `crs_inputs.py --nolib` | the input checks of `crs_inputs.py` (below): projected GeoJSON or rasters without `:InputCRS`, files in another projection than `:InputCRS`, wells given by X and Y without `:InputCRS` stop Raven while it reads the geometry |
 | `edge.py --nolib` | the faulty and unusual set-ups of `edge.py` (below), judged by the message Raven stops with; valid existing-model preparations checked in detail (stress periods split at the start date, restart renumbering, original model untouched) |
 
 ## Generated models (Raven builds the groundwater model)
@@ -79,6 +80,8 @@ case once (3 km cells, half-day steps, a pumping and a monitoring well).
 | `behaviour_check.py` | a 50 km² reservoir with seepage and a pumping well on the full Liard example for two years (reservoir identity, exact accounts), and the same set-up as a two-member ensemble (members identical to the single run) |
 | `edge.py [--nolib]` | faulty set-ups (each must stop with a message naming the problem) and unusual valid ones (each must run), for generated and existing models |
 | `fuzz_grids.py SEED N [lakes]` | N random set-ups of the subbasin-52 model over every grid type, with wells, boundaries, reservoirs, wetlands and lake refinement, checked with the accounting identities, MODFLOW's list-file budget and restarts; `lakes` puts a reservoir and lake refinement in every set-up |
+| `crs_inputs.py [--nolib]` | `:InputCRS`: the Liard example with every geometry and raster input in UTM zone 10 against the lon/lat example. Without rasters the grid, the HRU-cell overlaps (within 1e-6 of a cell), the monitoring well's cell (given by X and Y) and the outputs agree (Hydrographs and HRU states within 1e-6, GWBudget within 1e-5); with the DEM and bedrock resampled to UTM the model top agrees within the resampling (mean below 0.05 m). Input checks as in `--nolib`; with `RAVEN_EXE_REF` the lon/lat run equals the reference build |
+| `dry_start.py` | the warning for a layer that starts completely dry (Liard with INITIAL_HEAD_DEPTH 25 m: layer 2 named, summary line), none with `:GWInitialization STEADY_STATE` or for the example as shipped (with `RAVEN_EXE_REF`: equal to the reference build) |
 | `budget_xcheck.py OUT [OUT ...]` | the coupler's budget against MODFLOW's own list-file budget, package by package (read by package name from the list file), for any output folders |
 
 ## Existing MODFLOW 6 models (`existing/`)
@@ -134,8 +137,8 @@ identities 1e-8, the negative recharge not held), MODFLOW's and Raven's balance,
 | `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C11: depth classes of the unsaturated columns; C9 R20 with three classes; C10 hotstart after a dropped class column; C11 the columns' upflow and the rise from the water table share one source-cell limit |
 | `test_vz_initial.py` (`soilzone_vz_initial`) | I1, I2, I4-I6: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1 |
 | `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases R1-R20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
-| `test_sz_models_ext.py` (`soilzone_models_ext`) | X1-X7: the soil zone with an existing MODFLOW model (round trip, feet and seconds, specified heads, outputs, NEWTON required, specific yield) |
+| `test_sz_models_ext.py` (`soilzone_models_ext`) | X1-X8: the soil zone with an existing MODFLOW model (round trip, feet and seconds, specified heads, outputs, NEWTON required, specific yield; a steady model takes SPEC_YIELD of `:SoilZoneAquiferClass`) |
 | `test_liard_physical.py 365` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year |
 
 (T6, a planned comparison with GSFLOW's Sagehen model, was not implemented; the existing-model soil zone is covered by
-X1-X7 and the existing-model cases of the rough-terrain suite.)
+X1-X8 and the existing-model cases of the rough-terrain suite.)

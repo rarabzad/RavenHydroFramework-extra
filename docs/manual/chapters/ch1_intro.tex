@@ -113,7 +113,7 @@ Confined / unconfined & An unconfined aquifer has a free water table; a confined
 Converged & MODFLOW solves each day by repeated improvement; a day has \emph{converged} when the answer stops changing within a small tolerance.\\
 Coupled HRU & An HRU that has groundwater underneath it in the model and so exchanges water with MODFLOW.\\
 DIS, DISV, DISU & MODFLOW's three ways of describing a grid: rows and columns; layers of any-shaped cells; fully free cells.\\
-EPSG code & A standard number for a map projection, e.g.\ EPSG:32610 is UTM zone 10 North. Used with \cmd{:MF6CRS}.\\
+EPSG code & A standard number for a map projection, e.g.\ EPSG:32610 is UTM zone 10 North. Used with \cmd{:MF6CRS} and \cmd{:InputCRS}.\\
 Existing-model mode & Using the coupling with a MODFLOW~6 model you already have (Chapter~\ref{ch:existing}).\\
 Grid & The set of cells MODFLOW calculates in: squares of one size by default, or other shapes (Section~\ref{sec:gridtypes}).\\
 Head ($h$) & The level to which water rises in a well, in metres above sea level. Water flows from high to low head.\\
@@ -225,10 +225,12 @@ system under the coupled HRUs, including dry and rewetting cells.
 \item \textbf{What stays in Raven:} everything above the model top --- snow, canopy, soil and unsaturated zone, surface
 runoff, depressions, rivers, lakes and reservoirs --- and all HRUs without an aquifer profile.
 \item \textbf{Water density and temperature} are constant; there is no salt-water or heat transport.
-\item \textbf{The grid} is regular (square cells); the model area is the part of the rectangle around the coupled HRUs
-that those HRUs cover.
+\item \textbf{The grid} is regular (square cells, optionally rotated), a quadtree, an HRU mesh whose cells follow HRU
+boundaries, or imported cell polygons (Section~\ref{sec:gridtypes}); an existing MODFLOW~6 model keeps its own DIS or DISV
+grid (Chapter~\ref{ch:existing}). A generated model covers the cells that the coupled HRUs cover.
 \item \textbf{Time}: both models use Raven's time step (daily or shorter). Exchanges are explicit between the models at
-the step level, but every head-dependent exchange is implicit inside MODFLOW.
+the step level, but every head-dependent exchange is implicit inside MODFLOW; with \cmd{:SoilZone PHYSICAL} the
+soil--aquifer interface is also iterated inside MODFLOW's outer iterations (Section~\ref{sec:szinterface}).
 \end{itemize}
 
 \section{When to use the coupling --- and when not to}

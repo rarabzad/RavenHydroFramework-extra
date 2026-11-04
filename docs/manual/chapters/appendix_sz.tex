@@ -30,7 +30,8 @@ all inactive (dry) and \emph{m} column(s) whose highest active cell is a specifi
 \item ``MODFLOW 6 stopped the run during \emph{call}: \emph{the error report of mfsim.lst}'' (stop: an input error MODFLOW finds
 inside its library, e.g. \cmd{LINEAR\_ACCELERATION CG} with \cmd{NEWTON}).
 \item ``the existing model has no specific yield (no STO package or SY); 0.2 is assumed for the soil-zone checks, the release
-limits and the unsaturated columns''; ``the existing model's specific yield (STO SY) is below 0.01 in \emph{n} of its \emph{m}
+limits and the unsaturated columns'' (or ``SPEC\_YIELD \emph{s} of :SoilZoneAquiferClass \emph{class} is used \ldots'' when that
+class gives \cmd{SPEC\_YIELD}); ``the existing model's specific yield (STO SY) is below 0.01 in \emph{n} of its \emph{m}
 active cells \ldots''.
 \item ``:SoilZone PHYSICAL with :SolverMaxOuterIterations \emph{n}'' / ``with OUTER\_MAXIMUM \emph{n} in the model's IMS file
 (MODFLOW's MXITER): \ldots a limit below 20 leaves many steps unconverged''.

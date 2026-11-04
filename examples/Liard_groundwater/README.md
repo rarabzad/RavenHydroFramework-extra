@@ -84,7 +84,7 @@ NSE at gauges 10BE004 / 10BE005 / 10BE010: 0.850 / 0.821 / 0.634 (uncoupled 0.86
 not recalibrated, stand-in geometry).
 
 ## 5. Adapting this to your own model
-1. Build HRU polygons with the same HRU IDs as your `.rvh` (GeoJSON, lon/lat).
+1. Build HRU polygons with the same HRU IDs as your `.rvh` (GeoJSON, lon/lat; or in a projection named by `:InputCRS`).
 2. Choose aquifer profiles; set `AQUIFER_PROFILE` per HRU; define classes and profiles in the `.rvp`.
 3. Route the water your model sends to deep groundwater into `GROUNDWATER` for the coupled HRUs, and make
    sure no process draws from `GROUNDWATER` there (Raven checks this).

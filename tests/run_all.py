@@ -144,6 +144,9 @@ STEPS = [
      % (cxx, ROOT, PY), last_line(r'ALL PASSED'), 600),
     ('crs', False, 'cd existing && %s crstest.cpp %s/GWGeometry.cpp -o crstest && %s crs_check.py'
      % (cxx, ROOT, PY), small_numbers(r'worst ([0-9.e+-]+) m', 1e-3, 'worst position difference [m]'), 600),
+    ('crs_inputs_nolib', False, [PY, 'crs_inputs.py', '--nolib'], last_line(r'crs inputs: ALL PASSED'), 600),
+    ('crs_inputs', True, [PY, 'crs_inputs.py'], last_line(r'crs inputs: ALL PASSED'), 1800),
+    ('dry_start', True, [PY, 'dry_start.py'], last_line(r'dry-start checks: ALL PASSED'), 1800),
     ('mf6files', False, [PY, 'mf6files_check.py'], zero_failed, 3600),
     ('mf6lib_unit', False, [PY, 'mf6lib_check.py', '--unit'], last_line(r'library unit checks: ALL PASSED'), 600),
     ('mf6lib', True, [PY, 'mf6lib_check.py'], last_line(r'library checks: ALL PASSED'), 1800),

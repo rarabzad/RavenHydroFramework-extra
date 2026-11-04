@@ -99,9 +99,22 @@ Polygon clipping and area (400 random, mostly concave polygons) & shapely & $1.3
 Equal-area projection (300 points over the Liard region) & pyproj (same sphere) & $5\times10^{-7}$ m\\
 Projection round trip & -- & exact\\
 Bilinear raster sampling with a no-data cell (200 points) & independent code & $4\times10^{-7}$\\
-GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\\bottomrule
+GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\
+\cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
+\cmd{:InputCRS}: UTM GeoJSON polygons and lines read back in lon/lat & pyproj (PROJ) & $1.1\times10^{-11}$ degrees\\
+\cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\\bottomrule
 \end{tabularx}
 \end{table}
+The Liard example with every geometry and raster input converted to UTM zone 10 (\cmd{tests/crs\_inputs.py}, PROJ
+through pyproj, \cmd{:InputCRS EPSG:32610}) gives the same grid as the example in longitude/latitude: the same active
+columns and cells, river, boundary and well cells, polygon areas within $8\times10^{-12}$ and HRU--cell overlaps within
+$1.1\times10^{-9}$ of a cell; without rasters the hydrographs agree to the printed digits and the groundwater budget within
+$2\times10^{-8}$ over 120 days. With the DEM and bedrock resampled to 300~m UTM grids the model top differs by 0.018~m on
+average (the resampling) and the hydrographs by $10^{-3}$. Projected files without \cmd{:InputCRS}, files in another
+projection and wells given by \cmd{X} and \cmd{Y} without \cmd{:InputCRS} stop the run with a message naming
+\cmd{:InputCRS}. The start-up warning for a layer that starts dry (\cmd{tests/dry\_start.py}) names layer~2 of the Liard
+model with \cmd{INITIAL\_HEAD\_DEPTH} 25~m (2\,794 cells), and is absent with a steady-state start and for the example as
+shipped, whose outputs equal those of the reference build.
 
 \subsection{Exchanged flows against MODFLOW's own budget}
 MODFLOW writes its own volume budget in its list file. For runs covering every package, every flow the coupling exchanged
@@ -332,6 +345,7 @@ P6 classes & hillslope as one HRU over ten cell columns, 1, 5, 10 classes (Figur
 P7 specified heads & hillslope with a fixed head 0.2~m below the land surface at its toe; restart from day 150 & exchange both ways (29\,077 and 1\,277 m$^3$/d$\cdot$d); identities hold; restart $2\times10^{-7}$\\
 P8 restart with classes & steep slope, 3 classes, unsaturated columns, specified-head toe; 25 + 25 days against 50 & deviation $5\times10^{-8}$\\
 P9 rise across $L_{\min}$ & dry soil, water table 4.5 / 5.5~cm below the base with and without columns; thin top layer that dries and rewets & first-day rise 1\,765 / 1\,732 / 1\,732~m$^3$; largest daily water-table change 1.4~cm, 111 outer iterations\\
+X8 steady existing model & the X7 model without a storage package, with \cmd{:SoilZoneAquiferClass} whose \cmd{SPEC\_YIELD} is 0.1; and with a class without \cmd{SPEC\_YIELD} & $S_y$ 0.1 used (the $S_y$/drainable-porosity range halves, warning names it), identities hold; without \cmd{SPEC\_YIELD} 0.2 and outputs equal to X7\\
 X1--X4 existing model & the hillslope's MODFLOW model coupled as an existing model (X2 in feet and seconds; X3 with a specified-head toe, unsaturated columns and three classes; X4 a specified-head toe without capillary rise) & flows within $3.7\times10^{-4}$, $3.7\times10^{-4}$, $2.0\times10^{-4}$, $4.4\times10^{-4}$ of the generated run\\
 Liard speed & one year with \cmd{:SoilZone PHYSICAL}, optimized builds & the basic soil zone 106~s; the column soil zone defaults 69~s; all options 91~s; all identities $<10^{-10}$\\
 Regression case & water table crossing the base during the solve (rate links: soil-base drain); water table below a thin top layer (\cmd{SZW\_RAVEN}); low-$K_v$ aquifer across $L_{\min}$ (gap material); $S_y$ below the drainable porosity (release cap, warning); rise solver against bisection (20\,000 random cases) & spikes 352 / 386 / 37~m $\to$ 0.98 / 0.98 / 1.33~m and 1\,406 $\to$ 579 outer iterations; rise with a 0.5~m top layer 0 $\to$ 4\,565~m$^3$ (thick layer 4\,565); 28 of 30 random low-$K_v$ cases within 25\% across $L_{\min}$ (was 24 of 30); root within 0.2\%, about 4 evaluations\\

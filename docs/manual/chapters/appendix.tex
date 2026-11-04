@@ -105,9 +105,10 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvp} & \cmd{:AquiferClasses} \dots\ \cmd{:EndAquiferClasses} & material table (Section~\ref{app:class})\\
 \cmd{.rvp} & \cmd{:AquiferProfiles} \dots\ \cmd{:EndAquiferProfiles} & name, number of layers, \{class, thickness or \cmd{TO\_BEDROCK}, type\}\\
 \cmd{.rvp} & \cmd{:AquiferProfile\allowbreak Parameters} \dots & per-profile parameters (Section~\ref{app:profile})\\
-\cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat (\cmd{HRU\_ID}); required\\
+\cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat or \cmd{:InputCRS} (\cmd{HRU\_ID}); required\\
 \cmd{.rvg} & \cmd{:RiverGeometry file \{field\}} & river lines; subbasin field optional\\
-\cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat (HRU elevations)\\
+\cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat or \cmd{:InputCRS} (HRU elevations)\\
+\cmd{.rvg} & \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file and of wells given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
 \cmd{.rvg} & \cmd{:BedrockSurface file} & bedrock elevation grid (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
 \cmd{.rvg} & \cmd{:GridCellSize m} & cell size, $>0$ (1000)\\
 \cmd{.rvg} & \cmd{:MinCellCoverage f} & coverage for an active column, $(0,1]$ (0.25)\\
@@ -140,10 +141,10 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SoilZoneCapillaryRise ON | OFF} & capillary rise into the soil zone (Section~\ref{sec:szcaprise}) (ON with an unsaturated column: \cmd{RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG}; OFF with \cmd{NONE})\\
 \cmd{.rvg} & \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & order of Raven's processes and the exchange (Section~\ref{sec:sztiming}) (\cmd{LAGGED})\\
 \cmd{.rvg} & \cmd{:SoilZoneClasses K} & Raven's processes per class of columns, $1\le K\le50$ (Section~\ref{sec:szclasses}) (1)\\
-\cmd{.rvg} & \cmd{:SoilZoneAquiferClass class} & existing models: \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} of the cells for the unsaturated columns (4, 0.3 m, $S_y+0.1$); reported as ignored on a model Raven builds\\
+\cmd{.rvg} & \cmd{:SoilZoneAquiferClass class} & existing models: \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} of the cells for the unsaturated columns (4, 0.3 m, $S_y+0.1$), and \cmd{SPEC\_YIELD} for a steady model without one (0.2); reported as ignored on a model Raven builds\\
 \cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange (off)\\
-\cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT}\\
-\cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV}\\
+\cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT} (\cmd{X, Y} instead of \cmd{LATITUDE, LONGITUDE} with \cmd{:InputCRS})\\
+\cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV} (or \cmd{X, Y}, as for \cmd{:Wells})\\
 \cmd{.rvg} & \cmd{:GeneralHeadBoundary n file HEAD h CONDUCTANCE c \{LAYERS ALL|TOP\}} & head-dependent boundary; $c>0$ m$^2$/d per cell (\cmd{ALL})\\
 \cmd{.rvg} & \cmd{:SpecifiedHeadBoundary n file HEAD h \{LAYERS ALL|TOP\}} & fixed-head boundary (\cmd{ALL})\\
 \cmd{.rvg} & \cmd{:SolverHead\allowbreak Tolerance m} & Newton target tolerance, $>0$ (0.00001)\\
@@ -319,6 +320,11 @@ the period data of \emph{package} cannot be renumbered safely & start Raven at \
 \cmd{:GridRefinement} size must be positive and smaller than \cmd{:GridCellSize}; RIVERS needs \cmd{:RiverGeometry}; WELLS needs wells & correct the refinement\\
 :GridRefinement LAKES found no reservoir whose lake HRU has a polygon & give the reservoir an \cmd{:HRUID} whose polygon is in \cmd{:HRUGeometry}\\
 grid cell \dots\ must be a single polygon without holes & fix the cell file\\
+GeoJSON file \dots\ is in EPSG:\emph{n} (its "crs" member) & give \cmd{:InputCRS EPSG:}\emph{n}, or reproject the file to lon/lat\\
+GeoJSON file \dots\ is in EPSG:\emph{n} \dots, but :InputCRS is \dots / is in longitude/latitude, but :InputCRS says the input files are projected & give every input file in the projection of \cmd{:InputCRS}\\
+GeoJSON file \dots\ has coordinates outside the longitude/latitude range / raster \dots\ lies outside the longitude/latitude range & projected input: give \cmd{:InputCRS}\\
+well \dots\ is given by X and Y & give \cmd{:InputCRS}, or \cmd{LATITUDE} and \cmd{LONGITUDE}\\
+layer \dots\ starts dry (warning) & start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or \cmd{:InitialGWHeads} (Section~\ref{ch:layers})\\
 HRU mesh exceeds 5 million cells per layer & increase \cmd{:GridCellSize} or the refinement sizes\\
 grid exceeds 5 million cells per layer & increase \cmd{:GridCellSize}\\
 cannot load MODFLOW 6 library & run \cmd{python tools/get\_mf6.py}, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB}\\
@@ -326,7 +332,7 @@ cannot enter MODFLOW 6 folder & output folder removed or not writable during the
 \cmd{:SoilZone PHYSICAL}: SOIL[$m$] has zero thickness / no drainable porosity & every coupled HRU with soil needs all soil-zone layers, with \cmd{FIELD\_CAPACITY} $<1$ and \cmd{POROSITY} $>0$\\
 soil class \dots\ of SOIL[$M-1$] needs HYDRAUL\_COND & give \cmd{HYDRAUL\_COND} for the class of the bottom soil-zone layer\\
 recharge must leave the soil zone from its bottom layer & take percolation to \cmd{GROUNDWATER} from \cmd{SOIL[$M-1$]}\\
-RECHARGE\_DELAY \dots\ cannot be used with :SoilZone PHYSICAL & set \cmd{RECHARGE\_DELAY} to 0 in the profiles of soil-zone HRUs\\
+RECHARGE\_DELAY \dots\ cannot be used with :SoilZone PHYSICAL & set \cmd{RECHARGE\_DELAY} to 0 in the profiles of soil-zone HRUs; for a delay through a deep unsaturated zone use \cmd{:SoilZoneVadose LAG} (Section~\ref{sec:szvadoselag})\\
 the soil zone \dots\ is \dots\ m thick & list physical soil layers only (at most 20 m)\\
 Raven is running more time steps than the MODFLOW 6 simulation holds & check \cmd{:Duration} and \cmd{:TimeStep}\\\bottomrule
 \end{longtable}
