@@ -5,11 +5,13 @@ RavenHydroFramework-extra adds groundwater to the [Raven hydrological modelling 
 (`:GroundwaterModel MODFLOW6`) or **couples an existing one** (`:MF6Simulation`), and exchanges recharge, seepage,
 river leakage, water-table ET, wells, boundaries and reservoir seepage with it every time step. Optionally
 (`:SoilZone PHYSICAL`) the water table rises into Raven's soil layers, with the soil zone and MODFLOW iterated to
-agreement within each step, for generated and existing models alike. Below the soil, recharge can cross an
-unsaturated zone solved with Richards' equation (`:SoilZoneVadose RICHARDS`); dry soil draws water up from a shallow
-water table by capillary rise; the exchange is lagged into Raven's step to cut the splitting error; Raven's processes
-can act on classes of an HRU's columns (`:SoilZoneClasses`); and soil over specified heads exchanges with them exactly
-(manual Sections 5.3.7–5.3.15, design note `docs/design/soil_zone_columns_plan.md`).
+agreement within each step, for generated and existing models alike. On sloping and irregular land every cell samples
+the DEM at many points, so the soil saturates first at the foot of slopes and in hollows. Below the soil, recharge can
+cross an unsaturated zone (`:SoilZoneVadose RICHARDS`, `KINEMATIC` or `LAG`, with depth classes on hummocky ground);
+dry soil draws water up from a shallow water table by capillary rise; the exchange is lagged into Raven's step to cut the
+splitting error; Raven's processes can act on classes of an HRU's columns (`:SoilZoneClasses`); and soil over specified
+heads exchanges with them exactly (manual chapter 5, "The soil zone and the water table"; reference table of the
+`:SoilZone*` commands in chapter 7; design notes in `docs/design/`).
 
 The coupling's source code is part of Raven itself (RavenHydroFramework). This repository holds everything around it:
 
@@ -45,7 +47,7 @@ downloads the official release library (Linux x86_64, Windows x64, Apple Silicon
 zip on disk, and `-DRAVEN_MF6=OFF` builds Raven alone. On Linux other than x86_64 (e.g. aarch64), Windows on ARM64 and
 Intel Macs MODFLOW releases no library: there, install the source tools (`-DRAVEN_MF6=SOURCE`) or use `PATH`; without
 either the configure warns and builds Raven alone. `cmake --install build` and `cpack` give one folder (package) with
-Raven, the library and the Fortran runtime it needs. Details: manual, chapter 9, "Building".
+Raven, the library and the Fortran runtime it needs. Details: manual, chapter 10, "Building".
 
 For a Raven built without the library (GNU make, Visual Studio solution, `-DRAVEN_MF6=OFF`):
 `python tools/get_mf6.py` puts MODFLOW 6.8.1 into `../RavenHydroFramework/lib/mf6`, where Raven finds it (Linux x86_64,

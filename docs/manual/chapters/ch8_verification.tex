@@ -12,7 +12,7 @@ software, hundreds of random test set-ups, and a line-by-line reading of the cod
 \caption{Verification approaches.}\label{tab:vapproach}
 \begin{tabularx}{\linewidth}{P{0.27\linewidth}Y P{0.13\linewidth}}\toprule\hdr
 Approach & What it shows & Section\\\midrule
-Regression against Raven 4.15 & models without groundwater give identical results & \ref{sec:regression}\\
+Regression against Raven 4.15 & models without groundwater give identical results (apart from the corrections to Raven itself: reservoirs, ensembles, age-tracer hotstarts) & \ref{sec:regression}\\
 Automated audit of every run & exact water accounting on both sides; MODFLOW's balance & \ref{sec:audit}\\
 Behaviour tests & pumping, drying, restarts, ensembles and every exchange behave as expected & \ref{sec:behaviour}\\
 Grid types & geometry, format cross-checks, analytical solution, restarts and randomized tests for every grid & \ref{sec:vgrids}\\
@@ -35,7 +35,14 @@ groundwater were run with the unmodified Raven~4.15 and with the coupled code, b
       wilting point above field capacity), as they do in the unmodified Raven~4.15.
 \end{itemize}
 The changes made to Raven itself affect only ensembles, reservoirs with absolute stages or
-that dry out, restart files, constituent observations and the \cmd{:rvg\_Filename} command.
+that dry out, restart files, constituent observations, the \cmd{:rvg\_Filename} command and age tracers started from a
+hotstart file. A model with a reservoir therefore does not give byte-identical outputs (an absolute-stage reservoir
+without an initial stage starts at its crest; a drying reservoir books only the water it has; \cmd{solution.rvc} carries
+its stage and flows with 12 digits), and neither does an age-tracer run started from a hotstart file: the ages of the
+hotstart continue from the run that wrote the file, the masses keep the datum of that run and \cmd{solution.rvc} writes that datum as its
+\cmd{:StartTime} (test I14 of Section~\ref{sec:vsoilzone1}). Without reservoirs, ensembles or a hotstarted age tracer,
+every output of a model without groundwater is byte-identical to Raven~4.15 (checked on the 20-year
+Liard model, its hotstart and a cold-started age tracer).
 
 \section{Automated audit of every run}\label{sec:audit}
 The tool \cmd{tools\_audit.py}, shipped with the example, checks any output folder for:
@@ -293,6 +300,8 @@ Liard grid fails to converge on 295 of 344 days. Without it, every step passes w
 Liard grid table agrees to the last digit shown. For existing models Raven reads the library's version and warns when a model uses the
 keyword with a version before~6.8.
 
+\input{chapters/ch8_sz_columns}
+
 \section{Soil zone: every position of the water table}\label{sec:vsoilzone}
 The soil-zone coupling (Section~\ref{ch:soilzone}) is tested at three levels: the unsaturated column and the capillary
 rise relation on their own against independent solutions, small coupled models that put the water table in each of
@@ -315,14 +324,14 @@ Richards check of the rise & finite-volume column driven at $-q(d,\psi_s)$ until
 Speed & 4\,300 columns of 16 nodes, 10 days with a pulse & 0.2~s per day (unoptimized build)\\
 Robustness & remap across materials, air-dry columns, inflow far above $K_s$, substep limit, upward demand beyond supply; randomized stress of 40\,000 column-steps & no lock-up or pressure runaway; air-dry column takes water; mass exact to $10^{-14}$\\
 P1 deep water table & 3-day storm over a water table 6~m deep, with and without the column (Figure~\ref{fig:v2delay}) & centroid of the recharge day 6.1 $\to$ 15.6; peak 2\,000 $\to$ 1\,100 m$^3$/d; column balance $10^{-11}$\\
-P2 shallow water table & 60 days of PET 4 mm/d over water tables 0.7, 1.3, 2.5~m deep (Figure~\ref{fig:v2caprise}) & evaporation 180, 117, 51~mm with rise; 15~mm without\\
-P3 moving through the soil & 40 days of rain raise the water table through the column 0.93~m into the soil zone; it falls 0.62~m below the base & column vanishes and reforms; all identities hold\\
-P4 restart & 60 + 60 days from \cmd{:GWVadoseColumns} against 120 days & largest deviation $3\times10^{-9}$\\
-P5 timing & hillslope against the MODFLOW-only reference, \cmd{AFTER} and \cmd{LAGGED} (Figure~\ref{fig:v2timing}); restart with \cmd{:GWSoilZoneLag} & mean 1.78 $\to$ 0.68~cm, largest 6.6 $\to$ 2.5~cm; restart $6\times10^{-9}$~m\\
-P6 classes & hillslope as one HRU over ten cell columns, 1, 5, 10 classes (Figure~\ref{fig:v2classes}) & mean 1.38, 0.75, 0.68~cm; 10 classes = 10 HRUs to $7\times10^{-7}$~m\\
+P2 shallow water table & 60 days of PET 4 mm/d over water tables 0.7, 1.3, 2.5~m deep (Figure~\ref{fig:v2caprise}) & evaporation 180, 114, 50~mm with rise; 15~mm without\\
+P3 moving through the soil & 40 days of rain raise the water table through the column 0.93~m into the soil zone; it falls 1.11~m below the base & column vanishes and reforms; all identities hold\\
+P4 restart & 60 + 60 days from \cmd{:GWVadoseColumns} against 120 days & largest deviation $6\times10^{-15}$ (recharge), 0 (column storage)\\
+P5 timing & hillslope against the MODFLOW-only reference, \cmd{AFTER} and \cmd{LAGGED} (Figure~\ref{fig:v2timing}); restart with \cmd{:GWSoilZoneLag} & mean 1.78 $\to$ 0.68~cm, largest 6.6 $\to$ 2.5~cm; restart $7\times10^{-9}$~m\\
+P6 classes & hillslope as one HRU over ten cell columns, 1, 5, 10 classes (Figure~\ref{fig:v2classes}) & mean 1.38, 0.75, 0.68~cm; 10 classes = 10 HRUs to $6.5\times10^{-7}$~m\\
 P7 specified heads & hillslope with a fixed head 0.2~m below the land surface at its toe; restart from day 150 & exchange both ways (29\,077 and 1\,277 m$^3$/d$\cdot$d); identities hold; restart $2\times10^{-7}$\\
-P8 restart with classes & steep slope, 3 classes, unsaturated columns, specified-head toe; 25 + 25 days against 50 & deviation $3\times10^{-8}$\\
-P9 rise across $L_{\min}$ & dry soil, water table 4.5 / 5.5~cm below the base with and without columns; thin top layer that dries and rewets & first-day rise 1\,765 / 1\,733 / 1\,733~m$^3$; largest daily water-table change 1.4~cm, 112 outer iterations\\
+P8 restart with classes & steep slope, 3 classes, unsaturated columns, specified-head toe; 25 + 25 days against 50 & deviation $5\times10^{-8}$\\
+P9 rise across $L_{\min}$ & dry soil, water table 4.5 / 5.5~cm below the base with and without columns; thin top layer that dries and rewets & first-day rise 1\,765 / 1\,732 / 1\,732~m$^3$; largest daily water-table change 1.4~cm, 111 outer iterations\\
 X1--X4 existing model & the hillslope's MODFLOW model coupled as an existing model (X2 in feet and seconds; X3 with a specified-head toe, unsaturated columns and three classes; X4 a specified-head toe without capillary rise) & flows within $3.7\times10^{-4}$, $3.7\times10^{-4}$, $2.0\times10^{-4}$, $4.4\times10^{-4}$ of the generated run\\
 Liard speed & one year with \cmd{:SoilZone PHYSICAL}, optimized builds & the basic soil zone 106~s; the column soil zone defaults 69~s; all options 91~s; all identities $<10^{-10}$\\
 Regression case & water table crossing the base during the solve (rate links: soil-base drain); water table below a thin top layer (\cmd{SZW\_RAVEN}); low-$K_v$ aquifer across $L_{\min}$ (gap material); $S_y$ below the drainable porosity (release cap, warning); rise solver against bisection (20\,000 random cases) & spikes 352 / 386 / 37~m $\to$ 0.98 / 0.98 / 1.33~m and 1\,406 $\to$ 579 outer iterations; rise with a 0.5~m top layer 0 $\to$ 4\,565~m$^3$ (thick layer 4\,565); 28 of 30 random low-$K_v$ cases within 25\% across $L_{\min}$ (was 24 of 30); root within 0.2\%, about 4 evaluations\\

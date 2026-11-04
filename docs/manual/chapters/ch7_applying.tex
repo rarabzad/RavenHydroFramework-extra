@@ -227,6 +227,44 @@ active cells stays manageable (a few thousand to a few hundred thousand per laye
 \item \textbf{Calibrate.} Use streamflow and monitoring-well heads (Section~\ref{ch:calib}).
 \end{enumerate}
 
+\section{A water table in the soil, on sloping and irregular land}\label{sec:applysz}
+Where the water table comes close to the land --- valley bottoms, the foot of slopes, wetlands, flat lowlands --- add the
+soil zone (Section~\ref{ch:soilzone}): the water table can then rise into Raven's soil layers, saturated ground rejects
+recharge, groundwater discharges into the soil, and full soil overflows to surface water. Nothing else of the model changes.
+\begin{enumerate}
+\item \textbf{Choose the soil-zone layers} (\cmd{.rvg}): the physical soil layers above the aquifer, usually the top one
+or two, \cmd{:SoilZone PHYSICAL SOIL[0] SOIL[1]}. MODFLOW's top then lies one soil-zone thickness below the land, cell by
+cell, so the model's top follows the slope.
+\item \textbf{Send recharge from the bottom soil-zone layer} (\cmd{.rvi}): for example
+\cmd{:Percolation PERC\_GAWSER SOIL[1] GROUNDWATER}, conditional on the coupled HRUs. A drainage that moves only water above
+field capacity lets a soil zone that is not connected to the water table pass the rain on.
+\item \textbf{Soil parameters} (\cmd{.rvp}): \cmd{POROSITY}, \cmd{FIELD\_CAPACITY} ($<1$), and \cmd{HYDRAUL\_COND} [mm/d] for
+the class of the bottom soil-zone layer; \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} for capillary rise. Give the top
+aquifer layer a specific yield close to the soil's drainable porosity, $\eta(1-S_{\mathrm{fc}})$: otherwise the water table
+rises at different rates below and inside the soil (Raven warns).
+\item \textbf{Sloping and irregular land}: give a DEM finer than the cells. Each cell samples it at
+\cmd{:SoilZoneSubgrid} $n$ points per side (5 by default, 25 points), so within a cell the low ground saturates first
+and the high ground later (Figure~\ref{fig:szsubgrid}); between cells MODFLOW's heads carry the water down the slope, and
+the saturated area spreads up from the foot of the slope and from hollows and retreats downslope as it dries
+(Figure~\ref{fig:szhillslope}). Keep \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (the contact depth $d_s$) at 0.1--0.5~m. Seepage
+faces and saturated strips narrower than a cell need smaller cells (or \cmd{:GridRefinement} along valleys); within a cell
+the soil water stands at one level.
+\item \textbf{A deep water table elsewhere}: \cmd{:SoilZoneVadose RICHARDS} (or \cmd{KINEMATIC}, \cmd{LAG}) carries the
+recharge through the unsaturated zone between the soil and the water table, with its delay; on hummocky ground
+\cmd{:SoilZoneVadoseClasses} 3 gives the hollows and the hummocks their own columns (Section~\ref{sec:vzclasses}). Capillary
+rise from a shallow water table is then on by default. Figure~\ref{fig:szregimes} shows every position of the water
+table and what carries the water in each; the coupling moves between them without any setting.
+\item \textbf{HRUs that are wet at the foot and dry at the top}: \cmd{:SoilZoneClasses} 3--5 runs Raven's processes on
+classes of an HRU's columns (needs \cmd{:Method ORDERED\_SERIES}).
+\item \textbf{Check}: \cmd{GWSoilExchange.csv} gives, per HRU and step, the soil-zone base, the soil water level, the water
+table and the saturated fraction $F$; \cmd{tools/plot\_soilzone.py} plots them, and \cmd{tools\_audit.py} closes every
+soil-zone identity. The interface should converge on every step (\cmd{GWBudget.csv}, \emph{interface converged}).
+\end{enumerate}
+The coupling has been checked on planar and irregular hillslopes against a MODFLOW-only reference
+(Section~\ref{sec:vsoilzone1}) and on 1\,620 randomly drawn rough-terrain cases with slopes up to 30\,\%, pits, cliffs,
+ridges, sloping and pinching layers and DEMs coarser or finer than the grid (Section~\ref{sec:vrough}). The reference
+for every command is Table~\ref{tab:szcmds}.
+
 \section{Typical parameter values}
 Typical values for aquifer materials are listed in Section~\ref{app:materials}, and typical ranges for every aquifer class
 and profile parameter in Sections~\ref{app:class} and~\ref{app:profile}.

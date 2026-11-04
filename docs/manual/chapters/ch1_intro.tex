@@ -152,9 +152,11 @@ reservoirs.
 \item \textbf{MODFLOW} owns the saturated groundwater below the \emph{model top}. By default the model top is the land
 surface; users with physically based soil layers can lower it with \cmd{SOIL\_ZONE\_DEPTH}, or with
 \cmd{:SoilZone PHYSICAL} hand the soil layers to Raven and let the water table rise into them, as in GSFLOW
-\cite{markstrom2008gsflow} (Section~\ref{ch:soilzone}); below the soil, recharge can cross an unsaturated zone solved
-with Richards' equation, and dry soil draws water up from a shallow water table by capillary rise
-(Sections~\ref{sec:szvadose}, \ref{sec:szcaprise}).
+\cite{markstrom2008gsflow} (Section~\ref{ch:soilzone}). On sloping and irregular land each cell samples the DEM at
+many points, so the soil saturates first at the foot of a slope and in hollows, and the saturated area spreads up and
+retreats down the slope with the water table (Section~\ref{sec:szslope}; how to set it up: Section~\ref{sec:applysz}).
+Below the soil, recharge can cross an unsaturated zone (Richards' equation, a kinematic wave or a storage cascade), and
+dry soil draws water up from a shallow water table by capillary rise (Sections~\ref{sec:szvadose}, \ref{sec:szcaprise}).
 \end{itemize}
 Water moves between the two only through the exchanges described in Chapter~\ref{ch:c4}, and each exchange is recorded on both
 sides. In a coupled HRU, Raven's \cmd{GROUNDWATER} store is a \emph{pass-through}: whatever enters it during a day is
@@ -211,7 +213,9 @@ from time series.
 \item \textbf{Generic.} Nothing is specific to a basin; any Raven model can couple any subset of its HRUs.
 \item \textbf{Exact accounting.} Every exchanged volume is computed once and applied identically on both sides.
 \item \textbf{No surprise for existing users.} Models without groundwater give bit-for-bit the same results as
-Raven~4.15 (the version this coupling is built on); Raven still builds and runs without MODFLOW installed.
+Raven~4.15 (the version this coupling is built on), except where a correction to Raven itself applies: models with
+reservoirs, ensembles and age-tracer runs started from a hotstart file (Section~\ref{sec:regression}). Raven still builds
+and runs without MODFLOW installed.
 \end{enumerate}
 
 \section{Scope and assumptions}
@@ -235,7 +239,11 @@ better choice for fast screening, very large ensembles, or basins without a sign
 
 \section{What changes for an existing Raven model}
 \begin{itemize}
-\item Nothing, unless \cmd{:GroundwaterModel MODFLOW6} is added: results stay bit-for-bit identical.
+\item Nothing, unless \cmd{:GroundwaterModel MODFLOW6} is added: results stay bit-for-bit identical to Raven~4.15,
+except for the corrections made to Raven itself (Section~\ref{sec:regression}): models with reservoirs (absolute-stage
+reservoirs without an initial stage start at their crest, a drying reservoir books only the water it has, and
+\cmd{solution.rvc} carries stages and flows with 12 digits), ensembles (every member starts from the first run's state)
+and age-tracer runs started from a hotstart file (the ages continue from the run that wrote the file).
 \item With the coupling on, coupled HRUs lose their conceptual deep-groundwater behaviour (their \cmd{GROUNDWATER} store
 becomes a pass-through), and their baseflow now comes from the aquifer via seepage and river exchange.
 \item Run times increase: the 20-year Liard run (3\,252 active columns) takes about 15 minutes instead of 35 seconds on one processor core.

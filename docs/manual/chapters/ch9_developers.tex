@@ -59,7 +59,7 @@ WEL (\cmd{RES\_RAVEN}) & \cmd{Q}, \cmd{HCOF}, \cmd{RHS} & reservoir seepage\\\bo
 For MODFLOW versions before 6.5 the values are written to the columns of \cmd{BOUND} instead.
 
 \section{Changes to existing Raven files}\label{sec:coreflix}
-The changes are against Raven~4.15 (v593) and are offered as four independent pull requests, which merge cleanly in any
+The changes are against Raven~4.15 (v593) and are offered as independent pull requests (four so far, a fifth to follow), which merge cleanly in any
 order:
 \begin{enumerate}
 \item \textbf{Groundwater coupling} (branch \cmd{mf6-groundwater}): the new source files and the changes below that
@@ -73,6 +73,11 @@ order:
       \cmd{:HRUID} lies in another subbasin stops with a message instead of crashing.
 \item \textbf{Observation constituent} (\cmd{fix-observation-constituent}): \cmd{:ObservationData} and
       \cmd{:ObservationWeights} for \cmd{STREAM\_CONCENTRATION} read the constituent name before the line is re-read.
+\item \textbf{Age-tracer hotstart} (to be offered as a fifth pull request): the \cmd{:StartTime} offset of a
+      hotstart reaches the age tracers. The masses keep the datum of the run that wrote the file, the age clock and the
+      entry time of precipitation are shifted by the offset, and \cmd{solution.rvc} writes that datum as its
+      \cmd{:StartTime}, so a chain of hotstarts keeps one datum. (Shifting the masses instead made them negative, which
+      the advection limiter cannot carry.) Runs without an age tracer, and cold starts, are unchanged.
 \end{enumerate}
 \begin{table}[!htbp]\centering
 \caption{Changes to existing Raven files (pull request in brackets).}
@@ -81,12 +86,13 @@ File & Change\\\midrule
 \cmd{Solvers.cpp} & groundwater hook after lateral processes; river exchange before routing; losses from reach inflow (1)\\
 \cmd{Model.cpp/.h} & always creates the groundwater object; returned water counted as input; \cmd{GW\_HEAD} diagnostics (1); stored first routing state (2)\\
 \cmd{ModelInitialize.cpp} & groundwater initialized after all inputs (1); routing memory and reservoir states of the first run snapshotted and restored before each member's .rvc is read (2); reservoir \cmd{:HRUID} check (3)\\
-\cmd{StandardOutput.cpp} & groundwater hotstart blocks in \cmd{solution.rvc} (1)\\
+\cmd{StandardOutput.cpp} & groundwater hotstart blocks in \cmd{solution.rvc} (1); \cmd{:StartTime} of \cmd{solution.rvc} is the age tracers' datum (run start less the offset) when the model has an age tracer (5)\\
+\cmd{AgeTracers.cpp/.h}, \cmd{Advection.cpp} & the hotstart offset shifts the age clock, not the masses; precipitation enters at the shifted time (5)\\
 \cmd{ParseInput.cpp} & \cmd{:GroundwaterModel}; \cmd{:rvg\_Filename} relative to the \cmd{.rvi}; obsolete USG commands give clear errors (1)\\
 \cmd{ParsePropertyFile.cpp} & \cmd{:AquiferClasses}, \cmd{:AquiferProfiles}, \cmd{:AquiferProfile\allowbreak Parameters} (1)\\
 \cmd{ParseHRUFile.cpp}, \cmd{HydroUnits.h} & \cmd{AQUIFER\_PROFILE} stored on each HRU (1)\\
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate}, \cmd{:BoundaryHead} (1); constituent name captured before parsing (4)\\
-\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (it read an end date that was never set) (1)\\
+\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (it read an end date that was never set) (1), passed to the age tracers before their initial conditions are set (5)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor (2)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision, constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\
@@ -203,8 +209,10 @@ kept). Any other version than 6.8.1, a library that does not report its version,
 (quoted in the message) gives one warning; outputs are otherwise unchanged. Suffixes such as \cmd{6.8.1-dev} or
 \cmd{6.8.1+abc.dirty} (a source build inside a git checkout) count as 6.8.1.
 
-\paragraph{Checks.} \cmd{tests/cmake\_checks.py} runs 14 offline configure checks of the above in about a minute (each
-also shown to fail on the defect it was written for: \cmd{--selftest}); \cmd{tests/mf6version\_check.py} checks the
+\paragraph{Checks.} \cmd{tests/cmake\_checks.py} runs 19 offline configure checks of the above (60 parts) in about a
+minute, each also shown to fail on the defect it was written for (\cmd{--selftest}); checks 15--19 are those of
+Table~\ref{tab:vcmake} in Chapter~\ref{ch:verification} (offline default, default build type, version floor, runtime
+bundling for macOS and Windows emulated on Linux, messages); \cmd{tests/mf6version\_check.py} checks the
 version guard with a stand-in library. A library built from source and the official one give the same results to
 round-off (Section~\ref{sec:getmf6}).
 

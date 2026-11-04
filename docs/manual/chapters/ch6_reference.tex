@@ -53,7 +53,9 @@ Aquifer class attribute & Default & Meaning\\\midrule
 \cmd{K\_VERT} & $K_h/10$ & vertical hydraulic conductivity [m/d]\\
 \cmd{SPEC\_STORAGE} & $10^{-5}$ & specific storage [1/m]\\
 \cmd{SPEC\_YIELD} & 0.1 & specific yield [--]\\
-\cmd{POROSITY} & 0.3 & total porosity [--] (reserved for transport)\\\bottomrule
+\cmd{POROSITY} & 0.3 & saturated water content $\theta_s$ of the unsaturated columns [--] (\cmd{:SoilZoneVadose}; at least \cmd{SPEC\_YIELD})\\
+\cmd{CLAPP\_B} & 4 & Clapp--Hornberger exponent $b$ of the unsaturated columns [--]\\
+\cmd{AIR\_ENTRY\_PRESSURE} & 0.3 m & air-entry suction $\psi_a$ of the unsaturated columns [m]\\\bottomrule
 \end{tabular}
 \end{table}
 Layer types: \cmd{AQUIFER} (or \cmd{UNCONFINED\_AQUIFER}), \cmd{CONFINED\_AQUIFER}, \cmd{AQUITARD},
@@ -115,8 +117,37 @@ Command & Meaning (default)\\\midrule\endhead
 \cmd{:SolverHead\allowbreak Tolerance m} & Newton head-change tolerance (0.00001 m)\\
 \cmd{:HeadSaveFrequency n} & steps between saves of the full head field (30)\\
 \cmd{:WriteNetCDFHeads} & write \cmd{GWHeads.nc} (Raven compiled with NetCDF)\\
-\cmd{:LinkageCache file} & linkage cache location (\cmd{<output>/mf6/linkage.cache})\\\bottomrule
+\cmd{:LinkageCache file} & linkage cache location (\cmd{<output>/mf6/linkage.cache})\\
+\cmd{:SoilZone CONCEPTUAL | PHYSICAL SOIL[0] \dots} & the soil zone and the water table (\cmd{CONCEPTUAL}); with \cmd{PHYSICAL} the further \cmd{:SoilZone*} commands of Table~\ref{tab:szcmds} apply\\\bottomrule
 \end{longtable}
+
+\subsection{Soil-zone commands (\texttt{.rvg})}\label{sec:szcmdref}
+These commands apply only with \cmd{:SoilZone PHYSICAL} (Section~\ref{ch:soilzone}); without it they are reported as
+ignored. A command given where it has no effect (\cmd{:SoilZoneVadoseClasses} or \cmd{:SoilZoneVadoseInitialFlux} with
+\cmd{:SoilZoneVadose NONE}, \cmd{:SoilZoneAquiferClass} on a model Raven builds) is reported as ignored too. Values
+outside the ranges given stop the run with a message.
+\begin{longtable}{P{0.36\linewidth}P{0.15\linewidth}P{0.42\linewidth}}
+\caption{Soil-zone commands in the \cmd{.rvg} file.}\label{tab:szcmds}\\
+\toprule\hdr Command and syntax & Default & Meaning\\\midrule\endfirsthead
+\caption[]{Soil-zone commands in the \cmd{.rvg} file (continued).}\\
+\toprule\hdr Command and syntax & Default & Meaning\\\midrule\endhead
+\cmd{:SoilZone CONCEPTUAL} \newline \cmd{:SoilZone PHYSICAL SOIL[0] \dots\ SOIL[$M-1$]} & \cmd{CONCEPTUAL} & \cmd{PHYSICAL}: the listed soil layers (from the top, consecutive) are the soil zone, owned by Raven; MODFLOW starts below them and the water table may rise into them (Section~\ref{ch:soilzone}). The last \cmd{:SoilZone} counts\\
+\cmd{:SoilZoneIteration n \{$\epsilon_h$\} \{tol$_Q$\}} & 100, 0.0001~m, 0.000001 & interface updates after MODFLOW's outer iterations, $n\ge0$ (0: explicit coupling); soil-level tolerance [m] and relative flow tolerance, $>0$ (Section~\ref{sec:szinterface})\\
+\cmd{:SoilZoneSubgrid n} & 5 & DEM points per cell side ($n^2$ points per cell) for the saturated fraction on sloping and irregular land, $1\le n\le20$ (Section~\ref{sec:szslope})\\
+\cmd{:SoilZoneOutput group} & all soil-zone HRUs & HRU group written to \cmd{GWSoilExchange.csv}\\
+\cmd{:SoilZoneVadose NONE} \newline \cmd{:SoilZoneVadose RICHARDS \{$\epsilon$\} \{N\}} \newline \cmd{:SoilZoneVadose KINEMATIC \{$\epsilon$\} \{N\}} \newline \cmd{:SoilZoneVadose LAG \{$t_m$\} \{N\}} & \cmd{NONE}; $\epsilon$ 0.02, $t_m$ 0, $N$ 16 & unsaturated columns between the soil-zone base and a deeper water table: Richards' equation, kinematic wave or linear storage cascade (Sections~\ref{sec:szvadose}, \ref{sec:szvadosekw}, \ref{sec:szvadoselag}); $\epsilon$ largest content change in a substep, $(0,0.2]$; $t_m$ travel time per metre [d/m], $\ge0$ (0: derived from each material); $N$ nodes per column at most, 3 to 200. \cmd{NONE}: recharge reaches the water table in the step\\
+\cmd{:SoilZoneVadoseClasses K} & 1 & unsaturated columns per exchange column, one per depth class of its DEM points, $1\le K\le10$ (Section~\ref{sec:vzclasses})\\
+\cmd{:SoilZoneVadoseInitialFlux q} & 0 & on a cold start, every unsaturated column starts at its steady profile for the flux it receives, $(1-F)\,q$, $q\ge0$ [mm/d]; 0: at rest (reference profile); ignored on a groundwater hotstart\\
+\cmd{:SoilZoneCapillaryRise ON | OFF} & \cmd{ON} with \cmd{RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG}; \cmd{OFF} with \cmd{NONE} & capillary rise from the water table (and, with \cmd{RICHARDS}, from the columns' top nodes) into soil-zone layers below field capacity (Section~\ref{sec:szcaprise})\\
+\cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & \cmd{LAGGED} & \cmd{LAGGED}: last step's exchange is lent to the soil zone before Raven's processes and settled after the step's exchange; \cmd{AFTER}: the exchange follows Raven's processes (the basic soil zone order) (Section~\ref{sec:sztiming})\\
+\cmd{:SoilZoneClasses K} & 1 & Raven's processes run on up to $K$ wetness classes of each HRU's soil-zone columns, $1\le K\le50$; needs \cmd{:Method ORDERED\_SERIES} (Section~\ref{sec:szclasses})\\
+\cmd{:SoilZoneAquiferClass class} & $b$ 4, $\psi_a$ 0.3~m, $\theta_s$ $S_y+0.1$ & existing models only: the aquifer class whose \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE} and \cmd{POROSITY} the unsaturated columns use (conductivity and specific yield come from the model; Section~\ref{sec:szexisting})\\\bottomrule
+\end{longtable}
+The soil classes of the soil-zone layers need \cmd{POROSITY}, \cmd{FIELD\_CAPACITY} $<1$, and, for the bottom layer,
+\cmd{HYDRAUL\_COND} [mm/d]; capillary rise uses their \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} [mm]. Recharge must leave the
+soil zone from \cmd{SOIL[$M-1$]} into \cmd{GROUNDWATER}, and \cmd{RECHARGE\_DELAY} must be 0 for soil-zone HRUs. The
+aquifer profile parameter \cmd{SEEPAGE\_SMOOTHING\_DEPTH} is the contact depth $d_s$ of the soil zone (below 0.1~m a
+warning); \cmd{SOIL\_ZONE\_DEPTH} and \cmd{SEEPAGE\_LEAKANCE} are not used for soil-zone HRUs.
 The block commands take one row per item, for example:
 \begin{lstlisting}
 :Wells
@@ -156,8 +187,9 @@ The block commands take one row per item, for example:
 :InitialGWHeads DEPTH_BELOW_SURFACE 5.0     # or FROM_PROFILE (default) or ELEVATION z
 \end{lstlisting}
 \end{minipage}\par\smallskip
-\cmd{:GWHeads nlay nrow ncol}, \cmd{:GWRechargeStore}, \cmd{:GWRiverLossCarry} and \cmd{:GWReservoirSeepage} are written by Raven into
-\cmd{solution.rvc} for hotstart; they are read back automatically.
+\cmd{:GWHeads nlay nrow ncol}, \cmd{:GWRechargeStore}, \cmd{:GWRiverLossCarry} and \cmd{:GWReservoirSeepage}, and with
+\cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns} and \cmd{:GWSoilZoneLag},
+are written by Raven into \cmd{solution.rvc} for hotstart; they are read back automatically (Section~\ref{app:hotstart}).
 
 \section{Output reference}\label{ch:outputs}
 All rows are stamped with the date at the \emph{end} of the step (the moment the values refer to).
@@ -187,7 +219,8 @@ reservoir seepage sent, delivered [m$^3$/d], awaiting delivery [m$^3$] & reservo
 reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that a drying cell could not supply; taken back from the water reaching the subbasin in the same step (normally 0)\\
 soil zone to aquifer, aquifer to soil zone [m$^3$/d] & \cmd{:SoilZone PHYSICAL}: soil-zone exchange, each direction\\
 rejected recharge, soil-zone overflow, exchange applied to Raven, shortfall [m$^3$] & Section~\ref{ch:soilzone}; shortfall is 0 (except on steps MODFLOW ended unconverged at a low outer-iteration limit)\\
-interface updates, converged, change [m] & soil-zone interface iteration of the step\\\bottomrule
+interface updates, converged, change [m] & soil-zone interface iteration of the step\\
+further soil-zone columns & layer redistribution, withheld discharge, negative recharge not held, unsaturated zone (inflow, to aquifer, capillary rise, storage), capillary rise from the water table, lagged-exchange debt and repayment, specified-head exchange, recharge not applied: Section~\ref{app:outputs}\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -220,12 +253,12 @@ File & Content\\\midrule
 \cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds})\\
 \cmd{Diagnostics.csv} & Raven's usual file, now also with \cmd{GW\_HEAD} statistics\\
 \cmd{Watershed\allowbreak Storage.csv} & Raven's balance; includes all exchanged water\\
-\cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWSoilZoneLag}\\\bottomrule
+\cmd{solution.rvc} & includes \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag}\\\bottomrule
 \end{tabular}
 \end{table}
 
 \section{A complete example set-up}
-The following \cmd{.rvg} uses every option; lines not needed can be deleted.
+The following \cmd{.rvg} uses most options (the soil-zone commands of Table~\ref{tab:szcmds} keep their defaults except those shown); lines not needed can be deleted. With \cmd{:SoilZone PHYSICAL} the \cmd{:SurfaceWaterExchange} group must not name a soil-zone layer, and the \cmd{.rvi} takes recharge from \cmd{SOIL[1]}.
 \begin{lstlisting}
 # ---- geometry ----
 :HRUGeometry        my_hrus.geojson   HRU_ID
@@ -247,6 +280,11 @@ The following \cmd{.rvg} uses every option; lines not needed can be deleted.
 :GWInitialization   STEADY_STATE 0.5
 :SurfaceWaterExchange DEPRESSION WetlandHRUs LEAKANCE 0.01
 :ReservoirExchange
+# ---- soil zone and water table (optional) ----
+:SoilZone PHYSICAL SOIL[0] SOIL[1]
+:SoilZoneVadose RICHARDS
+:SoilZoneVadoseClasses 3
+:SoilZoneClasses 3
 # ---- stresses and observations ----
 :Wells
   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT
