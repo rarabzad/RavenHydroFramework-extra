@@ -105,8 +105,8 @@ case('E06_two_solutions', 'error', lambda d: edit(d, 'model/mfsim.nam', '  ims6 
 case('E07_adaptive_time_steps', 'error', lambda d: edit(d, 'model/ext.tdis', '  TIME_UNITS  days\n', '  TIME_UNITS  days\n  ATS6  FILEIN  ext.ats\n'), src=EXT)
 case('E08_noleap_calendar', 'error', lambda d: edit(d, 'Liard.rvi', ':StartDate', ':Calendar NOLEAP\n:StartDate'), src=EXT)
 case('E09_model_in_working_folder', 'error', lambda d: (shutil.copytree(f'{d}/model', f'{d}/out/mf6'), edit(d, 'Liard.rvg', 'model/mfsim.nam', 'out/mf6/mfsim.nam')), src=EXT)
-case('E10_restart_with_time_series', 'error', lambda d: (edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-11-04'),
-     edit(d, 'model/gwf_liard.wel', 'BEGIN options\n', 'BEGIN options\n  TS6  FILEIN  wel.ts\n')), src=EXT)
+case('E10_restart_with_time_array_series', 'error', lambda d: (edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-11-04'),
+     edit(d, 'model/gwf_liard.ghb', 'BEGIN options\n', 'BEGIN options\n  TAS6  FILEIN  ghb.tas\n')), src=EXT)
 case('E11_restart_with_tvk', 'error', lambda d: (edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-11-04'),
      edit(d, 'model/gwf_liard.npf', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TVK6  FILEIN  npf.tvk\n')), src=EXT)
 case('E12_usg_command', 'error', lambda d: app(d, 'Liard.rvg', ':GWRiverConnection\n'), src=EXT)

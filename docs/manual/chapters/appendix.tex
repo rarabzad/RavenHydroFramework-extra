@@ -130,7 +130,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SeepageReturnTo SV} & store receiving seepage (lowest soil layer; \cmd{SURFACE\_WATER} for soil-less HRUs)\\
 \cmd{.rvg} & \cmd{:RiverBedDepth m|REFERENCE\_FLOW} & riverbed depth below the DEM (\cmd{REFERENCE\_FLOW})\\
 \cmd{.rvg} & \cmd{:GWInitialization STEADY\_STATE r} & steady-state start, recharge $r\ge0$ mm/d (off); if it does not converge, the initial heads are used\\
-\cmd{.rvg} & \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & store--aquifer exchange, leakance $\Lambda>0$ 1/d\\
+\cmd{.rvg} & \cmd{:SurfaceWater\allowbreak Exchange SV group LEAKANCE L} & store--aquifer exchange, leakance $\Lambda>0$ 1/d (generated and existing models)\\
 \cmd{.rvg} & \cmd{:SoilZone CONCEPTUAL | PHYSICAL SOIL[0] \dots\ SOIL[$M-1$]} & soil zone owned by Raven, water table may rise into it (Section~\ref{ch:soilzone}); the last \cmd{:SoilZone} counts (\cmd{CONCEPTUAL})\\
 \cmd{.rvg} & \cmd{:SoilZoneIteration n \{$\delta_h$\} \{$\delta_q$\}} & interface updates after MODFLOW converged, $n\ge0$ (0: explicit), head [m] and flow [--] tolerances (100, 0.0001, 0.000001)\\
 \cmd{.rvg} & \cmd{:SoilZoneSubgrid n} & DEM points per cell side for the saturated area, $1\le n\le20$ (5, i.e.\ 25 points per cell)\\
@@ -142,7 +142,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SoilZoneExchangeTiming LAGGED | AFTER} & order of Raven's processes and the exchange (Section~\ref{sec:sztiming}) (\cmd{LAGGED})\\
 \cmd{.rvg} & \cmd{:SoilZoneClasses K} & Raven's processes per class of columns, $1\le K\le50$ (Section~\ref{sec:szclasses}) (1)\\
 \cmd{.rvg} & \cmd{:SoilZoneAquiferClass class} & existing models: \cmd{CLAPP\_B}, \cmd{AIR\_ENTRY\_PRESSURE}, \cmd{POROSITY} of the cells for the unsaturated columns (4, 0.3 m, $S_y+0.1$), and \cmd{SPEC\_YIELD} for a steady model without one (0.2); reported as ignored on a model Raven builds\\
-\cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange (off)\\
+\cmd{.rvg} & \cmd{:ReservoirExchange} & reservoir--aquifer exchange, generated and existing models (off)\\
 \cmd{.rvg} & \cmd{:Wells} \dots\ \cmd{:EndWells} & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_TOP, SCREEN\_BOT} (\cmd{X, Y} instead of \cmd{LATITUDE, LONGITUDE} with \cmd{:InputCRS})\\
 \cmd{.rvg} & \cmd{:ObservationWells} \dots & ID, \cmd{NAME, LATITUDE, LONGITUDE, SCREEN\_ELEV} (or \cmd{X, Y}, as for \cmd{:Wells})\\
 \cmd{.rvg} & \cmd{:GeneralHeadBoundary n file HEAD h CONDUCTANCE c \{LAYERS ALL|TOP\}} & head-dependent boundary; $c>0$ m$^2$/d per cell (\cmd{ALL})\\
@@ -151,6 +151,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:SolverMax\allowbreak OuterIterations n} & Newton iteration limit, $\ge1$ (500)\\
 \cmd{.rvg} & \cmd{:HeadSaveFrequency n} & steps between saved head fields, $\ge1$ (30)\\
 \cmd{.rvg} & \cmd{:WriteNetCDFHeads} & write \cmd{GWHeads.nc} (off; needs a NetCDF build)\\
+\cmd{.rvg} & \cmd{:WriteGWBudgetFile} & MODFLOW budget file \cmd{mf6/gwf.cbc} every \cmd{:HeadSaveFrequency} steps, with specific discharge and saturation, and \cmd{mf6/gwf.porosity}, for particle tracking (Section~\ref{sec:budgetfile}); generated models only (off)\\
 \cmd{.rvg} & \cmd{:LinkageCache file} & linkage cache (\cmd{<output>/mf6/linkage.cache})\\
 \cmd{.rvt} & \cmd{:WellFlowRate id units} \dots\ \cmd{:EndWellFlowRate} & well rate series, m$^3$/d, negative = pumping\\
 \cmd{.rvt} & \cmd{:BoundaryHead name units} \dots & time-varying boundary head\\
@@ -315,6 +316,10 @@ stress period \dots\ is not a whole number of Raven time steps & choose a Raven 
 cells of the grid file differ from the model's cell area & wrong projection, length unit or cell numbering in the file\\
 give one of \cmd{:MF6CRS}, \cmd{:MF6GridFile} or \cmd{:OverlapWeights} & link HRUs in exactly one way\\
 the period data of \emph{package} cannot be renumbered safely & start Raven at \cmd{:MF6StartDate}\\
+\emph{package} uses time-array series (TAS6) / time series, \dots\ and the simulation holds several models & start Raven at \cmd{:MF6StartDate}\\
+TDIS period data given as INTERNAL / the water mover \dots\ gives its period data as INTERNAL & list the rows in the file itself or in an \cmd{OPEN/CLOSE} file\\
+an aquifer profile has EXTINCTION\_DEPTH $>0$ \dots\ and the model keeps its EVT/UZF package & list that package in \cmd{:RavenTakesOver}, or set \cmd{EXTINCTION\_DEPTH} 0\\
+with \cmd{:MF6Simulation} \dots\ remove \dots\ (these apply to models Raven builds) & remove the generated-model commands (grid options, \cmd{:LandSurface}, solver settings, \cmd{:WriteGWBudgetFile}, \dots); for an existing model's budget file edit its OC file\\
 \cmd{:GridType FILE} needs \cmd{:GridFile} (and the reverse) & give both, or neither\\
 \cmd{:GridRotation} applies only to REGULAR and QUADTREE grids & remove it, or change the grid type\\
 \cmd{:GridRefinement} size must be positive and smaller than \cmd{:GridCellSize}; RIVERS needs \cmd{:RiverGeometry}; WELLS needs wells & correct the refinement\\

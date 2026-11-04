@@ -874,7 +874,9 @@ HRUs cover only part of the cell. MODFLOW removes
 Q^{\mathrm{evt}}_i=E_i\,|\Omega_i|\;\min\!\left(1,\max\!\left(0,\;1-\frac{z_{\mathrm{land},i}-h_i}{d_x}\right)\right),
 \end{equation}
 the full rate when the water table is at the surface, falling linearly to zero at depth $d_x$ (Figure~\ref{fig:curves}d).
-This water leaves the system as evaporation.
+This water leaves the system as evaporation. With an existing model (Chapter~\ref{ch:existing}) the same package is added at the
+top active cell of each column, with $z_{\mathrm{land}}$ the top of that cell and $|\Omega_i|$ MODFLOW's own cell area; the
+model's own ET package must then be taken over (\cmd{:RavenTakesOver}).
 \begin{example}[: water-table ET]
 Unmet PET 2 mm/d over a 4 km$^2$ cell fully covered by coupled HRUs, $d_x=2$ m, water table 0.5 m deep:
 $Q=0.002\times4\times10^6\times(1-0.5/2)=6\,000$ m$^3$/d. If coupled HRUs covered only 1 km$^2$ of the cell, the unmet volume
@@ -911,8 +913,8 @@ Wetlands and small lakes are often represented in Raven by a store in their HRUs
 group, to the aquifer below.
 
 \subsection{The boundary}
-In each column holding HRUs of the group, the exchange is a river-type boundary (MODFLOW RIV package) whose bed is the
-model top and whose water level is the top plus the average depth of water in the store:
+In each column holding HRUs of the group, the exchange is a river-type boundary (MODFLOW RIV package \cmd{SWX\_RAVEN}) whose bed is the
+model top (with an existing model: the top of the column's top active cell) and whose water level is the top plus the average depth of water in the store:
 \begin{equation}
 \bar d^{\,\mathrm{st}}_i=\frac{\sum_kA_{k,i}\,\phi^{\mathrm{st}}_k}{1000\sum_kA_{k,i}},\qquad h_b=z_{\mathrm{top},i}+\bar d^{\,\mathrm{st}}_i,
 \qquad q=\begin{cases}C\left(h_b-h\right) & h>z_{\mathrm{top},i},\\ C\,\bar d^{\,\mathrm{st}}_i & h\le z_{\mathrm{top},i},\end{cases}
@@ -977,7 +979,8 @@ V^{\mathrm{res}}=k_{\mathrm{seep}}\left(\tfrac12\left(h^{t}_{\mathrm{res}}+h^{t+
 \quad[\mathrm{m}^3],
 \end{equation}
 using the average of the stages at the start and end of the step. \cmd{:ReservoirExchange} connects this to the aquifer
-for every reservoir that has \cmd{:SeepageParameters} and whose lake HRU (\cmd{:HRUID}) has an \cmd{AQUIFER\_PROFILE}.
+for every reservoir that has \cmd{:SeepageParameters} and whose lake HRU (\cmd{:HRUID}) has an \cmd{AQUIFER\_PROFILE}, with a
+generated or an existing model (Chapter~\ref{ch:existing}; the seepage enters the top active cells under the lake).
 
 \subsection{How the exchange works}
 \begin{enumerate}
