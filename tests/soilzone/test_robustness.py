@@ -57,6 +57,15 @@ R19 (N7) RICHARDS with three depth classes drawing upflow from a nearly empty to
    head far outside the model (the column took 16.4 m3/d from a cell that could give 2.6e-9).
 R20 (N6) sibling columns: one HRU over 8 cells, BASEFLOW_COEFF 0.5, a 2 m aquifer from 1.8 m deep, 30 days, AFTER and LAGGED:
    "not held" is booked only on steps whose HRU soil zone is empty (the cut is first taken from the HRU's other columns) and no round-off is booked.
+R21 (N8) rule (ii) hand-back in a step with negative recharge: one HRU of 400 x 200 m whose wet unsaturated columns (initial
+   flux 30 mm/d, column 0.4 m) vanish under a water table raised by a specified head 0.3 m below the ground, while
+   PERC_GR4JEXCH takes water out of GROUNDWATER (GR4J_X2 1e-4 mm/d, and 60 mm/d in the full mode); RICHARDS (and
+   KINEMATIC in the full mode): the water of the vanished columns beyond S_y dh goes back to the soil zone as the link's
+   rejected recharge, so the recharge identity holds at round-off (0.31 m3 per vanishing step otherwise missing).
+R22 (N9) the top-cell limit of a negative recharge with depth classes: one HRU of 200 x 200 m with +-0.5 m hummocks, a
+   0.6 m top cell (S_y 0.05) and the water table 1.2 m deep, so the hollow classes have no column; PERC_GR4JEXCH with
+   GR4J_X2 250 mm/d. MODFLOW's recharge on step 1 is at most the limit 0.5 S_y A (h - z_bot) (400 m3/d) with one class
+   and with three classes (RICHARDS, and LAG in the full mode), the cut goes back to the soil zone, identities hold.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -393,6 +402,45 @@ def main():
               % (tim, nh.sum(), len(held), max(held) if held else 0.0, tiny, 'ok' if gg else 'FAIL'))
         g &= gg
     res.append(('R20 not held only where the HRU holds nothing', g))
+
+    # R21: rule (ii) hand-back with negative recharge
+    import pandas as pd
+    g = True
+    for m, x2 in ((('RICHARDS', 1e-4),) if QUICK else (('RICHARDS', 1e-4), ('RICHARDS', 60.0), ('KINEMATIC', 60.0))):
+        d = case('R21_%s_%g' % (m.lower(), x2), nhru=1, hru_w=400.0, width=200.0, cell=100.0, perc=0.0, ksat=500.0, Kv=0.5, Kh=1000.0, Sy=0.02,
+                 aq_b=4.0, aq_psia=0.3, init_depth=1.4, rain=[0.0] * 5, days=5, chd=99.7, phi0=(100.0, 190.0),
+                 extra_proc=GR['extra_proc'], extra_soil={'GR4J_X2': x2, 'GR4J_X3': 150.0},
+                 extra_rvg=':SoilZoneVadose %s\n:SoilZoneVadoseInitialFlux 30\n' % m)
+        ok, txt = sz_check.run(d)
+        if not ok: print('  R21 %s: run FAILED\n%s' % (m, txt[-600:])); g = False; continue
+        good, r = ident(d)
+        b = sz_check.outputs(d)[0]
+        vin = b['unsaturated zone inflow [m3]'].values; neg = (b['Raven recharge [m3/d]'] < 0).values
+        back = int(((vin < 0) & neg).sum())   # (a negative column inflow: water handed back from vanished columns)
+        print('  R21 %s X2 %g: steps with negative recharge and a vanishing column %d, recharge identity %.2g' % (m, x2, back, r['rch_identity']))
+        g &= good and back > 0
+    res.append(('R21 hand-back of vanished columns with negative recharge', g))
+
+    # R22: negative recharge with depth classes keeps the top-cell limit
+    import math
+    def hummocks(x, y, amp=0.5, lam=100.0):
+        return amp * math.sin(2 * math.pi * (x + 0.25 * lam) / lam) * math.sin(2 * math.pi * (y + 0.25 * lam) / lam)
+    HUM = dict(nhru=1, hru_w=200.0, width=200.0, cell=100.0, subgrid=5, perc=0.0, ksat=500.0, Kv=0.5, Sy=0.05, aq_b=4.0, aq_psia=0.3,
+               smooth=0.2, aq_thick=0.6, dem_res=400, init_depth=1.2, rain=[0.0] * 3, days=3, dem_fn=hummocks,
+               extra_proc=GR['extra_proc'], extra_soil={'GR4J_X2': 250.0, 'GR4J_X3': 150.0})
+    g = True
+    for m, k in ((('RICHARDS', 1), ('RICHARDS', 3)) if QUICK else (('RICHARDS', 1), ('RICHARDS', 3), ('LAG', 3))):
+        d = case('R22_%s%d' % (m.lower(), k), extra_rvg=vz(m, k), **HUM); ok, txt = sz_check.run(d)
+        if not ok: print('  R22 %s K=%d: run FAILED\n%s' % (m, k, txt[-600:])); g = False; continue
+        good, r = ident(d)
+        b = sz_check.outputs(d)[0]
+        lim = 0.5 * 0.05 * 200.0 * 200.0 * ((100.0 - 1.2) - (100.0 - 1.0 - 0.6))   # 0.5 S_y A (h - z_bot) at the start of step 1
+        ratio = float(-b['MF6 recharge [m3/d]'].iloc[0] / lim)
+        cut = float(b['rejected recharge [m3]'].iloc[0])
+        gg = good and ratio <= 1.0 + 1e-6 and ratio > 0.5 and cut < 0
+        print('  R22 %s K=%d: MODFLOW recharge on step 1 / limit %.6f, cut back to the soil zone %.1f m3 -> %s' % (m, k, ratio, cut, 'ok' if gg else 'FAIL'))
+        g &= gg
+    res.append(('R22 negative recharge with depth classes within the top-cell limit', g))
 
     for n, g in res:
         print('  %-45s %s' % (n, 'ok' if g else 'FAILED'))

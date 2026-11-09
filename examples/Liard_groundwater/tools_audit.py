@@ -70,7 +70,10 @@ def audit(run,dt=1.0):
         R['reservoir: delivered / sent']=float(dl.sum()/sv.sum()) if sv.sum()!=0 else 1.0
         if 'reservoir gain not supplied by MODFLOW [m3]' in b:
             shv=b['reservoir gain not supplied by MODFLOW [m3]'].fillna(0).values   #gains MODFLOW could not supply, taken back from the reach
-            R['reservoir: (delivered + not supplied) / sent']=float((dl.sum()+shv.sum())/sv.sum()) if sv.sum()!=0 else 1.0
+            udv=b['reservoir seepage not delivered by MODFLOW [m3]'].fillna(0).values if 'reservoir seepage not delivered by MODFLOW [m3]' in b else 0.0*shv   #losses MODFLOW did not take, returned to the reach
+            #sent = delivered - gain not supplied + loss not delivered (both MODFLOW could not apply; the reach evens them out)
+            R['reservoir: (delivered + not supplied) / sent']=float((dl.sum()-shv.sum()+udv.sum())/sv.sum()) if sv.sum()!=0 else 1.0
+            R['reservoir: seepage not delivered [m3]']=float(udv.sum())
     R['MF6 worst step error [%]']=b['MF6 balance error [%]'].abs().max()
     R['unconverged steps']=int((b['converged']==0).sum()); R['max outer iterations']=int(b['outer iterations'].max())
     R['seepage returned vs MF6 seepage (rel)']=abs(b['returned to Raven [m3]'].sum()-b['seepage to Raven [m3/d]'].sum()*dt)/max(b['seepage to Raven [m3/d]'].sum()*dt,1)
@@ -80,7 +83,8 @@ def audit(run,dt=1.0):
         c=b[cc].fillna(0); cp=c.shift(1).fillna(0); n=(b['aquifer discharge to rivers [m3/d]']-b['river leakage to aquifer [m3/d]'])*dt; ok=b['converged'].astype(int)>=1
         sh=b['reservoir gain not supplied by MODFLOW [m3]'].fillna(0) if 'reservoir gain not supplied by MODFLOW [m3]' in b else 0.0   #taken from the reach in the same step
         wr=b['river gains withheld [m3]'].fillna(0) if 'river gains withheld [m3]' in b else 0.0   #:SoilZone PHYSICAL guard
-        r=(b['river exchange applied to Raven [m3]']-n-c+cp+sh+wr)[ok]; R['river: applied - net MF6 - carry change (rel)']=r.sum()/max(n.abs().sum(),1)
+        ud=b['reservoir seepage not delivered by MODFLOW [m3]'].fillna(0) if 'reservoir seepage not delivered by MODFLOW [m3]' in b else 0.0   #returned to the reach in the same step
+        r=(b['river exchange applied to Raven [m3]']-n-c+cp+sh+wr-ud)[ok]; R['river: applied - net MF6 - carry change (rel)']=r.sum()/max(n.abs().sum(),1)
         R['safeguard-limited steps']=int((~ok).sum())
         R['river loss carried at end [m3]']=float(c.iloc[-1]); R['river loss carried max [m3]']=float(c.max())
     else:

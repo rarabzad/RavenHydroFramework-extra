@@ -228,7 +228,7 @@ other model packages [m$^3$/d] & with an existing model: net flow of the model's
 soil zone to aquifer, aquifer to soil zone [m$^3$/d] & \cmd{:SoilZone PHYSICAL}: soil-zone exchange, each direction\\
 rejected recharge, soil-zone overflow, exchange applied to Raven, shortfall [m$^3$] & Section~\ref{ch:soilzone}; shortfall is 0 (except on steps MODFLOW ended unconverged at a low outer-iteration limit)\\
 interface updates, converged, change [m] & soil-zone interface iteration of the step\\
-further soil-zone columns & layer redistribution, withheld discharge, negative recharge not held, unsaturated zone (inflow, to aquifer, capillary rise, storage), capillary rise from the water table, lagged-exchange debt and repayment, specified-head exchange, recharge not applied: Section~\ref{app:outputs}\\\bottomrule
+further soil-zone columns & layer redistribution, withheld discharge, negative recharge not held, unsaturated zone (inflow, to aquifer, capillary rise, storage), capillary rise from the water table, lagged-exchange debt and repayment, specified-head exchange, recharge not applied, reservoir seepage not delivered: Section~\ref{app:outputs}\\\bottomrule
 \end{tabular}
 \end{table}
 
@@ -281,7 +281,7 @@ tracks particles on DIS and DISV grids (regular and quadtree grids); for trackin
 \cmd{SAVE BUDGET} to its OC file instead (Chapter~\ref{ch:existing}).
 
 \section{A complete example set-up}
-The following \cmd{.rvg} uses most options (the soil-zone commands of Table~\ref{tab:szcmds} keep their defaults except those shown); lines not needed can be deleted. With \cmd{:SoilZone PHYSICAL} the \cmd{:SurfaceWaterExchange} group must not name a soil-zone layer, and the \cmd{.rvi} takes recharge from \cmd{SOIL[1]}.
+The following \cmd{.rvg} uses most options (the soil-zone commands of Table~\ref{tab:szcmds} keep their defaults except those shown); lines not needed can be deleted. With \cmd{:SoilZone PHYSICAL} the \cmd{:SurfaceWaterExchange} group must not name a soil-zone layer (its \cmd{DEPRESSION} store lies on the ground above the soil zone, and its exchange has its bed there, Section~\ref{ch:stores}), and the \cmd{.rvi} takes recharge from \cmd{SOIL[1]}.
 \begin{lstlisting}
 # ---- geometry ----
 :HRUGeometry        my_hrus.geojson   HRU_ID

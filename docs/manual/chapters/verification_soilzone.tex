@@ -96,12 +96,12 @@ processes on 1, 5 and 10 classes of its columns (test P6).}\label{fig:sztiming}\
 \end{figure}
 
 \subsection{The interface iteration and MODFLOW's side}\label{sec:vszinterface}
-Five scripts test the interface iteration, drained columns, heads far outside the model, negative recharge and MODFLOW's
-budget as Raven books it (Table~\ref{tab:vszinterface}; numbers of the quick mode, \cmd{RAVEN\_TEST\_QUICK=1}). The negative
-recharge cases N1--N7 run in \cmd{test\_robustness.py} as R14--R20.
+Six scripts test the interface iteration, drained columns, heads far outside the model, negative recharge, MODFLOW's
+budget as Raven books it and surface stores on soil-zone HRUs (Table~\ref{tab:vszinterface}; numbers of the quick mode, \cmd{RAVEN\_TEST\_QUICK=1}). The negative
+recharge cases N1--N9 run in \cmd{test\_robustness.py} as R14--R22.
 \begin{longtable}{P{0.13\linewidth}P{0.42\linewidth}P{0.36\linewidth}}
 \caption{The interface and MODFLOW's side (\cmd{test\_interface\_stiff}, \cmd{test\_confined\_wet}, \cmd{test\_columns\_mf6},
-\cmd{test\_robustness} N1--N7, \cmd{test\_mf6\_budget}).}\label{tab:vszinterface}\\
+\cmd{test\_robustness} N1--N9, \cmd{test\_mf6\_budget}, \cmd{test\_surface\_stores}).}\label{tab:vszinterface}\\
 \toprule\hdr Test & Case & Result\\\midrule\endfirsthead
 \caption[]{The interface and MODFLOW's side (continued).}\\
 \toprule\hdr Test & Case & Result\\\midrule\endhead
@@ -120,6 +120,9 @@ W9, W10 & the same with limits 2 and 1 & stop: residual 2\,\% of the gross flow 
 W12 & existing model with an inactive top layer, limit 2 & every interface warning names layer 2\\
 M1--M4 & drained columns kept wet; a column delivers its inflow; \cmd{CONCEPTUAL} against a reference build; missing summary line & kept in 5 outer iterations; outflow 1.02 of the inflow; byte-identical except the balance-error \%\\
 N1--N7 (R14--R20) & negative recharge (\cmd{PERC\_GR4JEXCH}): split, cut by the top cell, hand-back, not held, existing model without \cmd{NEWTON} (confined variant), column upflow, sibling columns & identities at round-off; cut 437\,045~m$^3$; not held 3\,793 (LAGGED) / 2\,870 (AFTER)~m$^3$; not applied $-408\,000$~m$^3$, 0 with confined cells; not held only where the HRU's soil is empty (334~m$^3$)\\
+N8 (R21) & a step with negative recharge in which wet unsaturated columns vanish under a water table raised by a specified head (\cmd{RICHARDS}; \cmd{KINEMATIC} in the full mode) & the vanished columns' water beyond $S_y\,\Delta h$ goes back to the soil zone as the link's rejected recharge; recharge identity 0\\
+N9 (R22) & negative recharge with three depth classes, the hollow classes without a column (\cmd{RICHARDS}; \cmd{LAG} in the full mode) & MODFLOW's recharge on step 1 equals the top-cell limit (ratio 1.000000, as with one class); the cut, 2\,620~m$^3$, back to the soil zone\\
+SW1--SW3 & \cmd{:SurfaceWaterExchange} on \cmd{DEPRESSION} of \cmd{:SoilZone PHYSICAL} HRUs, generated and existing model; a control with the water table above the ground at the outlet & stores' bed at the ground (model top + 1.0~m of soil zone); no discharge into the stores while every water table is below the ground; leakage 6\,135~m$^3$; existing model within $5\times10^{-6}$; control: discharge 1\,399~m$^3$\\
 B1--B7 & steady existing model without STO (converged and OUTER\_MAXIMUM 3), gross flow, hourly dates, specified head under a dry cell, \cmd{:SoilZoneClasses 3}, audit guard counts & balance error $6\cdot10^{-12}$; residual equals the list file's IN$-$OUT within $1.3\cdot10^{-8}$ of the gross flow; gross flow equals TOTAL IN$+$TOTAL OUT within $5\cdot10^{-10}$; dates with times; warning names 2 columns over specified heads; no round-off as not held; guard counts 12 and 2\\
 B8 & without \cmd{:SoilZone PHYSICAL}, \cmd{:SolverMaxOuterIterations} 2 (10 unconverged steps) and 1 (every step), and the Liard example (rivers and lakes) at 2: each row's residual over all its columns equals MODFLOW's negative residual on unconverged steps and 0 otherwise; run total ``discharge withheld''; at most ten warnings & step 1: 1\,039.4~m$^3$/d withheld = $-$balance error; run total 1\,062.5~m$^3$ = sum of rows; limit 1: 18\,511~m$^3$; 10 warnings (full mode)\\
 B9 & \cmd{GWSoilExchange.csv} against \cmd{GWBudget.csv}: a generated model with an HRU wholly over specified-head cells, an existing model with a specified-head toe & on every date the four exchange columns summed over the HRUs equal \cmd{GWBudget.csv}'s within $2\cdot10^{-10}$ of the gross flow; the HRU over specified heads reports its base and water table\\\bottomrule
@@ -170,13 +173,14 @@ I15 & age-tracer chains across year boundaries: 1999-12-25 (7 + 7 + 6 days), 199
 I16 & age tracer started from the \cmd{solution.rvc} of a 30-day spin-up without it & ages 0 at the start, 1~d after the first day; no \cmd{:AgeTracerDatum}\\
 I17 & EnKF, 3 members, one well, \cmd{:ExtraRVTFilename} with $-100$, $-200$, $-300$~m$^3$/d & each member pumps its own rate; a series naming no well stops the run\\
 I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\
-I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\\bottomrule
+I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\
+I20 & a specified head with \cmd{HEAD} 0 (below every cell) and a \cmd{:BoundaryHead} series of 99.5~m; the same without the series & placed by the series: 2 cells, flow 1\,390~m$^3$; without it no cell and a warning naming the boundary, its head and the highest cell bottom\\\bottomrule
 \end{longtable}
 
 \subsection{Robustness}\label{sec:vszrobust}
 \begin{longtable}{P{0.07\linewidth}P{0.55\linewidth}P{0.30\linewidth}}
-\caption{Soil zone: robustness (\cmd{test\_robustness.py}; hard cases of the interface). R14--R20 are the negative-recharge
-cases N1--N7 of Table~\ref{tab:vszinterface}.}\label{tab:vszrobust}\\
+\caption{Soil zone: robustness (\cmd{test\_robustness.py}; hard cases of the interface). R14--R22 are the negative-recharge
+cases N1--N9 of Table~\ref{tab:vszinterface}.}\label{tab:vszrobust}\\
 \toprule\hdr Test & Case & Result\\\midrule\endfirsthead
 \caption[]{Soil zone: robustness (continued).}\\
 \toprule\hdr Test & Case & Result\\\midrule\endhead

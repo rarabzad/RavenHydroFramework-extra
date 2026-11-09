@@ -53,6 +53,10 @@ I18 damaged soil-zone hotstart values: a :GWSoilZoneColumns row with nan, one wi
 I19 Raven transport in a coupled run: :Transport Nitrate (CONCEPTUAL and PHYSICAL) and :Transport AGE with
    :GroundwaterModel MODFLOW6 stop the run naming the constituent (the coupling exchanges no constituent mass); the same
    model without :GroundwaterModel runs with :Transport Nitrate.
+I20 a head boundary is placed with the highest head it has in the run: the specified head EDGE with HEAD 0 (below every
+   cell) and a :BoundaryHead EDGE series of 99.5 m gets its cells (GWModelSummary "CHD cells" > 0) and holds the series'
+   head (CHD flow in GWBudget.csv); the same boundary without the series has no cells, and a warning names it, its head
+   and the highest cell bottom.
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -408,6 +412,26 @@ def main():
                                                  ('runs' if ok else 'stops') + (' with the message' if msg in txt else '')))
         good &= g
     res.append(('I19 :Transport with :GroundwaterModel MODFLOW6 stops', good))
+
+    # I20: head boundaries placed by their highest head in the run; a boundary left with no cells is reported
+    def chd_cells(d):
+        m = re.search(r'GHB cells / CHD cells : (\d+) / (\d+)', sz_check.summary(d)); return int(m.group(2)) if m else -1
+    good = True
+    d = case('I20_series', days=3, chd=0.0)
+    open(os.path.join(d, 'm.rvt'), 'a').write('\n:BoundaryHead EDGE m\n  2000-01-01 00:00:00 1.0 3\n  99.5\n  99.5\n  99.5\n:EndBoundaryHead\n')
+    ok, txt = run_err(d)
+    n1 = chd_cells(d); q = 0.0
+    if ok:
+        import pandas as pd
+        q = float(pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv'))['CHD [m3/d]'].abs().sum())
+    g1 = ok and n1 > 0 and q > 0 and 'has no cells' not in errors(d)
+    d = case('I20_low', days=3, chd=0.0)
+    ok2, txt2 = run_err(d)
+    n2 = chd_cells(d); e2 = errors(d)
+    g2 = ok2 and n2 == 0 and 'boundary EDGE has no cells' in e2 and 'highest' in e2
+    print('  I20: HEAD 0 with a :BoundaryHead series of 99.5 m: %d CHD cells, CHD flow %.0f m3 (%s); HEAD 0 alone: %d cells, warning %s'
+          % (n1, q, 'ok' if g1 else 'FAIL', n2, 'present' if 'boundary EDGE has no cells' in e2 else 'MISSING'))
+    res.append(('I20 head boundaries placed by their series, no-cell warning', g1 and g2))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

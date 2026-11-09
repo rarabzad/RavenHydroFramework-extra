@@ -65,7 +65,7 @@ and the largest take beyond the free water (0 up to round-off).
 GROUNDWATER} with a positive \cmd{GR4J\_X2}) gives a negative recharge. On an HRU with a soil zone it is never split by $F$: all
 of it is taken from MODFLOW (through the column on a column link), at most what the top cell can still give in the step
 (half its water above its bottom under the link, less what the columns, the capillary rise and the repayment of a lagged
-debt took before); the rest is cut and taken back out of the soil zone as a negative rejected recharge (run total ``negative
+debt took before; with depth classes this one limit also bounds the share of the classes without a column); the rest is cut and taken back out of the soil zone as a negative rejected recharge (run total ``negative
 recharge cut''). What the soil zone does not hold of that cut (a process after the import moved it on before the coupled
 exchange) is taken from the HRU's other columns in proportion to their water, and only what the whole HRU cannot supply is
 booked as ``negative recharge the soil zone did not hold'' (its own \cmd{GWBudget.csv} column, warning and run total). On HRUs

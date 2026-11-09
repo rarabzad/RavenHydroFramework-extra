@@ -922,6 +922,10 @@ model top (with an existing model: the top of the column's top active cell) and 
 with $\phi^{\mathrm{st}}_k$ [mm] the water in the store of HRU $k$ and $\bar d^{\,\mathrm{st}}_i$ [m] its overlap-weighted mean depth in column $i$. Positive $q$ is leakage from the store to
 the aquifer; negative $q$ is groundwater feeding the store. Because leakage stops growing once the water table is below
 the store's bed, it can never exceed $C\,\bar d^{\,\mathrm{st}}_i$.
+With \cmd{:SoilZone PHYSICAL} the store lies on the ground, above the soil zone, so $z_{\mathrm{top},i}$ above is the ground of the
+group's HRUs in the column: their overlap-weighted soil-zone base plus soil-zone thickness $D_k$ (an HRU without a soil zone
+counts at the model top, where its seepage leaves the aquifer). Groundwater then feeds the store only once the water table
+has risen through the soil zone to the ground, and the store's leakage enters the aquifer from the ground.
 
 \subsection{Never draining more than the store holds}
 The water available in a cell is the store's real volume, split among the HRU's cells by overlap and fixed at the start
@@ -1003,6 +1007,13 @@ reservoir loss (water leaving Raven).
 If a cell is nearly dry, MODFLOW extracts less than asked (\cmd{AUTO\_FLOW\_REDUCE}); the lake has already received that
 water, so the shortfall is taken back from the water reaching the reservoir's subbasin in the same step, like a river loss
 (\cmd{GWBudget.csv}: \emph{reservoir gain not supplied by MODFLOW}). No water is created.
+With an existing model, cells under the lake that cannot take the seepage in the step --- specified heads, and inactive
+(dry) cells of a model without \cmd{NEWTON} --- get none: the weights $w_i$ are taken over the lake's other cells, both for
+$Q_i$ and for the lake's groundwater level $h_{\mathrm{gw}}$ (item 1); with no such cell left, the lake exchanges nothing in that step
+($h_{\mathrm{gw}}=h_{\mathrm{res}}$). A loss MODFLOW still does not take (a cell that turns specified head or dries during
+the solve) has already left the lake, so it is returned to the water reaching the reservoir's subbasin in the same step,
+which flows on into the reservoir (\cmd{GWBudget.csv}: \emph{reservoir seepage not delivered by MODFLOW}, with a warning and
+a run total in \cmd{GWModelSummary.txt}). No water is lost.
 \end{enumerate}
 The reservoir's stages must be elevations on the aquifer's datum (\cmd{:AbsoluteCrest\allowbreak Height}): a stage below the
 bottom of the whole aquifer under the lake --- relative stages, with the crest at 0 m, or another datum --- stops the run.
@@ -1094,8 +1105,11 @@ A specified-head boundary holds the head of its cells at $h_c$; MODFLOW calculat
 \subsection{Where boundaries go}
 Boundaries are drawn in a GeoJSON file: polygons select the cells whose centre lies inside (tested with the even--odd
 ray-crossing rule, so holes work), lines select the cells they cross. With \cmd{LAYERS TOP} only the top active cell
-is used; with \cmd{LAYERS ALL}, every active layer. A boundary is placed only in cells whose bottom is below its head
-(MODFLOW requires this), and time-varying heads are kept at least 0.01 m above the cell bottom.
+is used; with \cmd{LAYERS ALL}, every active layer. A boundary is placed only in cells whose bottom is below the highest
+head it has in the run (MODFLOW requires a boundary head above the cell bottom): \cmd{HEAD}, or with a \cmd{:BoundaryHead}
+series the highest of its step values over the run (\cmd{HEAD} where the series has no value). In steps with a lower
+head, the head is kept at least 0.01 m above the cell bottom. A boundary that selects cells but has none left, because its
+head lies below all of them, is reported with a warning naming the head and the highest cell bottom.
 
 \subsection{Monitoring (observation) wells}
 Monitoring wells are listed in \cmd{:ObservationWells} with a location and a screen elevation. Each is attached to the

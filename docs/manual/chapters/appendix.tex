@@ -253,7 +253,8 @@ Column & Meaning\\\midrule\endhead
 \cmd{capillary rise from the water table [m3]} & capillary rise on: rise from the water table into the soil-zone layers (Section~\ref{sec:szcaprise})\\
 \cmd{lagged-exchange debt [m3]}, \cmd{lagged-exchange repayment [m3]} & \cmd{LAGGED} timing: lent water Raven's processes used that the step's exchange did not supply; the aquifer's repayment in the step (Section~\ref{sec:sztiming})\\
 \cmd{soil zone to specified heads [m3/d]}, \cmd{specified heads to soil zone [m3/d]} & soil-zone columns over specified heads, or an existing model (Section~\ref{sec:szchd})\\
-\cmd{recharge not applied by MODFLOW [m3/d]} & an existing model without \cmd{NEWTON}: recharge MODFLOW did not apply (dry cells, specified heads), signed\\\bottomrule
+\cmd{recharge not applied by MODFLOW [m3/d]} & an existing model without \cmd{NEWTON}: recharge MODFLOW did not apply (dry cells, specified heads), signed\\
+\cmd{reservoir seepage not delivered by MODFLOW [m3]} & an existing model with \cmd{:ReservoirExchange}: reservoir seepage MODFLOW did not take (cells under the lake that are specified heads or inactive), returned to the reservoir's subbasin in the same step (normally 0)\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
 water level, water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
@@ -268,7 +269,8 @@ recharge the soil zone did not hold}, with \cmd{:SoilZone PHYSICAL}; the unsatur
 \cmd{:SoilZoneVadose} method; \cmd{capillary rise from the water table} with capillary rise on; the lagged-exchange columns
 with \cmd{LAGGED} timing; the specified-head columns where soil-zone columns lie over specified heads; and, last,
 \cmd{recharge not applied by MODFLOW} for an existing model without \cmd{NEWTON} (signed: negative where a negative recharge
-was taken out of \cmd{GROUNDWATER} without MODFLOW supplying it). \cmd{MF6 balance error [\%]} divides by the gross flow
+was taken out of \cmd{GROUNDWATER} without MODFLOW supplying it), then \cmd{reservoir seepage not delivered by MODFLOW} for an
+existing model with \cmd{:ReservoirExchange}. \cmd{MF6 balance error [\%]} divides by the gross flow
 (Section~\ref{ch:balance}). Every row is stamped with the end of its step.
 
 \paragraph{Run totals.} At the end of a run Raven appends to \cmd{GWModelSummary.txt}: time steps and MODFLOW-unconverged steps; with
@@ -277,7 +279,8 @@ iterations and steps in which drained columns were kept 1~mm above their bottoms
 supply-limited link updates and the largest take beyond the free water, and the connection-test drops (link updates, steps,
 and those followed by a plain update); without \cmd{:SoilZone PHYSICAL} the discharge withheld on unconverged steps for
 MODFLOW's negative residual (only when such steps occurred); the negative recharge cut and the part not held (only when not zero); for an existing
-model without \cmd{NEWTON} the recharge not applied (always written, also 0).
+model with \cmd{:ReservoirExchange} the reservoir seepage not delivered, and for an existing model without \cmd{NEWTON} the recharge
+not applied (both always written, also 0).
 
 
 \section{Hotstart blocks (\texttt{solution.rvc})}\label{app:hotstart}
@@ -374,6 +377,10 @@ MODFLOW did not converge, but its last outer iteration moved the head only \ldot
 \item ``\ldots m$^3$ of the negative recharge the top cells could not supply was not held by the soil zone \ldots''.
 \item ``\ldots m$^3$ of Raven's recharge was not applied by MODFLOW (a model without NEWTON) on \emph{n} column(s) whose cells are
 all inactive (dry) and \emph{m} column(s) whose highest active cell is a specified head \ldots''.
+\item ``\ldots m$^3$ of reservoir seepage was not delivered by MODFLOW (cells under the lake that are specified heads or
+inactive); returned to the reservoir's subbasin \ldots'' (an existing model).
+\item ``boundary \emph{name} has no cells: its head (\emph{h} m, \ldots) lies below the bottom of every cell it selects (highest
+\emph{z} m) \ldots'' (at set-up: give a head above those cells, or a \cmd{:BoundaryHead} series that reaches above them).
 \item ``:SoilZone PHYSICAL needs an existing model that uses the Newton-Raphson formulation \ldots'' (stop).
 \item ``MODFLOW 6 stopped the run during \emph{call}: \emph{the error report of mfsim.lst}'' (stop: an input error MODFLOW finds
 inside its library, e.g. \cmd{LINEAR\_ACCELERATION CG} with \cmd{NEWTON}).

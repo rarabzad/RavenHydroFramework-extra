@@ -16,6 +16,17 @@ Cases (metres/days model md, feet/seconds model fs, linked through :MF6CRS):
   restart   all, restarted half-way from solution.rvc (heads, :GWReservoirSeepage in transit): equal to the continuous run
   plain     (with RAVEN_EXE_REF) the coupled case without these options: outputs and the mf6 folder identical to the
             reference build
+Dry and specified-head cells under the exchanges (the md model edited with flopy; 6 days, 15 in the full mode):
+  et_dry    the model without NEWTON, layer 1 made 4 m thick, heads 5 m deep (in layer 2), EXTINCTION_DEPTH 6 m: MODFLOW
+            moves the ET of each dry top cell to the cell below; GWBudget.csv's water-table ET is MODFLOW's (budget file,
+            every step), positive and finite, the MODFLOW balance error stays at round-off, no output holds HDRY or NaN
+  res_chd   the reservoir case with a CHD the model keeps on every cell under the lake from stress period 2: no seepage is
+            sent to the specified heads; what MODFLOW did not take is returned to the reservoir's subbasin and booked
+            ("reservoir seepage not delivered by MODFLOW", warning, run total): sent = delivered - gain not supplied + not
+            delivered, the river books include it, Raven's balance holds
+  res_chd2  the same with 2 of those cells specified heads: the seepage goes to the other cells, all of it delivered
+  res_dry   the reservoir case on the model without NEWTON with heads 25 m deep (the lake's top cells dry): the reservoir
+            books hold (sent = delivered - gain not supplied + not delivered), no output holds HDRY or NaN
 Quick mode (RAVEN_TEST_QUICK=1): 31 days and no et_ft; full mode 120 days.
 Usage: python3 ext_exchanges.py      (prints 'existing-model exchanges: ALL PASSED' when every check holds)"""
 import os, sys
@@ -49,8 +60,8 @@ def lake_hru(d):
     return int(r[0]), float(r[ie])
 
 
-def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=False, start='1985-10-01', rvc=None, exe=None):
-    subprocess.run([sys.executable, tc.SETUP_EXT, d, X + '/' + units], capture_output=True, check=True)
+def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=False, start='1985-10-01', rvc=None, exe=None, model=None, ed=2.0):
+    subprocess.run([sys.executable, tc.SETUP_EXT, d, model or (X + '/' + units)], capture_output=True, check=True)
     t = open(d + '/Liard.rvi').read()
     t = re.sub(r':StartDate\s+\S+\s+\S+', ':StartDate %s 00:00:00' % start, t); t = re.sub(r':Duration\s+\S+', ':Duration %d' % days, t)
     if et:
@@ -69,9 +80,9 @@ def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=Fals
         p = p.replace('INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SOIL_ZONE_DEPTH',
                       'INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SOIL_ZONE_DEPTH, EXTINCTION_DEPTH')
         i = p.find('INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH'); j = p.find(':EndAquiferProfileParameters', i); L = p[i:j].split('\n')
-        L = [l + (', m' if l.strip().startswith(':Units') else ', 2.0' if l.strip().split(',')[0] in ('VALLEY_ALLUVIUM', 'UPLAND_TILL') else '') for l in L]
+        L = [l + (', m' if l.strip().startswith(':Units') else ', %g' % ed if l.strip().split(',')[0] in ('VALLEY_ALLUVIUM', 'UPLAND_TILL') else '') for l in L]
         p = p[:i] + '\n'.join(L) + p[j:]
-        assert p.count(', 2.0') == 2, 'rvp edit failed'
+        assert p.count(', %g' % ed) >= 2, 'rvp edit failed'
         open(d + '/Liard.rvp', 'w').write(p)
     if res:
         lid, elev = lake_hru(d)
@@ -262,6 +273,95 @@ if 'Successful' in msg:
         check('restarted run = continuous run (%d days)' % len(m), len(m) == DAYS - k and dev < 1e-4, 'max deviation %.1e' % dev)
         identities(r2, swx=True, res=True, river=False)   # (the audit starts the river carry at 0, not at the hotstart's)
     shutil.rmtree(r1, ignore_errors=True); shutil.rmtree(r2, ignore_errors=True)
+
+# ---- dry and specified-head cells
+DDAYS = 6 if QUICK else 15
+
+
+def model_copy(name, newton=True, thin=None, depth=None, chd=None):
+    """a copy of the md model: without NEWTON, layer 1 `thin` m thick, initial heads `depth` m below the top, a CHD package
+    (CHD_LAKE) on the cells `chd` [(lay, row, col)] from stress period 2, 10 m below the top"""
+    M = W + '/model_' + name; shutil.rmtree(M, ignore_errors=True); shutil.copytree(X + '/md', M)
+    if not newton:
+        p = M + '/gwf_liard.nam'; nam = open(p).read(); open(p, 'w').write(re.sub(r'\n\s*NEWTON[^\n]*', '', nam))
+    sim = flopy.mf6.MFSimulation.load(sim_ws=M, verbosity_level=0); g = sim.get_model('gwf_liard'); top = g.dis.top.array
+    if thin:
+        b = g.dis.botm.array; b[0] = top - thin; g.dis.botm.set_data(b); g.dis.write()
+    if depth:
+        g.ic.strt.set_data(np.repeat((top - depth)[None], g.dis.nlay.get_data(), axis=0)); g.ic.write()
+    if chd:
+        flopy.mf6.ModflowGwfchd(g, pname='CHD_LAKE', stress_period_data={1: [[c, float(top[c[1], c[2]] - 10.0)] for c in chd]}, save_flows=True)
+        sim.write_simulation(silent=True)
+    return M
+
+
+def no_hdry(d):
+    """every number in the groundwater CSV outputs and WatershedStorage.csv is finite and below 1e20 in magnitude (no HDRY,
+    no NaN)"""
+    bad = []
+    for f in sorted(os.listdir(d + '/out')):
+        if not (f.endswith('.csv') and (f.startswith('GW') or f == 'WatershedStorage.csv')):
+            continue
+        t = pd.read_csv(d + '/out/' + f, low_memory=False)
+        v = t.apply(pd.to_numeric, errors='coerce').values.astype(float)
+        x = v[~np.isnan(v)]
+        nn = int(np.isnan(t.select_dtypes(include=[np.number]).values.astype(float)).sum())
+        if nn or (x.size and np.abs(x).max() >= 1e20):
+            bad.append('%s (%d NaN, largest %.3g)' % (f, nn, np.abs(x).max() if x.size else 0.0))
+    check('no HDRY or NaN in the CSV outputs', not bad, ', '.join(bad)[:150])
+
+
+def lake_cells(d):
+    """(lay, row, col) of the RES_RAVEN entries of a run (0-based)"""
+    txt = open(d + '/out/mf6/raven.res').read().split('BEGIN PERIOD')[1].split('END PERIOD')[0]
+    return [tuple(int(x) - 1 for x in l.split()[:3]) for l in txt.strip().split('\n')[1:] if l.strip()]
+
+
+print('et_dry: model without NEWTON, layer 1 4 m thick, heads 5 m deep, EXTINCTION_DEPTH 6 m, %d days' % DDAYS, flush=True)
+M = model_copy('n0_thin', newton=False, thin=4.0, depth=5.0)
+d = W + '/et_dry'; msg = prep(d, days=DDAYS, et=True, model=M, ed=6.0); check('run', 'Successful' in msg, msg[:120])
+if 'Successful' in msg:
+    b = budget(d); evt = b['water-table ET [m3/d]'].values
+    check('water-table ET finite and > 0 on every step', np.all(np.isfinite(evt)) and np.all(evt > 0), 'from %.4g to %.4g m3/d' % (evt.min(), evt.max()))
+    err = b['MF6 balance error [m3/d]'].abs().max()
+    check('MODFLOW balance error at round-off', err < 1e-6 * max(np.abs(evt).max(), 1.0), '%.2g m3/d' % err)
+    R = cbc_check(d, ['EVT_RAVEN']); w, n = R.get('EVT_RAVEN', (float('nan'), 0))
+    check('budget file EVT_RAVEN = GWBudget.csv water-table ET (%d saved steps)' % n, n > 0 and w < 1e-6, '%.1e' % w)
+    no_hdry(d)
+    shutil.rmtree(d, ignore_errors=True)
+shutil.rmtree(M, ignore_errors=True)
+
+print('res_chd: reservoir over cells that become specified heads, %d days' % DDAYS, flush=True)
+r0 = W + '/res_cells'; msg = prep(r0, days=2, res=True); cells = lake_cells(r0) if 'Successful' in msg else []
+check('lake cells found', len(cells) >= 3, str(cells)); shutil.rmtree(r0, ignore_errors=True)
+for tag, cc in (('res_chd', cells), ('res_chd2', cells[:2])):
+    if not cells:
+        break
+    M = model_copy(tag, chd=cc)
+    d = W + '/' + tag; msg = prep(d, days=DDAYS, res=True, model=M); check('%s: run' % tag, 'Successful' in msg, msg[:120])
+    if 'Successful' in msg:
+        b = budget(d); sent = b['reservoir seepage sent [m3/d]'].sum(); dl = b['reservoir seepage delivered [m3/d]'].sum()
+        ud = b['reservoir seepage not delivered by MODFLOW [m3]'].sum() if 'reservoir seepage not delivered by MODFLOW [m3]' in b else 0.0
+        A = identities(d, res=True)
+        if tag == 'res_chd':
+            e = open(d + '/out/Raven_errors.txt').read(); s = open(d + '/out/GWModelSummary.txt').read()
+            m = re.search(r'reservoir seepage not delivered: (\S+) m3', s)
+            check('res_chd: seepage not delivered booked, warned, run total = its column', ud > 0 and 'not delivered by MODFLOW' in e and m is not None
+                  and abs(float(m.group(1)) - ud) <= 1e-5 * ud, 'not delivered %.4g m3 of %.4g sent' % (ud, sent))
+        else:
+            check('res_chd2: the seepage goes to the other cells (delivered = sent)', sent > 0 and abs(dl - sent) <= 1e-6 * sent and ud == 0.0,
+                  'delivered %.6g of %.6g m3/d, not delivered %.3g m3' % (dl, sent, ud))
+        no_hdry(d)
+        shutil.rmtree(d, ignore_errors=True)
+    shutil.rmtree(M, ignore_errors=True)
+
+print('res_dry: reservoir on the model without NEWTON whose top cells are dry, %d days' % DDAYS, flush=True)
+M = model_copy('n0_deep', newton=False, depth=25.0)
+d = W + '/res_dry'; msg = prep(d, days=DDAYS, res=True, model=M); check('res_dry: run', 'Successful' in msg, msg[:120])
+if 'Successful' in msg:
+    identities(d, res=True); no_hdry(d)
+    shutil.rmtree(d, ignore_errors=True)
+shutil.rmtree(M, ignore_errors=True)
 
 # ---- plain: without the options, identical to the reference build
 if tc.REF:

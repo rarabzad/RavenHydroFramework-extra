@@ -29,7 +29,8 @@ With \cmd{RICHARDS} each class column gives capillary rise from its top node on 
 no column (and for \cmd{KINEMATIC} and \cmd{LAG} everywhere) the rise comes from the water table to the class's own base.
 That rise takes what the source cell's limit (Section~\ref{sec:szvadose}) has left after all the class columns' draws on
 it: the water their new nodes took, the negative recharge passed through them and their bottom upflow; one cell never
-gives more than that one limit per step (test C11).
+gives more than that one limit per step (test C11). A negative recharge on the classes without a column takes what is
+left of it too, and the rest is cut back to the soil zone (test R22).
 The budget columns of the unsaturated zone (inflow, to aquifer, capillary rise, storage) sum all class columns over
 their areas $a\,a_c$, and the identities of Chapter~\ref{ch:balance} hold for them as for one column.
 
