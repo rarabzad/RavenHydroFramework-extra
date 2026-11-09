@@ -87,7 +87,7 @@ Pumping & 100\,000 m$^3$/d well, 5 years & 93\% delivered; seasonal drawdown 0.8
 Monitoring wells & synthetic heads with 5 cm noise & RMSE 4.9 cm; NSE 0.991--0.9997\\
 Fixed-head lake & 9 cells & heads held exactly; recharge on them redistributed\\
 Restart & 1 + 1 years against 2 years & flows within $6\times10^{-6}$ (Figure~\ref{fig:hotstart})\\
-Ensembles & 2 Monte Carlo members, every option on & members identical to each other and to a single run\\
+Ensembles & 2 Monte Carlo members, every option on & each member identical to a single run (groundwater budget, heads, hydrographs, reservoir stages, HRU states)\\
 Drying and rewetting & valley aquifer starting dry & 26 wet areas merge into 2 and split with the seasons (Figure~\ref{fig:conn}); one rewetting step of 1\,826 does not converge and is flagged\\
 Wetlands and lakes & 1\,903 exchange cells & water removed from Raven equals MODFLOW's leakage exactly\\
 Reservoir & 50 km$^2$ lake on a coupled HRU & seepage delivered each day equals Raven's seepage of the day before\\
@@ -99,8 +99,10 @@ Other features & \cmd{:rvg\_Filename}, NetCDF, linkage cache, calibration & file
 The reservoir and ensemble rows are repeated by \cmd{tests/behaviour\_check.py}: a 50~km$^2$ lake with seepage on the
 largest coupled HRU of subbasin~52, with a pumping well, for two years --- the seepage MODFLOW receives each day equals the
 volume that left the lake the day before (difference 0), all of it is delivered, and MODFLOW's residual is
-$1.7\times10^{-11}$; and the same set-up as a two-member ensemble --- both members identical to the single run
-(difference 0).
+$1.7\times10^{-11}$; and the same set-up as a two-member ensemble --- each member identical to the single run in
+\cmd{GWBudget.csv}, \cmd{GWHeads.csv}, \cmd{Hydrographs.csv}, \cmd{ReservoirStages.csv} and \cmd{GWHRUState.csv}
+(difference 0), with exact accounts. (\cmd{WatershedStorage.csv} is not compared: in ensemble mode base Raven reports other
+channel and rivulet storages than in a single run, also without groundwater; Section~\ref{ch:limits}.)
 
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_pumping.png}
 \caption{Pumping test: drawdown at the monitoring wells (left) and where the pumped water comes from (right).}\label{fig:pumping}\end{figure}
@@ -129,7 +131,8 @@ Bilinear raster sampling with a no-data cell (200 points) & independent code & $
 GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\
 \cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
 \cmd{:InputCRS}: UTM GeoJSON polygons and lines read back in lon/lat & pyproj (PROJ) & $1.1\times10^{-11}$ degrees\\
-\cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\\bottomrule
+\cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\
+\cmd{"crs"} members: EPSG:6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 (not built in) & -- & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 asks for its parameters, which are then accepted\\\bottomrule
 \end{tabularx}
 \end{table}
 
@@ -140,7 +143,10 @@ $8\times10^{-12}$ and HRU--cell overlaps within $1.1\times10^{-9}$ of a cell; wi
 printed digits and the groundwater budget within $2\times10^{-8}$ over 120 days. With the DEM and bedrock resampled to
 300~m UTM grids the model top differs by 0.018~m on average (the resampling) and the hydrographs by $10^{-3}$. Projected
 files without \cmd{:InputCRS}, files in another projection and wells given by \cmd{X} and \cmd{Y} without \cmd{:InputCRS}
-stop the run with a message naming \cmd{:InputCRS}.
+stop the run with a message naming \cmd{:InputCRS}; with \cmd{:InputCRS}, a DEM, a bedrock raster, the HRU polygons or a
+boundary line left in longitude/latitude stop the run as ``looks like longitude/latitude''. The boundaries of this test have
+heads above their cells (the general-head line by its \cmd{HEAD}, the specified-head lake by a \cmd{:BoundaryHead} series
+with \cmd{HEAD 0}), and both runs give them the same cells (3 and 9).
 
 \paragraph{A layer that starts dry.} The start-up warning for a layer that starts dry (\cmd{tests/dry\_start.py}) names
 layer~2 of the Liard model with \cmd{INITIAL\_HEAD\_DEPTH} 25~m (2\,794 cells), and is absent with a steady-state start
@@ -218,7 +224,10 @@ Duplicate IDs or names; two exchanges on one store; boundary without \cmd{HEAD} 
 Malformed groundwater command in \cmd{.rvg}, \cmd{.rvt} or \cmd{.rvc} & stops; names the command\\
 Hotstart heads for a different grid; cells larger than the HRUs & stops; explains the mismatch\\
 Monitoring well outside the model; unknown \cmd{.rvg} command & runs with a warning\\
-\cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\\bottomrule
+\cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\
+Malformed numbers in the \cmd{.rvg} (\cmd{:GridCellSize 2,000.0}, \cmd{2km}, \cmd{HEAD H1146}, \cmd{1146.85m}, \cmd{50.5} iterations, a \cmd{:Wells} value); a cell or refinement size giving more than $10^7$ cells per layer & stops before the grid is built; names the command and the value (\cmd{tests/input\_checks.py})\\
+\cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
+A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule
 \end{tabularx}
 \end{table}
 
@@ -445,6 +454,8 @@ returned, the run totals against their columns, and no HDRY or NaN in the ground
 of 8 days (about a minute), the full mode a larger matrix of 15 days, with half-day steps too. One result is reported
 apart as known: where a reservoir's stage falls back below its weir crest while groundwater feeds it, Raven's balance error
 equals the reservoir routing's own balance error (a few m$^3$, \cmd{ReservoirMassBalance.csv}); the coupling's books hold.
+The error comes from Raven's reservoir routine, which stops its stage iteration at a change of 0.1~mm next to the kink of the
+weir's outflow curve; base Raven gives the same without groundwater (Section~\ref{ch:limits}).
 
 \section{Running the tests}\label{sec:runtests}
 \cmd{python3 tests/run\_all.py} runs every test of this chapter (the unit tests, the file and input checks, the Thiem,
@@ -456,4 +467,7 @@ need no MODFLOW library, and \cmd{-{}-quick} uses smaller randomized rounds and 
 instead of 365; each script's header lists its quick mode). A check a script cannot make (for example a byte-identity check
 without a reference build, \cmd{RAVEN\_EXE\_REF}) is reported as skipped: the step reads ``PASS (k skipped)'' and the report
 lists the skipped checks. The two USGS example steps run only when \cmd{RAVEN\_USGS\_EXAMPLES} points at the MODFLOW~6 examples.
-\cmd{tests/README.md} lists every script and what it checks.
+A step passes when its script exits without error and its own criterion holds; the scripts with several runs (restart,
+lake, Thiem, Liard grids, existing-model restarts) end with a count of the runs that finished with no unconverged step and
+exact accounts, and their step passes only when every run counts. The step \cmd{run\_all\_selftest} checks that these
+criteria fail on outputs with failed runs. \cmd{tests/README.md} lists every script and what it checks.

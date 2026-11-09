@@ -1,5 +1,10 @@
 """Lake refinement: a reservoir on a coupled HRU of subbasin 52; LAKES refinement on each refinable grid type,
-POLYGONS on the HRU mesh; checked; cell sizes inside/around the lake against elsewhere."""
+POLYGONS on the HRU mesh; audited; cell sizes inside/around the lake against elsewhere.
+
+A run passes when it finishes with no unconverged step, the recharge identity below 1e-9, MODFLOW's cumulative residual
+below 1e-9, the reservoir seepage sent each step equal to the volume in transit the step before (1e-8 relative) and all of
+it delivered (1e-9), the manual's "Lakes" paragraph. The last line gives the count; the exit code is 1 unless all pass.
+The same in quick and full mode (RAVEN_TEST_QUICK has no effect)."""
 import os,shutil,subprocess,re,sys,json,math
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__))); import testconfig as tc; audit=tc.audit
 from shapely.geometry import shape
@@ -17,6 +22,7 @@ res=f"\n:Reservoir TestLake\n  :SubBasinID 52\n  :HRUID {lid}\n  :Type RESROUTE_
 V=[('regular, rotated, LAKES 750',':GridRotation 20\n:GridRefinement LAKES 750\n'),('quadtree, LAKES 375',':GridType QUADTREE\n:GridRefinement LAKES 375\n'),
    ('HRU mesh, LAKES 500',':GridType HRU_MESH\n:GridRefinement LAKES 500\n'),('HRU mesh, POLYGONS 500',':GridType HRU_MESH\n:GridRefinement POLYGONS lake_poly.geojson 500\n'),
    ('HRU mesh, no refinement',':GridType HRU_MESH\n')]
+npass=0
 for name,extra in V:
     d=tc.work('lake','lk_'+re.sub('[^a-z0-9]+','_',name.lower()).strip('_')); shutil.rmtree(d,ignore_errors=True); shutil.copytree(B,d,ignore=shutil.ignore_patterns('out')); os.makedirs(d+'/out')
     shutil.copy(LAKEPOLY,d); open(d+'/Liard.rvh','a').write(res)
@@ -36,3 +42,8 @@ for name,extra in V:
           abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),A['MF6 cumulative residual / gross flow'],abs(A['river: applied - net MF6 - carry change (rel)']),A['unconverged steps']))
     b=[k for k in A if 'reservoir' in k.lower()]
     print('      reservoir checks:',{k:A[k] for k in b})
+    good=(A['unconverged steps']==0 and abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven'])<1e-9 and abs(A['MF6 cumulative residual / gross flow'])<1e-9
+          and abs(A['reservoir: sent(t) - awaiting(t-1) (rel)'])<1e-8 and abs(A['reservoir: delivered / sent']-1)<1e-9)
+    npass+=good; print('      %s'%('ok' if good else 'FAIL'))
+print('lake runs: %d of %d pass'%(npass,len(V)))
+sys.exit(0 if npass==len(V) else 1)

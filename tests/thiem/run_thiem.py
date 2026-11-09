@@ -17,12 +17,14 @@ V=[('regular 1000 m',':GridCellSize 1000',''),('regular 500 m',':GridCellSize 50
    ('HRU mesh 250 m lattice only',':GridCellSize 250',':GridType HRU_MESH\n'),
    ('regular 250 m via DISU',':GridCellSize 250',':LayerConnection ELEVATION\n'),
    ('imported (quadtree cells)',':GridCellSize 1000',':GridType FILE\n:GridFile qt_cells.geojson cell\n')]
-rows=[]
+rows=[]; nok=0
 for name,csl,extra in V:
     d=OUT+'/v_'+re.sub(r'[^a-z0-9]+','_',name.lower()).strip('_')
     shutil.rmtree(d,ignore_errors=True); os.makedirs(d+'/out')
     for f in ('Thiem.rvi','Thiem.rvh','Thiem.rvp','Thiem.rvt','Thiem.rvc','hru.geojson','edge.geojson'): shutil.copy(HERE+'/'+f,d)
-    if 'imported' in name: shutil.copy(OUT+'/qt_cells.geojson',d)
+    if 'imported' in name:
+        if not os.path.exists(OUT+'/qt_cells.geojson'): print(name,'FAILED','(no quadtree cells: the quadtree run failed)'); continue
+        shutil.copy(OUT+'/qt_cells.geojson',d)
     open(d+'/Thiem.rvg','w').write(base.replace(':GridCellSize 1000',csl)+extra)
     r=subprocess.run([RV,'Thiem','-o','out/'],cwd=d,capture_output=True,text=True,env=ENV)
     ex=(re.findall(r'Exiting Gracefully: (.*)',r.stdout + r.stderr) or ['?'])[-1]
@@ -34,5 +36,10 @@ for name,csl,extra in V:
     s=open(d+'/out/GWModelSummary.txt').read(); ncell=re.findall(r'(\d+) (?:cells|cols)',s)
     A=audit.audit(d+'/out')
     rows.append((name,e1,e2,A.get('MF6 cumulative residual / gross flow'),A.get('unconverged steps')))
+    nok+=(A.get('unconverged steps')==0) and abs(A.get('MF6 cumulative residual / gross flow'))<1e-6
     print('%-42s dh(600-1200) err %+7.2f%%   dh(1200-2400) err %+7.2f%%   residual %.1e  failed %s'%(name,100*e1,100*e2,A.get('MF6 cumulative residual / gross flow'),A.get('unconverged steps')))
 print('analytic head difference per doubling of distance: %.4f m'%a)
+# every run must finish with no unconverged step and MODFLOW's cumulative residual below 1e-6 (the runs give 3e-8 at most) (the manual: "every run checked, none
+# with a failed step"); exit code 1 otherwise
+print('thiem runs: %d of %d finished, converged and balanced'%(nok,len(V)))
+sys.exit(0 if nok==len(V) else 1)

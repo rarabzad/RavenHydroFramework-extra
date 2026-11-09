@@ -720,7 +720,7 @@ zone}, \emph{unsaturated zone storage}, \emph{capillary rise from the water tabl
 (Section~\ref{sec:accsz}); \cmd{GWSoilExchange.csv} per HRU and step: soil-zone base, soil water
 level, water table, saturated fraction, exchange with the aquifer (and with specified heads, where the model has them,
 under the headings of \cmd{GWBudget.csv}), rejected recharge, overflow, soil water and capacity.
-\cmd{tools/plot\_soilzone.py} plots both.
+\cmd{tools/plot\_soilzone.py} plots both, the exchange with specified heads as lines of its own.
 \end{refcard}
 
 \subsection{Common questions}
@@ -1079,7 +1079,8 @@ the seepage as a loss.
 \section{Wells and boundaries}\label{ch:wells}
 \subsection{Pumping and injection wells}
 Wells are listed in \cmd{:Wells} with their location and screen (top and bottom elevation); pumping rates come from a
-time series \cmd{:WellFlowRate} in the \cmd{.rvt} file (m$^3$/d, negative for pumping, positive for injection). A screen that crosses several layers
+time series \cmd{:WellFlowRate} in the \cmd{.rvt} file (m$^3$/d, negative for pumping, positive for injection; rates given in
+\cmd{m3/s} or \cmd{L/s} on the command line are converted to m$^3$/d, and other units stop the run). A screen that crosses several layers
 is split among them by transmissivity, so more water comes from the more permeable layers:
 \begin{equation}
 Q_{w,\ell}=Q_w\,\frac{T_\ell}{\sum_{\ell'}T_{\ell'}},\qquad

@@ -3,13 +3,14 @@
   reservoir  a 50 km2 lake with seepage on the largest coupled HRU of subbasin 52 (:ReservoirExchange), two years, plus a
              pumping well and a monitoring well: the seepage MODFLOW receives each step must equal the volume that left
              the lake the step before, all of it delivered; exact water accounts on both sides
-  ensemble   the same set-up as a two-member Monte Carlo ensemble with a fixed parameter: the first member must equal the
-             single run (groundwater budget, heads, hydrographs, reservoir stages); the second must start from the same
-             groundwater state (the heads after its first step within 1e-6 of the single run's) and keep every account
-             exact. (Raven itself does not reset routing and reservoir outflow between ensemble members, also without
-             groundwater, so the second member's hydrographs differ from the single run in its first days.)
+  ensemble   the same set-up as a two-member Monte Carlo ensemble with a fixed parameter: each member must equal the
+             single run in GWBudget.csv, GWHeads.csv, Hydrographs.csv, ReservoirStages.csv and GWHRUState.csv (every
+             value, relative difference below 1e-12; Raven restores the initial state of routing and reservoirs before
+             each member), and keep every account exact. WatershedStorage.csv is not compared: base Raven's channel and
+             rivulet storage differ in ensemble mode, also without groundwater.
 
 Usage: python3 behaviour_check.py      (needs RAVEN_MF6_LIB)
+Quick mode (RAVEN_TEST_QUICK=1): 120 days; full mode: two years (731 days).
 """
 import os, sys, re, json, shutil, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -19,7 +20,7 @@ from shapely.geometry import shape
 
 tc.need_mf6()
 B = tc.LIARD
-DAYS = 731
+DAYS = 120 if os.environ.get('RAVEN_TEST_QUICK', '') == '1' else 731
 
 
 def setup(d):
@@ -85,30 +86,37 @@ open(e + '/Liard.rve', 'w').write(':OutputDirectoryFormat ./ens_*/\n:ParameterDi
 r = subprocess.run([tc.RAVEN, 'Liard', '-o', 'out/'], cwd=e, capture_output=True, text=True, env=tc.ENV)
 emsg = (re.findall(r'Exiting Gracefully: (.*)', r.stdout + r.stderr) or ['(no exit line)'])[-1]
 print('ensemble: 2 Monte Carlo members: %s' % emsg)
-worst = 0.0
-for f in ('GWBudget.csv', 'GWHeads.csv', 'Hydrographs.csv', 'ReservoirStages.csv', 'GWHRUState.csv'):
-    pa, pb = os.path.join(d, 'out', f), os.path.join(e, 'ens_1', f)
-    if not os.path.exists(pa):
-        continue
-    if not os.path.exists(pb):
-        print('  ens_1/%s missing' % f); ok_all = False; continue
-    a, c = pd.read_csv(pa), pd.read_csv(pb)
-    num = [k for k in a.columns if k in c.columns and pd.api.types.is_numeric_dtype(a[k]) and pd.api.types.is_numeric_dtype(c[k])]
-    worst = max(worst, max(float(((a[k] - c[k]).abs() / (a[k].abs().max() + 1e-9)).max()) for k in num))
-    if len(a) != len(c):
-        print('  ens_1/%s: %d rows instead of %d' % (f, len(c), len(a))); ok_all = False
-print('  first member against the single run: largest relative difference %.1e  %s' % (worst, 'ok' if worst < 1e-12 else 'FAIL'))
-ok_all &= worst < 1e-12 and 'Successful' in emsg
-h0 = pd.read_csv(os.path.join(d, 'out', 'GWHRUState.csv')); h2 = pd.read_csv(os.path.join(e, 'ens_2', 'GWHRUState.csv'))
-hc = [k for k in h0.columns if k.startswith('head_')]
-dh = float((h0[hc].iloc[0] - h2[hc].iloc[0]).abs().max())
-A2 = tc.audit.audit(os.path.join(e, 'ens_2'))
-c2 = [('second member: heads after step 1 against the single run [m]', dh, 1e-6),
-      ('second member: recharge identity', abs(A2['recharge: (Raven - MF6 - dStore - toCHD)/Raven']), 1e-9),
-      ('second member: MODFLOW cumulative residual', abs(A2['MF6 cumulative residual / gross flow']), 1e-8),
-      ('second member: reservoir (delivered + not supplied) / sent - 1', abs(A2['reservoir: (delivered + not supplied) / sent'] - 1), 1e-9)]
-for name, v, lim in c2:
-    ok = v < lim; ok_all &= ok
-    print('  %-62s %.2e  %s' % (name, v, 'ok' if ok else 'FAIL'))
+FILES = ('GWBudget.csv', 'GWHeads.csv', 'Hydrographs.csv', 'ReservoirStages.csv', 'GWHRUState.csv')
+ok_all &= 'Successful' in emsg
+for m in (1, 2):
+    worst, where, compared = 0.0, '', []
+    for f in FILES:
+        pa, pb = os.path.join(d, 'out', f), os.path.join(e, 'ens_%d' % m, f)
+        if not os.path.exists(pa):
+            continue
+        if not os.path.exists(pb):
+            print('  ens_%d/%s missing  FAIL' % (m, f)); ok_all = False; continue
+        a, c = pd.read_csv(pa), pd.read_csv(pb)
+        if len(a) != len(c) or list(a.columns) != list(c.columns):
+            print('  ens_%d/%s: %d rows instead of %d, or other columns  FAIL' % (m, f, len(c), len(a))); ok_all = False; continue
+        num = [k for k in a.columns if pd.api.types.is_numeric_dtype(a[k]) and pd.api.types.is_numeric_dtype(c[k])]
+        txt = [k for k in a.columns if k not in num]
+        if any((a[k].astype(str) != c[k].astype(str)).any() for k in txt):
+            print('  ens_%d/%s: text columns (dates) differ  FAIL' % (m, f)); ok_all = False
+        for k in num:
+            v = float(((a[k] - c[k]).abs() / (a[k].abs().max() + 1e-9)).max())
+            if v > worst:
+                worst, where = v, '%s %s' % (f, k)
+        compared.append(f)
+    ok = worst < 1e-12 and len(compared) == sum(1 for f in FILES if os.path.exists(os.path.join(d, 'out', f)))
+    ok_all &= ok
+    print('  member %d against the single run (%s): largest relative difference %.1e%s  %s' % (
+        m, ', '.join(compared), worst, (' (%s)' % where) if worst > 0 else '', 'ok' if ok else 'FAIL'))
+    Am = tc.audit.audit(os.path.join(e, 'ens_%d' % m))
+    for name, v, lim in (('recharge identity', abs(Am['recharge: (Raven - MF6 - dStore - toCHD)/Raven']), 1e-9),
+                         ('MODFLOW cumulative residual', abs(Am['MF6 cumulative residual / gross flow']), 1e-8),
+                         ('reservoir (delivered + not supplied) / sent - 1', abs(Am['reservoir: (delivered + not supplied) / sent'] - 1), 1e-9)):
+        ok = v < lim; ok_all &= ok
+        print('  member %d: %-56s %.2e  %s' % (m, name, v, 'ok' if ok else 'FAIL'))
 print('behaviour checks: %s' % ('ALL PASSED' if ok_all else 'FAILED'))
 sys.exit(0 if ok_all else 1)

@@ -180,16 +180,26 @@ longitude/latitude (\cmd{grid\_cells.geojson}, \cmd{GWHeads.nc}), and \cmd{GWMod
 
 Input files whose coordinates do not match these settings are recognised where possible, and the run stops with a message:
 \begin{itemize}
-\item a GeoJSON file whose \cmd{"crs"} member names a projected EPSG code (as GDAL writes it,
-\cmd{urn:ogc:def:crs:EPSG::32610}) needs \cmd{:InputCRS} with that projection; a file whose \cmd{"crs"} member names
-another built-in projection than \cmd{:InputCRS}, or longitude/latitude (EPSG:4326, CRS84, NAD83), is refused;
+\item a GeoJSON file's \cmd{"crs"} member is read by the EPSG code that ends its name (\cmd{EPSG:32610}, as GDAL writes it
+\cmd{urn:ogc:def:crs:EPSG::32610}, a versioned \cmd{urn:ogc:def:crs:EPSG:6.6:32610}, or
+\cmd{http://www.opengis.net/def/crs/EPSG/0/32610}). A built-in projected code needs \cmd{:InputCRS} with that projection,
+and a file whose code is another built-in projection than \cmd{:InputCRS} is refused. Geographic codes (longitude/latitude:
+every EPSG code from 4000 to 4999, such as 4326 WGS\,84, 4979 WGS\,84 3D, 4269 NAD83, 4267 NAD27, 4617 NAD83(CSRS), and
+6318/6319 NAD83(2011), 8255 NAD83(CSRS)v7, 7843/7844 GDA2020, 6667/6668 JGD2011; OGC CRS84, CRS83 and CRS27) are
+accepted without \cmd{:InputCRS} and refused with it. Any other code cannot be classified: the file's coordinates decide, and
+without \cmd{:InputCRS} coordinates outside the longitude/latitude range stop the run with a request for the projection's
+parameters (\cmd{TMERC}, \cmd{ALBERS} or \cmd{LCC});
 \item without \cmd{:InputCRS}, a GeoJSON file with coordinates outside $\pm360^\circ$ / $\pm90^\circ$, or a raster whose
 extent lies outside them, is refused (projected metres read as degrees);
+\item with \cmd{:InputCRS}, a GeoJSON file or raster left in longitude/latitude is refused (``looks like
+longitude/latitude''): its coordinates all lie within $\pm180^\circ$ / $\pm90^\circ$ and over the HRUs'
+\cmd{LATITUDE}/\cmd{LONGITUDE} of the \cmd{.rvh} file, but not near the HRUs in the projection's coordinates (within
+50~km plus half their extent);
 \item a well given by \cmd{X} and \cmd{Y} needs \cmd{:InputCRS}.
 \end{itemize}
 A file without a \cmd{"crs"} member is taken to be in the projection of \cmd{:InputCRS} when it is given, so with
-\cmd{:InputCRS} every input file must be projected (a code not built in, given by its parameters, cannot be compared with a
-file's \cmd{"crs"} member and is accepted). The equal-area projection Raven lays its grid in
+\cmd{:InputCRS} every input file must be projected (a projection given by its parameters, or a code not built in, cannot be
+compared with a file's \cmd{"crs"} member and is accepted). The equal-area projection Raven lays its grid in
 (Section~\ref{ch:grid}) is not changed by \cmd{:InputCRS}: the same HRU polygons given in longitude/latitude or in UTM give
 the same grid and the same overlaps (within $10^{-9}$ of a cell area in the Liard test, Chapter~\ref{ch:verification}).
 \subsection{Choosing the cell size}

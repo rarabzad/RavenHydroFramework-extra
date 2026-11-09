@@ -13,7 +13,10 @@ runs geomtest, then compares:
     plane at the PROJ position; GeoJSON polygons and lines in UTM read back in lon/lat against the originals (outer
     rings counterclockwise); the file's "crs" member: a projected file without :InputCRS, a different projection, a
     lon/lat file with :InputCRS, projected coordinates without any "crs" member and a projected raster without
-    :InputCRS are refused.
+    :InputCRS are refused; "crs" members naming geographic codes (EPSG:6318, 4979, 4267, a versioned URN
+    urn:ogc:def:crs:EPSG:6.6:4326, an http://www.opengis.net/def/crs/EPSG/0/4269 URL, OGC CRS83) are read as
+    longitude/latitude, a versioned URN of a projection is read by its code, and a projection that is not built in
+    (EPSG:3157) asks for its parameters (not for :InputCRS EPSG:3157), which are then accepted.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -59,6 +62,27 @@ json.dump(fc(pu), open('test_utm_bare.geojson', 'w'))
 json.dump(fc([[[list(p) for p in r + [r[0]]]] for r in polys_ll], 'urn:ogc:def:crs:OGC:1.3:CRS84'), open('test_ll_crs84.geojson', 'w'))
 lines_ll = [[(-123.3, 49.3), (-123.1, 49.35), (-122.8, 49.6)], [(-122.9, 49.7), (-122.7, 49.75)]]
 json.dump(fc([to_utm(l) for l in lines_ll], 'EPSG:32610', 'LineString'), open('test_utm_line.geojson', 'w'))
+# "crs" members: geographic codes (any EPSG code 4000-4999, NAD83(2011) 6318, ...), versioned URNs and URLs, OGC CRS84/CRS83;
+# a projection that is not built in (EPSG:3157, NAD83(CSRS) / UTM zone 10N): the message asks for its parameters, and they work
+pl = [[[list(p) for p in r + [r[0]]]] for r in polys_ll]
+CRS_FILES = {'ll_6318': (pl, 'urn:ogc:def:crs:EPSG::6318'), 'll_4979': (pl, 'urn:ogc:def:crs:EPSG::4979'), 'll_4267': (pl, 'EPSG:4267'),
+             'll_ver': (pl, 'urn:ogc:def:crs:EPSG:6.6:4326'), 'll_url': (pl, 'http://www.opengis.net/def/crs/EPSG/0/4269'),
+             'll_crs83': (pl, 'urn:ogc:def:crs:OGC:1.3:CRS83'), 'utm_ver': (pu, 'urn:ogc:def:crs:EPSG:9.8.15:32610'),
+             'utm_3157': (pu, 'urn:ogc:def:crs:EPSG::3157')}
+for k, (g, c) in CRS_FILES.items():
+    json.dump(fc(g, c), open('test_crs_%s.geojson' % k, 'w'))
+TM10 = 'TMERC 0 -123 0.9996 500000 0 GRS80'
+CRS_CASES = [  # (name, file, :InputCRS or NONE, accepted, part of the message, text the message must not hold)
+    ('crs_6318', 'll_6318', 'NONE', 1, '', ''), ('crs_4979', 'll_4979', 'NONE', 1, '', ''), ('crs_4267', 'll_4267', 'NONE', 1, '', ''),
+    ('crs_ver4326', 'll_ver', 'NONE', 1, '', ''), ('crs_url4269', 'll_url', 'NONE', 1, '', ''), ('crs_crs83', 'll_crs83', 'NONE', 1, '', ''),
+    ('crs_6318_inputcrs', 'll_6318', 'EPSG:32610', 0, 'is in longitude/latitude', ':InputCRS EPSG:6318'),
+    ('crs_ver4326_inputcrs', 'll_ver', 'EPSG:32610', 0, 'is in longitude/latitude', 'EPSG:6 '),
+    ('crs_utm_ver', 'utm_ver', 'EPSG:32610', 1, '', ''), ('crs_utm_ver_none', 'utm_ver', 'NONE', 0, ':InputCRS EPSG:32610', ''),
+    ('crs_3157_none', 'utm_3157', 'NONE', 0, 'TMERC, ALBERS or LCC', ':InputCRS EPSG:3157'),
+    ('crs_3157_tmerc', 'utm_3157', TM10, 1, '', '')]
+with open('crs_cases.txt', 'w') as f:
+    for n, k, spec, _, _, _ in CRS_CASES:
+        f.write('%s test_crs_%s.geojson %s\n' % (n, k, spec))
 
 exe = os.path.join(here, 'geomtest')
 if not os.path.exists(exe):
@@ -125,9 +149,16 @@ expect = {'raster_nocrs': (0, ':InputCRS'), 'poly_crs': (1, ''), 'line_crs': (1,
 for k, (ok, msg) in expect.items():
     got = st.get(k, (-1, 'missing'))
     report(':InputCRS file check %-14s %s' % (k, 'accepted' if ok else 'refused (%s)' % msg), got[0] == ok and msg in got[1], got[0])
+for n, k, spec, ok, msg, nomsg in CRS_CASES:
+    got = st.get(n, (-1, 'missing'))
+    good = got[0] == ok and msg in got[1] and not (nomsg and nomsg in got[1])
+    report('"crs" %-22s %-11s %s' % (CRS_FILES[k][1][-22:], spec[:11], 'accepted' if ok else 'refused (%s)' % msg), good, got[0])
+    if not good:
+        print('      message: %s' % got[1][:300])
 
 for f in ('clip.txt', 'proj.txt', 'raster.txt', 'test.asc', 'test_utm.asc', 'raster_utm.txt', 'crs_status.txt', 'poly_utm.txt', 'line_utm.txt',
-          'test_utm_poly.geojson', 'test_utm_bare.geojson', 'test_ll_crs84.geojson', 'test_utm_line.geojson'):
+          'test_utm_poly.geojson', 'test_utm_bare.geojson', 'test_ll_crs84.geojson', 'test_utm_line.geojson', 'crs_cases.txt') + tuple(
+          'test_crs_%s.geojson' % k for k in CRS_FILES):
     if os.path.exists(f):   # another run in the same checkout may have removed it already
         os.remove(f)
 print('ALL PASSED' if fails == 0 else '%d FAILED' % fails)

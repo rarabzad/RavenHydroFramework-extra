@@ -4,7 +4,9 @@
 
 Per HRU (default: up to six HRUs with the largest exchange): water table and soil water level against the soil-zone
 base and the land surface, connected fraction, exchange up and down, rejected recharge and overflow. Below, the
-model-wide totals of GWBudget.csv and the interface updates per step. Use it to inspect the dynamics of a case: the
+model-wide totals of GWBudget.csv and the interface updates per step. When the model has soil-zone columns over
+specified heads, their exchange (the columns "soil zone to specified heads" and "specified heads to soil zone") is drawn
+as lines of its own beside the exchange with the aquifer, and counts in the choice of HRUs. Use it to inspect the dynamics of a case: the
 soil level should follow the water table once connected, the exchange should change sign only at physical turning
 points, and rejection should start when the water table reaches the base.
 """
@@ -13,6 +15,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+CHD_DOWN, CHD_UP = 'soil zone to specified heads [m3/d]', 'specified heads to soil zone [m3/d]'
 
 
 def main(argv):
@@ -26,8 +30,9 @@ def main(argv):
     s = pd.read_csv(os.path.join(out, 'GWSoilExchange.csv'))
     b = pd.read_csv(os.path.join(out, 'GWBudget.csv'))
     hrus = [int(x) for x in argv[2:]]
+    chd = [c for c in (CHD_DOWN, CHD_UP) if c in s.columns]     # (only with soil-zone columns over specified heads)
     if not hrus:
-        g = s.groupby('HRU_ID')[['soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]']].sum().sum(axis=1)
+        g = s.groupby('HRU_ID')[['soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]'] + chd].sum().sum(axis=1)
         hrus = list(g.sort_values(ascending=False).index[:6])
     n = len(hrus)
     fig, ax = plt.subplots(n + 2, 2, figsize=(12, 2.6 * (n + 2)), squeeze=False)
@@ -43,11 +48,17 @@ def main(argv):
         a = ax[r][1]
         a.plot(t, x['aquifer to soil zone [m3/d]'], label='aquifer to soil')
         a.plot(t, -x['soil zone to aquifer [m3/d]'], label='soil to aquifer (neg.)')
+        if chd:
+            a.plot(t, x[CHD_UP], '--', label='specified heads to soil')
+            a.plot(t, -x[CHD_DOWN], '--', label='soil to specified heads (neg.)')
         a2 = a.twinx(); a2.plot(t, x['saturated fraction [-]'], 'k:', lw=0.8, label='F'); a2.set_ylim(-0.05, 1.05)
         a.set_title('HRU %d: exchange [m3/d], connected fraction (dotted)' % k, fontsize=9); a.legend(fontsize=7)
     a = ax[n][0]
     a.plot(b['time [d]'], b['aquifer to soil zone [m3/d]'], label='aquifer to soil')
     a.plot(b['time [d]'], -b['soil zone to aquifer [m3/d]'], label='soil to aquifer (neg.)')
+    if all(c in b.columns for c in (CHD_DOWN, CHD_UP)):
+        a.plot(b['time [d]'], b[CHD_UP], '--', label='specified heads to soil')
+        a.plot(b['time [d]'], -b[CHD_DOWN], '--', label='soil to specified heads (neg.)')
     a.set_title('all HRUs: exchange [m3/d]', fontsize=9); a.legend(fontsize=7)
     a = ax[n][1]
     a.plot(b['time [d]'], b['rejected recharge [m3]'], label='rejected recharge')

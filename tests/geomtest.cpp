@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Rezgar Arabzadeh -- Raven-MODFLOW 6 groundwater coupling
 // SPDX-License-Identifier: Artistic-2.0
 // Unit test harness for GWGeometry: clipping areas, projection, raster sampling
+#include <sstream>
+#include <fstream>
 #include "GWGeometry.h"   // compile: g++ -std=c++11 -O2 -I$RAVEN_SRC/src geomtest.cpp $RAVEN_SRC/src/GWGeometry.cpp -o geomtest; then python3 geomtest_check.py
 #include <cstdio>
 #include <cmath>
@@ -51,6 +53,16 @@ int main(){
   { std::map<long long,std::vector<gw_ring> > sh; bool ok=GWGeom::ReadGeoJSONPolygons("test_ll_crs84.geojson","ID",sh,err,&U); fprintf(st,"ll_crs %d %s\n",ok?1:0,ok?"":err.c_str()); }
   { CGWCRS T; bool ok=T.Parse("TMERC 0 -123 0.9996 500000 0 WGS84",err); fprintf(st,"same_tmerc %d \n",(ok && T.Same(U))?1:0);
     fprintf(st,"same_other %d \n",U.Same(U9)?1:0); }
+  //"crs" members of GeoJSON files (crs_cases.txt, written by geomtest_check.py: name, file, :InputCRS spec or NONE)
+  { std::ifstream C("crs_cases.txt"); std::string line;
+    while (std::getline(C,line)){
+      std::istringstream is(line); std::string name,file,spec,w; is>>name>>file; while (is>>w){spec+=(spec.empty()?"":" ")+w;}
+      CGWCRS K; const CGWCRS *pk=NULL;
+      if (spec!="NONE"){if (!K.Parse(spec,err)){fprintf(st,"%s 0 (spec) %s\n",name.c_str(),err.c_str()); continue;} pk=&K;}
+      std::map<long long,std::vector<gw_ring> > sh; err=""; bool ok=GWGeom::ReadGeoJSONPolygons(file,"ID",sh,err,pk);
+      fprintf(st,"%s %d %s\n",name.c_str(),ok?1:0,ok?"":err.c_str());
+    }
+  }
   fclose(st);
   printf("done\n"); return 0;
 }

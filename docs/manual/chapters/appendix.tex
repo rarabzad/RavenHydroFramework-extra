@@ -153,8 +153,8 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:WriteNetCDFHeads} & write \cmd{GWHeads.nc} (off; needs a NetCDF build)\\
 \cmd{.rvg} & \cmd{:WriteGWBudgetFile} & MODFLOW budget file \cmd{mf6/gwf.cbc} every \cmd{:HeadSaveFrequency} steps, with specific discharge and saturation, and \cmd{mf6/gwf.porosity}, for particle tracking (Section~\ref{sec:budgetfile}); generated models only (off)\\
 \cmd{.rvg} & \cmd{:LinkageCache file} & linkage cache (\cmd{<output>/mf6/linkage.cache})\\
-\cmd{.rvt} & \cmd{:WellFlowRate id units} \dots\ \cmd{:EndWellFlowRate} & well rate series, m$^3$/d, negative = pumping\\
-\cmd{.rvt} & \cmd{:BoundaryHead name units} \dots & time-varying boundary head\\
+\cmd{.rvt} & \cmd{:WellFlowRate id \{units\}} \dots\ \cmd{:EndWellFlowRate} & well rate series, negative = pumping; units \cmd{m3/d} (default), \cmd{m3/s} or \cmd{L/s} (converted to m$^3$/d); others stop the run\\
+\cmd{.rvt} & \cmd{:BoundaryHead name \{units\}} \dots & time-varying boundary head; units \cmd{m} (default); others stop the run\\
 \cmd{.rvt} & \cmd{:ObservationData GW\_HEAD id units} \dots & observed heads for diagnostics\\
 \cmd{.rvc} & \cmd{:InitialGWHeads FROM\_PROFILE|DEPTH\_BELOW\_SURFACE d|ELEVATION z} & initial heads (\cmd{FROM\_PROFILE})\\
 \cmd{.rvc} & \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag} & hotstart blocks written by Raven (Section~\ref{app:hotstart})\\\bottomrule
@@ -322,6 +322,11 @@ aquifer class/profile \dots\ must be positive / may not be negative / between 0 
 top layer cannot be an AQUICLUDE; layer thickness must be positive & correct the profile\\
 \cmd{:MinCellCoverage}, \cmd{:GridCellSize}, \cmd{:SolverHead\allowbreak Tolerance}, \cmd{:SolverMax\allowbreak OuterIterations}, \cmd{:HeadSaveFrequency} out of range & correct the value (Section~\ref{app:commands})\\
 improper format of command \dots & correct the command syntax\\
+command \dots\ in \dots: '\emph{token}' is not a number / is not a whole number / is not a whole-number ID & give a plain number, in the units of the manual, without units or thousands separators\\
+command \dots\ has the surplus value '\emph{token}' & remove it; a comma separates values (2000.0, not 2,000.0)\\
+boundary \dots: the values after the file must come in keyword-value pairs / unknown keyword & \cmd{HEAD}, \cmd{CONDUCTANCE} and \cmd{LAYERS}, each with its value\\
+\cmd{:GridCellSize} \dots\ m gives about \dots\ cells per layer over the HRUs' extent \dots, more than 1e+07 / the \cmd{:GridRefinement} sizes give a regular grid of about \dots\ cells per layer & give the sizes in metres as plain numbers; for refinement around features only use \cmd{QUADTREE} or \cmd{HRU\_MESH}\\
+\cmd{:WellFlowRate} \emph{id}: units \dots\ are not supported / \cmd{:BoundaryHead} \emph{name}: units \dots & rates in \cmd{m3/d}, \cmd{m3/s} or \cmd{L/s}; heads in \cmd{m}\\
 boundary \dots\ needs a HEAD value / positive CONDUCTANCE & complete the boundary command\\
 two wells / observation wells / boundaries have the same ID or name & make IDs unique\\
 \cmd{:WellFlowRate} \emph{id} / \cmd{:BoundaryHead} \emph{name} in the .rvt file names no well / boundary & correct the ID or name (the message lists the wells or boundaries of the .rvg file)\\
@@ -332,6 +337,7 @@ HRU \dots\ is in two \cmd{:SurfaceWater\allowbreak Exchange} groups for the same
 well \dots\ is outside the active groundwater model & move the well or enlarge the coupled area\\
 \cmd{:GWHeads} does not match the groundwater grid & hotstart file from a different grid\\
 the model's \emph{type} package \emph{name} would add recharge or ET beside Raven's & list it in \cmd{:RavenTakesOver} or \cmd{:KeepPackages}\\
+the model name file \dots\ has a \emph{type} package named \emph{name}, a name Raven reserves for the packages it adds (\cmd{RCH\_RAVEN}, \cmd{DRN\_RAVEN}, \cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}, \cmd{SZX/SZQ/SZD/SZW\_RAVEN}) & rename the package, or remove its line if Raven added it to a model it wrote; a recharge or ET package may instead be listed in \cmd{:RavenTakesOver}\\
 \cmd{:MF6StartDate} \dots / the model ends before Raven's run & correct the dates or \cmd{:Duration}\\
 stress period \dots\ is not a whole number of Raven time steps & choose a Raven time step that divides the periods\\
 cells of the grid file differ from the model's cell area & wrong projection, length unit or cell numbering in the file\\
@@ -346,7 +352,9 @@ with \cmd{:MF6Simulation} \dots\ remove \dots\ (these apply to models Raven buil
 \cmd{:GridRefinement} size must be positive and smaller than \cmd{:GridCellSize}; RIVERS needs \cmd{:RiverGeometry}; WELLS needs wells & correct the refinement\\
 :GridRefinement LAKES found no reservoir whose lake HRU has a polygon & give the reservoir an \cmd{:HRUID} whose polygon is in \cmd{:HRUGeometry}\\
 grid cell \dots\ must be a single polygon without holes & fix the cell file\\
-GeoJSON file \dots\ is in EPSG:\emph{n} (its "crs" member) & give \cmd{:InputCRS EPSG:}\emph{n}, or reproject the file to lon/lat\\
+GeoJSON file \dots\ is in EPSG:\emph{n} (its "crs" member, a built-in projection) & give \cmd{:InputCRS EPSG:}\emph{n}, or reproject the file to lon/lat\\
+GeoJSON file \dots\ has coordinates outside the longitude/latitude range and is in EPSG:\emph{n} \dots, a projection that is not built in & give \cmd{:InputCRS} with the projection's parameters (\cmd{TMERC}, \cmd{ALBERS} or \cmd{LCC}), or reproject the file to lon/lat\\
+GeoJSON file / raster \dots\ looks like longitude/latitude: its coordinates \dots\ lie over the HRUs' LATITUDE/LONGITUDE \dots & with \cmd{:InputCRS} give every GeoJSON and raster input in that projection (or remove \cmd{:InputCRS} if every input is in lon/lat)\\
 GeoJSON file \dots\ is in EPSG:\emph{n} \dots, but :InputCRS is \dots / is in longitude/latitude, but :InputCRS says the input files are projected & give every input file in the projection of \cmd{:InputCRS}\\
 GeoJSON file \dots\ has coordinates outside the longitude/latitude range / raster \dots\ lies outside the longitude/latitude range & projected input: give \cmd{:InputCRS}\\
 well \dots\ is given by X and Y & give \cmd{:InputCRS}, or \cmd{LATITUDE} and \cmd{LONGITUDE}\\

@@ -302,7 +302,8 @@ def matrix():
 # results known to fail for a reason outside the coupling's books, reported apart (case-name pattern, check prefix, reason)
 KNOWN = [(r'res', 'raven_mb_mm (= the reservoir routing balance error',
           "Raven's balance error equals the lake's own routing balance error (ReservoirMassBalance.csv 'MB error', a few m3 on the steps "
-          "its stage falls back below the weir crest while groundwater feeds it); the coupling's books hold")]
+          "its stage falls back below the weir crest while groundwater feeds it): Raven's reservoir routine stops its stage iteration at a "
+          "0.1 mm change next to the kink of the weir curve, and base Raven gives the same without groundwater; the coupling's books hold")]
 
 
 def main():

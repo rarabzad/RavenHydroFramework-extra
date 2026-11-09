@@ -6,17 +6,21 @@ same example in longitude/latitude.
 
 The UTM copy (EPSG:32610, the coordinates converted with PROJ through pyproj):
   - HRU polygons, river lines, GHB line and CHD polygon as GeoJSON in UTM, each with a "crs" member naming EPSG:32610;
+    the GHB head (1310 m) lies above the top layer's bottom (1300 m) under the line, and the CHD lake has HEAD 0 with a
+    :BoundaryHead series of 1312 m, which places its cells;
   - DEM and bedrock as ESRI ASCII grids in UTM (cell size 300 m), resampled from the lon/lat grids by the same bilinear
     sampling Raven uses, so both runs see nearly the same land surface;
   - a monitoring well given by X and Y in the UTM copy and by LATITUDE and LONGITUDE in the lon/lat copy;
   - :InputCRS EPSG:32610 in the .rvg file.
 Checks:
   - the same grid: active columns, active cells, river cells, GHB/CHD cells and the monitoring well's cell are identical,
-    HRU polygon and linked areas agree within 1e-6 (relative) and every HRU has the same number of cells;
+    and both runs have GHB and CHD cells (not zero); HRU polygon and linked areas agree within 1e-6 (relative) and every
+    HRU has the same number of cells;
   - the runs agree: Hydrographs.csv and the GWBudget.csv flows within the tolerance of the resampled DEM (reported);
   - input checks: a UTM GeoJSON without :InputCRS, a UTM raster without :InputCRS, UTM boundary polygons without a "crs"
     member, files in EPSG:32610 with :InputCRS EPSG:32609, and a well given by X and Y without :InputCRS stop Raven with a
-    message naming the file or :InputCRS;
+    message naming the file or :InputCRS; with :InputCRS, a DEM raster, an HRU file and a boundary file left in
+    longitude/latitude stop with "looks like longitude/latitude";
   - with RAVEN_EXE_REF: the lon/lat run is byte-identical to the reference build (otherwise SKIP).
 Quick mode (RAVEN_TEST_QUICK=1): 10 days; full mode: 120 days.
 """
@@ -135,6 +139,13 @@ GEO = [('Liard_HRUs_standin.geojson', 'utm_hrus.geojson'), ('Liard_rivers.geojso
 RAS = [('Liard_dem_standin.asc', 'utm_dem.asc'), ('Liard_bedrock_standin.asc', 'utm_bedrock.asc')]
 BOUNDS = ('# :GeneralHeadBoundary   GHB1 boundary_line.geojson HEAD 1146.85 CONDUCTANCE 5000.0 LAYERS TOP\n'
           '# :SpecifiedHeadBoundary LAKE1 lake.geojson HEAD 1226.5 LAYERS TOP\n')
+# heads above the cells under the boundaries (top layer: bottom 1300 m, top 1315 m there): GHB1 by its HEAD, LAKE1 by a
+# :BoundaryHead series (HEAD 0 alone would leave it without cells)
+HEADS = [('HEAD 1146.85', 'HEAD 1310.0'), ('HEAD 1226.5', 'HEAD 0.0')]
+
+
+def add_lake_series(d, days):
+    open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:BoundaryHead LAKE1 m\n  1985-10-01 00:00:00 1.0 %d\n' % (days + 2) + '  1312.0\n' * (days + 2) + ':EndBoundaryHead\n')
 
 
 def ow_block(xy):
@@ -146,7 +157,7 @@ def ow_block(xy):
 
 def make_lonlat(d, days):
     copy_liard(d, days)
-    edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :', ':'))], ow_block(False))
+    edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :', ':'))] + HEADS, ow_block(False)); add_lake_series(d, days)
 
 
 def make_utm(d, days, crs_line=':InputCRS EPSG:32610\n', well_xy=True):
@@ -155,7 +166,7 @@ def make_utm(d, days, crs_line=':InputCRS EPSG:32610\n', well_xy=True):
         geojson_utm(os.path.join(d, s), os.path.join(d, t))
     for s, t in RAS:
         raster_utm(os.path.join(d, s), os.path.join(d, t))
-    edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :', ':'))] + GEO + RAS, crs_line + ow_block(well_xy))
+    edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :', ':'))] + HEADS + GEO + RAS, crs_line + ow_block(well_xy)); add_lake_series(d, days)
 
 
 # ---- comparisons ----
@@ -237,6 +248,19 @@ stops(d, 'must use the projection of :InputCRS', 'files in EPSG:32610 with :Inpu
 d = os.path.join(W, 'well_xy'); make_lonlat(d, 2)
 edit_rvg(d, [(ow_block(False), ow_block(True))])
 stops(d, 'is given by X and Y', 'monitoring well given by X and Y without :InputCRS stops')
+# with :InputCRS, inputs left in longitude/latitude (no "crs" member) are recognised against the HRUs' place
+d = os.path.join(W, 'lonlat_dem'); make_utm(d, 2)
+edit_rvg(d, [('utm_dem.asc', 'Liard_dem_standin.asc')])
+stops(d, 'raster Liard_dem_standin.asc looks like longitude/latitude', 'lon/lat DEM raster with :InputCRS stops')
+d = os.path.join(W, 'lonlat_bedrock'); make_utm(d, 2)
+edit_rvg(d, [('utm_bedrock.asc', 'Liard_bedrock_standin.asc')])
+stops(d, 'Liard_bedrock_standin.asc looks like longitude/latitude', 'lon/lat bedrock raster with :InputCRS stops')
+d = os.path.join(W, 'lonlat_hrus'); make_utm(d, 2)
+edit_rvg(d, [('utm_hrus.geojson', 'Liard_HRUs_standin.geojson')])
+stops(d, 'Liard_HRUs_standin.geojson looks like longitude/latitude', 'lon/lat HRU polygons with :InputCRS stop (not "no overlap")')
+d = os.path.join(W, 'lonlat_boundary'); make_utm(d, 2)
+edit_rvg(d, [('utm_boundary_line.geojson', 'boundary_line.geojson')])
+stops(d, 'boundary_line.geojson looks like longitude/latitude', 'lon/lat boundary line with :InputCRS stops')
 
 def dis_arrays(d):
     """TOP and BOTM of the generated DIS file"""
@@ -270,6 +294,9 @@ if not NOLIB:
         same = {k: (kl[k], ku[k]) for k in kl if kl[k] != ku[k]}
         report('%s: same grid (active columns and cells, river/GHB/CHD cells, monitoring well)' % what, not same and kl['OW_NEAR'] is not None,
                '; '.join('%s: %s / %s' % (k, a, b) for k, (a, b) in same.items()) or '%s; OW_NEAR %s' % (kl['active columns'], kl['OW_NEAR']))
+        nb = [int(x) for x in re.findall(r'\d+', ku['GHB cells / CHD cells'] or '')]
+        report('%s: the boundaries have cells (GHB by its HEAD, CHD placed by its :BoundaryHead series)' % what, len(nb) == 2 and min(nb) > 0,
+               'GHB / CHD cells: %s (lon/lat run: %s)' % (ku['GHB cells / CHD cells'], kl['GHB cells / CHD cells']))
         if case == 'geometry':
             ids = list(hl.keys()); pl, ol = linkage(dl, ids); pu, ou = linkage(du, ids)
             ea = max(abs(pl[k] - pu[k]) / pl[k] for k in pl)

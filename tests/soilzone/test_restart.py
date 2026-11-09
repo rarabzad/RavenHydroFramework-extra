@@ -165,6 +165,13 @@ def r4_vz():
         good &= g
     return good
 
+def verdict(hill, r2, r3, r4):
+    """the last line: PASS only when the hillslope restart and R2, R3 and R4 all pass"""
+    ok = bool(hill) and bool(r2) and bool(r3) and bool(r4)
+    print('restart test: %s (hillslope restart %s, R2 %s, R3 %s, R4 %s)' % tuple(['PASS' if ok else 'FAIL'] +
+          ['PASS' if x else 'FAIL' for x in (hill, r2, r3, r4)]))
+    return ok
+
 def main():
     r3 = r3_clip(); r4 = r4_vz()
     print('R3 restart with seepage above soil capacity: %s' % ('PASS' if r3 else 'FAIL'))
@@ -176,13 +183,13 @@ def main():
     full = case('full', NT, RAIN[:NT])
     first = case('first', N1, RAIN[:N1])
     if not (full and first):
-        return False
+        return verdict(False, r2, r3, r4)
     rvc = os.path.join(first, 'out', 'solution.rvc')
     has = ':GWSoilZoneColumns' in open(rvc).read()
     start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=N1)).isoformat()
     second = case('second', NT - N1, RAIN[N1:NT], start, rvc)
     if not second:
-        return False
+        return verdict(False, r2, r3, r4)
     cols = ['water table [m]', 'soil water level [m]', 'saturated fraction [-]', 'soil-zone water [mm]',
             'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]']
     a = pd.read_csv(os.path.join(full, 'out', 'GWSoilExchange.csv'))
@@ -199,8 +206,8 @@ def main():
     # within C x 1e-4 m
     flows = ('saturated fraction [-]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]')
     good &= has and len(m) == (NT - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
-    print('restart test: %s' % ('PASS' if good else 'FAIL'))
-    return bool(good) and r2 and r3 and r4
+    print('hillslope restart: %s' % ('PASS' if good else 'FAIL'))
+    return verdict(good, r2, r3, r4)
 
 if __name__ == '__main__':
     sys.exit(0 if main() else 1)

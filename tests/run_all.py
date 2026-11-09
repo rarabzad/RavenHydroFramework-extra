@@ -6,6 +6,7 @@
                                   # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds, the
                                   # Liard soil-zone run T7 30 days instead of 365)
     python3 run_all.py --only thiem,edge    # selected steps (names as in the report)
+    python3 run_all.py --selftest           # only the self-test of the pass criteria below (seconds)
 
 The USGS example-model steps need the MODFLOW 6 examples (mf6examples.zip from
 https://github.com/MODFLOW-ORG/modflow6-examples/releases): export RAVEN_USGS_EXAMPLES=/path/to/mf6examples.zip
@@ -23,10 +24,14 @@ Skipped checks: a script reports a check it could not make as one line "SKIP <wh
 counts them, the report shows "PASS (k skipped)" and lists the lines, and the console summary gives the total. (Without
 RAVEN_EXE_REF the byte-identity checks against a reference build are skipped this way.)
 
-Each step is judged by what its script prints: a step passes when the script finishes without error and its own pass
-criterion holds (all cases pass, all random set-ups pass, residuals and restart deviations within the manual's limits).
-Steps that only report numbers for the manual (Thiem slopes, Liard grid table) pass when every run finishes and is
-checked; their numbers are copied into the report for comparison with the manual.
+Each step is judged by what its script prints: a step passes when the script finishes without error (exit code 0) and its
+own pass criterion holds (all cases pass, all random set-ups pass, residuals and restart deviations within the manual's
+limits). The scripts with several runs (restart, lake, Thiem, Liard grids, existing-model restarts) end with a count line
+("k of n pass") and exit with 1 unless every run finished, had no unconverged step and kept exact accounts; their step
+passes only when that count is complete. Steps that only report numbers for the manual (Thiem slopes, Liard grid table)
+copy them into the report for comparison with the manual. The step run_all_selftest (run_all.py --selftest) feeds these
+criteria outputs with failed runs, and runs the restart, lake, Thiem and grid scripts with a Raven that always fails,
+and checks that each is judged FAIL.
 """
 import os, sys, re, json, time, subprocess, glob
 
@@ -120,15 +125,27 @@ def fuzz_json(paths_fn):
     return judge
 
 
+def all_of(*judges):
+    """every criterion must hold; the summaries are joined"""
+    def judge(out):
+        r = [j(out) for j in judges]
+        return all(ok for ok, _ in r), '; '.join(s for _, s in r)
+    return judge
+
+
 def thiem_judge(out):
-    # every run must be checked (no failed steps); slopes are reported for the manual's Thiem table. Grids whose cells
-    # are larger than the fitting window (regular 1000 m: four cells > 3 km) have no cells to fit and are not judged.
+    # every run must finish and be audited (no failed steps, the count line "thiem runs: k of n" complete), and every run
+    # must have its slope fitted; slopes are reported for the manual's Thiem table. Grids whose cells are larger than the
+    # fitting window (regular 1000 m: four cells > 3 km) have no cells to fit and are not judged.
     fails = re.findall(r'failed (\d+)', out)
     fits = [l for l in out.split('\n') if 'slope error' in l]
     fitted = [l for l in fits if 'cells used 0' not in l]
-    ok = bool(fitted) and all(f == '0' for f in fails)
-    return ok, '%d grids fitted (%d with no cells in the window), %d runs with failed steps' % (
-        len(fitted), len(fits) - len(fitted), sum(1 for f in fails if f != '0'))
+    m = re.findall(r'thiem runs: (\d+) of (\d+)', out)
+    k, n = map(int, m[-1]) if m else (0, -1)
+    ok = bool(fitted) and all(f == '0' for f in fails) and k == n and len(fits) == n
+    return ok, '%s; %d grids fitted (%d with no cells in the window), %d runs with failed steps' % (
+        ('%d of %d runs finished, converged and balanced' % (k, n)) if m else 'count line not found', len(fitted),
+        len(fits) - len(fitted), sum(1 for f in fails if f != '0'))
 
 
 # ---- the steps: (name, needs MODFLOW, command, pass criterion, timeout [s]) ----
@@ -139,6 +156,7 @@ FZL = [('12', '4')] if QUICK else [('12', '12'), ('13', '12')]                  
 FE = ('5', '6') if QUICK else ('5', '20')
 cxx = 'g++ -std=c++11 -O2 -I%s' % ROOT
 STEPS = [
+    ('run_all_selftest', False, [PY, 'run_all.py', '--selftest'], last_line(r'run_all self-test: ALL PASSED'), 1800),
     ('gridtest', False, '%s gridtest.cpp %s/GWGrid.cpp %s/GWGeometry.cpp -o %s/gridtest && %s/gridtest'
      % (cxx, ROOT, ROOT, LOGS, LOGS), last_line(r'ALL PASSED: 0 failures'), 600),
     ('geomtest', False, '%s geomtest.cpp %s/GWGeometry.cpp -o geomtest && %s geomtest_check.py'
@@ -147,6 +165,7 @@ STEPS = [
      % (cxx, ROOT, PY), small_numbers(r'worst ([0-9.e+-]+) m', 1e-3, 'worst position difference [m]'), 600),
     ('crs_inputs_nolib', False, [PY, 'crs_inputs.py', '--nolib'], last_line(r'crs inputs: ALL PASSED'), 600),
     ('crs_inputs', True, [PY, 'crs_inputs.py'], last_line(r'crs inputs: ALL PASSED'), 1800),
+    ('input_checks', True, [PY, 'input_checks.py'], last_line(r'input checks: ALL PASSED'), 1800),
     ('dry_start', True, [PY, 'dry_start.py'], last_line(r'dry-start checks: ALL PASSED'), 1800),
     ('mf6files', False, [PY, 'mf6files_check.py'], zero_failed, 3600),
     ('mf6lib_unit', False, [PY, 'mf6lib_check.py', '--unit'], last_line(r'library unit checks: ALL PASSED'), 600),
@@ -156,9 +175,10 @@ STEPS = [
     ('edge_nolib', False, [PY, 'edge.py', '--nolib'], n_of_n(r'(\d+) of (\d+) cases pass'), 3600),
     ('edge', True, [PY, 'edge.py'], n_of_n(r'(\d+) of (\d+) cases pass'), 4 * 3600),
     ('thiem', True, '%s thiem/run_thiem.py && %s thiem/fit_thiem.py' % (PY, PY), thiem_judge, 6 * 3600),
-    ('restart', True, [PY, 'restart_test.py'], small_numbers(r'restart deviation ([0-9.e+-]+)', 1e-4, 'restart deviations'), 4 * 3600),
-    ('lake', True, [PY, 'lake_test.py'], no_word('FAIL'), 4 * 3600),
-    ('liard_grids', True, [PY, 'liard_grids.py'], no_word('FAILED', r'results in .*'), 6 * 3600),
+    ('restart', True, [PY, 'restart_test.py'], all_of(n_of_n(r'restart grids: (\d+) of (\d+) pass'),
+                                                      small_numbers(r'restart deviation ([0-9.e+-]+)', 1e-4, 'restart deviations')), 4 * 3600),
+    ('lake', True, [PY, 'lake_test.py'], all_of(n_of_n(r'lake runs: (\d+) of (\d+) pass'), no_word('FAIL')), 4 * 3600),
+    ('liard_grids', True, [PY, 'liard_grids.py'], all_of(n_of_n(r'liard grids: (\d+) of (\d+) finished'), no_word('FAILED', r'results in .*')), 6 * 3600),
     ('behaviour', True, [PY, 'behaviour_check.py'], last_line(r'behaviour checks: ALL PASSED'), 3 * 3600),
     ('budget_xcheck', True, lambda: [PY, 'budget_xcheck.py'] + sorted(glob.glob(os.path.join(tc.WORK, 'liard_grids', '*', 'out'))
                                     + glob.glob(os.path.join(tc.WORK, 'lake', '*', 'out')) + glob.glob(os.path.join(tc.WORK, 'behaviour', 'reservoir', 'out'))),
@@ -171,7 +191,7 @@ STEPS = [
     ('ext_roundtrip', True, [PY, 'existing/roundtrip.py'],
      small_numbers(r'max relative difference ([0-9.e+-]+)', 1e-4, 'round-trip differences'), 3 * 3600),
     ('ext_restart', True, [PY, 'existing/restart_ext.py'],
-     small_numbers(r'max deviation ([0-9.e+-]+)', 1e-4, 'restart deviations'), 3 * 3600),
+     all_of(n_of_n(r'existing-model restarts: (\d+) of (\d+) pass'), small_numbers(r'max deviation ([0-9.e+-]+)', 1e-4, 'restart deviations')), 3 * 3600),
     ('ext_exchanges', True, [PY, 'existing/ext_exchanges.py'], last_line(r'existing-model exchanges: ALL PASSED'), 3 * 3600),
     ('ext_inputs', True, [PY, 'existing/ext_inputs.py'], last_line(r'existing-model input forms: ALL PASSED'), 3 * 3600),
     ('budget_file', True, [PY, 'budget_file.py'], last_line(r'budget file checks: ALL PASSED'), 3600),
@@ -190,6 +210,7 @@ STEPS = [
     ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
     ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
     ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
+    ('soilzone_plot_tool', False, [PY, 'soilzone/test_plot_tool.py'], last_line(r'plot tool tests: ALL PASSED'), 600),
     ('soilzone_surface_stores', True, [PY, 'soilzone/test_surface_stores.py'], last_line(r'surface-store tests: ALL PASSED'), 1800),
     ('soilzone_robustness', True, [PY, 'soilzone/test_robustness.py'], last_line(r'robustness tests: ALL PASSED'), 3600),
     ('soilzone_interface_stiff', True, [PY, 'soilzone/test_interface_stiff.py'], last_line(r'stiff interface tests: ALL PASSED'), 3600),
@@ -212,6 +233,67 @@ STEPS = [
     ('soilzone_existing', True, [PY, 'soilzone/test_sz_existing.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
     ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py'] + ([] if QUICK else ['365']), last_line(r'T7 Liard physical: PASS'), 4 * 3600),
 ]
+
+def selftest():
+    """the pass criteria of the steps with several runs must fail on outputs with failed runs, and the scripts must end
+    with a failing count line and a nonzero exit code when their runs fail (Raven replaced by a program that fails)"""
+    J = {name: judge for name, _, _, judge, _ in STEPS}
+    nf = [0]
+
+    def check(what, ok, detail=''):
+        print('%-86s %s  %s' % (what, 'ok' if ok else 'FAIL', detail), flush=True)
+        nf[0] += 0 if ok else 1
+    good = ('regular (default)            restart deviation 9.9e-07 (60 days)  residual -1.6e-11  recharge 0e+00  river 9e-12  failed 0  ok\n' * 5 +
+            'restart grids: 5 of 5 pass\n')
+    check('restart: five grids that pass are judged PASS', J['restart'](good)[0], J['restart'](good)[1])
+    bad = ('regular (default)            restart deviation 9.9e-07 (60 days)  residual -1.6e-11  recharge 0e+00  river 9e-12  failed 0  ok\n' +
+           'quadtree                     FAILED\n' * 4)
+    check('restart: four of five grids FAILED (no count line) is judged FAIL', not J['restart'](bad)[0], J['restart'](bad)[1])
+    check('restart: four of five grids FAILED with the count line is judged FAIL', not J['restart'](bad + 'restart grids: 1 of 5 pass\n')[0])
+    unc = good.replace('failed 0  ok\n', 'failed 3  FAIL\n', 1).replace('5 of 5', '4 of 5')
+    check('restart: a grid with unconverged steps is judged FAIL', not J['restart'](unc)[0], J['restart'](unc)[1])
+    ext = ('continuous: Successful Simulation\nsplit 30 FAILED Successful Simulation ?\nsplit at day 150 (1986-02-28): 50 days compared, max deviation 9.0e-08; '
+           'audit recharge 0e+00 residual 9.9e-12 failed 0  ok\nsub-daily split at day 10.5 (6-hour steps): 38 steps compared, max deviation 2.3e-06; '
+           'audit recharge 0e+00 residual 1e-11 failed 0  ok\n')
+    check('ext_restart: a split FAILED (no count line) is judged FAIL', not J['ext_restart'](ext)[0], J['ext_restart'](ext)[1])
+    check('ext_restart: a split FAILED with the count line is judged FAIL', not J['ext_restart'](ext + 'existing-model restarts: 2 of 3 pass\n')[0])
+    th = ''.join('grid %d  dh(600-1200) err +1.00%%  dh(1200-2400) err +1.00%%  residual 1e-10  failed 0\n' % i for i in range(16)) + \
+        'grid 16 FAILED Error\n' + ''.join('g%d  slope error +0.10%%   fit RMS 0.01 m   cells used 100\n' % i for i in range(16))
+    check('thiem: one run FAILED is judged FAIL', not J['thiem'](th + 'thiem runs: 16 of 17 finished, converged and balanced\n')[0])
+    check('thiem: one run FAILED without the count line is judged FAIL', not J['thiem'](th)[0])
+    th2 = th.replace('grid 16 FAILED Error\n', 'grid 16  residual 1e-10  failed 2\n') + 'g16  slope error +0.10%   fit RMS 0.01 m   cells used 100\n'
+    check('thiem: a run with unconverged steps is judged FAIL', not J['thiem'](th2 + 'thiem runs: 16 of 17 finished, converged and balanced\n')[0])
+    okth = th2.replace('failed 2', 'failed 0') + 'thiem runs: 17 of 17 finished, converged and balanced\n'
+    check('thiem: seventeen runs that pass are judged PASS', J['thiem'](okth)[0], J['thiem'](okth)[1])
+    lk = 'quadtree, LAKES 375   cells near the lake: 81 | recharge 0e+00 residual -1.2e-11 river 1e-11 failed 4\n      ok\nlake runs: 4 of 5 pass\n'
+    check('lake: a run with unconverged steps (count 4 of 5) is judged FAIL', not J['lake'](lk)[0])
+    lg = 'regular 2 km (default) FAILED\nliard grids: 4 of 5 finished, converged and balanced\nresults in x\n'
+    check('liard_grids: a FAILED grid is judged FAIL', not J['liard_grids'](lg)[0])
+    # soil-zone restart: the last line is PASS only when R2-R4 pass too
+    r = subprocess.run([PY, '-c', 'import sys; sys.path.insert(0, "soilzone"); import test_restart as t; t.verdict(True, True, False, True)'],
+                       cwd=HERE, capture_output=True, text=True, env=tc.ENV)
+    o = r.stdout + r.stderr
+    check('soilzone_restart: R3 failing makes the last line FAIL', ('restart test: FAIL' in o) and not J['soilzone_restart'](o)[0], o.strip().split('\n')[-1][:100])
+    # the scripts themselves, with a Raven that always fails (own scratch folder): count line and exit code
+    if not (tc.MF6LIB and os.path.exists(tc.MF6LIB)):
+        tc.skip('the scripts with a failing Raven', 'RAVEN_MF6_LIB not set (they stop before running)')
+    else:
+        env = dict(tc.ENV, RAVEN_EXE='/bin/false', RAVEN_TEST_WORK=os.path.join(tc.WORK, 'run_all_selftest'), RAVEN_TEST_QUICK='1')
+        for name, cmd, want in (('restart', [PY, 'restart_test.py'], 'restart grids: 0 of 5 pass'),
+                                ('ext_restart', [PY, 'existing/restart_ext.py'], 'existing-model restarts: 0 of 3 pass'),
+                                ('lake', [PY, 'lake_test.py'], 'lake runs: 0 of 5 pass'),
+                                ('thiem', [PY, 'thiem/run_thiem.py'], 'thiem runs: 0 of 17'),
+                                ('liard_grids', [PY, 'liard_grids.py'], 'liard grids: 0 of 5')):
+            r = subprocess.run(cmd, cwd=HERE, capture_output=True, text=True, env=env, timeout=1800)
+            o = r.stdout + r.stderr
+            check('%s with a failing Raven: count line "%s", exit code %d, step judged FAIL' % (name, want, r.returncode),
+                  want in o and r.returncode != 0 and not J[name](o)[0], o.strip().split('\n')[-1][:80])
+    print('run_all self-test: ALL PASSED' if nf[0] == 0 else 'run_all self-test: %d FAILED' % nf[0])
+    sys.exit(1 if nf[0] else 0)
+
+
+if '--selftest' in sys.argv:
+    selftest()
 
 have_lib = bool(tc.MF6LIB) and os.path.exists(tc.MF6LIB)
 if not NOLIB and not have_lib:

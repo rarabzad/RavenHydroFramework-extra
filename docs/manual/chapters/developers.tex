@@ -309,7 +309,11 @@ start); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\c
 package keeps the model's stage and has no conductance (supply) limit; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are
 taken as metres and days (set them in DIS and TDIS); monitoring wells and \cmd{GWHeads.nc} need the cell outlines
 (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not \cmd{:OverlapWeights}). Water-table ET, \cmd{:SurfaceWaterExchange} and
-\cmd{:ReservoirExchange} work as with a generated model.
+\cmd{:ReservoirExchange} work as with a generated model. In a model without \cmd{NEWTON} a top cell that dries becomes
+inactive: MODFLOW moves recharge and evapotranspiration to the active cell below, but not Raven's seepage drain or a
+reservoir's seepage, which stop on that column until the cell rewets (the reservoir's seepage is returned to Raven and
+booked); the water table in the layer below can then rise above the ground without seeping out. Use \cmd{NEWTON} where top
+cells dry.
 \end{itemize}
 \paragraph{Known issues in Raven itself.} The following belong to Raven's own code, behave the same without groundwater, and
 are left to the Raven developers:
@@ -319,6 +323,15 @@ are left to the Raven developers:
 \item Reservoir routine: on the day after a reservoir has been drawn empty by a minimum flow, the outflow still averages in
 the release rate at the end of the previous day, although the lake is empty; this makes up most of such a reservoir's balance
 error (Section~\ref{sec:behaviour}, Reservoirs that run dry).
+\item Reservoir routine: the stage iteration stops once its change falls below 0.1~mm. On a step whose stage ends within a
+millimetre of the weir crest, where the weir's outflow curve has its kink, the remaining imbalance is up to about the lake
+area times 0.1~mm (a few m$^3$ on a 0.04~km$^2$ lake), shown as the reservoir's \emph{MB error} in
+\cmd{ReservoirMassBalance.csv} and in Raven's balance. Base Raven gives the same without groundwater (3 to 7~m$^3$ on such a
+lake whose stage falls slowly through the crest, with a fixed \cmd{:SeepageParameters} level); with \cmd{:ReservoirExchange}
+it appears where the aquifer holds a lake near its crest (Section~\ref{sec:vcombinations}).
+\item In ensemble mode, \cmd{WatershedStorage.csv} shows channel and rivulet storages that differ from a single run, also
+without groundwater; the hydrographs, reservoir stages and groundwater outputs of each member equal the single run's
+(Section~\ref{sec:behaviour}).
 \item valgrind reports uninitialised reads in base Raven when it reads the \cmd{.rvp} file: in \cmd{RVPParameterWarning}
 (called from \cmd{ParseClassPropertiesFile}; three contexts) and in \cmd{CVegetationClass::RecalculateRootParams} (two
 contexts; 23 errors in the short run of test I10). The coupling's own code and the hotstart code show none

@@ -13,6 +13,7 @@ def table(res):
     discharge to rivers [million m3/d], plus the audit's recharge identity, MODFLOW residual and failed steps"""
     import pandas as pd
     print('%-50s %7s %6s  %-23s %8s %7s | %8s %9s %s'%('grid','cells','time','NSE 10BE004/005/010','seepage','rivers','recharge','residual','failed'))
+    npass=0
     for r in res:
         o=r['dir']+'/out'
         if not r['ok']: print('%-50s FAILED'%r['name']); continue
@@ -23,8 +24,12 @@ def table(res):
         A=tc.audit.audit(o)
         print('%-50s %7d %6.0f  %-23s %8.2f %7.2f | %8.0e %9.1e %s'%(r['name'],cells,r['sec'],' / '.join('%.3f'%x for x in nse),seep,riv,
               abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),A['MF6 cumulative residual / gross flow'],A['unconverged steps']))
+        npass+=(A['unconverged steps']==0) and abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven'])<1e-9 and abs(A['MF6 cumulative residual / gross flow'])<1e-8
+    # every grid must finish with no unconverged step and exact accounts (recharge 1e-9, residual 1e-8)
+    print('liard grids: %d of %d finished, converged and balanced'%(npass,len(res)))
+    return npass==len(res)
 if '--table' in sys.argv:
-    table(json.load(open(R))); sys.exit()
+    sys.exit(0 if table(json.load(open(R))) else 1)
 res=[]
 for name,extra in V:
     d=tc.work('liard_grids',re.sub('[^a-z0-9]+','_',name.lower()).strip('_'))
@@ -43,5 +48,6 @@ for name,extra in V:
     ok='Successful' in (r.stdout + r.stderr)
     res.append(dict(name=name,dir=d,ok=ok,sec=dt)); json.dump(res,open(R,'w'),indent=1)
     print(name,'ok' if ok else 'FAILED',round(dt),'s',flush=True)
-table(res)
+ok=table(res)
 print('results in',R)
+sys.exit(0 if ok else 1)

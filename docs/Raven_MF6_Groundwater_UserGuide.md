@@ -188,7 +188,11 @@ pumping as a cell dries (GWBudget.csv reports specified and actual rates).
 (`:HRUGeometry`, `:RiverGeometry`, `:GridFile`, refinement and boundary files, `:LandSurface`, `:BedrockSurface`, and
 `:MF6GridFile` for an existing model) is in that projection; rasters are sampled in their own coordinates, without
 resampling. Raven stops on a GeoJSON file whose `"crs"` member names a projection other than `:InputCRS` (or a projected
-one without it, or lon/lat with it), and, without `:InputCRS`, on coordinates or raster extents outside the lon/lat range.
+one without it, or lon/lat with it), and, without `:InputCRS`, on coordinates or raster extents outside the lon/lat range;
+with `:InputCRS`, on a GeoJSON file or raster left in lon/lat ("looks like longitude/latitude": its coordinates lie over
+the HRUs' LATITUDE/LONGITUDE, not near them in the projection). The `"crs"` member is read by the code that ends its name
+(also a versioned URN such as `urn:ogc:def:crs:EPSG:6.6:4326`); geographic codes (EPSG 4000-4999, e.g. 4326, 4979, 4269,
+and NAD83(2011) 6318) mean lon/lat; a projection that is not built in is accepted, and its coordinates decide.
 Outputs stay in lon/lat.
 
 ### 4.3a Grid options (`.rvg`)
@@ -335,19 +339,19 @@ existing model without NEWTON (CONCEPTUAL only) the recharge not applied by MODF
 and step the soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge,
 overflow, soil water and capacity, and the interface updates and change. `GWModelSummary.txt` ends with run totals
 (unconverged steps, substeps, supply-limited updates, withheld discharge, ...). `tools/plot_soilzone.py OUTPUT_FOLDER`
-plots the exchange. Manual: Section "The soil zone and the water table", the reference table of the soil-zone commands
+plots the exchange (with specified heads too, where there are soil-zone columns over them). Manual: Section "The soil zone and the water table", the reference table of the soil-zone commands
 (chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land"; developer
 notes on the design: `docs/design/soil_zone_*.md`.
 
 ### 4.4 `.rvt`
 
 ```
-:WellFlowRate 1 m3/d             # well ID; negative = pumping, positive = injection
+:WellFlowRate 1 m3/d             # well ID and units (m3/d; m3/s and L/s are converted); negative = pumping, positive = injection
   1985-10-01 00:00:00 1.0 1826
   0.0
   ...
 :EndWellFlowRate
-:BoundaryHead GHB1 m             # overrides HEAD of the named boundary
+:BoundaryHead GHB1 m             # overrides HEAD of the named boundary (heads in m)
   ...
 :EndBoundaryHead
 :ObservationData GW_HEAD 101 m   # observation-well ID; scored in Diagnostics.csv
@@ -435,7 +439,12 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | warning "m3 that MODFLOW took from the soil zone was not in it" | `:SoilZone PHYSICAL` on steps whose interface did not converge (mostly at a low `:SolverMaxOuterIterations`): raise it (default 500; keep it at 20 or more) |
 | warning "... ignored" for a `:SoilZone*` command | the command has no effect here (without `:SoilZone PHYSICAL`; depth classes or initial flux with `:SoilZoneVadose NONE`; `:SoilZoneAquiferClass` on a model Raven builds) |
 | "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone; for a delay through a deep unsaturated zone use `:SoilZoneVadose LAG` |
-| "GeoJSON file ... is in EPSG:n" / "... outside the longitude/latitude range" / "well ... is given by X and Y" | a projected input file: give `:InputCRS` with its projection (all input files in that projection) |
+| "GeoJSON file ... is in EPSG:n" / "... outside the longitude/latitude range" / "well ... is given by X and Y" | a projected input file: give `:InputCRS` with its projection (all input files in that projection; a projection that is not built in by its TMERC, ALBERS or LCC parameters) |
+| "... looks like longitude/latitude" | with `:InputCRS` a GeoJSON file or raster is still in lon/lat: reproject it (or remove `:InputCRS` if every input is lon/lat) |
+| "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | give plain numbers in the `.rvg`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0) |
+| ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid of about ..." | more than 10 million cells per layer: give the sizes in metres; refine locally with QUADTREE or HRU_MESH |
+| ":WellFlowRate ...: units ... are not supported" / ":BoundaryHead ...: units ..." | well rates in m3/d, m3/s or L/s; heads in m |
+| "... a name Raven reserves for the packages it adds" | an existing model's package is named like one of Raven's (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN, RES_RAVEN, SZ*_RAVEN): rename it, or remove the line if Raven wrote it |
 | warning "layer ... starts dry" | the initial heads leave a whole layer dry (INITIAL_HEAD_DEPTH deeper than the layers above); start from `:GWInitialization STEADY_STATE`, a smaller INITIAL_HEAD_DEPTH or `:InitialGWHeads` |
 | warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
 
