@@ -17,8 +17,8 @@ run(d) runs Raven in folder d; checks(d) returns a dict of the identities of pla
                    the unsaturated columns, less the rounding of its five values in GWBudget.csv (half a unit in the
                    10th significant digit of each, csv_rounding), / max(1 m3, flows), per step, from the first step when
                    GWModelSummary.txt gives the storage at the start (vz_start; res['vz_step1']), else from the second
-                   (the recharge identity then includes the columns). (the storages were added to the scale
-                   in full, which let 2e-4 m3 per step through on a 1e4 m3 store where the CSV resolves 1e-6 m3.)
+                   (the recharge identity then includes the columns). The scale leaves out the storages: added in full,
+                   they would let 2e-4 m3 per step through on a 1e4 m3 store where the CSV resolves 1e-6 m3.
 """
 import os, sys, subprocess
 import numpy as np, pandas as pd
@@ -83,10 +83,10 @@ def selftest_vz_identity():
     exact = vz_identity(r10(s), 9776.123456789, r10(vin), r10(vout), r10(vcap))
     leak = vz_identity(r10(s - 1e-4 * np.arange(1, n + 1)), 9776.123456789, r10(vin), r10(vout), r10(vcap))
     s10 = r10(s - 1e-4 * np.arange(1, n + 1)); ds = s10.diff(); sp = s10.shift(); ds.iloc[0] = s10.iloc[0] - 9776.123456789; sp.iloc[0] = 9776.123456789
-    old = float(((ds - vin + vcap + vout).abs() / (vin.abs() + vout.abs() + vcap.abs() + s10.abs() + sp.abs()).clip(lower=1.0)).max())
+    scaled = float(((ds - vin + vcap + vout).abs() / (vin.abs() + vout.abs() + vcap.abs() + s10.abs() + sp.abs()).clip(lower=1.0)).max())
     ok = exact <= 1e-8 and leak > 1e-8
-    print('vz_identity self-test: exact books %.2g, a 1e-4 m3/step leak %.2g (the old storage-scaled form %.2g) -> %s'
-          % (exact, leak, old, 'ok' if ok else 'FAIL'))
+    print('vz_identity self-test: exact books %.2g, a 1e-4 m3/step leak %.2g (a storage-scaled form would give %.2g) -> %s'
+          % (exact, leak, scaled, 'ok' if ok else 'FAIL'))
     return ok
 
 

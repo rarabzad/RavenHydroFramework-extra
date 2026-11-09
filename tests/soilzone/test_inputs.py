@@ -348,10 +348,10 @@ def main():
     if good:
         a = pd.read_csv(os.path.join(dr, 'out', 'Ages.csv')); cols = [x for x in a.columns if x.endswith('[d]') and x != 'time[d]']
         val = lambda r: pd.to_numeric(a[cols].iloc[r], errors='coerce').replace(-1.2345, float('nan')).abs().max()   # (-1.2345: no water)
-        v0 = val(0); v1 = val(1)
+        age0 = val(0); age1 = val(1)
         nod = ':AgeTracerDatum' not in open(os.path.join(dr, 'out', 'solution.rvc')).read()
-        good = v0 < 1e-9 and v1 < 1.01 and nod
-        print('  I16: largest age at the start %.3g d, after one day %.3g d; no :AgeTracerDatum written %s -> %s' % (v0, v1, nod, 'ok' if good else 'FAIL'))
+        good = age0 < 1e-9 and age1 < 1.01 and nod
+        print('  I16: largest age at the start %.3g d, after one day %.3g d; no :AgeTracerDatum written %s -> %s' % (age0, age1, nod, 'ok' if good else 'FAIL'))
     res.append(('I16 age tracer from a spin-up without it: ages start at 0', good))
 
     # I17: EnKF members' extra .rvt series

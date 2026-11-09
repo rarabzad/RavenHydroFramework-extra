@@ -1,5 +1,5 @@
-"""The soil zone with an existing MODFLOW 6 model (docs/design/soil_zone_columns_plan.md section 6), and columns over
-specified heads (section 5).
+"""The soil zone with an existing MODFLOW 6 model, and columns over specified heads (manual, "The soil zone and the
+water table" and "Coupling an existing MODFLOW 6 model").
 
 X1  round trip: the T2/T3 hillslope run with :SoilZone PHYSICAL; its MODFLOW model (without Raven's packages) is then
     coupled as an existing model (:MF6Simulation) with the same soil zone. Flows agree within the interface
@@ -68,7 +68,7 @@ def roundtrip(name, extra='', feet=False, **over):
     return good and ok2
 
 def outputs_x3():
-    """X5 (soil_zone_existing_outputs.md section 3), on the x3 runs (unsaturated columns, a specified-head toe): GWSoilExchange.csv
+    """X5, on the x3 runs (unsaturated columns, a specified-head toe): GWSoilExchange.csv
     rejects recharge only where the HRU's saturated fraction is positive (the fraction is over all the HRU's columns, those
     over specified heads included, as the rejected recharge), and GWModelSummary.txt ends with the run totals, the
     unsaturated columns' substeps counted (they were written at the start, always 0)"""
@@ -86,7 +86,7 @@ def outputs_x3():
     return good
 
 def stops_x6():
-    """X6 (soil_zone_existing_outputs.md sections 2, 3): the x1 existing model without NEWTON stops at start-up with :SoilZone PHYSICAL
+    """X6: the x1 existing model without NEWTON stops at start-up with :SoilZone PHYSICAL
     (NEWTON required); with NEWTON and CG instead of BICGSTAB MODFLOW 6 stops inside its library while reading the model
     (an input error, exit code 2) and Raven reports MODFLOW's error report"""
     m0, e0 = os.path.join(W, 'x1_model'), os.path.join(W, 'x1_ext')
@@ -110,7 +110,7 @@ def stops_x6():
     return good
 
 def sy_x7():
-    """X7 (soil_zone_restart_sy.md section 2): warnings for a specific yield the model does not give (no STO: 0.2) or gives
+    """X7: warnings for a specific yield the model does not give (no STO: 0.2) or gives
     below 0.01 (ICONVERT 0 with SY 0: floored at 0.01); every identity holds"""
     m0, e0 = os.path.join(W, 'x1_model'), os.path.join(W, 'x1_ext')
     good = True

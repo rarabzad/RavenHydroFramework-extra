@@ -5,7 +5,7 @@
 cells with their Raven subbasin ID in an auxiliary variable, a head boundary at the outlet, its own recharge and ET).
 Raven's files are those of `../Liard_groundwater` (forcing and observations are read from there).
 
-Run (two years, about four minutes):
+Run (two years, about five minutes):
 
     $RAVEN Liard -o output/                     # $RAVEN: your Raven executable (see ../README.md)
     python3 ../Liard_groundwater/tools_audit.py output

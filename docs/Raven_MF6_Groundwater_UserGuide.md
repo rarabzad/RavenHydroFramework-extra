@@ -41,8 +41,10 @@ counts it as leaving Raven. Groundwater storage itself is reported by the files 
   gets the MODFLOW 6 library (option `RAVEN_MF6`): by default it builds it from source (`SOURCE`) when a Fortran compiler,
   meson, ninja and git are found and the MODFLOW repository answers at configure time, otherwise it downloads the official
   release library (`PREBUILT`), and without network it builds Raven alone (`OFF`, with a warning); `-DRAVEN_MF6=PATH
-  -DRAVEN_MF6_PATH=...` uses a library you have. A library older than 6.5.0 stops the configure. Raven builds and runs
-  without MODFLOW; the library is loaded only when `:GroundwaterModel MODFLOW6` is used.
+  -DRAVEN_MF6_PATH=...` uses a library you have. A library older than 6.5.0 stops the configure when its version is
+  known there (`SOURCE`, `PREBUILT`, a zip or source folder); a `PATH` library's version is checked when Raven loads it,
+  and an older one stops the run. Raven builds and runs without MODFLOW; the library is loaded only when
+  `:GroundwaterModel MODFLOW6` is used.
 - Raven finds the library by itself: next to its executable, or in `lib/mf6/` of its checkout (one to three folders
   above the executable, as for `src/Raven.exe`, `build/Raven`, `build/Release/Raven.exe` or Visual Studio's
   `src/x64/Release/Raven.exe`). `:MF6Library` in the `.rvg`
@@ -258,8 +260,8 @@ existing MODFLOW 6 model".
   (the same lake must not be in both).
 - **Later starts and restarts:** stress periods already simulated are dropped and the rest renumbered; TS6 time series are
   shifted to Raven's start (earlier entries keep negative times); TDIS and water-mover period data may sit in OPEN/CLOSE
-  files; sub-daily steps work (the start must fall on a Raven step). TAS6, TVK6/TVS6 and simulations with several models
-  stop a later start.
+  files; sub-daily steps work (the start must fall on a Raven step). TAS6, TVK6/TVS6, simulations with several models
+  and a TS6 file whose TIMESERIES rows come from another file (OPEN/CLOSE or INTERNAL) stop a later start.
 - **Budget file:** the model keeps its own output control; add `BUDGET FILEOUT` and `SAVE BUDGET` to its OC file for
   `gwf.cbc` (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN and RES_RAVEN save their flows to it). `:WriteGWBudgetFile` is for generated models.
 - Tested on USGS example models (Sagehen Creek with UZF, SFR and mover; a steady-state stream-capture model) with MODFLOW
@@ -328,7 +330,11 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   below it, with its delay and spreading, and follow the water table as it moves (saved as `:GWVadoseColumns`, and
   `:GWVadoseClassColumns` with depth classes; the methods' hotstarts are interchangeable). Give the aquifer classes
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
-  curve implies (a warning when they differ by more than a factor two).
+  curve implies (a warning when they differ by more than a factor two). Column water goes back to the soil zone, as
+  rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
+  column vanishes beyond what MODFLOW stores for the rise (rule (ii)); it is subtracted from the unsaturated-zone inflow,
+  which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
+  column").
 
 Outputs: `GWBudget.csv` gains soil-zone exchange (both ways), rejected recharge, overflow, applied volume, shortfall (0
 when the interface converges), interface updates, converged and change, layer redistribution, withheld discharge, and
@@ -340,8 +346,7 @@ and step the soil-zone base, soil water level, water table, saturated fraction, 
 overflow, soil water and capacity, and the interface updates and change. `GWModelSummary.txt` ends with run totals
 (unconverged steps, substeps, supply-limited updates, withheld discharge, ...). `tools/plot_soilzone.py OUTPUT_FOLDER`
 plots the exchange (with specified heads too, where there are soil-zone columns over them). Manual: Section "The soil zone and the water table", the reference table of the soil-zone commands
-(chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land"; developer
-notes on the design: `docs/design/soil_zone_*.md`.
+(chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land".
 
 ### 4.4 `.rvt`
 
@@ -430,6 +435,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | ":MF6Model ... apply only to an existing model" | `:MF6Model`, `:MF6StartDate`, `:KeepPackages`, `:SeepageToRaven` are for `:MF6Simulation` only; remove them |
 | "EXTINCTION_DEPTH > 0 ... the model keeps its EVT ... package" | water-table ET from Raven and the model's own ET would both act: list the model's EVT/UZF package in `:RavenTakesOver`, or set EXTINCTION_DEPTH 0 |
 | "uses time-array series (TAS6) ... start Raven at :MF6StartDate" | a later start cannot shift TAS6 series; start at the model's time zero |
+| "the time-series file ... reads its rows from another file" | a later start shifts the times of TS6 files; list the rows of the TIMESERIES block in the file itself (no OPEN/CLOSE or INTERNAL), or start at the model's time zero |
 | ":SoilZone PHYSICAL needs an existing model that uses the Newton-Raphson formulation" | add `NEWTON` to the model's name file OPTIONS (and `LINEAR_ACCELERATION BICGSTAB` to its IMS file) |
 | "process ... sends water to GROUNDWATER in HRU ... which has no AQUIFER_PROFILE" | that water leaves the model; restrict the process with :-->Conditional |
 | well rate is zero ("has no :WellFlowRate time series") | the `:WellFlowRate` block is missing or its well ID does not match an ID in `:Wells` |
@@ -467,7 +473,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   only through the aquifer.
 - Existing models (section 4.3b): no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse
   time-array series (TAS6), TVK6/TVS6, simulations with several models and array or advanced packages with several period
-  entries before the start (TS6 series are shifted); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
+  entries before the start (TS6 series are shifted; their rows must be listed in the TS6 file itself); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
   files are read); the stream package keeps the model's stage and has no conductance (supply) limit; undefined length or
   time units are taken as metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`.
   Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model.

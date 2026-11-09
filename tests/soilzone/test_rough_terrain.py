@@ -23,13 +23,14 @@ once per unsaturated-zone method. Checks on every run:
             where F > 0 and equal to F times the recharge on HRUs over one cell; with a column method (whose columns give
             water stored in earlier steps back to the soil zone where the water table reaches the base) all rejected
             recharge of a step at most the step's recharge plus the columns' storage at its start (GWBudget)
-  heads     with a column method, no water table more than EXF above the highest land sample of its cell, unless the
+  heads     with a column method, no water table more than EXF above the highest land sample of its cell (guards against
+            columns injecting water into cells filled to the soil-zone base, which would lift heads far above the land), unless the
             NONE run of the same case already lifts it to within 1 m of that height (none_exf)
   conv      steps on which MODFLOW or the interface did not converge (counted; a failure beyond MAXNC per cent)
 Diagnostics: largest water table above the highest land sample of a cell (exfiltration), outer iterations, run time.
-Regression cases (minimal repros of the problems the suite found, rough_cases/*.json and one flat case) run first, each
-with its own checks besides the above (REG: the saturated-fraction limit RFTOL of R20 for any method; R6, R11-R13 and
-R19 must complete); KNOWN lists the open ones by case and KNOWN_PATTERNS by kind (one: interface unconverged where land
+Regression cases (minimal hard cases, rough_cases/*.json and one flat case) run first, each
+with its own checks besides the above (REG: the saturated-fraction limit RFTOL of RT20 for any method; RT6, RT11-RT13 and
+RT19 must complete); KNOWN lists the open ones by case and KNOWN_PATTERNS by kind (one: interface unconverged where land
 lies below the top cell's bottom); a run is XFAIL only when every failure it has, its regression case's own included, is
 a known one (a known case that fails otherwise is FAIL; one that passes is XPASS, a note).
 A stop is justified (STOPS, or MODFLOW 6 alone): an outcrop case; an existing model without NEWTON; or a diverged solve
@@ -397,29 +398,29 @@ def load_case(name):
 
 # (name, stored case, method, what it holds)
 REG = [
-    ('R1_flat_rejection', None, 'NONE', 'rejection follows the converged head on flat cells (an interface that passed as converged with the saturated fraction of an earlier iterate rejected 15 % of the recharge where the closure gives at most 5 %)'),
-    ('R2_rejection_g93', 'rejection_g93', 'NONE', 'rejected recharge only where saturated, F x recharge on one-cell HRUs (a wet start under heavy rain)'),
-    ('R3_deep_samples_g44', 'deep_samples_g44', 'RICHARDS', 'DEM samples whose base lies below the top cell\'s bottom (relief larger than the top layer)'),
-    ('R4_disv_e4', 'disv_e4', 'NONE', 'an existing DISV model with irregular cells, pass-through and inactive cells'),
-    ('R5_dryisolated_e351', 'dryisolated_e351', 'RICHARDS', 'dried top cells over a wet lower cell (upward flows through SZW_RAVEN)'),
-    ('R6_drained_e363', 'drained_e363', 'RICHARDS', 'drained columns kept 1 mm above their bottoms: must complete'),
-    ('R7_lowkv_e25', 'lowkv_e25', 'RICHARDS', 'a slowly permeable top cell (Kv 3.6 mm/d) under rain: head-dependent rejection'),
-    ('R8_lowkv_g21', 'lowkv_g21', 'NONE', 'the same on a generated model'),
-    ('R9_lowsy_e367', 'lowsy_e367', 'RICHARDS', 'a small specific yield (0.02): the water table jumps through the base'),
-    ('R10_lowsy_g334', 'lowsy_g334', 'NONE', 'the same on a generated model'),
-    ('R11_drained_e106', 'drained_e106', 'LAG', 'a drained column under a dry spell: must complete'),
-    ('R12_mf6dry_e9', 'mf6dry_e9', 'RICHARDS', 'top cells MODFLOW dries (the drained-column stop): must complete'),
-    ('R13_mf6dry_e9_kw', 'mf6dry_e9', 'KINEMATIC', 'the same with KINEMATIC: must complete'),
-    ('R14_vzrelease_e87', 'vzrelease_e87', 'RICHARDS', 'columns give stored water back where the water table reaches the base'),
-    ('R15_lowkv_g57', 'lowkv_g57', 'RICHARDS', 'a slowly permeable steep slope (Kv 3.6 mm/d, 30 %): column lift bounded by NONE\'s'),
-    ('R16_vzrelease_g5', 'vzrelease_g5', 'LAG', 'the release with LAG'),
-    ('R17_nonewton_e14', 'nonewton_e14', 'NONE', 'an existing model without NEWTON: the justified stop'),
-    ('R18_mf6dry_g36', 'mf6dry_g36', 'NONE', 'a solve that may diverge: completes, or stops only where MODFLOW 6 alone repeats it'),
-    ('R19_lagdiv_g350', 'lagdiv_g350', 'LAG', 'the LAG divergence: must complete'),
-    ('R20_band_e43', 'band_e43', 'LAG', 'no sub-grid base in the 1 mm below the lowest drain level (top cell bottom + 1 mm): the saturated fraction follows the closure within RFTOL for any method'),
+    ('RT1_flat_rejection', None, 'NONE', 'rejection follows the converged head on flat cells (an interface that took the saturated fraction of an earlier iterate as converged would reject 15 % of the recharge where the closure gives at most 5 %)'),
+    ('RT2_rejection_g93', 'rejection_g93', 'NONE', 'rejected recharge only where saturated, F x recharge on one-cell HRUs (a wet start under heavy rain)'),
+    ('RT3_deep_samples_g44', 'deep_samples_g44', 'RICHARDS', 'DEM samples whose base lies below the top cell\'s bottom (relief larger than the top layer)'),
+    ('RT4_disv_e4', 'disv_e4', 'NONE', 'an existing DISV model with irregular cells, pass-through and inactive cells'),
+    ('RT5_dryisolated_e351', 'dryisolated_e351', 'RICHARDS', 'dried top cells over a wet lower cell (upward flows through SZW_RAVEN)'),
+    ('RT6_drained_e363', 'drained_e363', 'RICHARDS', 'drained columns kept 1 mm above their bottoms: must complete'),
+    ('RT7_lowkv_e25', 'lowkv_e25', 'RICHARDS', 'a slowly permeable top cell (Kv 3.6 mm/d) under rain: head-dependent rejection'),
+    ('RT8_lowkv_g21', 'lowkv_g21', 'NONE', 'the same on a generated model'),
+    ('RT9_lowsy_e367', 'lowsy_e367', 'RICHARDS', 'a small specific yield (0.02): the water table jumps through the base'),
+    ('RT10_lowsy_g334', 'lowsy_g334', 'NONE', 'the same on a generated model'),
+    ('RT11_drained_e106', 'drained_e106', 'LAG', 'a drained column under a dry spell: must complete'),
+    ('RT12_mf6dry_e9', 'mf6dry_e9', 'RICHARDS', 'top cells MODFLOW dries (the drained-column stop): must complete'),
+    ('RT13_mf6dry_e9_kw', 'mf6dry_e9', 'KINEMATIC', 'the same with KINEMATIC: must complete'),
+    ('RT14_vzrelease_e87', 'vzrelease_e87', 'RICHARDS', 'columns give stored water back where the water table reaches the base'),
+    ('RT15_lowkv_g57', 'lowkv_g57', 'RICHARDS', 'a slowly permeable steep slope (Kv 3.6 mm/d, 30 %): column lift bounded by NONE\'s'),
+    ('RT16_vzrelease_g5', 'vzrelease_g5', 'LAG', 'the release with LAG'),
+    ('RT17_nonewton_e14', 'nonewton_e14', 'NONE', 'an existing model without NEWTON: the justified stop'),
+    ('RT18_mf6dry_g36', 'mf6dry_g36', 'NONE', 'a solve that may diverge: completes, or stops only where MODFLOW 6 alone repeats it'),
+    ('RT19_lagdiv_g350', 'lagdiv_g350', 'LAG', 'the LAG divergence: must complete'),
+    ('RT20_band_e43', 'band_e43', 'LAG', 'no sub-grid base in the 1 mm below the lowest drain level (top cell bottom + 1 mm): the saturated fraction follows the closure within RFTOL for any method'),
 ]
-MUST_COMPLETE = {'R6_drained_e363', 'R11_drained_e106', 'R12_mf6dry_e9', 'R13_mf6dry_e9_kw', 'R19_lagdiv_g350'}
-RFTOL = {'R20_band_e43': 0.004}   # (regression cases whose saturated fraction is checked against the closure on converged steps, any method)
+MUST_COMPLETE = {'RT6_drained_e363', 'RT11_drained_e106', 'RT12_mf6dry_e9', 'RT13_mf6dry_e9_kw', 'RT19_lagdiv_g350'}
+RFTOL = {'RT20_band_e43': 0.004}   # (regression cases whose saturated fraction is checked against the closure on converged steps, any method)
 REG_OF = {c: (n, m) for n, c, m, _ in REG if c}
 
 # how each stored case is made (regenerate with --make-cases): seed, family, overrides of the generated spec
@@ -490,16 +491,16 @@ def make_cases():
         print('wrote rough_cases/%s.json' % name)
 
 def flat_rejection(keep=False):
-    """R1: rejection follows the converged head on flat cells (the P3 configuration without unsaturated columns): an
-    interface that passed as converged with the saturated fraction of an earlier iterate rejected 15 % of the recharge
+    """RT1: rejection follows the converged head on flat cells (a flat hillslope without unsaturated columns): an
+    interface that took the saturated fraction of an earlier iterate as converged would reject 15 % of the recharge
     where the closure at the step's heads gives at most 5 %"""
     import sz_models, flopy
     rain = [0.0] * 5 + [30.0] * 40 + [0.0] * 135
-    d = os.path.join(W, 'R1_flat'); shutil.rmtree(d, ignore_errors=True)
+    d = os.path.join(W, 'RT1_flat'); shutil.rmtree(d, ignore_errors=True)
     sz_models.make_case(d, nhru=1, hru_w=400.0, init_depth=3.0, chd=97.0, aq_thick=20.0, rain=rain, days=len(rain), perc=30.0, ksat=300.0,
                         Kh=1.0, Kv=0.3, Sy=0.1, pet=3.0, soil_b=5.0, soil_psia=200.0, aq_b=4.0, aq_psia=0.3, extra_rvg=':HeadSaveFrequency 1\n')
     t0 = time.time(); ok, txt = sz_check.run(d)
-    res = dict(name='R1_flat_rejection', fails=[], notes=[], method='NONE', family='flat', time=time.time() - t0)
+    res = dict(name='RT1_flat_rejection', fails=[], notes=[], method='NONE', family='flat', time=time.time() - t0)
     if not ok: res['fails'].append('run failed'); return decide(res, keep, d)
     r = sz_check.checks(d); res['ident'] = {k: r[k] for k in LIM if k in r}
     for k, lim in LIM.items():
@@ -620,11 +621,11 @@ def selftest():
     case's own failure added after run_case, FAIL; a shortfall is never XFAIL"""
     base = dict(name='c', method='LAG', notes=[], family='ext', deep_links=True)
     a = decide(dict(base, fails=['unconverged steps: interface on 9 of 60']))
-    b = dict(base, fails=['unconverged steps: interface on 9 of 60'], F_err=0.51); decide(b); b = regression_checks(b, 'R20_band_e43')
+    b = dict(base, fails=['unconverged steps: interface on 9 of 60'], F_err=0.51); decide(b); b = regression_checks(b, 'RT20_band_e43')
     c = decide(dict(base, fails=['shortfall 3 m3 on a step whose interface converged']))
     d = decide(dict(base, fails=['unconverged steps: interface on 9 of 60'], deep_links=False))
     ok = (a['status'], b['status'], c['status'], d['status']) == ('XFAIL', 'FAIL', 'FAIL', 'FAIL')
-    print('selftest: known pattern alone %s; with R20\'s own failure %s; shortfall %s; pattern without its condition %s -> %s'
+    print('selftest: known pattern alone %s; with RT20\'s own failure %s; shortfall %s; pattern without its condition %s -> %s'
           % (a['status'], b['status'], c['status'], d['status'], 'ok' if ok else 'FAIL'))
     return ok
 

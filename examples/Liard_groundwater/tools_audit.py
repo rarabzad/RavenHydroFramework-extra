@@ -16,7 +16,7 @@ def audit(run,dt=1.0):
     s0=(st if False else 0.0)
     rejv=b['rejected recharge [m3]'] if 'rejected recharge [m3]' in b else 0*b['MF6 recharge [m3/d]']   #:SoilZone PHYSICAL: recharge on saturated ground goes back to the soil (also subtracted)
     rej=rejv.sum()
-    uzs=(b['unsaturated zone inflow [m3]']-b['unsaturated zone to aquifer [m3]']) if 'unsaturated zone inflow [m3]' in b else 0*b['MF6 recharge [m3/d]']   #soil zone: recharge crosses the unsaturated columns
+    uzs=(b['unsaturated zone inflow [m3]']-b['unsaturated zone to aquifer [m3]']) if 'unsaturated zone inflow [m3]' in b else 0*b['MF6 recharge [m3/d]']   #(:SoilZoneVadose: recharge crosses the unsaturated columns)
     uz=uzs.sum()
     if 'recharge delay storage [m3]' in b:
         s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]+uzs.iloc[0]
@@ -36,7 +36,7 @@ def audit(run,dt=1.0):
         flows=flows+b['soil zone to aquifer [m3/d]']-b['aquifer to soil zone [m3/d]']; gross=gross+b['soil zone to aquifer [m3/d]']+b['aquifer to soil zone [m3/d]']
         if 'seepage and soil inflow withheld [m3]' in b:   #seepage and soil inflow are reported after the withholding: MODFLOW took the withheld part too
             flows=flows-b['seepage and soil inflow withheld [m3]']/dt
-        for c in ('capillary rise from the water table [m3]','lagged-exchange repayment [m3]'):   #soil zone: fixed rates out of the aquifer (SZQ_RAVEN)
+        for c in ('capillary rise from the water table [m3]','lagged-exchange repayment [m3]'):   #(capillary rise and lagged-exchange repayment: fixed rates out of the aquifer, SZQ_RAVEN)
             if c in b: flows=flows-b[c]/dt; gross=gross+b[c].abs()/dt
         szn=(b['aquifer to soil zone [m3/d]']-b['soil zone to aquifer [m3/d]'])*dt
         for c in ('capillary rise to soil zone [m3]','capillary rise from the water table [m3]','lagged-exchange debt [m3]'):

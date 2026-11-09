@@ -4,10 +4,15 @@ Two examples, both built on the Liard River Raven model (northern British Columb
 
 | Example | Folder | What it shows | Run time |
 |---|---|---|---|
-| **A. Raven builds the groundwater model** | `examples/Liard_groundwater` | Raven creates a MODFLOW 6 model under three subbasins from HRU polygons, river lines, a DEM and a bedrock surface | 20 years, about 5–15 minutes |
+| **A. Raven builds the groundwater model** | `examples/Liard_groundwater` | Raven creates a MODFLOW 6 model under three subbasins from HRU polygons, river lines, a DEM and a bedrock surface | 20 years, about 10 minutes |
 | **B. Raven couples an existing MODFLOW 6 model** | `examples/Liard_existing_model` | Raven links its HRUs to a MODFLOW 6 model built separately (`model/`) and takes over its recharge | 2 years, about 5 minutes |
 
 The commands below are for **Windows (Command Prompt)**. Linux and macOS commands follow each step where they differ.
+
+**With the Linux release package** (`Raven_MF6_linux`): Raven and the MODFLOW 6 library are ready in the package's
+`bin/`, so skip Part 1 and set `RAVEN=<package>/bin/Raven`; the example folders are the package's `examples/`, the manual
+is `Raven_MF6_Manual.pdf` beside them, and the repository files named below (the user guide in `docs/`, `tools/`) are in
+`source/raven_extra_docs_tests.tar.gz` (it unpacks as `raven-mf6-extra/`). The package's `README.md` has the commands.
 
 ---
 
@@ -113,8 +118,9 @@ cd %USERPROFILE%\RavenHydroFramework-extra\examples\Liard_groundwater
 
 ### Step A3. (Optional) Shorten the first run
 
-The example runs 20 years (`:Duration 7305` in `Liard.rvi`). For a quick first try, open `Liard.rvi` in a text editor
-and change that line to `:Duration 365` (one year, well under a minute). Change it back for the full run.
+The example runs 20 years: the `:Duration` line of `Liard.rvi` reads `:Duration           7305 00:00:00`. For a quick
+first try, open `Liard.rvi` in a text editor and change 7305 on that line to 365 (one year, well under a minute). Change
+it back for the full run.
 
 ### Step A4. Run
 
@@ -190,7 +196,7 @@ Two years; it ends with `Exiting Gracefully: Successful Simulation`. The run wor
 
 ### Step B4. Look at the results
 
-The same files as in Example A. `output\GWModelSummary.txt` now describes the coupling:
+The same files as in Example A. `output\GWModelSummary.txt` also describes the coupling:
 
     existing model        : GWF_LIARD in model/mfsim.nam (DIS, 4 layers x 11466 cells per layer; metres, days)
     cells linked by       : cell outlines from MODFLOW, Transverse Mercator (...)
@@ -225,5 +231,6 @@ Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gros
 | Some days say `MODFLOW 6 did not converge` | They are flagged in `GWBudget.csv`; see the manual, section "How MODFLOW solves each time step" |
 | Anything else | `output\Raven_errors.txt` has the details |
 
-More: the user guide `docs\Raven_MF6_Groundwater_UserGuide.md` and the manual `docs\manual\main.pdf`
-(chapters "Building the groundwater model", "Coupling an existing MODFLOW 6 model" and "Applying the coupling").
+More: the user guide `docs\Raven_MF6_Groundwater_UserGuide.md` and the manual `docs\manual\main.pdf` of the repository
+(in the release package: `Raven_MF6_Manual.pdf`, and the user guide inside `source/raven_extra_docs_tests.tar.gz`), chapters
+"Building the groundwater model", "Coupling an existing MODFLOW 6 model" and "Applying the coupling".

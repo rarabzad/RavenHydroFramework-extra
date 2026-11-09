@@ -79,7 +79,7 @@ $S_i=\min(q\,k_i,\,S_{\max,i})$ (a full node passes everything it receives), whi
 test U: to round-off).
 
 \paragraph{Behaviour to expect.} With three depth classes (\cmd{:SoilZoneVadoseClasses 3}) the water table can be lower
-during rain than with one class: the upper classes' columns are long (5 to 13~m in the rough-terrain case R20) and hold
+during rain than with one class: the upper classes' columns are long (5 to 13~m in the rough-terrain case RT20) and hold
 more of the rain in transit. That is the method's own physics, not an error. The cascade has no conductivity limit: a
 full column passes any inflow, however slowly permeable its material; where the permeability limits recharge, use
 \cmd{RICHARDS} or \cmd{KINEMATIC}.

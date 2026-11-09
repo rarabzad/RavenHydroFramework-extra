@@ -484,9 +484,32 @@ above the water table ($S_y$ integrated from the head up to the cell's top or th
 $S_y$ consistent with the retention curve this never binds; with $S_y$ well below the drainable porosity a rising water
 table would otherwise release more from the column at each step than the last (a feedback with gain $(\theta-\theta_{\mathrm{eq}})/S_y>1$),
 and Raven warns at start-up when $S_y$ and $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2.
-When the water table rises to within $L_{\min}$ of the base the column disappears and the
+When the water table rises to within $L_{\min}$ of the base the column disappears (rule (ii) below) and the
 soil zone's contact exchange (above) takes over; when it falls again the column reappears at equilibrium. The columns
 are saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}; with depth classes \cmd{:GWVadoseClassColumns}).
+
+\paragraph{Water handed back to the soil zone.} Two rules send column water to the soil zone instead of the aquifer.
+Both book it as \emph{rejected recharge}: it reaches the soil-zone layers as recharge on saturated ground does.
+\begin{description}
+\item[Rule (i): ground saturated during the step.] The column is solved with the water table of the start of the step,
+but MODFLOW's head can rise during the step onto ground that was unsaturated at its start: the saturated fraction of the
+column's ground rises from $F_0$ to $F(h)$. The column's outputs on that ground (its flux into MODFLOW and the excess a
+rising water table releases) go back to the soil zone, $R_q\min\big(\max(F(h)-F_0,0),\,1-F_0\big)$, with $R_q$ the
+column's outputs divided by $1-F_0$. A column whose ground was wholly saturated at the start of the step ($F_0=1$) hands
+back all its outputs. With the interface iteration the share follows the head of each iteration
+(Section~\ref{sec:szinterface}); in explicit coupling only the case $F_0=1$ applies. With depth classes the rule applies
+class by class (Section~\ref{sec:vzclasses}).
+\item[Rule (ii): a vanishing column.] A column that disappears because the water table rose to within $L_{\min}$ of its
+base releases to the aquifer at most what MODFLOW stores for the rise (the limit $S_y\Delta h$ above); the rest of its
+water goes back to the soil zone.
+\end{description}
+In \cmd{GWBudget.csv} the water handed back is part of \emph{rejected recharge}. It is subtracted from \emph{unsaturated
+zone inflow} (both rules) and from \emph{unsaturated zone to aquifer} (rule (i), whose water was among the column's
+outputs), so the column identity $\Delta V^{\mathrm{uz}}=V^{\mathrm{uz}}_{\mathrm{in}}-V^{\mathrm{uz}}_{\mathrm{to\,aq}}
+-V^{\mathrm{uz}}_{\mathrm{cap}}$ (Section~\ref{sec:accsz}) holds with these columns. The water handed back entered the
+columns in earlier steps. On a step with little new inflow and a rising water table (dry weather after a wet spell, or
+columns vanishing) \emph{unsaturated zone inflow} can therefore be negative: the columns then give the soil zone more
+than they receive.
 
 \begin{example}[: delay through a deep unsaturated zone]
 A 3-day storm of 40 mm/d on soil over a water table 6~m deep, sand with $K_s=0.5$ m/d, $b=4$, $\psi_a=0.3$~m (test P1).
@@ -998,8 +1021,8 @@ $z^{\mathrm{wt}}_i$ is the water table of column $i$ (the head of its highest we
 below the lake bed (the model top) means the lake is disconnected: its seepage then depends on the bed, not on how deep
 the water table is --- exactly as for a river. If the lake stands below the model top (for example a DEM that recorded a
 higher water surface), the true bed is below the lake level, so the bed is taken at the lake level $h_{\mathrm{res}}$: a
-deep water table then gives no exchange, where the model top would have given a false inflow to the lake. (Using raw heads
-here was an error: a dry cell's head can be far below the cell and produced impossible seepage.)
+deep water table then gives no exchange, where the model top would have given a false inflow to the lake. (Raw heads are not
+used here because a dry cell's head can lie far below the cell and would give impossible seepage.)
 \item Raven routes the day; the reservoir calculates its seepage $V^{\mathrm{res}}$ with this level and counts it as a
 reservoir loss (water leaving Raven).
 \item The next day, this volume is injected into the aquifer cells under the lake (MODFLOW WEL package
@@ -1136,8 +1159,8 @@ head. Monitoring wells move no water.\par\smallskip
   :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_ELEV
   101, OW_1, 59.27310, -124.73060, 1192.7
 :EndObservationWells
-:GeneralHeadBoundary   G1  edge.geojson  HEAD 1146.9 CONDUCTANCE 5000 LAYERS TOP
-:SpecifiedHeadBoundary L1  lake.geojson  HEAD 1226.5 LAYERS TOP
+:GeneralHeadBoundary   G1  edge.geojson  HEAD 1310.0 CONDUCTANCE 5000 LAYERS TOP
+:SpecifiedHeadBoundary L1  lake.geojson  HEAD 1312.0 LAYERS TOP
 # .rvt
 :WellFlowRate 1 m3/d                 # negative = pumping
   1985-10-01 00:00:00 1.0 3

@@ -61,6 +61,8 @@ for its first part; otherwise those parts are skipped).
 22 the default's offline fallback to OFF with the source tools installed: the warning names the network (no request to
    install the tools); without meson the warning asks to install the source tools
 
+--selftest shows that each check can fail: it applies one mutation per check (the defect the check guards against) to a
+copy of the source and expects that check to fail.
 Prints one line per part and "cmake checks: ALL PASSED (N parts)" at the end; exit code = number of failed parts.
 """
 import os, sys, re, shutil, subprocess, zipfile, hashlib, tarfile, io, argparse
@@ -266,7 +268,7 @@ install(FILES "%s/next/libnext.so" DESTINATION bin)
     run([CMAKE, '--install', b])
     moved = os.path.join(d, 'moved')
     shutil.move(os.path.join(d, 'inst'), moved)
-    shutil.rmtree(os.path.join(d, 'next'))                 # libnext only beside the moved executable now
+    shutil.rmtree(os.path.join(d, 'next'))                 # libnext only beside the moved executable from here on
     shutil.rmtree(b)
     rc4, out4 = run([os.path.join(moved, 'bin', 'mini')])
     report(3, '  moved install: starts (library beside it via $ORIGIN, private one via link path)',
@@ -727,7 +729,7 @@ CHECKS = {1: check1, 2: check2, 3: check3, 4: check4, 5: check5, 6: check6, 7: c
           10: check10, 11: check11, 12: check12, 13: check13, 14: check14, 15: check15, 16: check16, 17: check17,
           18: check18, 19: check19, 20: check20, 21: check21, 22: check22}
 
-# one mutation per check: (file, text in it, replacement) = the bug the check was written for
+# one mutation per check: (file, text in it, replacement) = the defect the check guards against
 MUTATIONS = {
     1: ('cmake/RavenMF6.cmake', 'macro(_rmf6_giveup)\n', 'macro(_rmf6_giveup)\n  set(_rmf6_explicit TRUE)\n'),
     2: ('cmake/RavenMF6.cmake', '  set(RAVEN_MF6_MODE OFF)\n  return()\nendmacro()',
@@ -785,7 +787,7 @@ def selftest(only):
         open(p, 'w').write(t.replace(old, new))
         SRC = mut
         results = []
-        print('--- check %d on a source with its bug put back (%s)' % (n, f))
+        print('--- check %d on a source with its defect put in (%s)' % (n, f))
         try:
             CHECKS[n]()
         except Exception as e:

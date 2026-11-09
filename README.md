@@ -17,12 +17,12 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 
 | Folder | Contents |
 |---|---|
-| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`; verification in chapter 9), developer notes on the design (`design/`) |
+| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`; verification in chapter 9) |
 | `examples/` | the Liard River model with a groundwater model built by Raven, and coupled to an existing MODFLOW 6 model; step-by-step guide in `examples/README.md` |
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
 | `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`), with specified heads too |
-| `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles; a shallow Raven clone is completed from the upstream Raven repository first) and runs the package README's restore commands to check that each bundle clones with its whole history |
+| `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles on branch `soil-zone`; a shallow Raven clone is completed from the upstream Raven repository first; `COMMITS.txt`) and runs the clone commands of the package README's "Restore the git history" section as written, checking that each bundle clones with its whole history, branch, tip and commit count as the README states |
 | `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run, including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
 ## Quick start
@@ -73,9 +73,14 @@ files. Windows, Linux and macOS step by step: `examples/README.md`.
 ```
 cd tests
 python3 run_all.py --nolib     # checks that need no MODFLOW library (a few minutes)
-python3 run_all.py --quick     # everything in quick mode (RAVEN_TEST_QUICK=1 for every script; about half an hour)
-python3 run_all.py             # everything in full mode (about an hour on one core)
+python3 run_all.py --quick     # everything in quick mode (about 35 minutes on two cores, up to an hour on a busy machine)
+python3 run_all.py             # everything in full mode (about 1.5 hours, up to 2.5 hours on a busy machine)
 ```
+
+`--quick` runs fewer randomized set-ups and sets `RAVEN_TEST_QUICK=1` for every script. The soil-zone scripts and
+`behaviour_check`, `budget_file`, `combinations`, `crs_inputs`, `input_checks`, `mf6version_check`, `ext_exchanges`,
+`ext_inputs` and `restart_ext` then run shorter cases; the other scripts (among them the long `edge`, `liard_grids` and
+the existing-model guards) run their usual cases in both modes. `tests/README.md` lists them.
 
 The tests find Raven in `../RavenHydroFramework`; otherwise set `RAVEN_SRC` (see `tests/README.md`). The C++ unit tests
 compile Raven's sources from `RAVEN_SRC`, so it must point at the Raven source even when `RAVEN_EXE` names a built Raven.

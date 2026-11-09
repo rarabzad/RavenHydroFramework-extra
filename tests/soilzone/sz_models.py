@@ -1,4 +1,4 @@
-"""Synthetic Raven + MODFLOW 6 models for the soil-zone tests (docs/design/soil_zone_coupling_plan.md §9.2).
+"""Synthetic Raven + MODFLOW 6 models for the soil-zone tests (manual, "Verification", "The soil zone").
 
 make_case(d, **cfg) writes a complete model in folder d:
   a strip of nhru HRUs (each hru_w x width m) along x, ground sloping down along x at `slope` (DEM raster),

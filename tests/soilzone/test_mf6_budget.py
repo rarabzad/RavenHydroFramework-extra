@@ -26,15 +26,15 @@ B8  without :SoilZone PHYSICAL, steps MODFLOW does not converge: only MODFLOW's 
     GWBudget row's residual, recharge + storage release
     - seepage to Raven - MF6 balance error, equals max(-balance error, 0) on unconverged steps and 0 on the others; its
     sum over the run equals the run total "discharge withheld" in GWModelSummary.txt; at most ten guard warnings, the
-    tenth saying further ones are suppressed. (The earlier cap at the step's inflow left out the storage release: row
-    residual 15284 m3/d against a balance error of -1039 m3/d on step 1, 21653 m3 lost unbooked over 10 steps.)
+    tenth saying further ones are suppressed. (A cap at the step's inflow alone would leave out the storage release:
+    row residual 15284 m3/d against a balance error of -1039 m3/d on step 1, 21653 m3 unbooked over 10 steps.)
     B8 Liard: the same with rivers and surface stores taking part, the Liard example (CONCEPTUAL, rivers, lakes) with
     :SolverMaxOuterIterations 2, 10 days (quick; 60 full): the row residual over every GWBudget column (recharge, storage
     release, river and store leakage, wells, GHB, CHD and reservoir seepage in; seepage to Raven, discharge to rivers and
     to surface stores, water-table ET out; less MF6 balance error) is the volume withheld: at most max(-balance error, 0)
     on unconverged steps (all of it where the step's discharge covers it), 0 on converged ones, and its sum over the run
-    equals the run total in GWModelSummary.txt. (When the discharge columns kept MODFLOW's flows, the river share of the
-    withheld water was in no column: rows 185,896 m3 against a run total of 559,616 m3 over 60 days.)
+    equals the run total in GWModelSummary.txt. (If the discharge columns kept MODFLOW's flows, the river share of the
+    withheld water would be in no column: rows 185,896 m3 against a run total of 559,616 m3 over 60 days.)
 B9  GWSoilExchange.csv books each HRU's exchange under the headings GWBudget.csv uses: on every date, the sums over the
     HRUs of "soil zone to aquifer", "aquifer to soil zone", "soil zone to specified heads" and "specified heads to soil
     zone" equal GWBudget's columns of the same names. Cases: a model Raven builds whose HRU 2 lies wholly over a

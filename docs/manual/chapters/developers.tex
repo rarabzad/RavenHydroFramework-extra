@@ -72,33 +72,40 @@ requests merge cleanly in any order:
       \cmd{:HRUID} lies in another subbasin stops with a message instead of crashing.
 \item \textbf{Observation constituent} (\cmd{fix-observation-constituent}): \cmd{:ObservationData} and
       \cmd{:ObservationWeights} for \cmd{STREAM\_CONCENTRATION} read the constituent name before the line is re-read.
-\item \textbf{Age-tracer hotstart}: the \cmd{:StartTime} offset of a
-      hotstart reaches the age tracers. The masses keep the datum of the run that wrote the file, the age clock and the
-      entry time of precipitation are shifted by the offset, and \cmd{solution.rvc} writes that datum as its
-      \cmd{:StartTime}, so a chain of hotstarts keeps one datum. (Shifting the masses instead would make them negative,
-      which the advection limiter cannot carry.) Runs without an age tracer, and cold starts, are unchanged.
+\item \textbf{Age-tracer hotstart}: the \cmd{:StartTime} offset of a hotstart reaches
+      the age tracers. The masses keep the datum of the run that wrote the file, and the age clock and the entry time of
+      precipitation are shifted by the offset. (Shifting the masses instead would make them negative, which the advection
+      limiter cannot carry.) \cmd{solution.rvc} keeps \cmd{:StartTime} as the start of the run, as Raven~4.15 writes it,
+      and adds a line \cmd{:AgeTracerDatum} with the datum when it is before that start (the start of the first run of a
+      chain of hotstarts), so a chain keeps one datum. Reading a file, the offset is taken from \cmd{:AgeTracerDatum}, else
+      from \cmd{:StartTime} when the file holds age-tracer masses, else it is 0 (a spin-up run without the tracer: the
+      initial water has age 0). Runs without an age tracer, and cold starts, are unchanged.
 \end{enumerate}
-\begin{table}[!htbp]\centering
-\caption{Changes to existing Raven files (pull request in brackets).}
-\begin{tabular}{P{0.4\linewidth}P{0.548\linewidth}}\toprule\hdr
-File & Change\\\midrule
-\cmd{Solvers.cpp} & groundwater hook after lateral processes; river exchange before routing; losses from reach inflow (1)\\
-\cmd{Model.cpp/.h} & always creates the groundwater object; returned water counted as input; \cmd{GW\_HEAD} diagnostics (1); stored first routing state (2)\\
+\begin{longtable}{P{0.32\linewidth}P{0.628\linewidth}}
+\caption{Changes to existing Raven files (pull request in brackets).}\label{tab:corechanges}\\
+\toprule\hdr
+File & Change\\\midrule\endfirsthead
+\caption[]{Changes to existing Raven files (continued).}\\
+\toprule\hdr
+File & Change\\\midrule\endhead
+\cmd{Solvers.cpp} & groundwater hook after lateral processes; river exchange before routing; losses from reach inflow; with \cmd{:SoilZoneClasses} the HRU's process sequence once per column class (1)\\
+\cmd{Model.cpp/.h} & always creates the groundwater object, deleted first so it can finish its outputs; returned water counted as input; \cmd{GW\_HEAD} diagnostics; flows of the column classes (\cmd{ClassBalance}, \cmd{SetFlowBalance}) (1); stored first routing state (2)\\
 \cmd{ModelInitialize.cpp} & groundwater initialized after all inputs (1); routing memory and reservoir states of the first run snapshotted and restored before each member's .rvc is read (2); reservoir \cmd{:HRUID} check (3)\\
-\cmd{StandardOutput.cpp} & groundwater hotstart blocks in \cmd{solution.rvc} (1); \cmd{:StartTime} of \cmd{solution.rvc} is the age tracers' datum (run start less the offset) when the model has an age tracer (5)\\
-\cmd{AgeTracers.cpp/.h}, \cmd{Advection.cpp} & the hotstart offset shifts the age clock, not the masses; precipitation enters at the shifted time (5)\\
-\cmd{ParseInput.cpp} & \cmd{:GroundwaterModel}; \cmd{:rvg\_Filename} relative to the \cmd{.rvi}; obsolete USG commands give clear errors (1)\\
+\cmd{StandardOutput.cpp} & groundwater hotstart blocks in \cmd{solution.rvc}; groundwater outputs closed at the end of the run (1); \cmd{:AgeTracerDatum} line in \cmd{solution.rvc} when the age tracers' datum is before the run's start; \cmd{:StartTime} unchanged (5)\\
+\cmd{AgeTracers.cpp/.h}, \cmd{Advection.cpp} & the hotstart offset shifts the age clock, not the masses; precipitation enters at the shifted time; the datum kept for \cmd{solution.rvc} (\cmd{SetDatum}, \cmd{GetDatum}, \cmd{GetTimeOffset}) (5)\\
+\cmd{ParseInput.cpp} & \cmd{:GroundwaterModel}; \cmd{:rvg\_Filename} relative to the \cmd{.rvi}; obsolete USG commands (\cmd{:Drain}, \cmd{:Recharge RECHARGE\_FLUX/RECHARGE\_DATA}) stop with clear errors; \cmd{:Transport} stops in a coupled run (the coupling exchanges water only, no constituent mass) (1)\\
 \cmd{ParsePropertyFile.cpp} & \cmd{:AquiferClasses}, \cmd{:AquiferProfiles}, \cmd{:AquiferProfile\allowbreak Parameters} (1)\\
 \cmd{ParseHRUFile.cpp}, \cmd{HydroUnits.h} & \cmd{AQUIFER\_PROFILE} stored on each HRU (1)\\
-\cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate}, \cmd{:BoundaryHead} (1); constituent name captured before parsing (4)\\
-\cmd{ParseInitialConditionFile.cpp} & \cmd{:InitialGWHeads}, \cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry} (1); ensemble members restored (2); default reservoir stage (3); \cmd{:StartTime}: the offset of the age tracers from the run's real start date (1), passed to the age tracers before their initial conditions are set (5)\\
+\cmd{ProcessGroup.h}, \cmd{SoilWaterMovers.h} & accessors the coupling reads (\cmd{GetSubProcess}, \cmd{GetPercolationType}) (1)\\
+\cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate} (m$^3$/d, m$^3$/s or L/s), \cmd{:BoundaryHead} (m); other units stop (1); constituent name captured before parsing (4)\\
+\cmd{ParseInitial\allowbreak ConditionFile.cpp} & \cmd{:InitialGWHeads} and the groundwater hotstart blocks (\cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWSoilZoneLag}), each value checked (not a finite number, or a negative water amount, stops: a damaged file), ignored with a warning in a run without \cmd{:GroundwaterModel}; the capacity check of the initial soil water skipped for the seepage target of a coupled model (it can hold more than its capacity, as in a continuous run) (1); ensemble members restored (2); default reservoir stage (3); \cmd{:AgeTracerDatum} read, age-tracer masses detected in the state table, and the offset passed to the age tracers before their initial conditions are set (5)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor (2)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision, constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\
-\cmd{CMakeLists.txt}, \cmd{src/Makefile}, \cmd{src/Raven.vcxproj(.filters)} & new files; link \cmd{-ldl} (CMake: \cmd{CMAKE\_DL\_LIBS}) (1)\\
+\cmd{CMakeLists.txt}, \cmd{src/Makefile}, \cmd{src/Raven.vcxproj(.filters)} & new files; link \cmd{-ldl} (CMake: \cmd{CMAKE\_DL\_LIBS}); CMake: Release by default for single-configuration generators, option \cmd{RAVEN\_MF6} with \cmd{cmake/RavenMF6*.cmake} (the MODFLOW~6 library: build, download or given path; install with its runtime) (1)\\
+\cmd{README.md}, \cmd{.gitignore}, \cmd{.github/\allowbreak workflows/\allowbreak testing.yml} & the \cmd{RAVEN\_MF6} option described; \cmd{cmake/RavenMF6*} tracked; the existing test workflow configures with \cmd{-DRAVEN\_MF6=OFF} (and \cmd{.github/workflows/raven-mf6.yml} builds and tests with the library) (1)\\
 \cmd{Drain.cpp}, \cmd{GWRecharge.cpp}, \cmd{GWRiverConnection.*}, \cmd{GWSWProcessABC.cpp}, \cmd{GWSWProcesses.h}, \cmd{MFUSGpp.h}, \cmd{RiverReach.*} & removed (1): the MODFLOW-USG coupling defined the same \cmd{CGroundwaterModel} class and only built with \cmd{\_MODFLOW\_USG\_} and the MF-USG library; it remains in the history of the Raven repository (v593)\\\bottomrule
-\end{tabular}
-\end{table}
+\end{longtable}
 
 \section{Where things live}
 The coupling is split as the Raven team asked: Raven's own repository holds only the source code, and everything else
@@ -304,8 +311,8 @@ starts dry (Section~\ref{ch:layers}). Start from a steady state or realistic hea
 need smaller cells.
 \item Existing models (Chapter~\ref{ch:existing}, Section~\ref{sec:extlimits}): no DISU grids; no ATS6, several solutions or
 a non-Gregorian calendar; restarts and later starts refuse time-array series (TAS6), TVK6/TVS6, simulations with several
-models and array or advanced packages with several period entries before the start (TS6 time series are shifted to Raven's
-start); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\cmd{OPEN/CLOSE} files are read); the stream
+models, array or advanced packages with several period entries before the start, and \cmd{TS6} files whose rows come
+from another file (\cmd{TS6} time series are shifted to Raven's start); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\cmd{OPEN/CLOSE} files are read); the stream
 package keeps the model's stage and has no conductance (supply) limit; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are
 taken as metres and days (set them in DIS and TDIS); monitoring wells and \cmd{GWHeads.nc} need the cell outlines
 (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not \cmd{:OverlapWeights}). Water-table ET, \cmd{:SurfaceWaterExchange} and

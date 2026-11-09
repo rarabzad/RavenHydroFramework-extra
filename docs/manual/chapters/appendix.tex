@@ -248,7 +248,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\
 \cmd{seepage and soil inflow withheld [m3]}, \cmd{river gains withheld [m3]}, \cmd{surface-store gains withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\
 \cmd{negative recharge the soil zone did not hold [m3]} & the cut of a negative recharge (Section~\ref{sec:negrecharge}) that the soil zone could not hold (0)\\
-\cmd{unsaturated zone inflow [m3]}, \cmd{unsaturated zone to aquifer [m3]} & \cmd{:SoilZoneVadose} other than \cmd{NONE}: water entering the unsaturated columns; water they pass to the water table (including the excess a rising water table absorbs)\\
+\cmd{unsaturated zone inflow [m3]}, \cmd{unsaturated zone to aquifer [m3]} & \cmd{:SoilZoneVadose} other than \cmd{NONE}: water entering the unsaturated columns, less the water they hand back to the soil zone (rules (i) and (ii), Section~\ref{sec:szvadose}; negative on steps where they hand back more than they receive); water they pass to the water table (including the excess a rising water table absorbs), less the hand-back of rule (i)\\
 \cmd{capillary rise to soil zone [m3]}, \cmd{unsaturated zone storage [m3]} & (same) rise from the columns' top nodes into the soil zone (\cmd{RICHARDS}); water in the columns relative to their reference profile at the end of the step\\
 \cmd{capillary rise from the water table [m3]} & capillary rise on: rise from the water table into the soil-zone layers (Section~\ref{sec:szcaprise})\\
 \cmd{lagged-exchange debt [m3]}, \cmd{lagged-exchange repayment [m3]} & \cmd{LAGGED} timing: lent water Raven's processes used that the step's exchange did not supply; the aquifer's repayment in the step (Section~\ref{sec:sztiming})\\
@@ -344,6 +344,7 @@ cells of the grid file differ from the model's cell area & wrong projection, len
 give one of \cmd{:MF6CRS}, \cmd{:MF6GridFile} or \cmd{:OverlapWeights} & link HRUs in exactly one way\\
 the period data of \emph{package} cannot be renumbered safely & start Raven at \cmd{:MF6StartDate}\\
 \emph{package} uses time-array series (TAS6) / time series, \dots\ and the simulation holds several models & start Raven at \cmd{:MF6StartDate}\\
+the time-series file \emph{file} reads its rows from another file; list them in the file itself & on a later start, list the rows of the \cmd{TS6} file's \cmd{TIMESERIES} block in the file (no \cmd{OPEN/CLOSE} or \cmd{INTERNAL}), or start Raven at \cmd{:MF6StartDate}\\
 TDIS period data given as INTERNAL / the water mover \dots\ gives its period data as INTERNAL & list the rows in the file itself or in an \cmd{OPEN/CLOSE} file\\
 an aquifer profile has EXTINCTION\_DEPTH $>0$ \dots\ and the model keeps its EVT/UZF package & list that package in \cmd{:RavenTakesOver}, or set \cmd{EXTINCTION\_DEPTH} 0\\
 with \cmd{:MF6Simulation} \dots\ remove \dots\ (these apply to models Raven builds) & remove the generated-model commands (grid options, \cmd{:LandSurface}, solver settings, \cmd{:WriteGWBudgetFile}, \dots); for an existing model's budget file edit its OC file\\

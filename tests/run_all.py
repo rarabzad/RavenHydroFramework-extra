@@ -1,10 +1,10 @@
 """Runs the whole verification suite and writes one report.
 
-    python3 run_all.py            # everything (needs the MODFLOW 6 library; about an hour on one core)
+    python3 run_all.py            # everything, full mode (needs the MODFLOW 6 library; about 1.5 hours on two cores)
     python3 run_all.py --nolib    # only the checks that do not need the MODFLOW 6 library (a few minutes)
-    python3 run_all.py --quick    # everything in quick mode: smaller randomized rounds, and every script runs with
-                                  # RAVEN_TEST_QUICK=1 (its smallest cases; the rough-terrain suite 40 seeds, the
-                                  # Liard soil-zone run T7 30 days instead of 365)
+    python3 run_all.py --quick    # everything in quick mode (about 35 minutes on two cores): fewer randomized set-ups,
+                                  # and RAVEN_TEST_QUICK=1 for every script, which shortens the scripts that have a
+                                  # quick mode (see "Mode" below)
     python3 run_all.py --only thiem,edge    # selected steps (names as in the report)
     python3 run_all.py --selftest           # only the self-test of the pass criteria below (seconds)
 
@@ -16,7 +16,15 @@ Settings come from testconfig.py (RAVEN_SRC, RAVEN_EXE, RAVEN_MF6_LIB, RAVEN_TES
 failed steps.
 
 Mode: --quick (or RAVEN_TEST_QUICK=1 in the environment) sets RAVEN_TEST_QUICK=1 for every step; otherwise every step runs
-with RAVEN_TEST_QUICK=0, its full mode, also when the variable is set to something else outside. The full mode runs the
+with RAVEN_TEST_QUICK=0, its full mode, also when the variable is set to something else outside. In quick mode this script
+runs fewer randomized set-ups (fuzz_grids 8 instead of 72, fuzz_lakes 4 instead of 24, ext_fuzz 6 instead of 20, the
+rough-terrain suite 40 seeds instead of 400, T7 30 days instead of 365), and the scripts with a quick mode run shorter
+cases: every soil-zone script (soilzone/; spike_xmi, test_hillslope, test_surface_stores and test_plot_tool run the same
+case in both modes), behaviour_check, budget_file, combinations, crs_inputs, input_checks, mf6version_check and
+existing/ext_exchanges, ext_inputs and restart_ext (its sub-daily case). The other scripts (edge, liard_grids,
+mf6files_check, mf6lib_check, restart_test, lake_test, dry_start, thiem, existing/guards and roundtrip, the USGS examples,
+the C++ unit tests, cmake_checks, budget_xcheck) run their usual cases in both modes. Measured on two cores: quick
+about 35 minutes, full about 1.5 hours (up to an hour and 2.5 hours on a busy machine, the latter with the USGS steps). The full mode runs the
 rough-terrain suite as the manual reports it (regression cases + 400 seeds x NONE, RICHARDS, KINEMATIC and LAG, 1,620
 runs) and again with three depth classes (--vzclasses 3).
 
@@ -151,8 +159,8 @@ def thiem_judge(out):
 # ---- the steps: (name, needs MODFLOW, command, pass criterion, timeout [s]) ----
 # the USGS example models (mf6examples.zip of the MODFLOW 6 examples, or its unpacked folder): set RAVEN_USGS_EXAMPLES
 USGS = os.environ.get('RAVEN_USGS_EXAMPLES', '')
-FZ = [('3', '8')] if QUICK else [('11', '24'), ('21', '24'), ('22', '24')]     # (seed, set-ups) of the grid rounds
-FZL = [('12', '4')] if QUICK else [('12', '12'), ('13', '12')]                  # rounds with a reservoir and lake refinement
+FZ = [('3', '8')] if QUICK else [('11', '24'), ('21', '24'), ('22', '24')]     # (seed, set-ups) of the grid batches
+FZL = [('12', '4')] if QUICK else [('12', '12'), ('13', '12')]                  # batches with a reservoir and lake refinement
 FE = ('5', '6') if QUICK else ('5', '20')
 cxx = 'g++ -std=c++11 -O2 -I%s' % ROOT
 STEPS = [
@@ -200,7 +208,7 @@ STEPS = [
     ('usgs_capture', True, lambda: [PY, 'existing/usgs_capture.py', USGS], last_line(r'capture checks: ALL PASSED'), 3 * 3600),
     ('ext_fuzz', True, [PY, 'existing/fuzz_ext.py', FE[0], FE[1]],
      fuzz_json(lambda: [os.path.join(tc.WORK, 'extmodel', 'fz_results_%s.json' % FE[0])]), 12 * 3600),
-    # :SoilZone PHYSICAL (docs/design/soil_zone_coupling_plan.md section 9)
+    # :SoilZone PHYSICAL (manual, "Verification", "The soil zone")
     ('soilzone_unit', False, '%s soilzone/soilzone_unit.cpp %s/GWSoilZone.cpp -o %s/soilzone_unit && %s/soilzone_unit'
      % (cxx, ROOT, LOGS, LOGS), last_line(r'soil-zone unit tests: \d+ checks, 0 failed'), 600),
     ('soilzone_check_selftest', False, [PY, 'soilzone/sz_check.py'], last_line(r'vz_identity self-test: .* -> ok'), 300),
@@ -221,7 +229,7 @@ STEPS = [
     ('soilzone_vadose_unit', False, '%s soilzone/vadose_unit.cpp %s/GWVadose.cpp -o %s/vadose_unit && %s/vadose_unit %s/vadose_drain.txt && %s soilzone/vadose_ref.py %s/vadose_drain.txt'
      % (cxx, ROOT, LOGS, LOGS, LOGS, PY, LOGS), last_line(r'vadose reference: PASS'), 900),
     ('soilzone_water_table', True, [PY, 'soilzone/test_water_table.py'], last_line(r'water-table tests: ALL PASSED'), 3600),
-    # :SoilZoneVadose KINEMATIC (docs/design/soil_zone_kinematic.md)
+    # :SoilZoneVadose KINEMATIC and LAG, depth classes, initial states
     ('soilzone_vz_kinematic', True, [PY, 'soilzone/test_vz_kinematic.py'], last_line(r'kinematic tests: ALL PASSED'), 3600),
     ('soilzone_vz_lag', True, [PY, 'soilzone/test_vz_lag.py'], last_line(r'LAG tests: ALL PASSED'), 1800),
     ('soilzone_vz_classes', True, [PY, 'soilzone/test_vz_classes.py'], last_line(r'vz classes tests: ALL PASSED'), 3600),
@@ -273,7 +281,7 @@ def selftest():
     r = subprocess.run([PY, '-c', 'import sys; sys.path.insert(0, "soilzone"); import test_restart as t; t.verdict(True, True, False, True)'],
                        cwd=HERE, capture_output=True, text=True, env=tc.ENV)
     o = r.stdout + r.stderr
-    check('soilzone_restart: R3 failing makes the last line FAIL', ('restart test: FAIL' in o) and not J['soilzone_restart'](o)[0], o.strip().split('\n')[-1][:100])
+    check('soilzone_restart: RS3 failing makes the last line FAIL', ('restart test: FAIL' in o) and not J['soilzone_restart'](o)[0], o.strip().split('\n')[-1][:100])
     # the scripts themselves, with a Raven that always fails (own scratch folder): count line and exit code
     if not (tc.MF6LIB and os.path.exists(tc.MF6LIB)):
         tc.skip('the scripts with a failing Raven', 'RAVEN_MF6_LIB not set (they stop before running)')

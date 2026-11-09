@@ -137,11 +137,11 @@ def raster_utm(src, dst):
 GEO = [('Liard_HRUs_standin.geojson', 'utm_hrus.geojson'), ('Liard_rivers.geojson', 'utm_rivers.geojson'),
        ('boundary_line.geojson', 'utm_boundary_line.geojson'), ('lake.geojson', 'utm_lake.geojson')]
 RAS = [('Liard_dem_standin.asc', 'utm_dem.asc'), ('Liard_bedrock_standin.asc', 'utm_bedrock.asc')]
-BOUNDS = ('# :GeneralHeadBoundary   GHB1 boundary_line.geojson HEAD 1146.85 CONDUCTANCE 5000.0 LAYERS TOP\n'
-          '# :SpecifiedHeadBoundary LAKE1 lake.geojson HEAD 1226.5 LAYERS TOP\n')
-# heads above the cells under the boundaries (top layer: bottom 1300 m, top 1315 m there): GHB1 by its HEAD, LAKE1 by a
-# :BoundaryHead series (HEAD 0 alone would leave it without cells)
-HEADS = [('HEAD 1146.85', 'HEAD 1310.0'), ('HEAD 1226.5', 'HEAD 0.0')]
+BOUNDS = ('# :GeneralHeadBoundary   GHB1 boundary_line.geojson HEAD 1310.0 CONDUCTANCE 5000.0 LAYERS TOP\n'
+          '# :SpecifiedHeadBoundary LAKE1 lake.geojson HEAD 1312.0 LAYERS TOP\n')
+# heads above the cells under the boundaries (top layer: bottom 1300 m, top 1315 m there): GHB1 by the example's HEAD,
+# LAKE1 by a :BoundaryHead series (HEAD 0 alone would leave it without cells)
+HEADS = [('HEAD 1312.0', 'HEAD 0.0')]
 
 
 def add_lake_series(d, days):

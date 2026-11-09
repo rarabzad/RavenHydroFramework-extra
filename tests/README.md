@@ -25,16 +25,29 @@ unpack as `raven-soil-zone/` and `raven-mf6-extra/` in one folder `<dir>`:
 
 ## Everything at once
 
-    python3 run_all.py            # every test below and one report, full mode (needs the MODFLOW 6 library; about an hour on one core)
-    python3 run_all.py --quick    # quick mode: smaller randomized rounds, RAVEN_TEST_QUICK=1 for every script
+    python3 run_all.py            # every test below and one report, full mode (needs the MODFLOW 6 library; about 1.5 hours on two cores)
+    python3 run_all.py --quick    # quick mode: fewer randomized set-ups, RAVEN_TEST_QUICK=1 for every script (about 35 minutes)
     python3 run_all.py --nolib    # only the checks that need no MODFLOW library (a few minutes)
     python3 run_all.py --only thiem,liard_grids
 
 The report goes to `<scratch>/run_all_report.md`, the full output of every step to `<scratch>/run_all_logs/`; the exit
 code is the number of failed steps. A check a script could not make prints "SKIP <what>: <why>"; the step's result then
 reads "PASS (k skipped)" (or FAIL) and the report lists those lines. The full mode runs the rough-terrain suite with 400
-seeds and all four unsaturated-zone methods, and again with three depth classes (`soilzone_rough_terrain_k3`). With `--only`, the report keeps the earlier results of the other steps (each row shows
-when it ran). The report lists which steps give the numbers quoted in the manual.
+seeds and all four unsaturated-zone methods, and again with three depth classes (`soilzone_rough_terrain_k3`). With
+`--only`, the report keeps the results of the other steps from their last run (each row shows when it ran). The report
+lists which steps give the numbers quoted in the manual.
+
+Quick mode (`--quick`, or `RAVEN_TEST_QUICK=1` for a single script): `run_all.py` runs fewer randomized set-ups
+(`fuzz_grids` 8 instead of 72, `fuzz_lakes` 4 instead of 24, `ext_fuzz` 6 instead of 20, the rough-terrain suite 40
+seeds instead of 400, T7 30 days instead of 365). The scripts with a quick mode run shorter cases, each described in its
+header: every soil-zone script (`spike_xmi.py`, `test_hillslope.py`, `test_surface_stores.py` and `test_plot_tool.py`
+run the same case in both modes), `behaviour_check.py`, `budget_file.py`, `combinations.py`, `crs_inputs.py`,
+`input_checks.py`, `mf6version_check.py`, and `existing/ext_exchanges.py`, `ext_inputs.py` and `restart_ext.py` (its
+sub-daily case). The other scripts run their usual cases in both modes: `edge.py`, `liard_grids.py`, `mf6files_check.py`,
+`mf6lib_check.py`, `restart_test.py`, `lake_test.py`, `dry_start.py`, the Thiem test, `existing/guards.py` and
+`roundtrip.py`, the USGS examples, the C++ unit tests, `cmake_checks.py` and `budget_xcheck.py`. Measured on two cores: quick
+mode about 35 minutes (up to an hour on a busy machine); full mode about 1.5 hours (up to 2.5 hours on a busy machine,
+with the USGS example steps).
 
 The coupled tests of the sections below start from the shipped Liard examples (`examples/Liard_groundwater`,
 `examples/Liard_existing_model`), copy them into the scratch folder and edit the copies; the examples themselves are never
@@ -63,7 +76,7 @@ run stops, with a message, right after that, so these checks need only Raven, Py
 | `mf6lib_check.py [--unit]` | part 0 (`--unit`, no library needed): `tools/get_mf6.py` platform choice with faked platforms (Windows ARM64 and Linux aarch64 stop and point to `-DRAVEN_MF6=SOURCE`/`PATH`, `--zip` accepts win64 on Windows ARM64 with a note, Intel Mac needs `--version 6.6.3`); then getting and finding the MODFLOW 6 library: `tools/get_mf6.py --zip` unpacks a release-style zip (with version file, idempotent); Raven with no setting finds the library in `lib/mf6` one folder up and next to its executable; with none, the message lists the places searched |
 | `mf6files_check.py [OLD_RAVEN]` | 16 generated set-ups (every grid type, rotation, refinement, layers by elevation, aquicludes, boundaries, wells, lakes, imported cells): FloPy reads the model; cells valid and not overlapping; DIS origin and rotation, DISV/DISU vertices, DISU symmetry and face angles against the cell file; no vertical connection through an aquiclude; drains inside the top cell; boundary polygons select the right cells. With an older Raven as argument, also shows which input files changed |
 | `crs_inputs.py --nolib` | the input checks of `crs_inputs.py` (below): projected GeoJSON or rasters without `:InputCRS`, files in another projection than `:InputCRS`, wells given by X and Y without `:InputCRS`, and with `:InputCRS` a DEM, bedrock raster, HRU file or boundary line left in lon/lat stop Raven while it reads the geometry |
-| `run_all.py --selftest` (`run_all_selftest`) | the pass criteria of `run_all.py` fail on outputs with failed or unconverged runs, `test_restart.py`'s last line fails when R2-R4 fail, and the restart, lake, Thiem, Liard-grid and existing-model restart scripts end with a failing count line and exit code 1 when Raven fails |
+| `run_all.py --selftest` (`run_all_selftest`) | the pass criteria of `run_all.py` fail on outputs with failed or unconverged runs, `test_restart.py`'s last line fails when RS2-RS4 fail, and the restart, lake, Thiem, Liard-grid and existing-model restart scripts end with a failing count line and exit code 1 when Raven fails |
 | `soilzone/test_plot_tool.py` (`soilzone_plot_tool`) | `tools/plot_soilzone.py` with soil-zone columns over specified heads: their exchange counts in the choice of HRUs and is drawn per HRU and model-wide |
 | `edge.py --nolib` | the faulty and unusual set-ups of `edge.py` (below), judged by the message Raven stops with; valid existing-model preparations checked in detail (stress periods split at the start date, restart renumbering, original model untouched) |
 
@@ -119,8 +132,8 @@ days and in feet and seconds, with an independent `:OverlapWeights` table from `
 The tests of `:SoilZone PHYSICAL` (manual, chapter "Verification", sections "The soil zone" and "Rough terrain"). Each
 script supports the quick mode (`RAVEN_TEST_QUICK=1`, which `run_all.py --quick` sets) and the full mode: in quick mode the
 scripts run shorter cases (for example T7 30 days instead of 365, the restart hillslope 60 + 60 days instead of 150 + 150,
-T4 without the hourly step), and the scripts whose full cases take a second or two (`spike_xmi.py`, the T2/T3 hillslope)
-run the same case in both modes; each script's header lists its quick mode. Every coupled run is checked by `sz_check.py`
+T4 without the hourly step), and the scripts whose cases take a few seconds (`spike_xmi.py`, the T2/T3 hillslope,
+`test_surface_stores.py`, `test_plot_tool.py`) run the same case in both modes; each script's header lists its quick mode. Every coupled run is checked by `sz_check.py`
 at the standard limits (`sz_check.ID_LIMITS`: recharge identity 5e-9, soil-zone and unsaturated-zone identities 1e-8 from
 the first step, the negative recharge not held), MODFLOW's and Raven's balance, and no shortfall.
 
@@ -140,7 +153,7 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 | `test_column.py` (`soilzone_column`) | T1/T1b: flat column, the water table rising into the soil zone (50 / 125 mm/d below the base, 50 inside, full on day 41) |
 | `test_hillslope.py --selftest` (`soilzone_hillslope`) | T2/T3: hillslope wetting and drying against a MODFLOW-only reference (`sz_reference.py`); T3 drying checks and their self-test |
 | `test_dynamics.py` (`soilzone_dynamics`) | T4 time step (1 d, 6 h, 1 h), T5 stiff contact (iterated vs explicit), SG sub-grid saturated fraction |
-| `test_restart.py` (`soilzone_restart`) | 300 d against 150 + 150 d (`:GWSoilZoneColumns`); R2 an existing model with specified heads, 10 d against 5 + 5; R3 seepage holding the lowest soil layer above capacity (no `:SoilZone PHYSICAL`); R4 KINEMATIC and LAG columns restored as written (`--r3r4`: only these two) |
+| `test_restart.py` (`soilzone_restart`) | RS1 the hillslope, 300 d against 150 + 150 d (`:GWSoilZoneColumns`); RS2 an existing model with specified heads, 10 d against 5 + 5; RS3 seepage holding the lowest soil layer above capacity (no `:SoilZone PHYSICAL`); RS4 KINEMATIC and LAG columns restored as written (`--rs3rs4`: only these two) |
 | `test_liard_physical.py [days]` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year (quick mode: 30 days) |
 
 **The water table in every position, and existing models**
@@ -167,7 +180,7 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 |---|---|
 | `test_vz_kinematic.py`, `vadose_kw_unit.cpp` (`soilzone_vz_kinematic`) | `:SoilZoneVadose KINEMATIC` (unit and model tests K1-K8); K9: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
 | `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (unit tests, L1-L6, cost, byte identity); L7: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
-| `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C11: depth classes of the unsaturated columns; C9 R20 with three classes; C10 hotstart after a dropped class column; C11 the columns' upflow and the rise from the water table share one source-cell limit |
+| `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C11: depth classes of the unsaturated columns; C9 RT20 with three classes; C10 hotstart after a dropped class column; C11 the columns' upflow and the rise from the water table share one source-cell limit |
 | `test_vz_initial.py` (`soilzone_vz_initial`) | I1, I2, I4-I6: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1 |
 
 **Inputs and hotstarts**
@@ -180,7 +193,7 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 
 | Script (run_all step) | Tests |
 |---|---|
-| `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases R1-R20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
+| `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases RT1-RT20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
 
 A comparison with GSFLOW's Sagehen model is not part of the suite; the soil zone with existing models is covered by X1-X8
 and the existing-model cases of the rough-terrain suite.

@@ -63,12 +63,12 @@ and no recharge, for the run's duration; the stop is justified only if those hea
 than $10^6$~m within the outer iterations. A column held 1~mm above its bottom (Section~\ref{sec:drained}) is reported,
 not a failure.
 
-\paragraph{Regression cases.} Twenty cases run first (R1--R20, Table~\ref{tab:vroughprob}): R1 is a flat hillslope (the
+\paragraph{Regression cases.} Twenty cases run first (RT1--RT20, Table~\ref{tab:vroughprob}): RT1 is a flat hillslope (the
 configuration of P3 without columns) on which the rejection must follow the converged head: with the saturated fraction of
 an earlier iterate it would reject 15\,\% of the recharge where the closure at the step's heads allows at most 5\,\%;
-R2--R20 are stored cases (\cmd{rough\_cases/*.json}, each with its spec and the meta data the checks use) of the hardest
+RT2--RT20 are stored cases (\cmd{rough\_cases/*.json}, each with its spec and the meta data the checks use) of the hardest
 situations the suite draws. Each has
-its own checks besides the above: R6, R11--R13 and R19 must complete (no stop at all), and R20 (stored existing model e43,
+its own checks besides the above: RT6, RT11--RT13 and RT19 must complete (no stop at all), and RT20 (stored existing model e43,
 \cmd{LAG}) must hold the saturated fraction to the closure within 0.004 with any method: its land lies in
 places within the 1~mm band above the top cell's bottom, where no sub-grid base may lie. \cmd{--case} applies these checks
 too when it replays a stored case.
@@ -101,7 +101,7 @@ mean run time [s] & 0.16 & 0.22 & 0.18 & 0.19\\\bottomrule
 \end{table}
 The justified stops are the outcrop cases (g14, g33, g58, g61, g162, g223, g266), the existing models without
 \cmd{NEWTON} (e36, e96, e200, e256, e316, e356: 6 of the 100 existing models, the others use it; with \cmd{NONE} also
-the regression case R17, which tests this stop), and stops that MODFLOW alone repeats (none). The run counts differ
+the regression case RT17, which tests this stop), and stops that MODFLOW alone repeats (none). The run counts differ
 between the methods because the regression cases run with one method each. Water tables far above the land occur where
 the land is steep and the top layer's vertical conductivity low: the largest, 94.2~m, is seed g274 (slope 16\,\%,
 150~m cells, $K_v=0.0047$~m/d) with every method, \cmd{NONE} included, so it comes from the aquifer model, not from the
@@ -112,8 +112,8 @@ failures, with the same completed runs and justified stops, no unconverged step,
 MODFLOW identity $8.3\times10^{-6}$), 0.0031 as the largest reported difference of the saturated fraction (\cmd{LAG}),
 44, 43, 41 and 43 runs (\cmd{NONE}, \cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}) with the water table more than 5~m above the land (largest 94.2~m, g274, as
 with one class; the column methods lift it by at most 0.1~m over \cmd{NONE}'s), 5.72, 5.61 and 7.13 outer iterations per
-step (\cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}) and mean run times of 0.34, 0.22 and 0.23~s. R20 holds the closure to
-0.0001 with three classes (0.0002 with one class; limit 0.004). The water table of R20's \cmd{LAG} run with three
+step (\cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}) and mean run times of 0.34, 0.22 and 0.23~s. RT20 holds the closure to
+0.0001 with three classes (0.0002 with one class; limit 0.004). The water table of RT20's \cmd{LAG} run with three
 classes differs from that with one class by at most 0.35~m: it is lower by up to 0.16~m during the first two weeks of the
 rain (the upper classes' longer columns hold more of the rain on its way down), and higher by up to 0.35~m late in the
 dry spell that follows the rain (day 67, as they release it).
@@ -121,16 +121,16 @@ dry spell that follows the rain (day 67, as they release it).
 \begin{table}[!htbp]\centering
 \caption{The regression cases of the rough-terrain suite: the situation each one stores and the part of the coupling that
 handles it. They run first in the suite.}\label{tab:vroughprob}\small
-\begin{tabular}{P{0.47\linewidth}P{0.33\linewidth}P{0.11\linewidth}}\toprule\hdr
+\begin{tabular}{P{0.44\linewidth}P{0.32\linewidth}P{0.15\linewidth}}\toprule\hdr
 Situation & Handled by & Case\\\midrule
-rejection on a converged step & the rejection follows the converged head & R1\\
-columns over cells filled to the soil-zone base & the columns' hand-back and the heads check & R14--R16\\
-drained columns, which would leave MODFLOW's solve singular & a drained column is held 1~mm above its bottom once per step (and once more on any later solve in that step) & R6, R11--R13\\
-an existing model without \cmd{NEWTON} whose top cells dry & a start-up stop: \cmd{NEWTON} is required & R17\\
-\cmd{LAG} on a slowly permeable slope (g350), which must complete & the \cmd{LAG} cascade (Section~\ref{sec:szvadoselag}) & R19\\
-sub-grid bases in the 1~mm band below the lowest drain level & bases clipped at the top cell's bottom + 1~mm & R3, R20\\
-the saturated fraction with three depth classes (a connection head away from MODFLOW's head) & the connection test (Section~\ref{sec:szinterface}) & R20, also with three depth classes (C9)\\
-slowly permeable or low-yield top cells, dried top cells, DISV models & head-dependent rejection, upward flow from a lower cell & R2, R4, R5, R7--R10, R18\\
+rejection on a converged step & the rejection follows the converged head & RT1\\
+columns over cells filled to the soil-zone base & the columns' hand-back and the heads check & RT14--RT16\\
+drained columns, which would leave MODFLOW's solve singular & a drained column is held 1~mm above its bottom once per step (and once more on any later solve in that step) & RT6, RT11--RT13\\
+an existing model without \cmd{NEWTON} whose top cells dry & a start-up stop: \cmd{NEWTON} is required & RT17\\
+\cmd{LAG} on a slowly permeable slope (g350), which must complete & the \cmd{LAG} cascade (Section~\ref{sec:szvadoselag}) & RT19\\
+sub-grid bases in the 1~mm band below the lowest drain level & bases clipped at the top cell's bottom + 1~mm & RT3, RT20\\
+the saturated fraction with three depth classes (a connection head away from MODFLOW's head) & the connection test (Section~\ref{sec:szinterface}) & RT20, also with three depth classes (C9)\\
+slowly permeable or low-yield top cells, dried top cells, DISV models & head-dependent rejection, upward flow from a lower cell & RT2, RT4, RT5, RT7--RT10, RT18\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -144,7 +144,7 @@ each HRU over the run.}\label{fig:vrough}
 
 \begin{refcard}{rough-terrain suite}
 \begin{tabular}{@{}P{0.42\linewidth}P{0.53\linewidth}@{}}
-\cmd{python3 test\_rough\_terrain.py} & regression cases R1--R20 and 400 seeds, \cmd{NONE} and \cmd{RICHARDS}\\
+\cmd{python3 test\_rough\_terrain.py} & regression cases RT1--RT20 and 400 seeds, \cmd{NONE} and \cmd{RICHARDS}\\
 \cmd{--quick} / \cmd{--full} & 40 / 1\,500 seeds (\cmd{RAVEN\_TEST\_QUICK=1}: quick)\\
 \cmd{--methods NONE,RICHARDS,KINEMATIC,LAG} & the methods run for every seed (and the regression cases whose method is listed)\\
 \cmd{--vzclasses K} & \cmd{:SoilZoneVadoseClasses K} for every run\\

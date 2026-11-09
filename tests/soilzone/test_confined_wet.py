@@ -7,7 +7,7 @@ W1  a confined layer below its bottom: 5 HRUs on a 5 % slope, 1 m of sand over a
     required; a missing line fails). NONE (all methods in the full mode).
 W2  the same with 5 mm/d of rain, 15 m deep.
 W3  the W1 model as an existing model (MODFLOW's ICELLTYPE 0 read from its memory, NPF): the same.
-W4  rough-terrain regression cases: SKIP (permanent; the regression cases R1-R20 run in test_rough_terrain.py, run_all steps
+W4  rough-terrain regression cases: SKIP (permanent; the regression cases RT1-RT20 run in test_rough_terrain.py, run_all steps
     soilzone_rough_terrain and soilzone_rough_terrain_k3).
 W5  case Dc: an existing NEWTON model, layers 0.5/0.3/0.5 m with ICELLTYPE 1/0/1 and ICONVERT 1, a
     20 % slope draining to a specified head, 20 dry days then 30 mm/d: no interface update from a diverged iterate (the

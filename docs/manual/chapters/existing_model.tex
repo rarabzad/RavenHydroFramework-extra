@@ -163,8 +163,10 @@ start. Such a package with several earlier entries, whose settings build on one 
 renumbered); Raven must then start at \cmd{:MF6StartDate}. The times of a time series (\cmd{TS6} files) count from the
 model's own time zero: on a later start, even one inside the first period, Raven shifts every time of each \cmd{TS6} file
 named by a package it keeps by the time elapsed before its start. Entries before the start keep negative times,
-so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}), and
-time series in a simulation holding more than one model, stop a later start. A time of day in Raven's \cmd{:StartDate}
+so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}),
+time series in a simulation holding more than one model, and a \cmd{TS6} file whose \cmd{TIMESERIES} block reads its rows
+from another file (\cmd{OPEN/CLOSE} or \cmd{INTERNAL}; Raven can shift only rows listed in the file itself) stop a later
+start. A time of day in Raven's \cmd{:StartDate}
 counts in the offset, so restarts work with sub-daily time steps too (the start must fall on a Raven step of its stress
 period); the working copy's \cmd{START\_DATE\_TIME} is set to Raven's start, with the time of day when there is one.
 The TDIS period data may be listed in the TDIS file or in an \cmd{OPEN/CLOSE} text file (path relative to the simulation
@@ -201,7 +203,9 @@ Every one of these stops the run with a message that names the problem and the f
       \cmd{OPEN/CLOSE} file is read and written into the working copy); TDIS period data given as \cmd{INTERNAL};
 \item an \cmd{EXTINCTION\_DEPTH} in an aquifer profile while the model keeps an EVT or UZF package;
 \item several groundwater models in the simulation and no \cmd{:MF6Model};
-\item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot follow (Section~\ref{sec:existingtime}); a stress period that is not a whole number of Raven steps; a Raven run longer than
+\item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot
+      follow (Section~\ref{sec:existingtime}: array or advanced packages with several period entries before the start, \cmd{TVK6}/\cmd{TVS6},
+      \cmd{TAS6}, time series in a simulation of several models, a \cmd{TS6} file that reads its rows from another file); a stress period that is not a whole number of Raven steps; a Raven run longer than
       the model;
 \item a cell file whose polygons are not the model's cells (count, numbering or area);
 \item a stream cell whose subbasin does not exist or is disabled;
@@ -253,7 +257,7 @@ periods as described above. A restarted run reproduces a continuous one (Section
 regular grid of 1.5 km cells rotated 15\textdegree{} in UTM zone 10N, four layers with spatially varying conductivity,
 a one-day steady-state period followed by 24 monthly periods, two wells with seasonal pumping, 239 river cells carrying
 their subbasin ID in an auxiliary variable, a head boundary at the outlet, and its own recharge and ET packages. The \cmd{.rvg}
-file of Section~\ref{ch:existing} couples it to the Liard Raven model; the two-year run takes about four minutes.
+file of Section~\ref{ch:existing} couples it to the Liard Raven model; the two-year run takes about five minutes.
 
 \section{Checking the calibration}
 Replacing a calibrated recharge package with Raven's recharge changes the model's water budget. Compare the coupled heads and
@@ -267,7 +271,8 @@ recharge the model was calibrated with, needs attention.
 river cells, so a losing reach can take more than the channel holds; the part the channel cannot supply is carried to the
 next step (exactly accounted).
 \item Later starts and restarts refuse time-array series (\cmd{TAS6}), \cmd{TVK6}/\cmd{TVS6}, simulations with several models,
-and array-based or advanced packages with several period entries before Raven's start (Section~\ref{sec:existingtime}).
+array-based or advanced packages with several period entries before Raven's start, and \cmd{TS6} files whose
+\cmd{TIMESERIES} rows come from another file (Section~\ref{sec:existingtime}).
 \item A column whose top cell becomes specified-head in a later stress period keeps its \cmd{EVT\_RAVEN} and \cmd{SWX\_RAVEN}
 entries; MODFLOW books no flow through them there, and Raven reads back what MODFLOW booked. Reservoir seepage is sent only
 to the lake's cells that can take it in the step (Table~\ref{tab:extpkgs}); a gain MODFLOW does not supply is taken back from

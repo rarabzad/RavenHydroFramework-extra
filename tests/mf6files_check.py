@@ -13,9 +13,9 @@ there, and the files can be checked on their own:
   - drains: the smoothing interval stays inside the top cell (MODFLOW refuses it otherwise);
   - HRU meshes: share of each active cell's area in its dominant HRU, computed independently with shapely.
 
-Usage:  python3 mf6files_check.py [OLD_RAVEN_EXE]
-With OLD_RAVEN_EXE (an earlier build) the written files of both builds are compared case by case, to show which
-results can have changed between the two builds. Results: <scratch>/mf6files/results.json
+Usage:  python3 mf6files_check.py [OTHER_RAVEN_EXE]
+With OTHER_RAVEN_EXE (another build, e.g. of the commit before a change) the written files of both builds are compared
+case by case, to show which results can differ between the two builds. Results: <scratch>/mf6files/results.json
 """
 import os, sys, re, json, shutil, subprocess, math, filecmp
 import numpy as np
@@ -27,7 +27,7 @@ from shapely.ops import unary_union
 
 NOLIB = '/nonexistent/libmf6.so'
 OUT = os.path.dirname(tc.work('mf6files', 'x'))
-OLD = sys.argv[1] if len(sys.argv) > 1 else None
+OTHER = sys.argv[1] if len(sys.argv) > 1 else None
 EX = tc.LIARD
 
 
@@ -258,17 +258,17 @@ def main():
         R = check_case(name, d, msg, rc, **kw)
         if name.startswith('quadtree, rivers'):
             qt = os.path.join(d, 'out', 'mf6', 'grid_cells.geojson')
-        if OLD:
-            do, mo, ro = build(re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_'), extra, edits, exe=OLD, tag='old')
+        if OTHER:
+            do, mo, ro = build(re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_'), extra, edits, exe=OTHER, tag='other')
             fs = sorted(f for f in os.listdir(os.path.join(d, 'out', 'mf6')) if f != 'linkage.cache')
             diff = [f for f in fs if not os.path.exists(os.path.join(do, 'out', 'mf6', f)) or not filecmp.cmp(os.path.join(d, 'out', 'mf6', f), os.path.join(do, 'out', 'mf6', f), shallow=False)]
-            R['files_differ_from_old_build'] = diff
+            R['files_differ_from_other_build'] = diff
             if kw.get('mesh_fidelity') and 'cannot load' in mo:
-                Ro = check_case(name + ' (old build)', do, mo, ro, mesh_fidelity=True)
-                R['old_mesh_dominant_share'] = Ro.get('mesh_dominant_share')
+                Ro = check_case(name + ' (other build)', do, mo, ro, mesh_fidelity=True)
+                R['other_mesh_dominant_share'] = Ro.get('mesh_dominant_share')
         results.append(R)
         print('%-44s %s' % (name, 'PASS' if all(c[1] for c in R['checks']) else 'FAIL'),
-              ('files differ from old build: %s' % (R['files_differ_from_old_build'] or 'none')) if OLD else '', flush=True)
+              ('files differ from the other build: %s' % (R['files_differ_from_other_build'] or 'none')) if OTHER else '', flush=True)
         for c in R['checks']:
             if not c[1]: print('      FAIL %s: %s' % (c[0], c[2]))
     if qt:   # imported cells: the quadtree case's cells

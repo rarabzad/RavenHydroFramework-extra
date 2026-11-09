@@ -1,5 +1,5 @@
 """Tests of :SoilZoneVadose KINEMATIC (gravity-only kinematic wave in the unsaturated columns; manual section
-sec:szvadosekw, design note docs/design/soil_zone_kinematic.md).
+sec:szvadosekw).
 
 K1  unit tests (vadose_kw_unit.cpp against GWVadose.cpp and GWVadoseKW.cpp): mass balance to round-off over random
     fluxes, steps, materials and layering; contents within [ths - Sy, ths]; monotonicity; SPEC_YIELD 0 and POROSITY 0

@@ -77,7 +77,7 @@ int main(int argc,char **argv)
         if ((q>=0.0) && (std::fabs(rej)>0.0)){nonfin++;}                   //(an active column takes any inflow)
         if ((q<0.0) && (std::fabs(rej-q*dt)>1e-15)){nonfin++;}             //(an upward demand is rejected entirely)
         for (size_t i=0;i<c.th.size();i++){over=std::max(over,c.th[i]-S.mat[c.im[i]].ths); if (!std::isfinite(c.th[i]) || !std::isfinite(c.psi[i])){nonfin++;}}
-        if (st%9==8){MoveBottom(c,S,std::min(c.zbot+(U(rng)-0.5)*0.4*L,c.ztop-0.06),N);} //(the water table moves now and then)
+        if (st%9==8){MoveBottom(c,S,std::min(c.zbot+(U(rng)-0.5)*0.4*L,c.ztop-0.06),N);} //(the water table moves every ninth step)
       }
     }
     printf("  mass balance: %d columns, %d steps (%d substeps): worst residual %.3g of the step's flows and storage; largest content above ths %.3g\n",ncol,nst,nsub,worst,over);

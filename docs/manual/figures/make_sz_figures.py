@@ -81,11 +81,11 @@ def head_err_series(d, rd):
 ea = head_err_series(os.path.join(W, 'e_after'), os.path.join(W, 'e_ref'))
 el = head_err_series(os.path.join(W, 'e_lag'), os.path.join(W, 'e_ref'))
 fig, ax = plt.subplots(figsize=(6.2, 3.0))
-ax.plot(ea[:, 0], ea[:, 2] * 100, color=C[0], lw=2, marker='o', ms=4, label='AFTER (the basic soil zone), largest')
+ax.plot(ea[:, 0], ea[:, 2] * 100, color=C[0], lw=2, marker='o', ms=4, label='AFTER, largest')
 ax.plot(el[:, 0], el[:, 2] * 100, color=C[1], lw=2, marker='o', ms=4, label='LAGGED (default), largest')
 ax.plot(ea[:, 0], ea[:, 1] * 100, color=C[0], lw=1.2, ls='--', label='AFTER, mean')
 ax.plot(el[:, 0], el[:, 1] * 100, color=C[1], lw=1.2, ls='--', label='LAGGED, mean')
-ax.set_xlabel('day (rain 10 mm/d until day 150)'); ax.set_ylabel('head difference to reference [cm]'); ax.legend(fontsize=8, ncol=2)
+ax.set_xlabel('day (rain 10 mm/d until day 150)'); ax.set_ylabel('head difference to reference [cm]'); ax.legend(fontsize=8, ncol=1, loc='upper right')
 save(fig, 'fig_sz_timing.png')
 
 # 6. column classes: one HRU over ten cell columns

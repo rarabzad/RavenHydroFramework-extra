@@ -16,7 +16,8 @@ every step (:HeadSaveFrequency 1); with a coarser frequency PRT stops at the fir
                  mf6/gwf.dis(v), z an elevation in m). Default: 8 points around the centre of each well cell of Raven's
                  :Wells (WEL_RAVEN in mf6/gwf.wel), at the cell's middle elevation. Coordinates include the grid's XORIGIN,
                  YORIGIN and ANGROT (Raven's grid frame, metres)
-  --radius F     default release points lie F x the cell width from the cell centre (default 0.25)
+  --radius F     default release points lie F x the cell width from the cell centre (default 0.25); the width is measured
+                 along the grid's own axes, so on a rotated grid as on an unrotated one
   --run LIBMF6   run the PRT simulation through the MODFLOW 6 library (no mf6 executable needed); otherwise run
                  mf6 in OUTPUT_FOLDER/prt yourself
 
@@ -78,7 +79,8 @@ def main():
                 lay, node2 = int(w[0]), int(w[1]) - 1
             xc, yc = np.ravel(mg.xcellcenters)[node2], np.ravel(mg.ycellcenters)[node2]
             xv, yv = np.array(mg.get_cell_vertices(node2 if dis_type == 'DISV6' else (row - 1, col - 1))).T
-            width = min(xv.max() - xv.min(), yv.max() - yv.min())
+            xvl, yvl = mg.get_local_coords(xv, yv)   # (the cell's width along the grid's own axes: also on a rotated grid)
+            width = min(np.ptp(xvl), np.ptp(yvl))
             top = mg.top.ravel()[node2] if lay == 1 else mg.botm.reshape(mg.nlay, -1)[lay - 2, node2]
             z = 0.5 * (top + mg.botm.reshape(mg.nlay, -1)[lay - 1, node2])
             for k in range(8):

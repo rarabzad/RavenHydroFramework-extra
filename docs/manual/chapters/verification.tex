@@ -242,9 +242,9 @@ below 0.1\%, cumulative below $10^{-4}$); Raven's balance below 1 mm; agreement 
 third of the set-ups, a restart that must reproduce the continuous run (every flow within $10^{-4}$ of its largest value in
 the run).
 
-With MODFLOW 6.8.1, three rounds of 24 (72 set-ups: 10 regular, 11 rotated and refined, 16 quadtree, 15 HRU mesh,
+With MODFLOW 6.8.1, three batches of 24 (72 set-ups: 10 regular, 11 rotated and refined, 16 quadtree, 15 HRU mesh,
 6 imported, 14 with layers connected by elevation; 49 with a reservoir; 20 with a restart comparison, largest deviation
-$3.1\times10^{-6}$) and two rounds of 12 that always have a reservoir and lake refinement (24 set-ups, 6 with a restart) all
+$3.1\times10^{-6}$) and two batches of 12 that always have a reservoir and lake refinement (24 set-ups, 6 with a restart) all
 pass every check, including MODFLOW's list-file budget and the reservoir identity. The optional fully implicit XT3D can
 fail to converge where cells dry and rewet (in one random set-up on 38 of 45 days, with exact accounts on the converged
 days and the safeguard limiting the exchange on the others); it is therefore off by default.
@@ -462,9 +462,14 @@ weir's outflow curve; base Raven gives the same without groundwater (Section~\re
 restart, lake and grid tests, the budget cross-check, both randomized harnesses, the existing-model tests, the soil-zone tests
 of Section~\ref{sec:vsoilzone} and the rough-terrain suite: in full mode 400 seeds with all four unsaturated-zone methods,
 1\,620 runs, and the same again with three depth classes) and writes one report; \cmd{-{}-nolib} runs only the checks that
-need no MODFLOW library, and \cmd{-{}-quick} uses smaller randomized rounds and runs every script in its quick mode
-(\cmd{RAVEN\_TEST\_QUICK=1}: shorter cases, for example the rough-terrain suite 40 seeds and the Liard soil-zone run T7 30 days
-instead of 365; each script's header lists its quick mode). A check a script cannot make (for example a byte-identity check
+need no MODFLOW library. \cmd{-{}-quick} runs fewer randomized set-ups (the grid harnesses 8 and 4 set-ups instead of
+72 and 24, the existing-model harness 6 instead of 20, the rough-terrain suite 40 seeds instead of 400, the Liard soil-zone
+run T7 30 days instead of 365) and sets \cmd{RAVEN\_TEST\_QUICK=1} for every script: the scripts that have a quick mode
+(every soil-zone script, the behaviour, budget-file, option-combination, projected-input, input and version-guard checks,
+and the existing-model exchange, input-form and restart tests) run shorter cases, each described in its header; the
+others run their usual cases (\cmd{tests/README.md} lists both groups). On two cores the quick mode takes about 35
+minutes and the full mode about 1.5 hours (on a busy machine up to an hour and 2.5 hours, the latter with the USGS example
+steps). A check a script cannot make (for example a byte-identity check
 without a reference build, \cmd{RAVEN\_EXE\_REF}) is reported as skipped: the step reads ``PASS (k skipped)'' and the report
 lists the skipped checks. The two USGS example steps run only when \cmd{RAVEN\_USGS\_EXAMPLES} points at the MODFLOW~6 examples.
 A step passes when its script exits without error and its own criterion holds; the scripts with several runs (restart,

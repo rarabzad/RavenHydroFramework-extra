@@ -1,4 +1,7 @@
-import sys, os; sys.path.insert(0,'/home/claude/p4'); import audit, pandas as pd, numpy as np
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'examples', 'Liard_groundwater'))
+import tools_audit as audit, pandas as pd, numpy as np
+# the behaviour-test runs (Section "Behaviour tests"): set these folders to where the runs are
 runs=[('20-year Liard','/home/claude/liard_gw2/out_final'),('Pumping','/home/claude/p3/R2obs'),('Fixed head, delay','/home/claude/p3/T3'),
       ('Restart','/home/claude/p3/T3b'),('Ensemble','/home/claude/p3/T5/out/ens_2'),('Wetlands','/home/claude/p3/T7'),('Reservoir','/home/claude/p3/T8'),('Soil-less HRUs','/home/claude/p3/T9'),('Drying (extreme)','/home/claude/liard_dry/out_final')]
 R={}
@@ -30,7 +33,7 @@ cols=[('Steps','steps',lambda v:'{:,}'.format(int(v)).replace(',','\\,')),('Rech
       ('\\shortstack[r]{MODFLOW\\\\residual}','MF6 cumulative residual / gross flow',sci),('\\shortstack[r]{Worst\\\\step [\\%]}','MF6 worst step error [%]',pct),
       ('\\shortstack[r]{Failed\\\\steps}','unconverged steps',lambda v:'%d'%v),('River','river: applied - net MF6 - carry change (rel)',sci),('\\shortstack[r]{Raven\\\\balance [mm]}','Raven MB error max [mm]',lambda v:'%.2f'%v)]
 out=[r'\begin{table}[!htbp]\centering',
-     r'\caption{Relative errors are shares of the water moved. In every run the seepage returned to Raven equals MODFLOW\textquotesingle s seepage exactly, the surface-store bookkeeping is exact, no river loss is carried at the end and the output dates are contiguous. The one failed step is the rewetting day of the deliberately extreme drying test (Section~\ref{sec:behaviour}).}\label{tab:audit}',
+     r'\caption{Automatic checks of the behaviour-test runs (\cmd{tools\_audit.py}). Relative errors are shares of the water moved. In every run the seepage returned to Raven equals MODFLOW\textquotesingle s seepage exactly, the surface-store bookkeeping is exact, no river loss is carried at the end and the output dates are contiguous. The one failed step is the rewetting day of the deliberately extreme drying test (Section~\ref{sec:behaviour}).}\label{tab:audit}',
      r'\footnotesize\setlength{\tabcolsep}{2.8pt}\begin{tabular}{l'+'r'*len(cols)+r'}\toprule\hdr',
      'Run & '+' & '.join(c[0] for c in cols)+r'\\\midrule']
 for n in names:

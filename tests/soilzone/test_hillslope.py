@@ -15,9 +15,8 @@ zone that is not connected to the water table passes the rain through and keeps 
                 reference head ends below its soil-zone base ends with F < 1e-6 (and at least five such HRUs), every HRU
                 whose reference head ends above it with F > 0.999; on day 300 no overflow where the water table lies
                 below the land and overflow where it lies above; the outflow after day 160 does not rise; the saturated
-                HRUs (F > 0.5) fall from at least 8 at the end of the rain to at most 4.
-                (the earlier check tested HRU 1, which never connects, and claimed "overflow stops" for
-                the whole slope, which the reference contradicts: a test-expectation error, not a model defect.)
+                HRUs (F > 0.5) fall from at least 8 at the end of the rain to at most 4. (HRU 1 never connects, and
+                the reference keeps overflow on the toe after the rain, so "overflow stops" holds upslope only.)
   --selftest    the T3 checks on altered results (an upslope HRU left saturated, upslope overflow after the rain, a
                 rising recession, a connected-HRU list that is empty) must fail.
 The coupled run is compared with a MODFLOW-only model in which the soil zone is a MODFLOW layer (sz_reference); with

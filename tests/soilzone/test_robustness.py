@@ -11,7 +11,7 @@ R2 one HRU over ten cells against ten one-cell HRUs (same hillslope and forcing)
 R3 RECHARGE_DELAY with :SoilZone PHYSICAL is refused with a clear message.
 R4 a smoothing depth below 0.1 m is reported.
 R5 hourly steps with a 0.001 m smoothing depth: the interface is frozen for MODFLOW's last outer iterations, so no step
-   ends with a MODFLOW residual.
+   ends with a MODFLOW residual (late updates would leave water created or lost).
 R6 a steep hillslope (slope 0.1) with 5x5 DEM samples per cell converges on every step.
 R7 explicit mode (:SoilZoneIteration 0): the boundary never drains more than a column holds (no shortfall).
 R8 a column 1e-6 mm wetter than the others does not attract the HRU's recharge (the heads stay uniform).

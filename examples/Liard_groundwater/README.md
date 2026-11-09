@@ -15,7 +15,7 @@ your own model.
 ## 1. Run it
 ```
 cd examples/Liard_groundwater
-$RAVEN Liard -o output/                # 20 years, daily; about 5-15 minutes on one core
+$RAVEN Liard -o output/                # 20 years, daily; about 10 minutes on one core
 python3 tools_audit.py output          # optional: automated water-balance and consistency audit
 ```
 (`$RAVEN` is your Raven executable, e.g. `RAVEN=../../../RavenHydroFramework/build/Raven`; on Windows
@@ -42,7 +42,7 @@ name (`VALLEY_ALLUVIUM` for forest/shrub/wetland HRUs, `UPLAND_TILL` for barren 
 :DefineHRUGroups AquiferHRUs
 ...
 :Percolation PERC_CONSTANT FAST_RESERVOIR SLOW_RESERVOIR
-  :-->Conditional HRU_GROUP IS_NOT AquiferHRUs      # (existing process, now restricted)
+  :-->Conditional HRU_GROUP IS_NOT AquiferHRUs      # (existing process, restricted to uncoupled HRUs)
 :Percolation PERC_CONSTANT FAST_RESERVOIR GROUNDWATER
   :-->Conditional HRU_GROUP IS AquiferHRUs          # new: this water becomes MODFLOW recharge
 ```
@@ -78,7 +78,7 @@ The original package was built for Raven 2.9.1; for Raven 4.x, Windows `\` paths
 `DEP_THRESHHOLD` was renamed `DEP_THRESHOLD`.
 
 ## 4. Results you should see (tools_audit.py)
-Recharge transferred exactly; MODFLOW cumulative balance residual ~3e-6 of gross flow; worst day 0.04%;
+Recharge transferred exactly; MODFLOW cumulative balance residual about -1e-10 of the gross flow; worst day 4e-6 %;
 every step converged; no river asked for more water than it carried; Raven balance error 0.52 mm.
 NSE at gauges 10BE004 / 10BE005 / 10BE010: 0.850 / 0.821 / 0.634 (uncoupled 0.867 / 0.835 / 0.681;
 not recalibrated, stand-in geometry).

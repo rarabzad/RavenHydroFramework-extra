@@ -1,4 +1,4 @@
-"""Tests of :SoilZoneVadose LAG {t_m} {N}, the linear storage cascade (docs/design/soil_zone_lag.md; manual
+"""Tests of :SoilZoneVadose LAG {t_m} {N}, the linear storage cascade (manual
 Section sec:szvadoselag).
 
 U   unit tests (vadose_lag_unit.cpp against GWVadose.cpp and GWVadoseLag.cpp): travel time per metre (eq. lagtm, also

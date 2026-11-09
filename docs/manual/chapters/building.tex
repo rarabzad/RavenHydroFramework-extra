@@ -27,7 +27,7 @@ $(\mathrm{lon}_0,\mathrm{lat}_0)$ of the coupled HRUs, on a sphere of radius $R_
 x &= R_\oplus\,\kappa\cos\mathrm{lat}\,\sin(\mathrm{lon}-\mathrm{lon}_0),\\
 y &= R_\oplus\,\kappa\left[\cos\mathrm{lat}_0\sin\mathrm{lat}-\sin\mathrm{lat}_0\cos\mathrm{lat}\cos(\mathrm{lon}-\mathrm{lon}_0)\right].
 \end{align}
-The reverse conversion (used to look up map values at cell locations) is
+The reverse conversion (for looking up map values at cell locations) is
 \begin{align}
 \rho&=\sqrt{x^2+y^2},\qquad c=2\arcsin\frac{\rho}{2R_\oplus},\\
 \mathrm{lat}&=\arcsin\!\left(\cos c\sin\mathrm{lat}_0+\frac{y\sin c\cos\mathrm{lat}_0}{\rho}\right),\\
@@ -452,11 +452,11 @@ exchange package (\cmd{gwf.rch}, \cmd{gwf.drn}, \cmd{gwf.riv}, \cmd{gwf.evt}, \c
 \cmd{gwf.swx}, \cmd{gwf.res}). Grid arrays are written layer by layer, each grid row starting on a new line, which is
 how MODFLOW reads them. These files can be opened in FloPy or ModelMuse; they never need editing.
 
-\section{Parameters used to build the model}\label{sec:buildparams}
+\section{Parameters for building the model}\label{sec:buildparams}
 The grid and layers are built from the following parameters; the class column says where each is set, the reference column
 where its default and allowed range are listed.
 \begin{table}[!htbp]\centering
-\caption{Parameters used to build the model.}
+\caption{Parameters for building the model.}
 \begin{tabular}{>{\raggedright\arraybackslash}P{0.09\linewidth}>{\raggedright\arraybackslash}P{0.26\linewidth}>{\raggedright\arraybackslash}P{0.287\linewidth}>{\raggedright\arraybackslash}P{0.1\linewidth}>{\raggedright\arraybackslash}P{0.15\linewidth}}\toprule\hdr
 Symbol & Parameter & Class (where it is set) & Units & Reference\\\midrule
 $\Delta$ & \cmd{:GridCellSize} & \cmd{.rvg} option & m & Sec.~\ref{app:commands}\\
@@ -510,7 +510,7 @@ Why such a small head tolerance? MODFLOW stops iterating when no head changes by
 conductance times a head difference. The seepage drains have very large conductances (one 1 km cell with a leakance of
 1~d$^{-1}$ has $10^6$~m$^2$/d), so a head tolerance of 1 cm could still leave about $10^4$~m$^3$/d of imbalance in such a cell on a
 difficult day. With 0.01 mm the imbalance is a thousand times smaller than with 1 cm. The price is more Newton iterations --- in the
-20-year Liard run about 10 per day on average instead of 7--8 --- and a longer run (about 15 instead of 8 minutes). The value was chosen from the
+20-year Liard run about 10 per day on average instead of 7--8 --- and a run about twice as long. The value was chosen from the
 randomized tests: at 0.1 mm a few extreme set-ups (drain conductance $2\times10^7$~m$^2$/d per cell) still showed a 0.2\%
 residual on single steps; at 0.01 mm none did.
 

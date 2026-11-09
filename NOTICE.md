@@ -8,9 +8,9 @@ part of Raven (RavenHydroFramework), offered to the Raven Development Team as pu
 
 | Part | Copyright | License |
 |---|---|---|
-| Coupling source code in RavenHydroFramework: `GroundwaterModel.*`, `GWExternal.cpp`, `GWGeometry.*`, `GWGrid.*`, `GWUtil.h`, `MF6Engine.*`, `ParseGWFile.cpp` | Rezgar Arabzadeh | Artistic License 2.0 (`LICENSE`) |
+| Coupling source code in RavenHydroFramework: `GroundwaterModel.*`, `GWExternal.cpp`, `GWGeometry.*`, `GWGrid.*`, `GWSoilZone*`, `GWUtil.h`, `GWVadose*`, `MF6Engine.*`, `ParseGWFile.cpp`; the CMake modules `cmake/RavenMF6*` | Rezgar Arabzadeh | Artistic License 2.0 (`LICENSE`) |
 | Changes to existing Raven files (marked "Modified 2026 by Rezgar Arabzadeh") | the Raven Development Team; changes by Rezgar Arabzadeh | Artistic License 2.0 |
-| Test and check scripts (`tests/`, `tools/`, `examples/Liard_groundwater/tools_*.py`) | Rezgar Arabzadeh | Artistic License 2.0 (`LICENSE`) |
+| Tests and tools (`tests/`, `tools/`, `examples/Liard_groundwater/tools_*.py`) | Rezgar Arabzadeh | Artistic License 2.0 (`LICENSE`) |
 | Manual and user guide (`docs/`) | Rezgar Arabzadeh | Creative Commons Attribution 4.0 International (`docs/LICENSE-docs.md`) |
 | Liard River model inputs (`examples/Liard_groundwater/`) | their original authors | not relicensed; see `examples/Liard_groundwater/DATA_NOTICE.md` |
 | Synthetic MODFLOW 6 example model (`examples/Liard_existing_model/model/`) | Rezgar Arabzadeh | Artistic License 2.0 (`LICENSE`) |

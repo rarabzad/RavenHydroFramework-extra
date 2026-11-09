@@ -1,4 +1,4 @@
-"""Spike Q1-Q3 (docs/design/soil_zone_coupling_plan.md §6.4): what MODFLOW 6 does with package values changed
+"""Spike Q1-Q3: what MODFLOW 6 does with package values changed
 between outer iterations through XMI.
 
 Q1: does writing the named input arrays (GHB BHEAD/COND, RCH RECHARGE) between solve() calls reach the solver
