@@ -1,4 +1,4 @@
-#include "GWGrid.h"   // compile: g++ -std=c++11 -I$RAVEN_SRC/src gridtest.cpp $RAVEN_SRC/src/GWGrid.cpp $RAVEN_SRC/src/GWGeometry.cpp
+#include "GWGrid.h"   // compile: g++ -std=c++11 -I$RAVEN_SRC/src gridtest.cpp $RAVEN_SRC/src/GWGrid.cpp $RAVEN_SRC/src/GWGeometry.cpp $RAVEN_SRC/src/GWGeoTIFF.cpp
 #include <cstdio>
 #include <cmath>
 #include <random>

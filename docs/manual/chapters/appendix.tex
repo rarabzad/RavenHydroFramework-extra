@@ -107,9 +107,9 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvp} & \cmd{:AquiferProfile\allowbreak Parameters} \dots & per-profile parameters (Section~\ref{app:profile})\\
 \cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat or \cmd{:InputCRS} (\cmd{HRU\_ID}); required\\
 \cmd{.rvg} & \cmd{:RiverGeometry file \{field\}} & river lines; subbasin field optional\\
-\cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat or \cmd{:InputCRS} (HRU elevations)\\
+\cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU elevations)\\
 \cmd{.rvg} & \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file and of wells given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
-\cmd{.rvg} & \cmd{:BedrockSurface file} & bedrock elevation grid (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
+\cmd{.rvg} & \cmd{:BedrockSurface file} & bedrock elevation, ESRI ASCII grid or GeoTIFF (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
 \cmd{.rvg} & \cmd{:GridCellSize m} & cell size, $>0$ (1000)\\
 \cmd{.rvg} & \cmd{:MinCellCoverage f} & coverage for an active column, $(0,1]$ (0.25)\\
 \cmd{.rvg} & \cmd{:GridType REGULAR|QUADTREE|HRU\_MESH|FILE} & kind of grid (\cmd{REGULAR})\\
@@ -362,6 +362,27 @@ GeoJSON file \dots\ has coordinates outside the longitude/latitude range and is 
 GeoJSON file / raster \dots\ looks like longitude/latitude: its coordinates \dots\ lie over the HRUs' LATITUDE/LONGITUDE \dots & with \cmd{:InputCRS} give every GeoJSON and raster input in that projection (or remove \cmd{:InputCRS} if every input is in lon/lat)\\
 GeoJSON file \dots\ is in EPSG:\emph{n} \dots, but :InputCRS is \dots / is in longitude/latitude, but :InputCRS says the input files are projected & give every input file in the projection of \cmd{:InputCRS}\\
 GeoJSON file \dots\ has coordinates outside the longitude/latitude range / raster \dots\ lies outside the longitude/latitude range & projected input: give \cmd{:InputCRS}\\
+raster \dots\ is in EPSG:\emph{n} (a projection, in its GeoTIFF keys), but there is no :InputCRS: give :InputCRS EPSG:\emph{n} / give :InputCRS with the projection's parameters (\dots\ EPSG:\emph{n} is not built in) & give \cmd{:InputCRS} as the message says (a code that is not built in by its \cmd{TMERC}, \cmd{ALBERS} or \cmd{LCC} parameters), or reproject the raster to lon/lat\\
+raster \dots\ is in longitude/latitude (EPSG:\emph{n} in its GeoTIFF keys), but :InputCRS is \dots\ / is in EPSG:\emph{n} \dots, but :InputCRS is \dots & give every raster in the projection of \cmd{:InputCRS} (Section~\ref{sec:geotiff})\\
+raster \dots\ is in EPSG:\emph{n}, a projection that is not built in, so it cannot be compared with :InputCRS (warning) & check that the raster is in the \cmd{:InputCRS} projection\\
+GeoTIFF file \dots: compression \dots\ is not supported / \dots\ samples (bands) per pixel / the photometric interpretation is \dots\ / samples of \dots\ bits \dots\ are not supported & save one band, uncompressed or with LZW, DEFLATE or PackBits, as integers of 8--64 bits or 32/64-bit floats: \cmd{gdal\_translate -b 1 -co COMPRESS=DEFLATE}\\
+GeoTIFF file \dots: \dots\ rotates or shears the raster / is not north-up / is georeferenced by control points / no georeferencing / geocentric coordinates & warp it to a north-up raster in lon/lat or a projection (\cmd{gdalwarp})\\
+GeoTIFF file \dots: \dots\ (truncated or corrupt file) / decompression error / not a TIFF file / the chain of image directories is corrupt & export the file again\\
+GeoTIFF file \dots: FillOrder 2 \dots\ is not supported & re-save the file (\cmd{gdal\_translate})\\
+GeoTIFF file \dots: the linear units of its projection / of its geographic coordinate system \dots, its angular units \dots, its elevations are in \dots\ (also: vertical coordinate system EPSG:\emph{n}) & reproject the raster to metres or degrees (\cmd{gdalwarp -t\_srs}); convert elevations to metres\\
+GeoTIFF file / GeoJSON file \dots\ is in EPSG:\emph{n}, whose longitudes count from the prime meridian of \dots\ / whose angles are in \dots; its prime meridian (GeogPrimeMeridianGeoKey) is not Greenwich & reproject the file to EPSG:4326\\
+GeoTIFF file \dots: its \emph{n} tiles / strips of \dots\ pixels cover more than 200 million pixels (corrupt file) & export the file again\\
+raster \dots\ has a vertical coordinate system (\dots) whose unit Raven does not know; its elevations are read as metres (warning) & check that the elevations are in metres\\
+raster \dots: its chain of image directories is damaged after the raster / loops \dots; the raster is read without an internal mask (warning) & export the file again if it has a mask\\
+GeoTIFF file \dots: the file has an internal mask (no-data pixels) that Raven cannot read & save it with a no-data value: \cmd{gdalwarp -dstnodata -9999 in.tif out.tif}\\
+GeoTIFF file \dots: strip / tile \emph{n} is empty and the file has no NODATA value (GDAL\_NODATA) to fill it with & give the file a no-data value (\cmd{gdal\_translate -a\_nodata}) or write it without \cmd{SPARSE\_OK}\\
+GeoTIFF file \dots: its GDAL\_NODATA tag (\dots) is not a number & set a numeric no-data value (\cmd{gdal\_translate -a\_nodata -9999})\\
+GeoTIFF file \dots: the first image of the file is a reduced-resolution copy or a mask, not the raster itself & export the full-resolution raster again (\cmd{gdal\_translate})\\
+raster \dots\ has no NODATA value (GDAL\_NODATA) but holds \emph{k} pixels of $-9999$ \dots\ (warning) & if they are no data, declare it: \cmd{gdal\_translate -a\_nodata -9999 in.tif out.tif}\\
+raster \dots\ has / GeoTIFF file \dots\ is \dots, more than the 50 million / 1024 MB Raven reads & resample it to a coarser resolution\\
+\cmd{:LandSurface} / \cmd{:BedrockSurface} raster \dots\ gives no value for any of the \emph{n} active columns: the raster covers \dots, the model's active columns lie at \dots & check that the file covers the model, its corner coordinates and \cmd{:InputCRS} (Section~\ref{sec:rasters})\\
+\cmd{:LandSurface} / \cmd{:BedrockSurface} raster \dots\ gives no value for \emph{k} of the \emph{n} active columns (warning) & extend the raster or fill its no-data cells; those columns take the HRU \cmd{ELEVATION} or \cmd{DEFAULT\_BEDROCK\_DEPTH}\\
+\cmd{:LandSurface} \dots\ is not used: an :OverlapWeights table has no cell outlines (warning) & give \cmd{:MF6CRS} or \cmd{:MF6GridFile} for relief within the cells, or remove \cmd{:LandSurface}\\
 well \dots\ is given by X and Y & give \cmd{:InputCRS}, or \cmd{LATITUDE} and \cmd{LONGITUDE}\\
 layer \dots\ starts dry (warning) & start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or \cmd{:InitialGWHeads} (Section~\ref{ch:layers})\\
 HRU mesh exceeds 5 million cells per layer & increase \cmd{:GridCellSize} or the refinement sizes\\

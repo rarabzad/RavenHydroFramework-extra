@@ -91,9 +91,9 @@ Command & Meaning (default)\\\midrule\endfirsthead
 Command & Meaning (default)\\\midrule\endhead
 \cmd{:HRUGeometry file \{ID field\}} & HRU polygons, GeoJSON in lon/lat (or \cmd{:InputCRS}); ID field (\cmd{HRU\_ID}). \textbf{Required.}\\
 \cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically\\
-\cmd{:LandSurface file} & DEM, ESRI ASCII grid in lon/lat or \cmd{:InputCRS} (HRU \cmd{ELEVATION})\\
+\cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU \cmd{ELEVATION})\\
 \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file; wells may then be given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
-\cmd{:BedrockSurface file} & bedrock elevation, same format (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
+\cmd{:BedrockSurface file} & bedrock elevation, same formats (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
 \cmd{:GridCellSize m} & cell size (1000 m)\\
 \cmd{:MinCellCoverage f} & fraction of a cell that coupled HRUs must cover (0.25)\\
 \cmd{:GridType REGULAR|QUADTREE|HRU\_MESH|FILE} & kind of grid (\cmd{REGULAR}); Section~\ref{sec:gridtypes}\\

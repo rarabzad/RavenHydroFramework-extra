@@ -3,7 +3,7 @@
 // Unit test harness for GWGeometry: clipping areas, projection, raster sampling
 #include <sstream>
 #include <fstream>
-#include "GWGeometry.h"   // compile: g++ -std=c++11 -O2 -I$RAVEN_SRC/src geomtest.cpp $RAVEN_SRC/src/GWGeometry.cpp -o geomtest; then python3 geomtest_check.py
+#include "GWGeometry.h"   // compile: g++ -std=c++11 -O2 -I$RAVEN_SRC/src geomtest.cpp $RAVEN_SRC/src/GWGeometry.cpp $RAVEN_SRC/src/GWGeoTIFF.cpp -o geomtest; then python3 geomtest_check.py
 #include <cstdio>
 #include <cmath>
 #include <cstdlib>

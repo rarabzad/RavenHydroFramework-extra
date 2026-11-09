@@ -132,9 +132,22 @@ GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre
 \cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
 \cmd{:InputCRS}: UTM GeoJSON polygons and lines read back in lon/lat & pyproj (PROJ) & $1.1\times10^{-11}$ degrees\\
 \cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\
-\cmd{"crs"} members: EPSG:6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 (not built in) & -- & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 asks for its parameters, which are then accepted\\\bottomrule
+\cmd{"crs"} members: EPSG:4326, 4269, 4617, 6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 and 4647 (projections, not built in) & EPSG registry (pyproj) & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 and 4647 ask for their parameters, which are then accepted\\
+GeoTIFF reader: 225 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
+GeoTIFF reader: 29 unsupported or damaged files, an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
 \end{tabularx}
 \end{table}
+
+\paragraph{GeoTIFF rasters.} \cmd{tests/geotiff/geotiff\_check.py} reads 225 GeoTIFF files written by GDAL and tifffile
+(every supported compression, predictor, sample type and byte order, in strips and tiles, classic and BigTIFF, with
+NODATA values, internal masks, \cmd{PixelIsPoint} and several EPSG codes) and compares each with an ESRI ASCII twin holding the same
+values: the corner, cell size and every value agree exactly, and Raven's sampling of the two at 4\,000 points agrees bit for
+bit; rasters with rectangular pixels agree with an independent bilinear sampler. Each of 184 of these files used as \cmd{:LandSurface} of a small model, and 43 as \cmd{:BedrockSurface}, gives outputs
+byte-identical to its twin (the model files hold the sampled cell elevations); so do projected rasters under
+\cmd{:InputCRS}. Unsupported, damaged and oversized files, a code that disagrees with \cmd{:InputCRS}, and a DEM or bedrock
+raster that covers no active column stop the run with their reason; a raster covering part of the columns gives a warning
+with their number. Damaged copies of every file (bytes changed, cut or inserted, random content) are refused with a message
+or read, never crash the reader (also checked once under AddressSanitizer and UndefinedBehaviorSanitizer).
 
 \paragraph{Projected input files.} The Liard example with every geometry and raster input converted to UTM zone 10
 (\cmd{tests/crs\_inputs.py}, PROJ through pyproj, \cmd{:InputCRS EPSG:32610}) gives the same grid as the example in
@@ -220,6 +233,7 @@ Missing HRU file or ID field; unknown profile or class; malformed class row & st
 Aquiclude as top layer; zero layer thickness; value out of range ($K\le0$, $S_y>1$, negative delay, \dots) & stops; names the parameter\\
 Process draining \cmd{GROUNDWATER} in a coupled HRU; no process feeding it & stops; names the process and HRU\\
 Wrong library path; missing raster; well outside the model & stops; names the path, file or well\\
+DEM or bedrock raster that covers no active column (another area, a wrong corner, NODATA only) / covers part of them & stops with both extents / warns with the count\\
 Duplicate IDs or names; two exchanges on one store; boundary without \cmd{HEAD} & stops; names the item\\
 Malformed groundwater command in \cmd{.rvg}, \cmd{.rvt} or \cmd{.rvc} & stops; names the command\\
 Hotstart heads for a different grid; cells larger than the HRUs & stops; explains the mismatch\\
@@ -470,7 +484,7 @@ of Section~\ref{sec:vsoilzone} and the rough-terrain suite: in full mode 400 see
 need no MODFLOW library. \cmd{-{}-quick} runs fewer randomized set-ups (the grid harnesses 8 and 4 set-ups instead of
 72 and 24, the existing-model harness 6 instead of 20, the rough-terrain suite 40 seeds instead of 400, the Liard soil-zone
 run T7 30 days instead of 365) and sets \cmd{RAVEN\_TEST\_QUICK=1} for every script: the scripts that have a quick mode
-(every soil-zone script, the behaviour, budget-file, option-combination, projected-input, input and version-guard checks,
+(every soil-zone script, the behaviour, budget-file, option-combination, projected-input, GeoTIFF, input and version-guard checks,
 and the existing-model exchange, input-form and restart tests) run shorter cases, each described in its header; the
 others run their usual cases (\cmd{tests/README.md} lists both groups). On two cores the quick mode takes about 35
 minutes and the full mode about 1.5 hours (on a busy machine up to an hour and 2.5 hours, the latter with the USGS example

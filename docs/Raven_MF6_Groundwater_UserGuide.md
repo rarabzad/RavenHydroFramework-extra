@@ -145,9 +145,9 @@ order where profiles meet.
 | --- | --- | --- |
 | `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat or `:InputCRS`) |
 | `:RiverGeometry file {subbasin field}` | none | river lines; without a field, each piece belongs to the subbasin of the dominant HRU in its cell |
-| `:LandSurface file` | HRU ELEVATION | DEM, ESRI ASCII grid in lon/lat or `:InputCRS`; averaged over each cell |
+| `:LandSurface file` | HRU ELEVATION | DEM, ESRI ASCII grid or GeoTIFF (`.tif`, `.tiff`) in lon/lat or `:InputCRS`; averaged over each cell |
 | `:InputCRS EPSG:code` or `TMERC\|ALBERS\|LCC ...` | lon/lat | projection of every geometry and raster input file (grammar of `:MF6CRS`); wells may then be given by X, Y |
-| `:BedrockSurface file` | DEFAULT_BEDROCK_DEPTH | bedrock elevation raster, same format |
+| `:BedrockSurface file` | DEFAULT_BEDROCK_DEPTH | bedrock elevation raster, same formats |
 | `:GridCellSize m` | 1000 | base cell size [m] of the grid |
 | `:MinCellCoverage f` | 0.25 | fraction of a cell covered by coupled HRUs needed to activate it |
 | `:MF6Library path` | RAVEN_MF6_LIB | MODFLOW 6 shared library |
@@ -193,9 +193,28 @@ resampling. Raven stops on a GeoJSON file whose `"crs"` member names a projectio
 one without it, or lon/lat with it), and, without `:InputCRS`, on coordinates or raster extents outside the lon/lat range;
 with `:InputCRS`, on a GeoJSON file or raster left in lon/lat ("looks like longitude/latitude": its coordinates lie over
 the HRUs' LATITUDE/LONGITUDE, not near them in the projection). The `"crs"` member is read by the code that ends its name
-(also a versioned URN such as `urn:ogc:def:crs:EPSG:6.6:4326`); geographic codes (EPSG 4000-4999, e.g. 4326, 4979, 4269,
-and NAD83(2011) 6318) mean lon/lat; a projection that is not built in is accepted, and its coordinates decide.
-Outputs stay in lon/lat.
+(also a versioned URN such as `urn:ogc:def:crs:EPSG:6.6:4326`); geographic codes mean lon/lat: the geographic 2D and 3D
+systems of the EPSG registry, a table compiled into Raven (e.g. 4326, 4979, 4269, 4617, NAD83(2011) 6318; not every code
+of the 4000s: 4647, ETRS89 / UTM 32N, is a projection; geographic codes that are not degrees from Greenwich, such as 4801
+Bern, are refused); a projection that is not built in is accepted, and its
+coordinates decide. Outputs stay in lon/lat.
+
+**Rasters.** `:LandSurface` and `:BedrockSurface` read ESRI ASCII grids, and GeoTIFF files when the name ends in `.tif`,
+`.tiff` or `.gtiff` (any case), with Raven's own reader (no GDAL needed); both are sampled the same way. GeoTIFF support: classic and
+BigTIFF, either byte order, strips or tiles; no compression, LZW, DEFLATE or PackBits, with predictor 1, 2 or 3; one band
+of 8-64 bit integers or 32/64-bit floats; north-up georeferencing (`ModelPixelScale` + `ModelTiepoint`, or a
+`ModelTransformation` without rotation); `PixelIsPoint` (the tie point is a pixel centre, so the corner is half a pixel up
+and left, as GDAL reads it); `GDAL_NODATA` and a GDAL internal mask as no-data (NaN is always no-data). Without either,
+every value is an elevation, as GDAL reads it; Raven warns when such a file holds -9999 or a type's extreme value. Other compressions (JPEG, ZSTD, LERC, ...),
+several bands, palette or colour images, other bit depths, FillOrder 2, units other than metres or degrees (units keys),
+a prime meridian other than Greenwich, a vertical coordinate system in feet,
+rotated or south-up rasters, files without georeferencing,
+corrupt or truncated files and files over 1 GB or 50 million pixels stop the run with the reason; convert with
+`gdal_translate -b 1 -co COMPRESS=DEFLATE`. The GeoTIFF's EPSG code is checked: a geographic code needs no `:InputCRS`, a
+projected one needs `:InputCRS` with the same projection (a code that is not built in is accepted under `:InputCRS` given
+by parameters, with a warning, and refused under `:InputCRS` given as a code, EPSG or ESRI); a user-defined CRS or none is checked by its extent, as an ESRI ASCII grid. A raster that
+gives no value for any active column (another area, a wrong corner or projection, NODATA only) stops the run with the
+raster's and the model's extents; one that misses some columns gives a warning with their number.
 
 ### 4.3a Grid options (`.rvg`)
 
@@ -448,6 +467,22 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone; for a delay through a deep unsaturated zone use `:SoilZoneVadose LAG` |
 | "GeoJSON file ... is in EPSG:n" / "... outside the longitude/latitude range" / "well ... is given by X and Y" | a projected input file: give `:InputCRS` with its projection (all input files in that projection; a projection that is not built in by its TMERC, ALBERS or LCC parameters) |
 | "... looks like longitude/latitude" | with `:InputCRS` a GeoJSON file or raster is still in lon/lat: reproject it (or remove `:InputCRS` if every input is lon/lat) |
+| "raster ... is in EPSG:n (a projection, in its GeoTIFF keys)" / "... is in longitude/latitude (EPSG:n in its GeoTIFF keys), but :InputCRS is ..." | give `:InputCRS` with the raster's projection (`EPSG:n` when the message offers it; a code that is not built in by its TMERC, ALBERS or LCC parameters), or every raster in the projection of `:InputCRS` |
+| "GeoTIFF file ...: compression ... is not supported" / "... samples (bands) per pixel" / "samples of ... bits" / "not north-up" / "rotates or shears" | save one north-up band, uncompressed or LZW/DEFLATE/PackBits: `gdal_translate -b 1 -co COMPRESS=DEFLATE` (`gdalwarp` for rotated rasters) |
+| "GeoTIFF file ...: ... (truncated or corrupt file)" / "decompression error" / "the chain of image directories is corrupt" | export the file again |
+| "GeoTIFF file ...: FillOrder 2 ..." | re-save the file with `gdal_translate` |
+| "GeoTIFF file ...: the linear units of its projection ... are foot" / "its angular units ..." / "its elevations are in ..." (also a vertical system such as EPSG:6360) | Raven reads metres and degrees: reproject (`gdalwarp -t_srs`) or convert the elevations to metres |
+| "... is in EPSG:n, whose longitudes count from the prime meridian of ..." / "whose angles are in ..." / "its prime meridian ... is not Greenwich" | reproject the GeoTIFF or GeoJSON file to EPSG:4326 |
+| "GeoTIFF file ...: its n tiles of ... pixels cover more than 200 million pixels" | export the file again |
+| warning "raster ... has a vertical coordinate system (...) whose unit Raven does not know" | check that the elevations are in metres |
+| warning "raster ...: its chain of image directories is damaged after the raster ..." | the raster is read without its internal mask; export the file again if it has one |
+| "GeoTIFF file ...: the file has an internal mask ... that Raven cannot read" | save it with a no-data value: `gdalwarp -dstnodata -9999 in.tif out.tif` |
+| "GeoTIFF file ...: strip/tile n is empty and the file has no NODATA value" | give it a no-data value (`gdal_translate -a_nodata`) or write it without SPARSE_OK |
+| "GeoTIFF file ...: its GDAL_NODATA tag (...) is not a number" | set a numeric no-data value: `gdal_translate -a_nodata -9999` |
+| "GeoTIFF file ...: the first image of the file is a reduced-resolution copy or a mask" | export the full-resolution raster again |
+| warning "raster ... has no NODATA value (GDAL_NODATA) but holds k pixels of -9999 ..." | if they are no data, declare it: `gdal_translate -a_nodata -9999 in.tif out.tif` |
+| ":LandSurface raster ... gives no value for any of the n active columns" | the raster does not cover the model (another area, wrong corner or `:InputCRS`, or NODATA only); the message gives both extents |
+| warning ":LandSurface / :BedrockSurface raster ... gives no value for k of the n active columns" | extend the raster or fill its no-data cells; those columns use the HRU ELEVATION / DEFAULT_BEDROCK_DEPTH |
 | "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | give plain numbers in the `.rvg`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0) |
 | ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid of about ..." | more than 10 million cells per layer: give the sizes in metres; refine locally with QUADTREE or HRU_MESH |
 | ":WellFlowRate ...: units ... are not supported" / ":BoundaryHead ...: units ..." | well rates in m3/d, m3/s or L/s; heads in m |
@@ -459,8 +494,9 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 
 - Refinement of a regular grid spans whole rows and columns (use QUADTREE or HRU_MESH for local refinement); XT3D
   (optional, off by default) costs more per iteration and can slow convergence.
-- Inputs are GeoJSON and ESRI ASCII grids, in lon/lat or in one projection given by `:InputCRS` (Transverse Mercator,
-  Albers, Lambert conformal conic); imported grid cells are single-ring polygons. DEM, bedrock, reservoir stages, boundary
+- Inputs are GeoJSON, ESRI ASCII grids and single-band GeoTIFF files (uncompressed, LZW, DEFLATE or PackBits; north-up),
+  in lon/lat or in one projection given by `:InputCRS` (Transverse Mercator, Albers, Lambert conformal conic); imported
+  grid cells are single-ring polygons. DEM, bedrock, reservoir stages, boundary
   heads and well screens must share one vertical datum (only a reservoir below its aquifer is detected).
 - By default layer l connects sideways only to layer l of the neighbouring columns; `:LayerConnection ELEVATION` connects
   overlapping cells (an existing model keeps its own connections).

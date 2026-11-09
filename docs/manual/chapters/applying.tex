@@ -171,16 +171,18 @@ exported as it is (\cmd{ogr2ogr -f GeoJSON my\_hrus.geojson my\_hrus.shp}) and i
 \cmd{AQUIFER\_PROFILE} appears in the file; \cmd{GWModelSummary.txt} lists, per HRU, its polygon area, its area in the \cmd{.rvh}
 and the fraction linked to active cells.
 \subsection{Maps}
-Convert the DEM and the bedrock (or aquifer base) surface to ESRI ASCII grids in longitude/latitude:
+The DEM and the bedrock (or aquifer base) surface are GeoTIFF files or ESRI ASCII grids in longitude/latitude, for
+example:
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
-gdalwarp -t_srs EPSG:4326 -tr 0.005 0.005 -r bilinear dem.tif dem_lonlat.tif
-gdal_translate -of AAIGrid dem_lonlat.tif dem_lonlat.asc
+gdalwarp -t_srs EPSG:4326 -tr 0.005 0.005 -r bilinear -dstnodata -9999 -co COMPRESS=DEFLATE dem.tif dem_lonlat.tif
 \end{lstlisting}
 \end{minipage}\par\smallskip
-Use a raster resolution finer than the model cells (each model cell averages 25 samples). A projected raster can be used
-without warping: \cmd{gdal\_translate -of AAIGrid dem.tif dem.asc} and \cmd{:InputCRS} with its projection
-(Section~\ref{sec:inputcrs}); all input files then use that projection. Both maps must use the same vertical datum, as must
+(\cmd{-dstnodata} marks the area outside the source as no-data, so that it does not read as 0~m.) Use a raster resolution finer than the model cells (each model cell averages 25 samples). A projected raster can be used
+without warping, with \cmd{:InputCRS} giving its projection (Section~\ref{sec:inputcrs}); all input files then use that
+projection, and the EPSG code of a GeoTIFF is checked against it. GeoTIFF files must hold one band and be uncompressed or
+compressed with LZW, DEFLATE or PackBits (Section~\ref{sec:geotiff}); \cmd{gdal\_translate -b 1 -co COMPRESS=DEFLATE}
+converts others. Both maps must use the same vertical datum, as must
 well screens, monitoring wells, boundary heads and reservoir stages; the only automatic check is the start-up stop for a
 coupled reservoir whose stages lie below the aquifer under its lake.
 \subsection{River lines}
@@ -221,8 +223,8 @@ quadtree with 500 m river cells, because its refinement spans whole rows and col
 \begin{enumerate}
 \item \textbf{HRU polygons.} Export the HRU polygons from your GIS or BasinMaker as GeoJSON in longitude/latitude
 (EPSG:4326), or in their projection with \cmd{:InputCRS}, with a field holding the HRU ID used in the \cmd{.rvh} file.
-\item \textbf{Maps.} A DEM and a bedrock (or aquifer-base) elevation map as ESRI ASCII grids in longitude/latitude (or in the
-projection of \cmd{:InputCRS}), in the same vertical datum. River lines as GeoJSON.
+\item \textbf{Maps.} A DEM and a bedrock (or aquifer-base) elevation map as GeoTIFF files or ESRI ASCII grids in
+longitude/latitude (or in the projection of \cmd{:InputCRS}), in the same vertical datum. River lines as GeoJSON.
 \item \textbf{Profiles.} Group your HRUs by the aquifer beneath them and write one profile per group; set
 \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh}.
 \item \textbf{Recharge.} Decide which Raven flux is recharge (usually percolation from the deepest soil store) and send it

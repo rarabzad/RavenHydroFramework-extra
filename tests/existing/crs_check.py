@@ -1,5 +1,5 @@
 """Built-in projections (CGWCRS) against PROJ/pyproj: 2000 random points per coordinate system.
-Build first: g++ -std=c++11 -O2 -I$RAVEN_SRC/src crstest.cpp $RAVEN_SRC/src/GWGeometry.cpp -o crstest   (pyproj is needed only for this test)"""
+Build first: g++ -std=c++11 -O2 -I$RAVEN_SRC/src crstest.cpp $RAVEN_SRC/src/GWGeometry.cpp $RAVEN_SRC/src/GWGeoTIFF.cpp -o crstest   (pyproj is needed only for this test)"""
 import numpy as np, pyproj, subprocess
 rng=np.random.default_rng(3)
 cases=[('EPSG:32610',(-126,-120),(40,72)),('EPSG:32609',(-132,-126),(50,62)),('EPSG:32718',(-78,-72),(-50,-5)),('EPSG:26910',(-126,-120),(45,60)),

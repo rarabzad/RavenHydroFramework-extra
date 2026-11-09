@@ -145,8 +145,9 @@ projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}), each with a property
 \end{lstlisting}
 \end{minipage}\par\smallskip
 Only HRUs with an \cmd{AQUIFER\_PROFILE} need polygons; others may be present and are ignored.
-\subsection{Raster maps}
-ESRI ASCII grids in longitude/latitude (or in the projection of \cmd{:InputCRS}, Section~\ref{sec:inputcrs}), for example:
+\subsection{Raster maps}\label{sec:rasters}
+\cmd{:LandSurface} and \cmd{:BedrockSurface} take an ESRI ASCII grid or a GeoTIFF file (Section~\ref{sec:geotiff}), in
+longitude/latitude or in the projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}). An ESRI ASCII grid, for example:
 \par\noindent\begin{minipage}{\linewidth}
 \begin{lstlisting}
 ncols 125
@@ -159,7 +160,78 @@ NODATA_value -9999
 \end{lstlisting}
 \end{minipage}\par\smallskip
 Values are interpolated bilinearly between raster cell centres, ignoring no-data cells; each model cell takes the mean of
-$5\times5$ such samples. Points more than one raster cell outside the map count as no-data.
+$5\times5$ such samples. Points more than one raster cell outside the map count as no-data. A grid without a
+\cmd{NODATA\_value} line takes $-9999$ as no-data.
+
+A raster that gives no value for any active column (all 25 samples of every column no-data or off the map) stops the run:
+it is a map of another area, has a wrong corner, or is in another projection than \cmd{:InputCRS}. The message gives the
+raster's extent and the extent of the active columns, both in the raster's coordinates. A raster that misses only some
+columns gives a warning with their number; those columns take the area-weighted HRU \cmd{ELEVATION} (DEM) or lie
+\cmd{DEFAULT\_BEDROCK\_DEPTH} below the land surface (bedrock). A raster may have at most 50 million cells: resample a
+finer one (a few raster cells per model cell are enough).
+
+\subsubsection{GeoTIFF files}\label{sec:geotiff}
+A raster file whose name ends in \cmd{.tif}, \cmd{.tiff} or \cmd{.gtiff} (in any case) is read as GeoTIFF by Raven's own reader; no GDAL
+or other library is needed. The values and their georeferencing are then sampled exactly as those of an ESRI ASCII grid:
+a GeoTIFF and an ESRI ASCII grid with the same values give the same model.
+\begin{center}
+\begin{tabular}{P{0.25\linewidth}P{0.68\linewidth}}
+\toprule\hdr Item & Supported\\\midrule
+file & classic TIFF and BigTIFF, little- and big-endian; the first image of the file (overviews are ignored); at most 1~GB\\
+units & coordinates in metres (projections) or degrees from Greenwich, elevations in metres: units keys, a prime meridian
+or a vertical coordinate system in feet that say otherwise stop the run; a vertical system of unknown unit gives a warning
+(read as metres)\\
+layout & strips or tiles\\
+compression & none, LZW, DEFLATE (codes 8 and 32946) and PackBits\\
+predictor & none, horizontal differencing (2) and floating-point (3), with LZW and DEFLATE\\
+values & one band (one sample per pixel, grey scale); unsigned and signed integers of 8, 16, 32 and 64 bits, floating
+point of 32 and 64 bits\\
+georeferencing & north-up: \cmd{ModelPixelScale} with \cmd{ModelTiepoint}, or a \cmd{ModelTransformation} without rotation
+or shear; pixels may be rectangular\\
+pixel position & \cmd{PixelIsArea} (the default): the tie point is the corner of the pixel; \cmd{PixelIsPoint}: the tie
+point is the centre of the pixel, so the raster's corner lies half a pixel up and left of it (as GDAL reads it)\\
+no-data & the \cmd{GDAL\_NODATA} tag (a 32-bit float raster compares at 32-bit precision; \cmd{nan} allowed), and a GDAL
+internal mask (1 or 8 bits; mask 0 is no-data; looked for among the first 4\,096 image directories; a damaged
+chain of directories after the raster gives a warning and the raster without its mask); without either every value is valid, as GDAL reads it. NaN and infinite
+values are always no-data\\
+\bottomrule
+\end{tabular}
+\end{center}
+The run stops with a message naming the file and the reason for: other compressions (JPEG, ZSTD, LZMA, LERC, WebP,
+\dots), more than one band, a palette or colour image, other bit depths (1, 12 or 16-bit floating point, complex values),
+a rotated, sheared or south-up raster, control points without a pixel size, no georeferencing, geocentric coordinates,
+bits stored in reverse order (\cmd{FillOrder} 2), projected coordinates or elevations in other units than metres
+(\cmd{ProjLinearUnitsGeoKey}, \cmd{GeogLinearUnitsGeoKey}, \cmd{VerticalUnitsGeoKey}) or longitude/latitude in other units
+than degrees, a geographic code or key with a prime meridian other than Greenwich (for example EPSG:4801, Bern), a
+vertical coordinate system in feet (for example EPSG:4269+6360, NAVD88 in US survey feet), an internal mask Raven cannot
+read, a truncated or corrupt file or a decompression error, and a file over 1~GB, 50 million pixels, or strips or tiles
+covering more than 200 million pixels. Raven is stricter than GDAL in a few rare cases: a negative pixel height
+(\cmd{ModelPixelScale}, which GDAL reads north-up by default) is refused, a \cmd{ModelTiepoint} tag of more than 4\,096
+values is taken as no georeferencing, and a \cmd{GDAL\_NODATA} text longer than 256 characters is ignored.
+
+A GeoTIFF without \cmd{GDAL\_NODATA} (for example one converted from an ESRI ASCII grid without its \cmd{NODATA\_value})
+holds no no-data value: every value is an elevation, also $-9999$. When such a file holds $-9999$, the lowest or highest
+32- or 64-bit float or, for signed integers, the type's minimum, Raven warns with the number of pixels of each value; if
+they mark missing data, declare the no-data value (\cmd{gdal\_translate -a\_nodata -9999 in.tif out.tif}). A GeoTIFF that GDAL
+writes with its default options (\cmd{gdal\_translate}, \cmd{gdalwarp}, QGIS export), uncompressed or with
+\cmd{COMPRESS=LZW}, \cmd{DEFLATE} or \cmd{PACKBITS}, is read as it is; otherwise convert it, for example
+\cmd{gdal\_translate -b 1 -co COMPRESS=DEFLATE in.tif dem.tif}.
+
+\paragraph{Coordinate system of a GeoTIFF.} The EPSG code of the GeoTIFF keys (\cmd{ProjectedCSTypeGeoKey} of a projected
+raster, \cmd{GeographicTypeGeoKey} of a geographic one) is checked against the run:
+\begin{itemize}
+\item a geographic code (longitude/latitude, any datum) is accepted without \cmd{:InputCRS} and refused with it;
+\item a projected code needs \cmd{:InputCRS}: the same code, or a built-in code or parameters giving the same projection;
+another built-in projection, or another EPSG code given as \cmd{:InputCRS}, is refused;
+\item a projected code that is not built in cannot be compared with \cmd{:InputCRS} given by its parameters (\cmd{TMERC},
+\cmd{ALBERS}, \cmd{LCC}): the file is read in the \cmd{:InputCRS} coordinates, with a warning; under \cmd{:InputCRS}
+given as a code (\cmd{EPSG:}\emph{n} or \cmd{ESRI:102001}) it is refused. Without \cmd{:InputCRS} the message asks for
+\cmd{:InputCRS EPSG:}\emph{n} when the code is built in, otherwise for the projection's parameters;
+\item a user-defined coordinate system (code 32767) or none at all says nothing: the file is treated as an ESRI ASCII grid,
+whose extent alone is checked (the longitude/latitude range without \cmd{:InputCRS}, ``looks like longitude/latitude''
+with it).
+\end{itemize}
+The message of a refused file names the file, the code found and the coordinate system expected.
 \subsection{Projected input files (\texttt{:InputCRS})}\label{sec:inputcrs}
 Most GIS data are projected (UTM, Albers, Lambert). Instead of reprojecting them to longitude/latitude, give their
 projection once in the \cmd{.rvg} file:
@@ -183,12 +255,17 @@ Input files whose coordinates do not match these settings are recognised where p
 \item a GeoJSON file's \cmd{"crs"} member is read by the EPSG code that ends its name (\cmd{EPSG:32610}, as GDAL writes it
 \cmd{urn:ogc:def:crs:EPSG::32610}, a versioned \cmd{urn:ogc:def:crs:EPSG:6.6:32610}, or
 \cmd{http://www.opengis.net/def/crs/EPSG/0/32610}). A built-in projected code needs \cmd{:InputCRS} with that projection,
-and a file whose code is another built-in projection than \cmd{:InputCRS} is refused. Geographic codes (longitude/latitude:
-every EPSG code from 4000 to 4999, such as 4326 WGS\,84, 4979 WGS\,84 3D, 4269 NAD83, 4267 NAD27, 4617 NAD83(CSRS), and
-6318/6319 NAD83(2011), 8255 NAD83(CSRS)v7, 7843/7844 GDA2020, 6667/6668 JGD2011; OGC CRS84, CRS83 and CRS27) are
-accepted without \cmd{:InputCRS} and refused with it. Any other code cannot be classified: the file's coordinates decide, and
-without \cmd{:InputCRS} coordinates outside the longitude/latitude range stop the run with a request for the projection's
-parameters (\cmd{TMERC}, \cmd{ALBERS} or \cmd{LCC});
+and a file whose code is another built-in projection than \cmd{:InputCRS} is refused. Geographic codes (longitude/latitude)
+are accepted without \cmd{:InputCRS} and refused with it: the geographic 2D and 3D coordinate systems of the EPSG
+registry, a table of 962 codes compiled into Raven (such as 4326 WGS\,84, 4979 WGS\,84 3D, 4269 NAD83, 4267 NAD27, 4617
+NAD83(CSRS), 4258 ETRS89, 6318 NAD83(2011), 8255 NAD83(CSRS)v7, 7844 GDA2020), and OGC CRS84, CRS83 and CRS27. Codes
+between 4000 and 4999 are not all geographic (4647, ETRS89 / UTM zone 32N, is a projection, as are 4087 and 4839). The
+table also holds 69 geographic codes whose coordinates are not degrees from Greenwich (27 with another prime meridian,
+such as 4801 Bern or 4807 NTF (Paris), and others in grads or degrees-minutes-seconds); a file in one of them is refused,
+asking for a reprojection to EPSG:4326. Any
+other code cannot be classified: the file's coordinates decide, and without \cmd{:InputCRS} coordinates outside the
+longitude/latitude range stop the run with a request for the projection's parameters (\cmd{TMERC}, \cmd{ALBERS} or
+\cmd{LCC}); GeoTIFF rasters carry their code in their keys (Section~\ref{sec:geotiff});
 \item without \cmd{:InputCRS}, a GeoJSON file with coordinates outside $\pm360^\circ$ / $\pm90^\circ$, or a raster whose
 extent lies outside them, is refused (projected metres read as degrees);
 \item with \cmd{:InputCRS}, a GeoJSON file or raster left in longitude/latitude is refused (``looks like

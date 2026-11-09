@@ -666,8 +666,8 @@ rest column of an HRU covers only the part outside the grid, where there is no a
 and, with more than one layer, \cmd{raven.szw} (WEL \cmd{SZW\_RAVEN}, Section~\ref{sec:szcaprise}) to the model's name
 file next to \cmd{raven.rch}. The soil zone lies on the model's top: the soil-zone base is the top
 of the top active cell and the land surface is $d_{\mathrm{sz},k}$ higher. Its relief within a cell comes from \cmd{:LandSurface}
-when given (the DEM's points about their mean in the cell; with an \cmd{:OverlapWeights} table, which has no cell
-outlines, one point per cell). The soil--aquifer conductance and the storage check use the model's own vertical
+when given (the DEM's points about their mean in the cell; an \cmd{:OverlapWeights} table has no cell outlines to sample
+the DEM in, so each cell is flat and a warning says that \cmd{:LandSurface} is not used). The soil--aquifer conductance and the storage check use the model's own vertical
 conductivity (\cmd{K33}, else \cmd{K}) and specific yield of the top active cell; unsaturated columns take the
 conductivity and specific yield of every layer from the model, and $b$, $\psi_a$ and $\theta_s$ from
 \cmd{:SoilZoneAquiferClass} (Section~\ref{app:commands}). A steady model (no storage package) has no specific yield: the

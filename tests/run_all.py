@@ -20,7 +20,7 @@ with RAVEN_TEST_QUICK=0, its full mode, also when the variable is set to somethi
 runs fewer randomized set-ups (fuzz_grids 8 instead of 72, fuzz_lakes 4 instead of 24, ext_fuzz 6 instead of 20, the
 rough-terrain suite 40 seeds instead of 400, T7 30 days instead of 365), and the scripts with a quick mode run shorter
 cases: every soil-zone script (soilzone/; spike_xmi, test_hillslope, test_surface_stores and test_plot_tool run the same
-case in both modes), behaviour_check, budget_file, combinations, crs_inputs, input_checks, mf6version_check and
+case in both modes), behaviour_check, budget_file, combinations, crs_inputs, geotiff_check (fewer damaged files), input_checks, mf6version_check and
 existing/ext_exchanges, ext_inputs and restart_ext (its sub-daily case). The other scripts (edge, liard_grids,
 mf6files_check, mf6lib_check, restart_test, lake_test, dry_start, thiem, existing/guards and roundtrip, the USGS examples,
 the C++ unit tests, cmake_checks, budget_xcheck) run their usual cases in both modes. Measured on two cores: quick
@@ -165,12 +165,14 @@ FE = ('5', '6') if QUICK else ('5', '20')
 cxx = 'g++ -std=c++11 -O2 -I%s' % ROOT
 STEPS = [
     ('run_all_selftest', False, [PY, 'run_all.py', '--selftest'], last_line(r'run_all self-test: ALL PASSED'), 1800),
-    ('gridtest', False, '%s gridtest.cpp %s/GWGrid.cpp %s/GWGeometry.cpp -o %s/gridtest && %s/gridtest'
-     % (cxx, ROOT, ROOT, LOGS, LOGS), last_line(r'ALL PASSED: 0 failures'), 600),
-    ('geomtest', False, '%s geomtest.cpp %s/GWGeometry.cpp -o geomtest && %s geomtest_check.py'
-     % (cxx, ROOT, PY), last_line(r'ALL PASSED'), 600),
-    ('crs', False, 'cd existing && %s crstest.cpp %s/GWGeometry.cpp -o crstest && %s crs_check.py'
-     % (cxx, ROOT, PY), small_numbers(r'worst ([0-9.e+-]+) m', 1e-3, 'worst position difference [m]'), 600),
+    ('gridtest', False, '%s gridtest.cpp %s/GWGrid.cpp %s/GWGeometry.cpp %s/GWGeoTIFF.cpp -o %s/gridtest && %s/gridtest'
+     % (cxx, ROOT, ROOT, ROOT, LOGS, LOGS), last_line(r'ALL PASSED: 0 failures'), 600),
+    ('geomtest', False, '%s geomtest.cpp %s/GWGeometry.cpp %s/GWGeoTIFF.cpp -o geomtest && %s geomtest_check.py'
+     % (cxx, ROOT, ROOT, PY), last_line(r'ALL PASSED'), 600),
+    ('crs', False, 'cd existing && %s crstest.cpp %s/GWGeometry.cpp %s/GWGeoTIFF.cpp -o crstest && %s crs_check.py'
+     % (cxx, ROOT, ROOT, PY), small_numbers(r'worst ([0-9.e+-]+) m', 1e-3, 'worst position difference [m]'), 600),
+    ('geotiff_nolib', False, [PY, 'geotiff/geotiff_check.py', '--nolib'], last_line(r'geotiff checks: ALL PASSED'), 900),
+    ('geotiff', True, [PY, 'geotiff/geotiff_check.py'], last_line(r'geotiff checks: ALL PASSED'), 1800),
     ('crs_inputs_nolib', False, [PY, 'crs_inputs.py', '--nolib'], last_line(r'crs inputs: ALL PASSED'), 600),
     ('crs_inputs', True, [PY, 'crs_inputs.py'], last_line(r'crs inputs: ALL PASSED'), 1800),
     ('input_checks', True, [PY, 'input_checks.py'], last_line(r'input checks: ALL PASSED'), 1800),
