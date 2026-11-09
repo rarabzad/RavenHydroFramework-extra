@@ -18,7 +18,7 @@ K5  hotstart continuity: 60 + 60 days from solution.rvc (:GWVadoseColumns) equal
 K6  existing-model round trip (test_sz_existing.roundtrip with KINEMATIC and :SoilZoneAquiferClass).
 K7  speed: run times of NONE, RICHARDS and KINEMATIC on a hillslope over a deep water table; returns the runs' results, the times are reported only.
 K8  byte-identity of NONE, RICHARDS and CONCEPTUAL against the reference build RAVEN_EXE_REF (out/*.csv and
-    solution.rvc, without the diagnostic column `interface change [m]`); SKIP without a reference.
+    solution.rvc, without the diagnostic column `interface change [m]` and solution.rvc's :GWVadoseColumnTops block); SKIP without a reference.
 Every run: the standard limits (sz_check.STD_LIMITS, and sz_check's column identity vz_identity 1e-8 from step 1: the
 start storage of the columns in GWModelSummary.txt is required, vz_step1_missing).
 K9  the leak check: the K2 storm with KINEMATIC passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3
@@ -241,7 +241,7 @@ def same_outputs(a, b):
             x = x[[c for c in x.columns if c not in DIAG]]; y = y[[c for c in y.columns if c not in DIAG]]
             if not x.equals(y):
                 worst.append(os.path.basename(f))
-        elif open(f, 'rb').read() != open(g, 'rb').read():
+        elif sz_check.rvc_text(f) != sz_check.rvc_text(g):   # (solution.rvc: without the column tops, which the reference may not write)
             worst.append(os.path.basename(f))
     return worst
 

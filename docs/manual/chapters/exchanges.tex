@@ -297,7 +297,7 @@ receives $(1-F)$ (Section~\ref{ch:recharge}). \emph{Raven recharge} in \cmd{GWBu
 rejected and returned; the net recharge is \emph{MF6 recharge}. Water that does not fit into a full
 column overflows to the HRU's \cmd{SURFACE\_WATER} and is routed the same day (saturation-excess runoff and
 exfiltration). Water-table ET is reduced by $(1-\bar F_i)$ of the cell, because saturated soil already evaporates in
-Raven.
+Raven; its extinction depth counts from the ground above the soil zone, as without a soil zone (Section~\ref{ch:et}).
 
 \subsection{Sloping and irregular land}\label{sec:szslope}
 Partial saturation is handled at two scales. \emph{Between cells}, MODFLOW gives every cell its own head and its own
@@ -653,8 +653,12 @@ solved with the specified head $h^{\mathrm{chd}}_i$,
 which is exact for that column (the head does not respond), and the flow is booked as \emph{soil zone to specified
 heads} or \emph{specified heads to soil zone}; capillary rise there comes from the head as well. The column's recharge
 goes to the specified head (\emph{recharge onto CHD cells}), rejected where the ground is saturated. With an existing
-model the specified-head cells may change with its stress periods; the columns follow them step by step. The rest
-column of an HRU covers only the part outside the grid, where there is no aquifer to exchange with.
+model the specified-head cells may change with its stress periods; the columns follow them step by step. An existing
+model's specified heads are known only once MODFLOW has read the step's period (from the first step on), so unsaturated
+columns (Section~\ref{sec:szvadose}) can exist on such cells: in a step in which a link's cell is a specified head its
+unsaturated columns end, their water above their reference profiles going to the specified head (\emph{recharge onto CHD
+cells}; a run total in \cmd{GWModelSummary.txt}), and a column forms again, at rest, when the cell is no longer one. The
+rest column of an HRU covers only the part outside the grid, where there is no aquifer to exchange with.
 
 \subsection{With an existing MODFLOW model}\label{sec:szexisting}
 \cmd{:SoilZone PHYSICAL} works with \cmd{:MF6Simulation} as with a generated model (Chapter~\ref{ch:existing}). Raven adds
@@ -899,7 +903,10 @@ Q^{\mathrm{evt}}_i=E_i\,|\Omega_i|\;\min\!\left(1,\max\!\left(0,\;1-\frac{z_{\ma
 the full rate when the water table is at the surface, falling linearly to zero at depth $d_x$ (Figure~\ref{fig:curves}d).
 This water leaves the system as evaporation. With an existing model (Chapter~\ref{ch:existing}) the same package is added at the
 top active cell of each column, with $z_{\mathrm{land}}$ the top of that cell and $|\Omega_i|$ MODFLOW's own cell area; the
-model's own ET package must then be taken over (\cmd{:RavenTakesOver}).
+model's own ET package must then be taken over (\cmd{:RavenTakesOver}). With \cmd{:SoilZone PHYSICAL}, $z_{\mathrm{land}}$ is
+the ground above the soil zone (the soil zone lies between the model top and the ground): the land surface of the DEM for a
+model Raven builds, and the model top plus the column's overlap-weighted soil-zone thickness for an existing model. The
+extinction depth is therefore always counted from the ground, and a water table deeper than $d_x$ below it gives no ET.
 \begin{example}[: water-table ET]
 Unmet PET 2 mm/d over a 4 km$^2$ cell fully covered by coupled HRUs, $d_x=2$ m, water table 0.5 m deep:
 $Q=0.002\times4\times10^6\times(1-0.5/2)=6\,000$ m$^3$/d. If coupled HRUs covered only 1 km$^2$ of the cell, the unmet volume
@@ -1014,36 +1021,49 @@ generated or an existing model (Chapter~\ref{ch:existing}; the seepage enters th
 \item After MODFLOW solves a day, the local groundwater level of the reservoir is set to the average head under its
 lake HRU, weighted by overlap:
 \begin{equation}
-h_{\mathrm{gw}}=\sum_iw_i\,\max\!\left(z^{\mathrm{wt}}_i,\;\min\!\left(z_{\mathrm{top},i},\,h_{\mathrm{res}}\right)\right),\qquad w_i=\frac{A_{k,i}}{\sum_{j\notin\mathcal{C}}A_{k,j}} ,
+h_{\mathrm{gw}}=\sum_{i\in\mathcal{U}}w_i\,\max\!\left(z^{\mathrm{wt}}_i,\;\min\!\left(z_{\mathrm{bed},i},\,h_{\mathrm{res}}\right)\right),\qquad w_i=\frac{A_{k,i}}{\sum_{j\in\mathcal{U}}A_{k,j}} ,
 \end{equation}
-where the sums run over the lake HRU's cells that do not hold a fixed head ($\mathcal{C}$), as for recharge, and
-$z^{\mathrm{wt}}_i$ is the water table of column $i$ (the head of its highest wet cell; Section~\ref{ch:mf6}). A water table
-below the lake bed (the model top) means the lake is disconnected: its seepage then depends on the bed, not on how deep
-the water table is --- exactly as for a river. If the lake stands below the model top (for example a DEM that recorded a
-higher water surface), the true bed is below the lake level, so the bed is taken at the lake level $h_{\mathrm{res}}$: a
-deep water table then gives no exchange, where the model top would have given a false inflow to the lake. (Raw heads are not
-used here because a dry cell's head can lie far below the cell and would give impossible seepage.)
+where $\mathcal{U}$ holds the lake HRU's cells that can take seepage in the step: not the columns of a
+\cmd{:SpecifiedHeadBoundary} (as for recharge) and, with an existing model, not its specified heads of the step nor its
+inactive (dry) cells without \cmd{NEWTON}. $z^{\mathrm{wt}}_i$ is the water table of column $i$ (the head of its highest wet
+cell; Section~\ref{ch:mf6}). The lake bed $z_{\mathrm{bed},i}$ is the ground: the model top, or with
+\cmd{:SoilZone PHYSICAL} on a lake HRU with a soil zone the ground above the soil zone (soil-zone base + soil-zone
+thickness), as for surface stores (Section~\ref{ch:stores}). A water table below the lake bed means the lake is
+disconnected: its seepage then depends on the bed, not on how deep the water table is --- exactly as for a river. If the
+lake stands below its bed (for example a DEM that recorded a higher water surface), the true bed is below the lake level,
+so the bed is taken at the lake level $h_{\mathrm{res}}$: a deep water table then gives no exchange, where the model top
+would have given a false inflow to the lake. (Raw heads are not used here because a dry cell's head can lie far below the
+cell and would give impossible seepage.)
 \item Raven routes the day; the reservoir calculates its seepage $V^{\mathrm{res}}$ with this level and counts it as a
-reservoir loss (water leaving Raven).
+reservoir loss (water leaving Raven). Only the part of the lake bed over cells that can take seepage exchanges water: the
+seepage constant used is $F\,k_{\mathrm{seep}}$, with $F=\sum_{i\in\mathcal{U}}A_{k,i}/\sum_iA_{k,i}$ the share of the
+lake's linked area over those cells ($F=1$ when every cell can take seepage). The seepage therefore falls continuously
+to 0 as cells become specified heads, and cells left under a small part of the lake (a sliver of a neighbouring HRU's
+cell) get only the seepage of that part.
 \item The next day, this volume is injected into the aquifer cells under the lake (MODFLOW WEL package
-\cmd{RES\_RAVEN}): $Q_i=V^{\mathrm{res}}\,w_i/\dt$. A negative volume (groundwater feeding the reservoir) is extracted.
+\cmd{RES\_RAVEN}): $Q_i=V^{\mathrm{res}}\,w_i/\dt$ over the cells that can take seepage on that day. A negative volume
+(groundwater feeding the reservoir) is extracted. When the cells able to take seepage have changed since the seepage was
+computed (share $F'$ then, $F$ now), each gets at most the rate it had when the seepage was computed:
+$Q_i=V^{\mathrm{res}}A_{k,i}/(\dt\,\max(F,F')\sum_jA_{k,j})$, and the rest, $V^{\mathrm{res}}(1-F/\max(F,F'))$, is
+returned to the reservoir's subbasin (a loss) or taken back from it (a gain), as below.
 If a cell is nearly dry, MODFLOW extracts less than asked (\cmd{AUTO\_FLOW\_REDUCE}); the lake has already received that
 water, so the shortfall is taken back from the water reaching the reservoir's subbasin in the same step, like a river loss
 (\cmd{GWBudget.csv}: \emph{reservoir gain not supplied by MODFLOW}). No water is created.
 With an existing model, cells under the lake that cannot take the seepage in the step --- specified heads, and inactive
-(dry) cells of a model without \cmd{NEWTON} --- get none: the weights $w_i$ are taken over the lake's other cells, both for
-$Q_i$ and for the lake's groundwater level $h_{\mathrm{gw}}$ (item 1); with no such cell left, the lake exchanges nothing in that step
-($h_{\mathrm{gw}}=h_{\mathrm{res}}$). A loss MODFLOW still does not take (a cell that turns specified head or dries during
+(dry) cells of a model without \cmd{NEWTON} --- get none (they are outside $\mathcal{U}$, item 1); with no such cell left,
+the lake exchanges nothing ($F=0$, $h_{\mathrm{gw}}=h_{\mathrm{res}}$). A loss MODFLOW does not take (seepage computed for
+cells that are specified heads or inactive on the day it is delivered, or a cell that turns specified head or dries during
 the solve) has already left the lake, so it is returned to the water reaching the reservoir's subbasin in the same step,
 which flows on into the reservoir (\cmd{GWBudget.csv}: \emph{reservoir seepage not delivered by MODFLOW}, with a warning and
-a run total in \cmd{GWModelSummary.txt}). No water is lost.
+a run total in \cmd{GWModelSummary.txt}). A gain MODFLOW does not supply is taken back the same way (\emph{reservoir gain
+not supplied by MODFLOW}, with a warning and a run total). No water is lost or created.
 \end{enumerate}
 The reservoir's stages must be elevations on the aquifer's datum (\cmd{:AbsoluteCrest\allowbreak Height}): a stage below the
 bottom of the whole aquifer under the lake --- relative stages, with the crest at 0 m, or another datum --- stops the run.
 For a large lake, fine cells in and around the lake HRU place this seepage more precisely: \cmd{:GridRefinement LAKES}
 (Section~\ref{sec:gridtypes}). The one-day delay is exact bookkeeping, not a loss. The volume in transit is reported every day (\emph{reservoir seepage
-awaiting delivery}), saved in \cmd{solution.rvc} (\cmd{:GWReservoirSeepage}), and delivered on the first day of a
-restarted run.
+awaiting delivery}), saved in \cmd{solution.rvc} (\cmd{:GWReservoirSeepage}, with the share $F'$ of the lake's cells it
+was computed for), and delivered on the first day of a restarted run.
 
 Without an initial condition in the \cmd{.rvc}, a reservoir with absolute stages starts at its crest height --- the same state
 that stage 0 means for a reservoir with relative stages (a start at 0~m, far below the lake bed, would create a large
@@ -1068,7 +1088,7 @@ $0.2\times4\times86\,400=69\,120$ m$^3$ that day, injected into the aquifer the 
 \begin{refcard}{reservoirs}
 \textbf{Sources/sinks.} Exchanges water between a Raven reservoir (subbasin outlet) and the aquifer under its lake HRU (MODFLOW WEL package
 \cmd{RES\_RAVEN}); Raven books the seepage as a reservoir loss.\par\smallskip
-\textbf{Constraints/notes.} One-step lag, exactly accounted (volume in transit reported and saved). The local head is never taken below the lake bed.
+\textbf{Constraints/notes.} One-step lag, exactly accounted (volume in transit reported and saved). The local head is never taken below the lake bed (the ground; above the soil zone under \cmd{:SoilZone PHYSICAL}). Only the share of the bed over cells that can take seepage exchanges water.
 Stages must be absolute. A reservoir that dries out books only the water that can actually leave.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
@@ -1095,7 +1115,7 @@ $h_{\mathrm{res}}$ & stage & Raven reservoir state; \cmd{:AbsoluteCrest\allowbre
 $h_{\mathrm{gw}}$ & local groundwater head & computed each step from MODFLOW (replaces the second value) & m & Sec.~\ref{ch:reservoirs}\\
 -- & \cmd{:ReservoirExchange} & \cmd{.rvg} option & -- & Sec.~\ref{app:commands}\\
 \bottomrule\end{tabular}\end{minipage}\par\smallskip
-\textbf{Outputs.} \cmd{GWBudget.csv}: \emph{reservoir seepage sent}, \emph{delivered}, \emph{awaiting delivery}, \emph{reservoir gain not supplied by MODFLOW}; Raven's reservoir outputs show
+\textbf{Outputs.} \cmd{GWBudget.csv}: \emph{reservoir seepage sent}, \emph{delivered}, \emph{awaiting delivery}, \emph{reservoir gain not supplied by MODFLOW}, and with an existing model \emph{reservoir seepage not delivered by MODFLOW}; \cmd{GWModelSummary.txt}: run totals of the gain not supplied and the seepage not delivered; Raven's reservoir outputs show
 the seepage as a loss.
 \end{refcard}
 
@@ -1128,12 +1148,23 @@ A specified-head boundary holds the head of its cells at $h_c$; MODFLOW calculat
 
 \subsection{Where boundaries go}
 Boundaries are drawn in a GeoJSON file: polygons select the cells whose centre lies inside (tested with the even--odd
-ray-crossing rule, so holes work), lines select the cells they cross. With \cmd{LAYERS TOP} only the top active cell
-is used; with \cmd{LAYERS ALL}, every active layer. A boundary is placed only in cells whose bottom is below the highest
-head it has in the run (MODFLOW requires a boundary head above the cell bottom): \cmd{HEAD}, or with a \cmd{:BoundaryHead}
-series the highest of its step values over the run (\cmd{HEAD} where the series has no value). In steps with a lower
-head, the head is kept at least 0.01 m above the cell bottom. A boundary that selects cells but has none left, because its
-head lies below all of them, is reported with a warning naming the head and the highest cell bottom.
+ray-crossing rule, so holes work), lines select the cells they cross. With \cmd{LAYERS ALL} the boundary is placed in
+every active layer whose bottom lies below its highest head; with \cmd{LAYERS TOP}, in the highest such layer (the top
+active cell when the head lies above it). The highest head is \cmd{HEAD} and, with a \cmd{:BoundaryHead} series, every value
+of the series (the whole series, not only the run's days, so a restarted run gets the same cells; \cmd{HEAD} applies where
+the series has no value). With a series, \cmd{LAYERS TOP} also places the layers below, down to the first one whose bottom
+lies below the series' lowest head.
+
+On each step, a placed cell whose bottom lies at or above the step's head is switched off: a general-head cell gets
+conductance 0, and a specified-head cell is left out of MODFLOW's list for the step (it is an ordinary active cell then).
+So the boundary neither holds the water table at the cell bottom nor feeds the aquifer from a head the series does not
+have. With \cmd{LAYERS TOP} only the highest placed layer whose bottom lies below the step's head is used; the boundary
+follows its head down and up through the layers. A step head within 0.01~m above a cell's bottom is held 0.01~m above
+it. The cell-steps switched off are counted in \cmd{GWModelSummary.txt} (\emph{head boundaries off}); the boundary's flow in
+\cmd{GWBudget.csv} (\emph{GHB}, \emph{CHD}) is that of the cells used. For the coupling, a column whose top cell is a placed
+specified head stays a specified-head column on every step (recharge, soil zone and stores there go to the specified
+head). A boundary that selects cells but has none left, because its head lies below all of them, is reported with a
+warning naming the head and the highest cell bottom.
 
 \subsection{Monitoring (observation) wells}
 Monitoring wells are listed in \cmd{:ObservationWells} with a location and a screen elevation. Each is attached to the

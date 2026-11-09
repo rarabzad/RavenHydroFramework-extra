@@ -36,7 +36,8 @@ their areas $a\,a_c$, and the identities of Chapter~\ref{ch:balance} hold for th
 
 \paragraph{Restart.} With $K>1$ the columns are saved in \cmd{solution.rvc} as \cmd{:GWVadoseClassColumns} (HRU ID, cell,
 class, classes of the cell, water table, contents; Appendix~\ref{app:hotstart}). A hotstart written with another $K$
-(or another node count) does not stop the run: the columns that do not match start at rest (their reference profile)
+(or another node count, or with other column tops: another \cmd{:SoilZoneSubgrid}, ground or soil-zone thickness, from
+\cmd{:GWVadoseColumnTops}) does not stop the run: the columns that do not match start at rest (their reference profile)
 and Raven warns. A class column that was inactive at the end of the run that wrote the file (the water table fell below
 its base in the last step) has no line; the restart builds it at rest, as the continuous run does in its next step, and
 this is not a mismatch (\cmd{test\_vz\_classes.py} C10).

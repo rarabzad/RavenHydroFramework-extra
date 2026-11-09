@@ -18,6 +18,13 @@ X8  a steady existing model (the x7 model without STO) with :SoilZoneAquiferClas
     the 0.2 (warning naming it; the Sy/drainable-porosity range of GWModelSummary.txt halves; identities hold); a class
     without SPEC_YIELD keeps 0.2 (the outputs of the x7 run without a class, byte for byte); with RAVEN_EXE_REF the x7 run
     without a class is byte-identical to the reference build (otherwise SKIP).
+X9  unsaturated columns on the existing model's own specified heads: the 'rise' column case of combinations.py (flat, a
+    specified head 0.3 m below the ground on the outlet cells, wet columns from :SoilZoneVadoseInitialFlux 30) generated
+    and as its existing twin (:SoilZoneAquiferClass SAND). The existing model learns its specified heads in its first
+    step: the columns built on them end there, their water to the specified heads (run total 'columns over specified
+    heads' in GWModelSummary.txt), so the unsaturated storage equals the generated run's on every step (1e-5 of its
+    start; the twins' flows differ by 4e-5), no column line of a specified-head cell is left in solution.rvc, and every identity of combinations.check_run
+    holds (LAG with one class; RICHARDS with 3 classes as well in the full mode). (The columns stayed frozen there: 61 m3.)
 Quick mode (RAVEN_TEST_QUICK=1): the round trips X1-X4 (and X5-X7, which use their runs) cover the first 120 days of the
 hillslope's rain instead of all 300; the checks are the same.
 """
@@ -188,13 +195,40 @@ def sy_x8():
         sz_check.tc.skip('X8: x7 run without a class against the reference build')
     return good
 
+def chd_columns_x9():
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    good = True
+    for m, K in [('LAG', 1)] + ([] if QUICK else [('RICHARDS', 3)]):
+        s = dict(sz='PHYS', vz=m, K=K, x={'chd'}, st={'rise'}, dt=1.0)
+        g = os.path.join(W, 'x9_%s%d_gen' % (m, K)); shutil.rmtree(g, ignore_errors=True); sz_models.make_case(g, **C.cfg_of(s)); C.options(g, s)
+        bad, _ = C.check_run(g, C.run(g))
+        e = os.path.join(W, 'x9_%s%d_ext' % (m, K)); C.existing(g, e, s); open(os.path.join(e, 'm.rvg'), 'a').write(':SoilZoneAquiferClass SAND\n')
+        bad2, _ = C.check_run(e, C.run(e))
+        if bad or bad2:
+            print('  X9 %s K=%d: FAILED %s %s' % (m, K, bad, bad2)); good = False; continue
+        a = pd.read_csv(os.path.join(g, 'out', 'GWBudget.csv'))['unsaturated zone storage [m3]'].values
+        b = pd.read_csv(os.path.join(e, 'out', 'GWBudget.csv'))['unsaturated zone storage [m3]'].values
+        s0 = sz_check.vz_start(e) or 1.0
+        dev = float(np.abs(a - b).max()) / s0
+        rvc = open(os.path.join(e, 'out', 'solution.rvc')).read()
+        cells = set()
+        blk = re.search(r':GWVadose(?:Class)?Columns[^\n]*\n([\s\S]*?):End', rvc)
+        if blk: cells = {int(l.split(',')[1]) for l in blk.group(1).strip().split('\n') if l.strip()}
+        m2 = re.search(r'columns over specified heads:\s*(\d+) unsaturated columns ended[^(]*\((\S+) m3', sz_check.summary(e))
+        ok = dev < 1e-5 and m2 is not None and int(m2.group(1)) > 0 and float(m2.group(2)) > 0.0 and len(cells) == 0
+        print('  X9 %s K=%d: unsaturated storage of the existing twin within %.2g of the generated run (start %.1f m3); ended over specified heads: %s; column lines left in solution.rvc: %d -> %s'
+              % (m, K, dev, s0, ('%s columns, %s m3' % (m2.group(1), m2.group(2))) if m2 else 'MISSING', len(cells), 'ok' if ok else 'FAIL'))
+        good &= ok
+    return good
+
 def main():
     res = [roundtrip('x1', **SHORT),
            roundtrip('x2', feet=True, **SHORT),
            roundtrip('x3', ':SoilZoneVadose RICHARDS\n:SoilZoneAquiferClass SAND\n:SoilZoneClasses 3\n',
                      chd=94.8, aq_b=4.0, aq_psia=0.3, init_depth=3.0, soil_b=5.0, soil_psia=200.0, pet=2.0, **SHORT),
            roundtrip('x4', ':SoilZoneCapillaryRise OFF\n', chd=94.8, **SHORT)]   # (capillary arrays sized with the rise off)
-    res += [outputs_x3(), stops_x6(), sy_x7(), sy_x8()]
+    res += [outputs_x3(), stops_x6(), sy_x7(), sy_x8(), chd_columns_x9()]
     print('soil-zone existing-model tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 

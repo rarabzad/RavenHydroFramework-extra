@@ -33,7 +33,7 @@ SG sub-grid & \cmd{:SoilZoneSubgrid 5} on the same slope: the saturated fraction
 Restart & RS1: 300 days against 150 + 150 days from \cmd{solution.rvc} (\cmd{:GWSoilZoneColumns}); RS2: an existing model with a specified-head toe and unsaturated columns, 10 days against 5 + 5; RS3: no \cmd{:SoilZone PHYSICAL}, seepage holding the lowest soil layer above capacity, 30 days against 12 + 18; RS4: \cmd{KINEMATIC} and \cmd{LAG} with $S_y$ equal to the porosity, 20 days against 10 + 10 & 1\,500 rows: water table and soil level $2\times10^{-10}$, $F$ $1.2\times10^{-7}$, exchange $2.4\times10^{-6}$ (limit $10^{-4}$); RS2 $2.5\times10^{-7}$; RS3 soil storage identical, recharge and seepage within $3.4\times10^{-9}$; RS4 column storage as written, restart identical to the continuous run\\
 T7 Liard & the Liard example with \cmd{:SoilZone PHYSICAL SOIL[0] SOIL[1]} (85 coupled HRUs, 2~km grid, one year from 1985-10-01; soils of drainable porosity 0.02 against $S_y=0.25$, a stiff interface, storage warning expected) & 365 steps, 0 unconverged (MODFLOW and interface), 3\,509 outer iterations (at most 72 in a step), residual $8\times10^{-12}$ of the gross flow, no shortfall; 80 of 85 HRUs more than 20\,\% saturated at some time\\\bottomrule
 \end{longtable}
-\noindent The soil zone with existing models is verified by X1--X8 (Table~\ref{tab:vszpositions}) and by the
+\noindent The soil zone with existing models is verified by X1--X9 (Table~\ref{tab:vszpositions}) and by the
 existing-model cases of the rough-terrain suite (Section~\ref{sec:vrough}).
 
 \subsection{The unsaturated column and capillary rise}\label{sec:vszcolumn}
@@ -73,7 +73,9 @@ P10 upward flows out of a lower cell & a specified head in layer 2 under a dried
 Liard speed & one year with \cmd{:SoilZone PHYSICAL}, optimized build & defaults 69~s; unsaturated columns, capillary rise and three classes 91~s; all identities $<10^{-10}$\\
 X1--X4 existing model & the hillslope's MODFLOW model coupled as an existing model (X2 in feet and seconds; X3 with a specified-head toe, unsaturated columns and three classes; X4 a specified-head toe without capillary rise) & flows within $3.7\times10^{-4}$, $3.7\times10^{-4}$, $2.0\times10^{-4}$, $4.4\times10^{-4}$ of the generated run\\
 X5--X7 & outputs of the X3 runs (no rejection where $F=0$; run totals); start-up stops for a model without \cmd{NEWTON} and for a MODFLOW input error (\cmd{CG} with \cmd{NEWTON}); the model's specific yield (a confined STO package without SY; no STO package) & X5 as required; X6 both stop with a message; X7 SY kept, floored at 0.01 for the release limits and the columns, or 0.2 without STO, with a warning\\
-X8 steady existing model & the X7 model without a storage package, with \cmd{:SoilZoneAquiferClass} whose \cmd{SPEC\_YIELD} is 0.1; and with a class without \cmd{SPEC\_YIELD} & $S_y$ 0.1 used (the $S_y$/drainable-porosity range halves, warning names it), identities hold; without \cmd{SPEC\_YIELD} 0.2 and outputs equal to X7\\\bottomrule
+X8 steady existing model & the X7 model without a storage package, with \cmd{:SoilZoneAquiferClass} whose \cmd{SPEC\_YIELD} is 0.1; and with a class without \cmd{SPEC\_YIELD} & $S_y$ 0.1 used (the $S_y$/drainable-porosity range halves, warning names it), identities hold; without \cmd{SPEC\_YIELD} 0.2 and outputs equal to X7\\
+X9 columns on the model's own specified heads & a flat strip with a specified head 0.3~m below the ground on the outlet cells and wet columns (\cmd{:SoilZoneVadoseInitialFlux} 30), generated and as an existing model (\cmd{LAG}, $K=1$; \cmd{RICHARDS}, $K=3$ in the full mode) & the columns built on the existing model's specified heads end in its first step, their water (61.3~m$^3$) to the specified heads; unsaturated storage equal to the generated run's within $1.2\times10^{-6}$ of its start; no column line of those cells in \cmd{solution.rvc}\\
+P11 ET under \cmd{PHYSICAL} & one HRU, soil zone 1~m, \cmd{EXTINCTION\_DEPTH} 1.5~m, unmet PET 5~mm/d; water table 2.2 and 1.2~m below the ground; \cmd{CONCEPTUAL} and an existing twin & no water-table ET at 2.2~m (it was 39~m$^3$/d, the depth counted from the soil-zone base); at 1.2~m 39.3~m$^3$/d, equal to \cmd{CONCEPTUAL}; existing twin within $3\times10^{-6}$\\\bottomrule
 \end{longtable}
 
 \begin{figure}[!htbp]\centering
@@ -123,6 +125,7 @@ N1--N7 (R14--R20) & negative recharge (\cmd{PERC\_GR4JEXCH}): split, cut by the 
 N8 (R21) & a step with negative recharge in which wet unsaturated columns vanish under a water table raised by a specified head (\cmd{RICHARDS}; \cmd{KINEMATIC} in the full mode) & the vanished columns' water beyond $S_y\,\Delta h$ goes back to the soil zone as the link's rejected recharge; recharge identity 0\\
 N9 (R22) & negative recharge with three depth classes, the hollow classes without a column (\cmd{RICHARDS}; \cmd{LAG} in the full mode) & MODFLOW's recharge on step 1 equals the top-cell limit (ratio 1.000000, as with one class); the cut, 2\,620~m$^3$, back to the soil zone\\
 SW1--SW3 & \cmd{:SurfaceWaterExchange} on \cmd{DEPRESSION} of \cmd{:SoilZone PHYSICAL} HRUs, generated and existing model; a control with the water table above the ground at the outlet & stores' bed at the ground (model top + 1.0~m of soil zone); no discharge into the stores while every water table is below the ground; leakage 6\,135~m$^3$; existing model within $5\times10^{-6}$; control: discharge 1\,399~m$^3$\\
+SW4 & restart of the control after 10 days, with a depression filled by groundwater to 64.6~mm (\cmd{DEP\_MAX} 50~mm) & the store is kept, not clipped to its maximum: Depression and the discharge into the stores equal the continuous run ($2.5\times10^{-9}$; 583~m$^3$ were lost and the discharge was 9\,\% off)\\
 B1--B7 & steady existing model without STO (converged and OUTER\_MAXIMUM 3), gross flow, hourly dates, specified head under a dry cell, \cmd{:SoilZoneClasses 3}, audit guard counts & balance error $6\cdot10^{-12}$; residual equals the list file's IN$-$OUT within $1.3\cdot10^{-8}$ of the gross flow; gross flow equals TOTAL IN$+$TOTAL OUT within $5\cdot10^{-10}$; dates with times; warning names 2 columns over specified heads; no round-off as not held; guard counts 12 and 2\\
 B8 & without \cmd{:SoilZone PHYSICAL}, \cmd{:SolverMaxOuterIterations} 2 (10 unconverged steps) and 1 (every step), and the Liard example (rivers and lakes) at 2: each row's residual over all its columns equals MODFLOW's negative residual on unconverged steps and 0 otherwise; run total ``discharge withheld''; at most ten warnings & step 1: 1\,039.4~m$^3$/d withheld = $-$balance error; run total 1\,062.5~m$^3$ = sum of rows; limit 1: 18\,511~m$^3$; 10 warnings (full mode)\\
 B9 & \cmd{GWSoilExchange.csv} against \cmd{GWBudget.csv}: a generated model with an HRU wholly over specified-head cells, an existing model with a specified-head toe & on every date the four exchange columns summed over the HRUs equal \cmd{GWBudget.csv}'s within $2\cdot10^{-10}$ of the gross flow; the HRU over specified heads reports its base and water table\\\bottomrule
@@ -146,7 +149,13 @@ in \cmd{GWModelSummary.txt}; hotstarts restore the columns; the columns' balance
 $F=0.16$, 2~mm/d, \cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}, $K=1$ and 3): step-1 outflow = inflow = 100.8~m$^3$, 25.6~m$^3$
 rejected;
 \item I6: a column that cannot carry $q$ (\cmd{K\_VERT} 1~mm/d under 2~mm/d) starts backed up: storage unchanged, outflow =
-inflow = 40.000~m$^3$, 40.000 rejected, with a warning.
+inflow = 40.000~m$^3$, 40.000 rejected, with a warning;
+\item I7: a restart with \cmd{:SoilZoneVadose NONE} from a file holding columns (\cmd{LAG}, $K=3$, negative recharge, 4 days):
+a warning names the columns and their water, and \cmd{GWModelSummary.txt} reports it (507~m$^3$, the first run's final
+unsaturated storage);
+\item I8: a restart with \cmd{:SoilZoneSubgrid 8} from a file written with 5 (\cmd{RICHARDS}, $K=3$): the columns' tops differ,
+so they start at rest with a warning (0 against 7.37~m$^3$ written; matched by node count alone they started with
+18.2~m$^3$); with \cmd{:SoilZoneSubgrid 5} the written water is read exactly.
 \end{itemize}
 
 \subsection{Input handling}\label{sec:vszinputs}
@@ -174,7 +183,8 @@ I16 & age tracer started from the \cmd{solution.rvc} of a 30-day spin-up without
 I17 & EnKF, 3 members, one well, \cmd{:ExtraRVTFilename} with $-100$, $-200$, $-300$~m$^3$/d & each member pumps its own rate; a series naming no well stops the run\\
 I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\
 I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\
-I20 & a specified head with \cmd{HEAD} 0 (below every cell) and a \cmd{:BoundaryHead} series of 99.5~m; the same without the series & placed by the series: 2 cells, flow 1\,390~m$^3$; without it no cell and a warning naming the boundary, its head and the highest cell bottom\\\bottomrule
+I20 & a specified head with \cmd{HEAD} 0 (below every cell) and a \cmd{:BoundaryHead} series of 99.5~m; the same without the series & placed by the series: 2 cells, flow 1\,390~m$^3$; without it no cell and a warning naming the boundary, its head and the highest cell bottom\\
+I21 & head boundary \cmd{EDGE} (\cmd{HEAD} 90) with a series of 99~m on day 1, then 90~m; layer 1 from 100 to 97~m: (a) a GHB (\cmd{LAYERS TOP}) against an aquifer at 95~m; (b) a CHD (\cmd{LAYERS TOP}); (c) a CHD (\cmd{LAYERS ALL}, 99~m for 3 days), restarted on day 4 & (a) the GHB drains on days 2--6 ($-7\,915$ to $-2\,275$~m$^3$/d; it fed the aquifer, $+659$ to $+895$), a series of 90~m gives the outputs of \cmd{HEAD} 90; (b) the water table falls below 97~m (93.8 to 92.9~m; it was held at 97.5~m); (c) the same 4 CHD cells and the same flows and heads as the continuous run (it had 2 cells)\\\bottomrule
 \end{longtable}
 
 \subsection{Robustness}\label{sec:vszrobust}

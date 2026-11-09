@@ -57,6 +57,15 @@ I20 a head boundary is placed with the highest head it has in the run: the speci
    cell) and a :BoundaryHead EDGE series of 99.5 m gets its cells (GWModelSummary "CHD cells" > 0) and holds the series'
    head (CHD flow in GWBudget.csv); the same boundary without the series has no cells, and a warning names it, its head
    and the highest cell bottom.
+I21 a head boundary on steps whose :BoundaryHead value lies at or below a cell's bottom: 4 HRUs, layer 1 100 to 97 m,
+   layer 2 97 to 79 m, boundary EDGE on the outlet column with HEAD 90 and a series 99 m on day 1, then 90 m.
+   (a) GHB, LAYERS TOP, CONDUCTANCE 1000, aquifer at 95 m: on days 2-6 the GHB drains the aquifer (flow <= 0 on each day),
+       as with HEAD 90 alone; a series of 90 m on every day gives the outputs of HEAD 90 alone (GWBudget.csv equal), and
+       GWModelSummary.txt counts the cell-steps switched off ("head boundaries off").
+   (b) CHD, LAYERS TOP, water table 98 m: on days 2-6 the water table under the outlet HRU falls below the bottom of layer 1
+       (97 m): no cell is held at the bottom of layer 1.
+   (c) CHD, LAYERS ALL, series 99, 99, 99, 90, 90, 90: the 6-day run against 3 + 3 days restarted from its solution.rvc:
+       the same number of CHD cells, and CHD flow and heads equal on days 4-6 (1e-6).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -432,6 +441,71 @@ def main():
     print('  I20: HEAD 0 with a :BoundaryHead series of 99.5 m: %d CHD cells, CHD flow %.0f m3 (%s); HEAD 0 alone: %d cells, warning %s'
           % (n1, q, 'ok' if g1 else 'FAIL', n2, 'present' if 'boundary EDGE has no cells' in e2 else 'MISSING'))
     res.append(('I20 head boundaries placed by their series, no-cell warning', g1 and g2))
+
+    # I21: boundary cells switched off on steps whose head lies at or below their bottom; the same cells on a restart
+    import pandas as pd
+    def bnd(name, kind, layers, series, init, days=6, start=None, rvc=None):
+        d = case(name, days=6, physical=False, top=3.0, rain=0.0, perc=0.0, nhru=4, init_depth=init, chd=90.0)
+        p = os.path.join(d, 'm.rvg'); line = ':SpecifiedHeadBoundary EDGE edge.geojson HEAD 90'
+        new = line + ' LAYERS ' + layers
+        if kind == 'GHB': new = new.replace(':SpecifiedHeadBoundary', ':GeneralHeadBoundary') + ' CONDUCTANCE 1000'
+        edit(p, line, new)
+        if series is not None:
+            open(os.path.join(d, 'm.rvt'), 'a').write('\n:BoundaryHead EDGE m\n  2000-01-01 00:00:00 1.0 %d\n' % len(series) + ''.join('  %g\n' % v for v in series) + ':EndBoundaryHead\n')
+        q = os.path.join(d, 'm.rvi'); t = open(q).read()
+        t = re.sub(r':Duration \d+', ':Duration %d' % days, t)
+        if start: t = t.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+        open(q, 'w').write(t)
+        if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+        ok, txt = sz_check.run(d)
+        return d, ok
+    def cells(d):
+        m = re.search(r'GHB cells / CHD cells : (\d+) / (\d+)', sz_check.summary(d)); return (int(m.group(1)), int(m.group(2))) if m else (-1, -1)
+    def gwb(d): return pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv'))
+    S = [99.0] + [90.0] * 5
+    da, oka = bnd('I21_ghb_series', 'GHB', 'TOP', S, 5.0)
+    ds, oks = bnd('I21_ghb_static', 'GHB', 'TOP', None, 5.0)
+    d9, ok9 = bnd('I21_ghb_s90', 'GHB', 'TOP', [90.0] * 6, 5.0)
+    g = oka and oks and ok9
+    if g:
+        q = gwb(da)['GHB [m3/d]'].values; qs = gwb(ds)['GHB [m3/d]'].values
+        a, b = gwb(ds).select_dtypes('number'), gwb(d9).select_dtypes('number')
+        same = bool((a - b).abs().max().max() <= 1e-9 * max(a.abs().max().max(), 1.0))
+        offl = re.search(r'head boundaries off\s*:\s*(\d+)', sz_check.summary(da))
+        g = bool((q[1:] <= 0.0).all()) and bool((qs <= 0.0).all()) and same and offl is not None and int(offl.group(1)) > 0
+        print('  I21a: GHB series 99, 90 m against an aquifer at 95 m: GHB on days 2-6 %s m3/d (HEAD 90 alone %s); series of 90 m = HEAD 90 alone: %s; '
+              'cell-steps off %s -> %s' % (', '.join('%.0f' % x for x in q[1:]), ', '.join('%.0f' % x for x in qs[1:]), same, offl.group(1) if offl else 'MISSING', 'ok' if g else 'FAIL'))
+    else:
+        print('  I21a: run FAILED')
+    res.append(('I21a GHB below its cell: conductance 0 (drains as with HEAD 90)', g))
+    db, okb = bnd('I21_chd_top', 'CHD', 'TOP', S, 2.0)
+    g = okb
+    if g:
+        h = pd.read_csv(os.path.join(db, 'out', 'GWHRUState.csv'))['head_4 [m]'].values
+        g = bool((h[1:] < 97.0).all())
+        print('  I21b: CHD LAYERS TOP, series 99, 90 m: head under the outlet HRU on days 2-6 %s m (layer 1 bottom 97 m) -> %s'
+              % (', '.join('%.3f' % x for x in h[1:]), 'ok' if g else 'FAIL'))
+    else:
+        print('  I21b: run FAILED')
+    res.append(('I21b CHD below its cell: not held at the cell bottom', g))
+    S2 = [99.0] * 3 + [90.0] * 3
+    dc, okc = bnd('I21_rs_cont', 'CHD', 'ALL', S2, 2.0)
+    d1, ok1 = bnd('I21_rs_part1', 'CHD', 'ALL', S2, 2.0, days=3)
+    g = okc and ok1
+    if g:
+        d2, ok2 = bnd('I21_rs_part2', 'CHD', 'ALL', S2, 2.0, days=3, start='2000-01-04', rvc=os.path.join(d1, 'out', 'solution.rvc'))
+        g = ok2
+    if g:
+        a = gwb(dc).set_index('date'); b = gwb(d2).set_index('date')
+        ha = pd.read_csv(os.path.join(dc, 'out', 'GWHRUState.csv')).set_index('date'); hb = pd.read_csv(os.path.join(d2, 'out', 'GWHRUState.csv')).set_index('date')
+        ix = b.index
+        dq = float((a.loc[ix, 'CHD [m3/d]'] - b['CHD [m3/d]']).abs().max() / max(a['CHD [m3/d]'].abs().max(), 1.0))
+        dh = float((ha.loc[ix, 'head_4 [m]'] - hb['head_4 [m]']).abs().max())
+        g = cells(dc) == cells(d2) and dq < 1e-6 and dh < 1e-6
+        print('  I21c: restart on day 4: CHD cells %s against %s; CHD flow within %.2g, heads within %.2g m -> %s' % (cells(d2)[1], cells(dc)[1], dq, dh, 'ok' if g else 'FAIL'))
+    else:
+        print('  I21c: run FAILED')
+    res.append(('I21c boundary cells the same on a restart', g))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

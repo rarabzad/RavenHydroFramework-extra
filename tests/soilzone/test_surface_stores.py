@@ -13,6 +13,10 @@ SW2 the same coupled as an existing model (the generated MODFLOW files without R
    leakage within 1e-4 of their largest value; bed in raven.swx at the ground.
 SW3 control: specified head 92 m at the outlet, above the ground of the last cells: the aquifer discharges into the
    depressions there (discharge > 0); identities.
+SW4 restart of SW3: 10 days, then 10 days from its solution.rvc. Groundwater discharge fills a depression above DEP_MAX
+   (the precondition is checked: a DEPRESSION above 50 mm in the solution.rvc); the restart keeps it (the store of a
+   :SurfaceWaterExchange is not clipped to its maximum when the .rvc is read: 583 m3 were lost), so the watershed's
+   Depression on day 11 and the discharge into the stores on days 12-20 equal the continuous SW3 run (1e-6).
 Quick mode (RAVEN_TEST_QUICK=1): the same cases (each run takes seconds).
 Usage: python3 test_surface_stores.py      (prints 'surface-store tests: ALL PASSED')"""
 import os, sys, shutil, re
@@ -100,9 +104,36 @@ def main():
         gg = good and dis.sum() > 0 and (dis[below].max() if below.sum() else 0.0) == 0.0
         print('  SW3: discharge into the stores %.0f m3 (water table above the ground at the outlet) -> %s' % (dis.sum(), 'ok' if gg else 'FAIL'))
         res.append(('SW3 control: discharge where the water table is above the ground', gg))
+        # SW4: restart from day 10 of SW3
+        a = os.path.join(W, 'SW4_first'); shutil.rmtree(a, ignore_errors=True); sz_models.make_case(a, **dict(CFG, chd=92.0, days=10, rain=CFG['rain'][:10])); stores(a)
+        ok1, _ = sz_check.run(a)
+        b = os.path.join(W, 'SW4_second'); shutil.rmtree(b, ignore_errors=True); sz_models.make_case(b, **dict(CFG, chd=92.0, days=10, rain=CFG['rain'][10:])); stores(b)
+        for f in ('m.rvi', 'm.rvt'):
+            p = os.path.join(b, f); t = open(p).read(); open(p, 'w').write(t.replace('2000-01-01 00:00:00', '2000-01-11 00:00:00'))
+        gg = ok1
+        if ok1:
+            rvc = os.path.join(a, 'out', 'solution.rvc'); shutil.copy(rvc, os.path.join(b, 'm.rvc'))
+            t = open(rvc).read(); tab = t.split(':HRUStateVariableTable')[1].split(':EndHRUStateVariableTable')[0].strip().split('\n')
+            i = tab[0].split(',').index('DEPRESSION'); dep = max(float(r.split(',')[i]) for r in tab[2:])
+            ok2, _ = sz_check.run(b); gg = ok2 and dep > 50.0
+            if ok2:
+                wc = pd.read_csv(os.path.join(c, 'out', 'WatershedStorage.csv')); wc.columns = [x.strip() for x in wc.columns]
+                wr = pd.read_csv(os.path.join(b, 'out', 'WatershedStorage.csv')); wr.columns = [x.strip() for x in wr.columns]
+                d0 = abs(float(wc.loc[wc['date'] == '2000-01-11', 'Depression [mm]'].iloc[0]) - float(wr.loc[wr['date'] == '2000-01-11', 'Depression [mm]'].iloc[0]))
+                k = 'aquifer discharge to surface stores [m3/d]'
+                bc = pd.read_csv(os.path.join(c, 'out', 'GWBudget.csv')).set_index('date'); br = pd.read_csv(os.path.join(b, 'out', 'GWBudget.csv')).set_index('date')
+                dq = float((bc.loc[br.index, k] - br[k]).abs().max() / max(bc[k].abs().max(), 1.0))
+                gg = gg and d0 < 1e-6 and dq < 1e-6
+                print('  SW4: restart on day 11 with a store at %.2f mm (DEP_MAX 50): Depression %.2g mm from the continuous run, discharge into the stores within %.2g -> %s'
+                      % (dep, d0, dq, 'ok' if gg else 'FAIL'))
+            else:
+                print('  SW4: restarted run FAILED')
+        else:
+            print('  SW4: first run FAILED')
+        res.append(('SW4 restart keeps a store filled above its maximum by groundwater', gg))
     for n, ok in res:
         print('  %-72s %s' % (n, 'ok' if ok else 'FAILED'))
-    good = len(res) == 3 and all(ok for _, ok in res)
+    good = len(res) == 4 and all(ok for _, ok in res)
     print('surface-store tests: %s' % ('ALL PASSED' if good else 'FAILED'))
     return good
 

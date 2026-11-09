@@ -20,6 +20,15 @@ I6  a RICHARDS column that cannot carry q: K_VERT 1 mm/d under :SoilZoneVadoseIn
     starts at its backed-up steady profile for the flux it passes (warning "cannot carry the flux"); step 1: storage
     unchanged (1e-9 of the storage), outflow = inflow = K_VERT A, the rest rejected. (The profile for q had positive
     pressure up to the top: step 1 drained 0.8 m3 of it, outflow 40.27 against 40.00 m3.)
+I7  a restart without columns from a file that holds them: the combinations.py column case (negative recharge, 3 depth
+    classes, LAG) run 4 days writes :GWVadoseClassColumns and :GWVadoseColumnTops; restarted with :SoilZoneVadose NONE
+    the run warns that the columns' water is dropped and names the volume, and GWModelSummary.txt reports it ('hotstart
+    columns unused'): the volume equals the first run's final 'unsaturated zone storage' (1e-6). (It was dropped silently:
+    507 m3.)
+I8  a restart whose columns have other tops: the same case with RICHARDS, written with :SoilZoneSubgrid 5 and restarted
+    with :SoilZoneSubgrid 8. Lines whose column top differs by more than 1 mm do not match (the warning names the column
+    top); the restart starts with no more unsaturated water than the file holds (it started with 18.2 m3 from 7.4 m3
+    written). Restarted with :SoilZoneSubgrid 5 the columns are read and start with the written water (1e-9).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -176,9 +185,51 @@ def i6():
     print('I6 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
+def restart_pair(name, m, K, n1, second_rvg=None):
+    """the combinations.py column case (negative recharge) with method m and K classes: n1 days, then restarted (the rest of
+    the run) from its solution.rvc with second_rvg(text) applied to the .rvg; returns (first, second, ok)"""
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    s = dict(sz='PHYS', vz=m, K=K, x={'swx', 'et'}, st={'neg'}, dt=1.0)
+    def mk(tag, dur, start):
+        d = os.path.join(W, name + tag); shutil.rmtree(d, ignore_errors=True); sz_models.make_case(d, **C.cfg_of(s)); C.options(d, s)
+        p = os.path.join(d, 'm.rvi'); t = re.sub(r':Duration \d+', ':Duration %d' % dur, open(p).read())
+        if start: t = t.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+        open(p, 'w').write(t)
+        return d
+    a = mk('_first', n1, None); oka = 'Successful Simulation' in C.run(a)
+    b = mk('_second', C.DAYS - n1, '2000-01-%02d' % (n1 + 1))
+    if not oka: return a, b, False
+    shutil.copy(os.path.join(a, 'out', 'solution.rvc'), os.path.join(b, 'm.rvc'))
+    if second_rvg:
+        p = os.path.join(b, 'm.rvg'); t = second_rvg(open(p).read()); open(p, 'w').write(t)
+    return a, b, 'Successful Simulation' in C.run(b)
+
+def i7():
+    print('I7 restart with :SoilZoneVadose NONE from a file with columns')
+    a, b, ok = restart_pair('i7', 'LAG', 3, 4, lambda t: t.replace(':SoilZoneVadose LAG', ':SoilZoneVadose NONE'))
+    if not ok: print('  runs FAILED'); return False
+    v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); e = errs(b)
+    m = re.search(r'hotstart columns unused: (\d+) unsaturated columns of the hotstart file, (\S+) m3', sz_check.summary(b))
+    good = v0 > 0.0 and m is not None and abs(float(m.group(2)) - v0) <= 1e-6 * v0 and 'is dropped' in e and ':SoilZoneVadose NONE' in e
+    print('  first run ends with %.3f m3 in its columns; restart: warning %s, run total %s -> %s'
+          % (v0, 'present' if 'is dropped' in e else 'MISSING', ('%s lines, %s m3' % (m.group(1), m.group(2))) if m else 'MISSING', 'ok' if good else 'FAIL'))
+    return good
+
+def i8():
+    print('I8 restart whose columns have other tops (:SoilZoneSubgrid)')
+    a, b, ok = restart_pair('i8', 'RICHARDS', 3, 4, lambda t: t.replace(':SoilZoneSubgrid 5', ':SoilZoneSubgrid 8'))
+    a2, b2, ok2 = restart_pair('i8s', 'RICHARDS', 3, 4)
+    if not (ok and ok2): print('  runs FAILED'); return False
+    v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); s1 = sz_check.vz_start(b); s2 = sz_check.vz_start(b2); e = errs(b)
+    good = v0 > 0.0 and s1 is not None and s1 <= v0 * (1.0 + 1e-9) and 'another column top' in e and s2 is not None and abs(s2 - v0) <= 1e-9 * v0
+    print('  written %.4f m3; restart with :SoilZoneSubgrid 8 starts with %.4f m3 (warning %s); with :SoilZoneSubgrid 5 %.6f m3 -> %s'
+          % (v0, s1 if s1 is not None else float('nan'), 'present' if 'another column top' in e else 'MISSING', s2 if s2 is not None else float('nan'), 'ok' if good else 'FAIL'))
+    return good
+
 def main():
     tc.need_mf6()
-    res = {'I1': i1(), 'I2': i2(), 'I4': i4(), 'I5': i5(), 'I6': i6()}
+    res = {'I1': i1(), 'I2': i2(), 'I4': i4(), 'I5': i5(), 'I6': i6(), 'I7': i7(), 'I8': i8()}
     print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
     good = all(res.values())
     print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')

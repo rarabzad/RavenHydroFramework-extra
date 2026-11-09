@@ -155,7 +155,7 @@ order where profiles meet.
 | `:RiverBedDepth m` or `REFERENCE_FLOW` | REFERENCE_FLOW | channel bed depth below the DEM along rivers |
 | `:GWInitialization STEADY_STATE r` | off | steady-state first stress period with uniform recharge r [mm/d] If the steady state does not converge (e.g. wells pumping more than the aquifer supplies), the run starts from the initial heads, with a warning. |
 | `:SurfaceWaterExchange SV group LEAKANCE L` | none | Raven store (e.g. DEPRESSION, LAKE_STORAGE) of an HRU group exchanging with the aquifer; leakance L [1/d]; never draws more water than the store holds |
-| `:ReservoirExchange` | off | couple Raven reservoirs that have :SeepageParameters and a lake HRU (:HRUID) with an AQUIFER_PROFILE: the water table under the lake (never below the lake bed: a lake above a deep water table is disconnected) sets the reservoir's local groundwater head, and its seepage enters the aquifer the next step; stages must be absolute (:AbsoluteCrestHeight) |
+| `:ReservoirExchange` | off | couple Raven reservoirs that have :SeepageParameters and a lake HRU (:HRUID) with an AQUIFER_PROFILE: the water table under the lake (never below the lake bed, the ground: with :SoilZone PHYSICAL above the soil zone; a lake above a deep water table is disconnected) sets the reservoir's local groundwater head, only the share of the lake over cells that can take seepage (not specified heads) exchanges water, and its seepage enters the aquifer the next step; stages must be absolute (:AbsoluteCrestHeight) |
 | `:WriteNetCDFHeads` | off | full head field to GWHeads.nc every :HeadSaveFrequency steps (Raven built with -Dnetcdf) |
 | `:WriteGWBudgetFile` | off | generated models: MODFLOW budget file `mf6/gwf.cbc` (every package's flows, specific discharge, saturation) every :HeadSaveFrequency steps and `mf6/gwf.porosity` (class POROSITY per cell), for offline particle tracking with `tools/make_prt.py`; the solution is unchanged |
 | `:LinkageCache file` | <output>/mf6/linkage.cache | cached HRU/grid intersection reused by later runs |
@@ -375,12 +375,13 @@ Observed heads at date D are compared with the simulated head at D (end of the p
 Raven's `solution.rvc` also contains `:GWHeads nlay nrow ncol` (the head of every cell; 12 significant digits, 17 with
 `:SoilZone PHYSICAL`), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
 seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), and with `:SoilZone PHYSICAL`
-`:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns` and `:GWVadoseClassColumns` (unsaturated columns) and
-`:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
+`:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
+(unsaturated columns; a column whose top differs starts at rest) and `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
 `:GWHeads` header, a value that is not a finite number in any of these blocks, or negative water in the soil-zone or
 unsaturated columns stops the run with a message. Using `solution.rvc` as the `.rvc`
 of the next run continues exactly where the previous run stopped: seepage held above the capacity of its target soil
-layer (without `:SoilZone PHYSICAL`) is kept, and the unsaturated columns start with the contents as written. With an age
+layer (without `:SoilZone PHYSICAL`) and a surface store filled above its maximum by groundwater are kept, and the
+unsaturated columns start with the contents as written (a run without columns warns and reports their water as dropped). With an age
 tracer, `:StartTime` is the start of the run that wrote the file and `:AgeTracerDatum` (when earlier) the start of the
 first run of the chain, from which the tracer's entry times count; a file without age-tracer masses (a spin-up without
 the tracer) starts the ages at 0.

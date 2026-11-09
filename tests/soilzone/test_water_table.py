@@ -27,6 +27,10 @@ P9  capillary rise across the shortest column (5 cm): the rise from a column jus
 P10 upward flows out of a lower cell: a specified head in layer 2 under a dried thin top layer supplies
      the rise (booked as specified head to soil zone, MODFLOW's balance closes); a thin lowest wet cell under strong rise
      is not pumped dry (no MODFLOW non-convergence), with and without unsaturated columns.
+P11 water-table ET under :SoilZone PHYSICAL counts its extinction depth from the ground, as under CONCEPTUAL: one HRU,
+     soil zone 1 m, EXTINCTION_DEPTH 1.5 m, PET 5 mm/d unmet (dry soil). With the water table 2.2 m below the ground there
+     is no water-table ET (it was 39 m3/d, the depth counted from the soil-zone base); with it 1.2 m below the ground the
+     ET equals the CONCEPTUAL run's (1e-3) and is positive; the existing-model twin gives the generated run's ET (1e-4).
 All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities and the negative
 recharge not held at the standard limits (sz_check.ID_LIMITS), and no unconverged MODFLOW or interface step.
 Quick mode (RAVEN_TEST_QUICK=1): P4 runs 30 + 30 days against 60 (one storm in each part) instead of 60 + 60 against
@@ -370,8 +374,38 @@ def p10():
     print('    rising water table under a dried column, thin aquifer: MODFLOW steps not converged %d -> %s' % (nc2, 'ok' if good2 else 'FAIL'))
     return ok and good and good2
 
+def p11():
+    print('P11 water-table ET under :SoilZone PHYSICAL: extinction depth from the ground')
+    def et_case(name, depth, phys, ext=False):
+        cfg = dict(nhru=1, days=5, rain=0.0, perc=0.0, pet=5.0, init_depth=depth, physical=phys, phi0=(0.0, 0.0), aq_thick=10.0)
+        d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True); sz_models.make_case(d, **cfg)
+        def edits(dd):
+            p = os.path.join(dd, 'm.rvp'); t = open(p).read()
+            t = t.replace('SEEPAGE_SMOOTHING_DEPTH\n  :Units, m, m, 1/d, m\n', 'SEEPAGE_SMOOTHING_DEPTH, EXTINCTION_DEPTH\n  :Units, m, m, 1/d, m, m\n')
+            open(p, 'w').write(t.replace('1.0, 0.5\n:EndAquiferProfileParameters', '1.0, 0.5, 1.5\n:EndAquiferProfileParameters'))
+            p = os.path.join(dd, 'm.rvi'); t = open(p).read(); open(p, 'w').write(t.replace(':Evaporation PET_CONSTANT', ':Evaporation PET_DATA'))
+        edits(d)
+        if ext:
+            ok, txt = sz_check.run(d)
+            if not ok: print('  %s: run FAILED\n%s' % (name, txt[-800:])); return None
+            def drop(m):
+                p = os.path.join(m, 'gwf.nam'); nam = open(p).read(); open(p, 'w').write('\n'.join(l for l in nam.split('\n') if 'EVT_RAVEN' not in l))
+            d = sz_check.ext_case(d, d + '_ext', cfg, model_edit=drop); edits(d)
+        ok, txt = sz_check.run(d)
+        if not ok: print('  %s: run FAILED\n%s' % (name, txt[-800:])); return None
+        return budget(d)['water-table ET [m3/d]'].values
+    deep_p, deep_c = et_case('p11_deep_phys', 2.2, True), et_case('p11_deep_conc', 2.2, False)
+    sh_p, sh_c, sh_e = et_case('p11_shallow_phys', 1.2, True), et_case('p11_shallow_conc', 1.2, False), et_case('p11_shallow_phys', 1.2, True, ext=True)
+    if any(x is None for x in (deep_p, deep_c, sh_p, sh_c, sh_e)):
+        return False
+    d1 = float(np.abs(sh_p - sh_c).max() / max(np.abs(sh_c).max(), 1e-9)); d2 = float(np.abs(sh_e - sh_p).max() / max(np.abs(sh_p).max(), 1e-9))
+    ok = float(np.abs(deep_p).max()) == 0.0 and float(np.abs(deep_c).max()) == 0.0 and sh_p.min() > 0.0 and d1 < 1e-3 and d2 < 1e-4
+    print('  water table 2.2 m deep: ET %.3g m3/d (CONCEPTUAL %.3g); 1.2 m deep: ET %.2f m3/d on day 1, CONCEPTUAL within %.2g, existing twin within %.2g -> %s'
+          % (np.abs(deep_p).max(), np.abs(deep_c).max(), sh_p[0], d1, d2, 'ok' if ok else 'FAIL'))
+    return ok
+
 def main():
-    res = [f() for f in (p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)]
+    res = [f() for f in (p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11)]
     print('water-table tests: %s' % ('ALL PASSED' if all(res) else 'FAILED (%d of %d)' % (res.count(False), len(res))))
     return all(res)
 

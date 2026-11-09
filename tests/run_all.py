@@ -204,6 +204,7 @@ STEPS = [
     ('ext_inputs', True, [PY, 'existing/ext_inputs.py'], last_line(r'existing-model input forms: ALL PASSED'), 3 * 3600),
     ('budget_file', True, [PY, 'budget_file.py'], last_line(r'budget file checks: ALL PASSED'), 3600),
     ('combinations', True, [PY, 'combinations.py'], last_line(r'option combinations: \d+ runs, 0 failed.*'), 4 * 3600),
+    ('reservoir_checks', True, [PY, 'reservoir_checks.py'], last_line(r'reservoir checks: ALL PASSED'), 3600),
     ('usgs_sagehen', True, lambda: [PY, 'existing/usgs_sagehen.py', USGS], last_line(r'Sagehen checks: ALL PASSED'), 6 * 3600),
     ('usgs_capture', True, lambda: [PY, 'existing/usgs_capture.py', USGS], last_line(r'capture checks: ALL PASSED'), 3 * 3600),
     ('ext_fuzz', True, [PY, 'existing/fuzz_ext.py', FE[0], FE[1]],

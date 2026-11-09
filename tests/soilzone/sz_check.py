@@ -230,6 +230,12 @@ def ext_case(g, e, cfg, newton=True, model_edit=None):
     open(os.path.join(e, 'm.rvg'), 'w').write(rvg)
     return e
 
+def rvc_text(p):
+    """the text of a solution.rvc without its :GWVadoseColumnTops block (the columns' tops and water, written since the
+    restart match checks the tops): byte-identity checks against a reference build that does not write it compare the rest"""
+    import re
+    return re.sub(r':GWVadoseColumnTops[^\n]*\n.*?:EndGWVadoseColumnTops\n', '', open(p).read(), flags=re.S)
+
 def errors(d):
     p = os.path.join(d, 'out', 'Raven_errors.txt')
     return open(p).read() if os.path.exists(p) else ''

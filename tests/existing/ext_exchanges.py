@@ -24,7 +24,9 @@ Dry and specified-head cells under the exchanges (the md model edited with flopy
             sent to the specified heads; what MODFLOW did not take is returned to the reservoir's subbasin and booked
             ("reservoir seepage not delivered by MODFLOW", warning, run total): sent = delivered - gain not supplied + not
             delivered, the river books include it, Raven's balance holds
-  res_chd2  the same with 2 of those cells specified heads: the seepage goes to the other cells, all of it delivered
+  res_chd2  the same with 2 of those cells specified heads: from the step after they become specified heads only the
+            lake's bed over the other cells exchanges water and all of it is delivered (delivered = sent); on that step the
+            share of the seepage computed for the 2 cells is returned (not delivered), and only on that step
   res_dry   the reservoir case on the model without NEWTON with heads 25 m deep (the lake's top cells dry): the reservoir
             books hold (sent = delivered - gain not supplied + not delivered), no output holds HDRY or NaN
 Quick mode (RAVEN_TEST_QUICK=1): 31 days and no et_ft; full mode 120 days.
@@ -349,8 +351,12 @@ for tag, cc in (('res_chd', cells), ('res_chd2', cells[:2])):
             check('res_chd: seepage not delivered booked, warned, run total = its column', ud > 0 and 'not delivered by MODFLOW' in e and m is not None
                   and abs(float(m.group(1)) - ud) <= 1e-5 * ud, 'not delivered %.4g m3 of %.4g sent' % (ud, sent))
         else:
-            check('res_chd2: the seepage goes to the other cells (delivered = sent)', sent > 0 and abs(dl - sent) <= 1e-6 * sent and ud == 0.0,
-                  'delivered %.6g of %.6g m3/d, not delivered %.3g m3' % (dl, sent, ud))
+            sv = b['reservoir seepage sent [m3/d]'].values; dv = b['reservoir seepage delivered [m3/d]'].values
+            uv = b['reservoir seepage not delivered by MODFLOW [m3]'].values if 'reservoir seepage not delivered by MODFLOW [m3]' in b else np.zeros(len(b))
+            k = np.nonzero(uv > 0.0)[0]; rest = np.ones(len(b), bool); rest[k] = False
+            g = sent > 0 and len(k) == 1 and bool((np.abs(dv - sv)[rest] <= 1e-6 * np.abs(sv).max()).all()) and 0.0 < uv[k[0]] < sv[k[0]]
+            check('res_chd2: the other cells take the seepage of their share of the bed (delivered = sent), the 2 cells\' share returned once', g,
+                  'delivered %.6g of %.6g m3/d; returned %.3g m3 on %d step(s)' % (dl, sent, ud, len(k)))
         no_hdry(d)
         shutil.rmtree(d, ignore_errors=True)
     shutil.rmtree(M, ignore_errors=True)

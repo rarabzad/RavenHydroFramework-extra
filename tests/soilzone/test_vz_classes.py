@@ -6,7 +6,7 @@ and takes the unsaturated share a_c (1 - F_c) of the link's recharge. The test c
 irregular land (dem_fn: hummocks, terraces) over a generated MODFLOW model.
 
 C1  K = 1 byte-identical to the reference build (RAVEN_EXE_REF; every out/*.csv and solution.rvc, the diagnostic column
-    'interface change [m]' left out) for RICHARDS and NONE on a planar and a hummocky case; without a reference build
+    'interface change [m]' and solution.rvc's :GWVadoseColumnTops block left out) for RICHARDS and NONE on a planar and a hummocky case; without a reference build
     SKIP, and K = 1 given explicitly vs the default only.
 C2  hummocky cell whose mean soil-zone base is near the water table while the hummocks are well above it: with K = 1 the
     hummocks' recharge reaches MODFLOW in the step (no column), with K = 3 and 5 it is delayed (recharge centroid later).
@@ -117,7 +117,7 @@ def same_outputs(a, b):
             A = A.drop(columns=[c for c in DIAG if c in A]); B = B.drop(columns=[c for c in DIAG if c in B])
             if list(A.columns) != list(B.columns) or not A.equals(B):
                 bad.append(f)
-        elif open(pa).read() != open(pb).read():
+        elif sz_check.rvc_text(pa) != sz_check.rvc_text(pb):   # (solution.rvc: without the column tops, which the reference may not write)
             bad.append(f)
     return bad
 

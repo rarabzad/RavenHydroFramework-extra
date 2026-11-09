@@ -223,7 +223,7 @@ wells specified, wells actual [m$^3$/d] & requested and delivered well rates\\
 GHB, CHD [m$^3$/d] & boundary flows (positive into the aquifer)\\
 surface-store leakage / discharge [m$^3$/d], applied [m$^3$] & wetland and lake exchange\\
 reservoir seepage sent, delivered [m$^3$/d], awaiting delivery [m$^3$] & reservoir exchange\\
-reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that a drying cell could not supply; taken back from the water reaching the subbasin in the same step (normally 0)\\
+reservoir gain not supplied by MODFLOW [m$^3$] & a gain the lake received that MODFLOW did not supply (a drying cell, or cells under the lake that were specified heads or inactive on the day it was delivered); taken back from the water reaching the subbasin in the same step (normally 0; a warning and a run total)\\
 other model packages [m$^3$/d] & with an existing model: net flow of the model's own packages (wells, boundaries, \dots), positive into the aquifer\\
 soil zone to aquifer, aquifer to soil zone [m$^3$/d] & \cmd{:SoilZone PHYSICAL}: soil-zone exchange, each direction\\
 rejected recharge, soil-zone overflow, exchange applied to Raven, shortfall [m$^3$] & Section~\ref{ch:soilzone}; shortfall is 0 (except on steps MODFLOW ended unconverged at a low outer-iteration limit)\\

@@ -10,10 +10,17 @@ days) with some of these options:
              wel  a pumping well (:Wells, :WellFlowRate)
              ghb  a general-head boundary on the upslope cells
              chd  a specified head on the downslope cells
+             resg the reservoir with its crest and stage above the ground of its HRU (with chd: of its cells that are not
+                  specified heads), so it loses water to the aquifer
+             etw  water-table ET from a water table within the extinction depth (dry soil, no rain: the PET is unmet)
   stresses   dry  a 1 m top layer above the water table at the start (dry top cells; without NEWTON inactive)
              neg  negative recharge (PERC_GR4JEXCH from SOIL[1] to GROUNDWATER, GR4J_X2 20 mm/d)
              rise a specified head 0.3 m below the ground at the outlet and wet columns (:SoilZoneVadoseInitialFlux): the
                   water table rises through the unsaturated columns, which vanish
+             bhs  :BoundaryHead series on the specified head (LAYERS TOP) and the GHB: 0.5 m below the ground on days 1-3,
+                  3 m below it on days 4-6, then 0.5 m again, so cells are switched off and on
+             reschd  (existing twins) a CHD package of the model's own on the 4 cells under the lake in stress periods 3-5
+                  (one period per day): the lake's seepage on those days goes to its sliver of another HRU's cell only
   soil zone  CONCEPTUAL, or :SoilZone PHYSICAL with :SoilZoneVadose NONE / RICHARDS / KINEMATIC / LAG and 1 or 3 depth
              classes
   model      gen (Raven builds the model), ext (the generated model coupled as an existing model, NEWTON), ext_n0 (the
@@ -30,11 +37,16 @@ Checks on every run (sz_check.checks and the Liard audit tool):
   no HDRY (|x| >= 1e20) and no NaN in GWBudget.csv, GWHRUState.csv, GWSoilExchange.csv and WatershedStorage.csv; with
   :SoilZone PHYSICAL no groundwater discharge into the surface stores on a step on which every HRU's water table is below
   its ground; "Successful Simulation". Unconverged MODFLOW steps are reported, not failed (their residual is booked).
+  The moving-water group requires the flow it is meant to move: resg seepage delivered to the aquifer (> 1 m3/d), reschd
+  seepage returned on the day the specified heads start and none piled into the sliver on their other days (at most
+  1e-3 of the seepage before), bhs cell-steps switched off (GWModelSummary.txt) and a non-zero CHD flow on every step,
+  etw water-table ET (> 0).
   A result whose cause lies outside the coupling is reported as KNOWN (listed with its reason), not failed: Raven's
   balance error equal to a reservoir's own routing balance error (ReservoirMassBalance.csv).
 
-Quick mode (RAVEN_TEST_QUICK=1): 237 runs of 8 days (about a minute). Full mode: dry top cells with negative recharge
-and the feet/seconds twin of every case added, 15 days each, and half-day steps (about 370 runs, a few minutes).
+Quick mode (RAVEN_TEST_QUICK=1): 260 runs of 8 days (about a minute). Full mode: dry top cells with negative recharge
+and the feet/seconds twin of every case added, negative recharge in the moving-water group, 15 days each, and half-day
+steps (398 runs, a few minutes).
 Usage: python3 combinations.py [--list] [--only NAME,...]   (prints 'option combinations: N runs, 0 failed')"""
 import os, sys, shutil, re, subprocess, json, itertools, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,8 +82,10 @@ def cfg_of(s):
     wet = [20.0] * 3 + [0.0] * (DAYS - 3)
     c = dict(timestep=s.get('dt', 1.0), nhru=NHRU, hru_w=HW, width=HW, cell=CELL, slope=SLOPE, z0=Z0, rain=wet, days=DAYS, init_depth=1.5, Kh=10.0, Kv=1.0,
              aq_thick=10.0, Sy=0.1, perc=10.0, physical=(s['sz'] != 'CONC'))
-    if 'et' in s['x']:
+    if 'et' in s['x'] or 'etw' in s['x']:
         c['pet'] = 5.0
+    if 'etw' in s['x']:
+        c['rain'] = [0.0] * DAYS; c['phi0'] = (0.0, 0.0)
     if 'chd' in s['x']:
         c['chd'] = land(L - 0.5 * CELL) - (0.3 if 'rise' in s['st'] else 2.0)   # (at the outlet's cells: 2 m below the ground; 'rise' 0.3 m)
     if 'dry' in s['st']:
@@ -94,7 +108,7 @@ def options(d, s, ext=False):
     head boundaries of Raven's: they are the model's own packages)"""
     rvi, rvh, rvp, rvt, rvg, rvc = (os.path.join(d, 'm.' + e) for e in ('rvi', 'rvh', 'rvp', 'rvt', 'rvg', 'rvc'))
     xp = []   # aquifer profile parameters added
-    if 'et' in s['x']:
+    if 'et' in s['x'] or 'etw' in s['x']:
         xp.append(('EXTINCTION_DEPTH', 'm', 3.0)); sub(rvi, ':Evaporation PET_CONSTANT', ':Evaporation PET_DATA')
     if 'riv' in s['x'] and not ext:
         xp += [('RIVERBED_K', 'm/d', 5.0), ('RIVERBED_THICKNESS', 'm', 1.0)]
@@ -104,7 +118,7 @@ def options(d, s, ext=False):
         sub(rvp, '  :Units, m, m, 1/d, m\n  AQ, ', '  :Units, m, m, 1/d, m' + ''.join(', ' + u for _, u, _ in xp) + '\n  AQ, ')
         t = open(rvp).read(); i = t.find('\n  AQ, ', t.find('SEEPAGE_SMOOTHING_DEPTH')); j = t.find('\n', i + 1)
         open(rvp, 'w').write(t[:j] + ''.join(', %g' % v for _, _, v in xp) + t[j:])
-    if 'riv' in s['x'] or 'res' in s['x']:   # a routed channel
+    if 'riv' in s['x'] or 'res' in s['x'] or 'resg' in s['x']:   # a routed channel
         sub(rvh, '  1, box, -1, NONE, ZERO-, 1', '  1, box, -1, CHAN, 0.8, 1')
         sub(rvi, ':Routing ROUTE_NONE', ':Routing ROUTE_DIFFUSIVE_WAVE')
         open(rvh, 'a').write('\n:SubBasinProperties\n  :Parameters, Q_REFERENCE\n  :Units, m3/s\n  1, 0.05\n:EndSubBasinProperties\n')
@@ -124,9 +138,10 @@ def options(d, s, ext=False):
         open(rvg, 'a').write(':SurfaceWaterExchange DEPRESSION All LEAKANCE 0.05\n')
     else:
         sub(rvp, ':Parameters, PARTITION_COEFF\n  :Units, none\n  [DEFAULT], 0.0', ':Parameters, PARTITION_COEFF\n  :Units, none\n  [DEFAULT], %s' % pc)
-    if 'res' in s['x']:
+    if 'res' in s['x'] or 'resg' in s['x']:
         kl = NHRU if 'chd' in s['x'] else 1   # (with the specified head: the lake on the outlet HRU, half over specified-head cells)
-        z1 = land((kl - 0.5) * HW)
+        z1 = land((kl - 0.5) * HW) if 'resg' not in s['x'] else land(XS + (kl - 0.5) * HW if kl == 1 else XS + L - 1.5 * CELL)   # (resg: at the ground of its
+                                                                                                                       #  cells, not the specified heads')
         open(rvh, 'a').write('\n:Reservoir Lake\n  :SubBasinID 1\n  :HRUID %d\n  :Type RESROUTE_STANDARD\n  :WeirCoefficient 0.6\n  :CrestWidth 5.0\n'
                              '  :MaxDepth 3.0\n  :LakeArea %g\n  :AbsoluteCrestHeight %.3f\n  :SeepageParameters 0.02 %.3f\n:EndReservoir\n' % (kl, HW * HW, z1 + 0.5, z1 - 2.0))
         open(rvc, 'a').write('\n:InitialReservoirStage 1 %.3f\n:InitialReservoirFlow 1 0.0\n' % (z1 + 0.3))
@@ -141,6 +156,12 @@ def options(d, s, ext=False):
     if 'ghb' in s['x'] and not ext:
         polygon(os.path.join(d, 'ghb.geojson'), XS - HW, XS + 0.75 * CELL)
         open(rvg, 'a').write(':GeneralHeadBoundary GHB1 ghb.geojson HEAD %.2f CONDUCTANCE 200 LAYERS TOP\n' % (land(0.0) - 2.5))
+    if 'bhs' in s['st'] and not ext:   # boundary heads that cross the bottom of the top layer: cells switched off and on
+        t = open(rvg).read(); t = re.sub(r'(:SpecifiedHeadBoundary EDGE edge.geojson HEAD \S+)', r'\1 LAYERS TOP', t); open(rvg, 'w').write(t)
+        for nm, xg in (('EDGE', XS + L - 0.5 * CELL), ('GHB1', XS + 0.5 * CELL)):
+            if nm == 'GHB1' and 'ghb' not in s['x']: continue
+            g = land(xg); v = [g - 0.5] * 3 + [g - 3.0] * 3 + [g - 0.5] * (DAYS - 6)
+            open(rvt, 'a').write('\n:BoundaryHead %s m\n  2000-01-01 00:00:00 1.0 %d\n' % (nm, DAYS) + ''.join('  %.3f\n' % x for x in v) + ':EndBoundaryHead\n')
 
 
 def generated(d, s):
@@ -171,14 +192,22 @@ def existing(g, e, s, newton=True, feet=False):
     keep = [l for l in t.split('\n') if not l.startswith((':GridCellSize', ':SolverHeadTolerance', ':SpecifiedHeadBoundary', ':GeneralHeadBoundary')
                                                          + (() if s['sz'] != 'CONC' else (':LandSurface',)))]
     open(rvg, 'w').write('\n'.join(keep) + '\n:MF6Simulation %s/mfsim.nam\n:MF6GridFile cells.geojson cell\n:MF6StartDate 2000-01-01\n:SeepageToRaven ON\n' % m)
+    if 'reschd' in s['st']:   # the model's own specified heads on the lake's 4 cells (HRU 1) in stress periods 3-5, one period per day
+        td = [os.path.join(m, f) for f in os.listdir(m) if f.endswith('.tdis')][0]
+        open(td, 'w').write('BEGIN OPTIONS\n  TIME_UNITS %s\nEND OPTIONS\n\nBEGIN DIMENSIONS\n  NPER %d\nEND DIMENSIONS\n\nBEGIN PERIODDATA\n' % ('SECONDS' if feet else 'DAYS', DAYS)
+                            + ('  86400.0 1 1.0\n' if feet else '  1.0 1 1.0\n') * DAYS + 'END PERIODDATA\n')
+        f = 3.280839895 if feet else 1.0
+        open(os.path.join(m, 'lake.chd'), 'w').write('BEGIN OPTIONS\n  SAVE_FLOWS\nEND OPTIONS\nBEGIN DIMENSIONS\n  MAXBOUND 4\nEND DIMENSIONS\nBEGIN PERIOD 3\n'
+                                                      + ''.join('  %s %r\n' % (c, (land(XS + 0.5 * HW) - 2.0) * f) for c in ('1 2 2', '1 3 2', '1 2 3', '1 3 3')) + 'END PERIOD\nBEGIN PERIOD 6\nEND PERIOD\n')
+        p = os.path.join(m, 'gwf.nam'); t = open(p).read(); open(p, 'w').write(t.replace('END PACKAGES', '  CHD6 lake.chd CHD_LAKE\nEND PACKAGES'))
     return e
 
 
 ID = dict(sz_check.ID_LIMITS); ID.pop('mf6_err_rel')   # (MODFLOW's balance: on converged steps, below)
 
 
-def check_run(d, txt):
-    """every identity of run folder d: (list of failures, info)"""
+def check_run(d, txt, need=()):
+    """every identity of run folder d: (list of failures, info); need: flows the case must move (moving-water group)"""
     bad = []
     if 'Successful Simulation' not in txt:
         m = re.findall(r'Exiting Gracefully: (.*)', txt) or re.findall(r'ERROR[^\n]*', txt)
@@ -248,6 +277,19 @@ def check_run(d, txt):
             obj = [c for c in t.columns if t[c].dtype == object and c not in ('date', 'HRU_ID')]
             if any(t[c].astype(str).str.contains('nan|inf', case=False).any() for c in obj):
                 bad.append('%s: nan/inf text' % f)
+    g2 = lambda c: b[c].fillna(0.0).values if c in b else np.zeros(len(b))
+    if 'resg' in need and not (g2('reservoir seepage delivered [m3/d]').max() > 1.0):
+        bad.append('required: reservoir seepage delivered to the aquifer, at most %.3g m3/d' % g2('reservoir seepage delivered [m3/d]').max())
+    if 'reschd' in need:
+        dl, nd = g2('reservoir seepage delivered [m3/d]'), g2('reservoir seepage not delivered by MODFLOW [m3]')
+        if not (len(dl) >= 5 and nd[2] > 1.0 and np.abs(dl[3:5]).max() <= 1e-3 * max(abs(dl[1]), 1.0)):
+            bad.append('required: seepage returned on day 3 (%.3g m3) and none piled into the sliver on days 4-5 (%.3g m3/d)' % (nd[2] if len(nd) > 2 else 0, np.abs(dl[3:5]).max() if len(dl) >= 5 else 0))
+    if 'bhs' in need:
+        m = re.search(r'head boundaries off\s*:\s*(\d+)', s)
+        if not (m and int(m.group(1)) > 0 and (np.abs(g2('CHD [m3/d]')) > 0.0).all()):
+            bad.append('required: boundary cells switched off (%s) and a CHD flow on every step' % (m.group(1) if m else 'no count'))
+    if 'etw' in need and not (np.abs(g2('water-table ET [m3/d]')).sum() > 0.0):
+        bad.append('required: water-table ET')
     info = 'MF6 unconverged %d' % int((~ok).sum())
     for c, lab in (('water-table ET [m3/d]', 'ET'), ('aquifer discharge to rivers [m3/d]', 'riv out'), ('river leakage to aquifer [m3/d]', 'riv in'),
                    ('surface-store leakage to aquifer [m3/d]', 'swx in'), ('aquifer discharge to surface stores [m3/d]', 'swx out'),
@@ -292,6 +334,16 @@ def matrix():
         x = {'swx', 'et'} | ({'chd'} if ('rise' in st or 'dry' in st) else set())
         models = ['gen', 'ext'] + (['ext_ft'] if (not QUICK or k == 3) else [])
         C.append((dict(sz='PHYS', vz=m, K=k, x=x, st=set(st), dt=1.0), models))
+    # moving-water group: cases that must move water through the exchange they test (check_run's need)
+    mw = [('CONC', {'resg'}, set(), ['gen', 'ext', 'ext_n0', 'ext_ft']), ('PHYS', {'resg'}, set(), ['gen', 'ext', 'ext_ft']),
+          ('CONC', {'resg'}, {'reschd'}, ['gen', 'ext', 'ext_n0', 'ext_ft']), ('PHYS', {'resg'}, {'reschd'}, ['gen', 'ext']),
+          ('CONC', {'chd'}, {'bhs', 'dry'}, ['gen']), ('PHYS', {'chd'}, {'bhs', 'dry'}, ['gen']), ('CONC', {'chd', 'ghb'}, {'bhs', 'dry'}, ['gen']),
+          ('CONC', {'etw'}, set(), ['gen', 'ext', 'ext_n0']), ('PHYS', {'etw'}, set(), ['gen', 'ext', 'ext_ft']),
+          ('PHYS', {'etw', 'resg', 'chd', 'swx'}, {'bhs', 'dry'}, ['gen'])]
+    if not QUICK:
+        mw += [('CONC', {'resg'}, {'neg'}, ['gen', 'ext', 'ext_ft']), ('PHYS', {'etw'}, {'neg'}, ['gen', 'ext']), ('PHYS', {'chd', 'ghb'}, {'bhs', 'dry', 'neg'}, ['gen'])]
+    for sz, x, st, models in mw:
+        C.append((dict(sz=sz, vz='NONE', K=1, x=set(x), st=set(st), dt=1.0), models))
     if not QUICK:   # half-day steps
         for sz, m, k in (('CONC', 'NONE', 1), ('PHYS', 'NONE', 1), ('PHYS', 'RICHARDS', 3), ('PHYS', 'LAG', 1)):
             C.append((dict(sz=sz, vz=m, K=k, x=set(ALL) if m == 'NONE' else {'swx', 'et', 'chd'}, st={'neg', 'rise'} if m != 'NONE' else {'neg'}, dt=0.5),
@@ -329,14 +381,15 @@ def main():
         if only and nm not in only: continue
         g = generated(os.path.join(W, nm, 'gen'), s)
         txt = run(g); nrun += 1
-        okg = report(nm, 'gen', *check_run(g, txt))
+        need = [k for k in ('resg', 'etw') if k in s['x']] + [k for k in ('bhs',) if k in s['st']]
+        okg = report(nm, 'gen', *check_run(g, txt, need))
         if 'Successful Simulation' not in txt:
             continue
         for mod in models[1:]:
             e = os.path.join(W, nm, mod)
             try:
                 existing(g, e, s, newton=(mod != 'ext_n0'), feet=(mod == 'ext_ft'))
-                txt = run(e); res = check_run(e, txt)
+                txt = run(e); res = check_run(e, txt, [k for k in need if k != 'bhs'] + (['reschd'] if 'reschd' in s['st'] else []))
             except Exception as ex:
                 res = (['set-up: %s' % str(ex)[:200]], '')
             nrun += 1
