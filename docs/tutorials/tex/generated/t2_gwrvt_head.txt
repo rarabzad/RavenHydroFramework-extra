@@ -1,0 +1,7 @@
+$ head -n 6 CreekGW.rvt
+# CreekGW.rvt - pumping of well PW_1 and level of the gravel-pit pond, 2010-2014
+:WellFlowRate 1 m3/d
+  2010-01-01 00:00:00 1.0 1826
+  -416.6
+  -414.4
+  -412.5

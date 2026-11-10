@@ -1,0 +1,44 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::32611"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "NAME": "POND"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       504500.0,
+       5603250.0
+      ],
+      [
+       505000.0,
+       5603250.0
+      ],
+      [
+       505000.0,
+       5603600.0
+      ],
+      [
+       504500.0,
+       5603600.0
+      ],
+      [
+       504500.0,
+       5603250.0
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

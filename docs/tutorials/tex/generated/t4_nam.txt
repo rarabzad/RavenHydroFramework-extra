@@ -1,0 +1,16 @@
+$ cat model/creek.nam
+BEGIN OPTIONS
+  NEWTON
+END OPTIONS
+BEGIN PACKAGES
+  DIS6   creek.dis   DIS
+  IC6    creek.ic    IC
+  NPF6   creek.npf   NPF
+  STO6   creek.sto   STO
+  RCH6   creek.rcha  RCH_MODEL
+  EVT6   creek.evta  EVT_MODEL
+  RIV6   creek.riv   RIV_CREEK
+  WEL6   creek.wel   WEL_PUMP
+  GHB6   creek.ghb   GHB_OUTLET
+  OC6    creek.oc    OC
+END PACKAGES

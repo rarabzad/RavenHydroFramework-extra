@@ -1,0 +1,5 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -32 +32 @@
+-:SoilZoneVadose    KINEMATIC                       # unsaturated columns between the soil zone and a deeper water table
++:SoilZoneVadose    LAG                             # unsaturated columns between the soil zone and a deeper water table

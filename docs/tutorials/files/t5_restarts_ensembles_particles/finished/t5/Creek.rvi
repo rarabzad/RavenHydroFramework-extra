@@ -1,0 +1,43 @@
+# Creek.rvi - Tutorial Creek: model options and processes
+:StartDate          2010-01-01 00:00:00
+:Duration           365
+:TimeStep           1.0
+:Method             ORDERED_SERIES
+:SoilModel          SOIL_MULTILAYER 3
+:Routing            ROUTE_DIFFUSIVE_WAVE
+:CatchmentRoute     ROUTE_DUMP
+:Evaporation        PET_OUDIN
+:OW_Evaporation     PET_OUDIN
+:RainSnowFraction   RAINSNOW_THRESHOLD
+:OroTempCorrect     OROCORR_NONE
+:OroPrecipCorrect   OROCORR_NONE
+
+:GroundwaterModel  MODFLOW6
+:DefineHRUGroups   AquiferHRUs
+
+:Alias  TOPSOIL     SOIL[0]
+:Alias  SUBSOIL     SOIL[1]
+:Alias  DEEP_STORE  SOIL[2]
+
+:HydrologicProcesses
+  :Precipitation        PRECIP_RAVEN     ATMOS_PRECIP  MULTIPLE
+  :LakeEvaporation      LAKE_EVAP_BASIC  SURFACE_WATER ATMOSPHERE
+    :-->Conditional HRU_TYPE IS LAKE
+  :Flush                RAVEN_DEFAULT    PONDED_WATER  DEPRESSION
+    :-->Conditional HRU_TYPE IS WETLAND
+  :DepressionOverflow   DFLOW_THRESHPOW  DEPRESSION    SURFACE_WATER
+  :OpenWaterEvaporation OPEN_WATER_EVAP  DEPRESSION    ATMOSPHERE
+  :Seepage              SEEP_LINEAR      DEPRESSION    SUBSOIL
+  :Infiltration         INF_HBV          PONDED_WATER  MULTIPLE
+  :SoilEvaporation      SOILEVAP_HBV     TOPSOIL       ATMOSPHERE
+  :Percolation          PERC_GAWSER      TOPSOIL       SUBSOIL
+  :Baseflow             BASE_LINEAR      SUBSOIL       SURFACE_WATER
+  :Percolation          PERC_LINEAR      SUBSOIL       DEEP_STORE
+    :-->Conditional HRU_GROUP IS_NOT AquiferHRUs
+  :Percolation          PERC_LINEAR      SUBSOIL       GROUNDWATER
+    :-->Conditional HRU_GROUP IS AquiferHRUs
+  :Baseflow             BASE_LINEAR      DEEP_STORE    SURFACE_WATER
+:EndHydrologicProcesses
+
+:EvaluationMetrics NASH_SUTCLIFFE RMSE KLING_GUPTA
+:WriteMassBalanceFile

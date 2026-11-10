@@ -1,0 +1,6 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -32 +32,2 @@
+-:SoilZoneVadose    LAG                             # unsaturated columns between the soil zone and a deeper water table
++:SoilZoneVadose    RICHARDS                        # unsaturated columns between the soil zone and a deeper water table
++:SoilZoneVadoseClasses 3                           # one column per depth class of the DEM points in a cell

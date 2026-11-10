@@ -1,0 +1,19 @@
+$ grep -v "computed in" out/GWModelSummary.txt | head -n 17
+Raven-MODFLOW 6 groundwater model summary
+  MODFLOW 6 files       : /home/user/work/examples/Liard_groundwater/out/mf6
+  MODFLOW 6 library     : /home/user/Raven_MF6_linux/bin/libmf6.so (version 6.8.1)
+  grid                  : regular, 3 layers x 85 rows x 54 cols, cell size 2000 m; MODFLOW DIS
+  HRU fidelity of cells : 94.49% of active-cell HRU area lies in each cell's dominant HRU
+  active columns        : 3252 (inactive 1338)
+  active cells          : 8840   vertical pass-through cells: 916
+  coupled HRUs          : 85
+  recharge/seepage cells: 3252
+  river cells           : 178
+  water-table ET cells  : 0
+  wells / WEL cells     : 0 / 0
+  GHB cells / CHD cells : 0 / 0
+  observation wells     : 0
+  surface-water exchange cells: 0
+  coupled reservoirs / cells  : 0 / 0
+  profile VALLEY_ALLUVIUM: 3 layers, 2794 columns
+...

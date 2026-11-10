@@ -1,0 +1,120 @@
+\tutorial{5}{Restarts, ensembles and particle tracking}
+
+\begin{goal}
+With the model of Tutorial~2 you split a run into two and continue the second part from \cmd{solution.rvc}, getting exactly
+the continuous run; run a Monte Carlo ensemble whose members rebuild the groundwater model; and write MODFLOW's budget file
+to track particles backwards from the pumping well with \cmd{make\_prt.py}. Time: about 30 minutes. The particle tracking
+needs FloPy (\cmd{python3 -m pip install flopy}).
+\end{goal}
+
+\begin{shell}
+$ cp -r $TUT/t5_restarts_ensembles_particles/start ~/work/t5
+$ cd ~/work/t5
+\end{shell}
+
+\section{Restarts: \texttt{solution.rvc}}
+At the end of every run Raven writes the state of the model to \cmd{solution.rvc}: soil and surface stores, channels and
+reservoirs, and in a coupled run the head of every MODFLOW cell (and, with a soil zone, its columns). Used as the
+\cmd{.rvc} of the next run, it continues the run where it stopped.
+
+\subsection{A continuous run}
+The reference: the three years 2010--2012 in one run.
+\term{t5_run_full.txt}
+
+\subsection{Part 1: the first two years}
+\diff{t5_part1.diff}
+\term{t5_run_part1.txt}
+\term{t5_rvc_blocks.txt}
+After Raven's own blocks (HRU states, basin states) comes \cmd{:GWHeads \V{t5:gwheads}}: the head of every cell, layer by
+layer and row by row, with 17 significant digits:
+\term{t5_rvc_head.txt}
+
+\subsection{Part 2: the third year, from the hotstart}
+Make a folder for the second part with the model's files, and use \cmd{solution.rvc} of part~1 as its \cmd{.rvc}:
+\begin{shell}
+$ mkdir ../t5_part2
+$ cp Creek.* CreekMet.rvt CreekGW.rvt *.geojson *.tif ../t5_part2/
+$ cp out_part1/solution.rvc ../t5_part2/Creek.rvc
+$ cd ../t5_part2
+\end{shell}
+(no output). Start on 1 January 2012 and run the rest of the three years:
+\diff{t5_part2.diff}
+\term{t5_run_part2.txt}
+\term{t5_part2_advisory.txt}
+The \cmd{:GWInitialization STEADY\_STATE} of the \cmd{.rvg} is skipped: the heads come from the hotstart.
+
+\subsection{Compare with the continuous run}
+\term{t5_diff.txt}
+\begin{tocheck}
+The largest difference is \V{t5:maxdiff}: the restarted run reproduces the continuous one bit for bit.
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \emph{``running more time steps than the MODFLOW 6 simulation holds''}: you changed \cmd{:Duration} between building
+      and running; run again from the start of the folder.
+\item A corrupt \cmd{:GWHeads} header or a non-number in a groundwater block stops the run with a message naming it: copy
+      \cmd{solution.rvc} again.
+\end{itemize}
+\end{trouble}
+Use restarts to spin a model up once and start every later run from the spun-up state, to split long runs, and for the
+unsaturated columns of Tutorial~3, whose contents are saved in \cmd{solution.rvc} as well.
+
+\section{A Monte Carlo ensemble}
+Raven's ensemble modes run the model several times; with groundwater, Raven rebuilds the MODFLOW model and restarts
+MODFLOW for each member, with its files in the member's output folder. Back in \cmd{\textasciitilde/work/t5}, put the
+duration back to three years (undo the part~1 edit) and ask for five Monte Carlo members:
+\begin{shell}
+$ cd ~/work/t5
+\end{shell}
+\diff{t5_ens.diff}
+The ensemble file \cmd{Creek.rve} says what varies between members: here \cmd{PERC\_COEFF} of the subsoil, which sets how
+fast it feeds the aquifer, drawn uniformly between 0.02 and 0.06~1/d. Create it:
+\showfile{t5_restarts_ensembles_particles/finished/t5/Creek.rve}
+\term{t5_run_ens.txt}
+\term{t5_ls_ens.txt}
+The run takes about \V{t5:enssec}~seconds (\V{t5:nens} members). Each \cmd{ens\_N} folder holds a member's outputs, with its own
+\cmd{mf6/}.
+\fig{t5_ensemble.png}{The \V{t5:nens} members: head at OW\_SLOPE and recharge reaching MODFLOW. The members' mean recharge ranges
+from \V{t5:ensrmin} to \V{t5:ensrmax}~m\textsuperscript{3}/d and the final head at OW\_SLOPE from \V{t5:enshmin} to
+\V{t5:enshmax}~m.}
+Remove the two lines of \cmd{:EnsembleMode} and \cmd{:RandomSeed} again before going on (the ensemble file is read only in
+ensemble mode). Raven's DDS and EnKF modes rebuild the groundwater model for each member in the same way.
+
+\section{The budget file and particle tracking}
+MODFLOW~6's particle tracking (PRT) runs after the coupled run, on the flows it saved. Still in \cmd{\textasciitilde/work/t5}
+(with the ensemble lines removed), run one year and ask Raven to save MODFLOW's flows every day:
+\diff{t5_prt_rvi.diff}
+\diff{t5_prt.diff}
+\term{t5_run_prt.txt}
+\cmd{out\_prt/mf6/gwf.cbc} now holds every package's flows, the specific discharge and the saturation of every day
+(\V{t5:cbcmb}~MB for this year), and \cmd{gwf.porosity} the porosity of every cell (\cmd{POROSITY} of the aquifer classes).
+\cmd{make\_prt.py} writes a PRT simulation for these flows --- by default \V{t5:npart} release points around each well of
+\cmd{:Wells} --- and runs it with the library; \cmd{--backward} tracks backwards in time, to where the pumped water came
+from:
+\term{t5_make_prt.txt}
+\term{t5_endpoints.txt}
+Each line is a particle: when it was released (in days of the tracking), its release point and end point (in metres, in the
+frame of the grid file \cmd{gwf.dis.grb}: PRT's own coordinates shifted by its \cmd{XORIGIN} and \cmd{YORIGIN}), the time it was tracked (here the whole year: no particle left the model), the PRT status code of its
+last record and, in words, why its track ended. The tutorial's script draws the tracks, in the same frame, with the travel times of \cmd{endpoints.csv}:
+\term{t5_plot_tracks.txt}
+\fig[0.62]{t5_tracks.png}{Backward tracks from the \V{t5:npart} release points around PW\_1 over one year: the water pumped at the
+end of 2010 was \V{t5:distmin} to \V{t5:distmax}~m away at the start of the year.}
+\begin{note}[Tracks need small cells]
+All the tracks begin and end inside the well's own 250-m cell: PRT interpolates the flow within a cell, and this cell is
+itself the sink of the well. They show the method, not a capture zone. A capture-zone or travel-time study needs cells
+much smaller than the distances of interest around the well (\cmd{:GridRefinement WELLS}, or a smaller
+\cmd{:GridCellSize}).
+\end{note}
+\begin{trouble}
+\begin{itemize}
+\item \emph{``No module named flopy''}: \cmd{python3 -m pip install flopy}.
+\item \cmd{make\_prt.py} stops with a message when the flows were not saved every day: add \cmd{:HeadSaveFrequency 1} and
+      \cmd{:WriteGWBudgetFile} to the \cmd{.rvg}.
+\item PRT needs a regular or quadtree grid (DIS or DISV); HRU meshes and imported grids use DISU.
+\end{itemize}
+\end{trouble}
+
+\section{The finished state}
+\cmd{\$TUT/t5\_restarts\_ensembles\_particles/finished} holds the two folders as this tutorial leaves them: \cmd{t5} (with
+\cmd{Creek.rve}, the one-year \cmd{Creek.rvi} and the budget-file lines in \cmd{Creek.rvg}) and \cmd{t5\_part2} (with the
+hotstart file as \cmd{Creek.rvc}).

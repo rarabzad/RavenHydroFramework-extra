@@ -1,0 +1,69 @@
+--------------------------------------------------------------------------
+ OSTRICH version 18.04.27 (Built Apr 27 2018 @ 15:08:39)
+
+ A computer program for model-independent calibration and optimization.
+
+ Author             L. Shawn Matott
+ Copyright (C) 2007 L. Shawn Matott
+
+ This program is free software; you can redistribute 
+ it and/or modify it under the terms of the GNU  
+ General Public License as published by the Free 
+ Software Foundation; either version 2 of the 
+ License, or(at your option) any later version. 
+
+ This program is distributed in the hope that it will 
+ be useful, but WITHOUT ANY WARRANTY; without even 
+ the implied warranty of MERCHANTABILITY or FITNESS 
+ FOR A PARTICULAR PURPOSE. See the GNU General Public 
+ License for more details. 
+
+ You should have received a copy of the GNU General 
+ Public License along with this program; if not, 
+ write to the Free Software Foundation, Inc., 59 
+ Temple Place, Suite 330, Boston, MA 02111-1307 USA 
+--------------------------------------------------------------------------
+
+Ostrich Setup
+Model                  : ./Ost-RAVEN.sh > OstExeOut.txt 2>&1
+Algorithm              : Dynamically Dimensioned Search Algorithm (DDS)
+Objective Function     : GCOP
+Number of Parameters   : 2
+Number of Tied Params  : 0
+Number of Observations : 0
+Seed for Random Nums.  : 20101
+Number of Resp. Vars        : 4
+Number of Tied Resp. Vars   : 1
+Number of Constraints       : 0
+Penalty Method              : Additive Penalty Method (APM)
+
+Ostrich Run Record
+trial    best fitness   par_K_sand    par_K_till     trials remaining
+1     8.544344E+00  2.000000E+00  5.000000E-01  2.990000E+02
+5     8.458647E+00  2.000000E+00  5.173238E-01  2.950000E+02
+6     8.158762E+00  1.490544E+01  6.945089E-01  2.940000E+02
+7     7.618356E+00  8.212601E+00  6.945089E-01  2.930000E+02
+9     -4.697133E-01  8.212601E+00  1.972468E+00  2.910000E+02
+131   -5.245612E-01  8.212601E+00  2.010471E+00  1.690000E+02
+147   -5.438500E-01  7.549175E+00  2.010471E+00  1.530000E+02
+181   -5.459964E-01  7.454856E+00  2.010471E+00  1.190000E+02
+188   -5.598694E-01  6.514966E+00  2.010471E+00  1.120000E+02
+300   -5.598694E-01  6.514966E+00  2.010471E+00  0.000000E+00
+
+Optimal Parameter Set
+Objective Function : -5.598694E-01
+par_K_sand         : 6.514966E+00
+par_K_till         : 2.010471E+00
+
+Summary of Constraints
+
+Algorithm Metrics
+Algorithm               : Dynamically-Dimensioned Search Algorithm (DDS)
+Desired Convergence Val : N/A
+Actual Convergence Val  : N/A
+Max Generations         : 300
+Actual Generations      : 300
+Peterbation Value       : 0.200000
+Total Evals             : 301
+Telescoping Strategy    : none
+Algorithm successfully converged on a solution, however more runs may be needed

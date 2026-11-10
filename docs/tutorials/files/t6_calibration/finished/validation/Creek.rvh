@@ -1,0 +1,36 @@
+# Creek.rvh - Tutorial Creek: two subbasins, nine HRUs, one reservoir
+:SubBasins
+  :Attributes, NAME,  DOWNSTREAM_ID, PROFILE,       REACH_LENGTH, GAUGED
+  :Units,      none,  none,          none,          km,           none
+  1,           UPPER, 2,             CREEK_CHANNEL, 3.2,          0
+  2,           LOWER, -1,            CREEK_CHANNEL, 4.0,          1
+:EndSubBasins
+
+:HRUs
+  :Attributes, AREA, ELEVATION, LATITUDE, LONGITUDE, BASIN_ID, LAND_USE_CLASS, VEG_CLASS, SOIL_PROFILE, AQUIFER_PROFILE, TERRAIN_CLASS, SLOPE, ASPECT
+  :Units,      km2,  m,         deg,      deg,       none,     none,           none,      none,         none,            none,          deg,   deg
+  1,   4.4800,   992.0, 50.578910, -116.977402, 1, OPEN   , GRASS , VALLEY_SOIL , VALLEY_FILL, [NONE],  1, 0
+  2,   6.0000,  1040.0, 50.591949, -116.971745, 1, FOREST , FOREST, SLOPE_SOIL  , SLOPE_TILL , [NONE],  6, 0
+  3,   9.2000,  1067.1, 50.562271, -116.971762, 1, FOREST , FOREST, SLOPE_SOIL  , SLOPE_TILL , [NONE],  6, 0
+  4,   3.2000,  1121.2, 50.602291, -116.971739, 1, ROCK   , BARE  , ROCK_SOIL   , [NONE]     , [NONE], 12, 0
+  5,   1.1200,   982.0, 50.578901, -116.949155, 1, WATER  , BARE  , LAKE        , VALLEY_FILL, [NONE],  0, 0
+  6,   5.0600,   969.8, 50.582026, -116.911015, 2, OPEN   , GRASS , VALLEY_SOIL , VALLEY_FILL, [NONE],  1, 0
+  7,   9.2000,  1047.1, 50.595518, -116.915228, 2, FOREST , FOREST, SLOPE_SOIL  , SLOPE_TILL , [NONE],  6, 0
+  8,   9.2000,  1047.1, 50.562244, -116.915288, 2, FOREST , FOREST, SLOPE_SOIL  , SLOPE_TILL , [NONE],  6, 0
+  9,   0.5400,   968.5, 50.574603, -116.906792, 2, WETLAND, GRASS , WETLAND_SOIL, VALLEY_FILL, [NONE],  0, 0
+:EndHRUs
+
+:HRUGroup AquiferHRUs
+  1, 2, 3, 5, 6, 7, 8, 9
+:EndHRUGroup
+
+:Reservoir CreekLake
+  :SubBasinID          1
+  :HRUID               5
+  :Type                RESROUTE_STANDARD
+  :WeirCoefficient     0.6
+  :CrestWidth          10.0
+  :MaxDepth            6.0
+  :LakeArea            1.12E6
+  :AbsoluteCrestHeight 982.0
+:EndReservoir

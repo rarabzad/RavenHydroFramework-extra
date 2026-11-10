@@ -1,0 +1,37 @@
+% cover.tex - title page and contents of the combined PDF
+\pagenumbering{roman}
+\begin{titlepage}
+\centering
+\vspace*{3.5cm}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{16pt}
+{\sffamily\bfseries\fontsize{30}{38}\selectfont\color{brand}Raven--MODFLOW~6\\[4pt]Tutorials\par}
+\vspace{14pt}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{24pt}
+{\large Six click-by-click tutorials for the groundwater coupling of the\\[2pt]Raven Hydrological Modelling Framework\par}
+\vfill
+{\large November 2026\par}
+\vspace{1.2cm}
+{\footnotesize\color{gray!70!black}Licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0),
+\url{https://creativecommons.org/licenses/by/4.0/}.\par}
+\end{titlepage}
+\renewcommand{\tutheader}{Raven--MODFLOW~6 tutorials}
+\begingroup\small\tableofcontents\endgroup
+\chapter*{About these tutorials}
+\addcontentsline{toc}{chapter}{About these tutorials}
+Each tutorial is a sequence of steps typed in a Linux terminal (Windows: the Windows Subsystem for Linux). Every file you
+create or change is shown in full or as an exact difference, every command with what it prints, and every number and
+figure comes from running the steps with the Raven of the release package; a rerun of \cmd{build\_tutorials.py}
+regenerates them.
+\begin{enumerate}
+\item \textbf{Getting started:} install the package, check it, run the Liard River example and read its groundwater outputs.
+\item \textbf{Your own groundwater model:} give a Raven model (Tutorial Creek) a groundwater model that Raven builds.
+\item \textbf{The soil-zone coupling:} let the water table rise into the soil; unsaturated columns below it.
+\item \textbf{Coupling an existing MODFLOW~6 model:} link the HRUs to a model in feet; ET, a wetland and a reservoir.
+\item \textbf{Restarts, ensembles and particle tracking:} continue runs exactly, run a Monte Carlo ensemble, track particles.
+\item \textbf{Calibration with Ostrich (DDS):} recover known aquifer parameters from streamflow and heads.
+\end{enumerate}
+Tutorial~1 comes first; Tutorials 3 to 6 start from the model built in Tutorial~2, whose finished state is included, so
+any of them can be done on its own. The tutorial files are in \cmd{Raven\_MF6\_Tutorial\_Files.zip}: one folder per
+tutorial with its \cmd{start} and \cmd{finished} state, and the scripts the tutorials use.
+\cleardoublepage
+\pagenumbering{arabic}

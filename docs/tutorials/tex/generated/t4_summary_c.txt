@@ -1,0 +1,4 @@
+$ grep -E "surface-water|reservoirs" out/GWModelSummary.txt
+  surface-water exchange cells: 10 (SWX_RAVEN, raven.swx)
+  coupled reservoirs / cells  : 1 / 15 (RES_RAVEN, raven.res)
+...

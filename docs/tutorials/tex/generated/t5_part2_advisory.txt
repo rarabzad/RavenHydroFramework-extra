@@ -1,0 +1,2 @@
+$ grep hotstart out/Raven_errors.txt
+ADVISORY : CGroundwaterModel: hotstart heads found in .rvc; steady-state initialization skipped

@@ -1,0 +1,2 @@
+$ grep :Duration Liard.rvi
+:Duration           365 00:00:00

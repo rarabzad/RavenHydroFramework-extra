@@ -1,0 +1,6 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -28,0 +29,3 @@
++
++# --- the soil zone and the water table ---------------------------------------------
++:SoilZone          PHYSICAL SOIL[0] SOIL[1]        # Raven owns TOPSOIL and SUBSOIL; MODFLOW starts below them

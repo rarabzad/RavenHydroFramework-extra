@@ -1,0 +1,7 @@
+$ head -n 6 model/creek.dis
+# lengths in feet; the grid lies in UTM zone 11N (EPSG:32611), origin given in feet
+BEGIN OPTIONS
+  LENGTH_UNITS FEET
+  XORIGIN 1639599.74
+  YORIGIN 18372047.24
+  ANGROT 0.0

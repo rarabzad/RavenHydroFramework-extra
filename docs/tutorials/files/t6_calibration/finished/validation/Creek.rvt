@@ -1,0 +1,4 @@
+# Creek.rvt - forcing (and, later, groundwater series and observations)
+:RedirectToFile CreekMet.rvt
+:RedirectToFile CreekGW.rvt
+:RedirectToFile CreekObs.rvt

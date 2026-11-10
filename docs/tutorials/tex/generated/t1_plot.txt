@@ -1,0 +1,12 @@
+$ python3 $TUT/scripts/plot_gw.py out --title "Liard"
+365 days, 1985-10-02 to 1986-10-01
+mean groundwater budget [m3/d]:
+  recharge from Raven                   5838714
+  seepage to Raven                      8079177
+  aquifer to rivers                     2680164
+  rivers to aquifer                     1186725
+  storage release                       3733903
+  largest |MF6 balance error| [%]      5.78e-09
+  unconverged steps                           0
+mean water-table depth [m]: HRU 2736 2.72, HRU 2745 2.42, HRU 2747 3.05, HRU 2748 5.74, HRU 2753 1.75, HRU 2758 3.81, HRU 2767 3.23, HRU 2775 3.73, HRU 2780 3.19, HRU 2819 2.60 ... (85 HRUs; range 1.01 to 14.67)
+wrote gw_budget.png, gw_map.png, gw_watertable.png

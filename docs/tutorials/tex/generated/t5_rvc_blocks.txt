@@ -1,0 +1,10 @@
+$ grep -n "^:" out_part1/solution.rvc
+1::StartTime 2010-01-01 00:00:00.00
+2::TimeStamp 2012-01-01 00:00:00.00
+3::TimeStep 1
+4::HRUStateVariableTable
+16::EndHRUStateVariableTable
+17::BasinStateVariables
+32::EndBasinStateVariables
+33::GWHeads 2 25 33
+199::EndGWHeads

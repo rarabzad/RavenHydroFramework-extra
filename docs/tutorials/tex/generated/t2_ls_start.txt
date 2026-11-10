@@ -1,0 +1,2 @@
+$ ls
+Creek.rvc  Creek.rvh  Creek.rvi  Creek.rvp  Creek.rvt  CreekGW.rvt  CreekMet.rvt  bedrock.asc  bedrock.tif  dem.asc  dem.tif  hrus.geojson  outlet.geojson  pond.geojson  rivers.geojson

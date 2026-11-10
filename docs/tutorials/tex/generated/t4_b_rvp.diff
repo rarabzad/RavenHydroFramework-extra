@@ -1,0 +1,13 @@
+--- Creek.rvp
++++ Creek.rvp
+@@ -81,6 +81,6 @@
+ :AquiferProfileParameters
+-  :Attributes, SEEPAGE_LEAKANCE
+-  :Units,      1/d
+-  VALLEY_FILL, 1.0
+-  SLOPE_TILL,  1.0
++  :Attributes, SEEPAGE_LEAKANCE, EXTINCTION_DEPTH
++  :Units,      1/d,              m
++  VALLEY_FILL, 1.0,              1.5
++  SLOPE_TILL,  1.0,              1.5
+ :EndAquiferProfileParameters

@@ -1,0 +1,17 @@
+--- Creek.rvp (start)
++++ Creek.rvp
+@@ -73 +73,14 @@
+ :EndChannelProfile
++
++# --- groundwater: the layers and properties come from the MODFLOW 6 model --------
++:AquiferProfiles
++  VALLEY_FILL, 0
++  SLOPE_TILL,  0
++:EndAquiferProfiles
++
++:AquiferProfileParameters
++  :Attributes, SEEPAGE_LEAKANCE
++  :Units,      1/d
++  VALLEY_FILL, 1.0
++  SLOPE_TILL,  1.0
++:EndAquiferProfileParameters

@@ -1,0 +1,6 @@
+# Creek.rve - a Monte Carlo ensemble: PERC_COEFF of SUBSOIL (how fast the subsoil feeds the aquifer) drawn per member
+:OutputDirectoryFormat ./out_ens/ens_*/
+:ParameterDistributions
+  #  parameter  class type  class    default  distribution  low   high
+  PERC_COEFF    SOIL        SUBSOIL  0.04     DIST_UNIFORM  0.02  0.06
+:EndParameterDistributions

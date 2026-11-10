@@ -1,0 +1,7 @@
+--- Creek.rvi
++++ Creek.rvi
+@@ -2,2 +2,2 @@
+-:StartDate          2010-01-01 00:00:00
+-:Duration           730
++:StartDate          2012-01-01 00:00:00
++:Duration           366

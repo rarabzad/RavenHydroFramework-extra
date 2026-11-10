@@ -1,0 +1,5 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -4 +4 @@
+-:InputCRS          EPSG:32611                      # every GeoJSON and raster below is in UTM zone 11N
++# :InputCRS        EPSG:32611                      # every GeoJSON and raster below is in UTM zone 11N

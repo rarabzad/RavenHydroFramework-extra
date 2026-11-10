@@ -1,0 +1,49 @@
+# ostIn.txt - Ostrich setup: calibrate the Tutorial Creek groundwater model with DDS
+ProgramType         DDS
+ObjectiveFunction   GCOP
+ModelExecutable     ./Ost-RAVEN.sh
+PreserveBestModel   ./save_best.sh
+
+BeginFilePairs
+  Creek.rvp.tpl ; Creek.rvp
+EndFilePairs
+
+# parameters (hydraulic conductivity is searched in log10 space)
+BeginParams
+  #name          init    low     high    tx_in  tx_ost  tx_out
+  par_K_gravel   10      1       200     none   log10   none
+  par_Sy_gravel  0.1     0.05    0.35    none   none    none
+  par_K_till     0.5     0.05    10      none   log10   none
+  par_perc       0.02    0.005   0.1     none   none    none
+EndParams
+
+# responses: rows of Raven's Diagnostics.csv (line 0 is the header line; columns count from 1)
+BeginResponseVars
+  #name     filename                           keyword   line  col  token
+  KGE_Q     ./model/output/Diagnostics.csv ;  OST_NULL  1     5    ','
+  RMSE_101  ./model/output/Diagnostics.csv ;  OST_NULL  2     4    ','
+  RMSE_102  ./model/output/Diagnostics.csv ;  OST_NULL  3     4    ','
+  RMSE_103  ./model/output/Diagnostics.csv ;  OST_NULL  4     4    ','
+EndResponseVars
+
+# objective to minimise: -KGE of the streamflow + 5 x (head RMSE [m]) at each observation well
+BeginTiedRespVars
+  COST 4 KGE_Q RMSE_101 RMSE_102 RMSE_103 wsum -1.0 5 5 5
+EndTiedRespVars
+
+BeginGCOP
+  CostFunction COST
+  PenaltyFunction APM
+EndGCOP
+
+BeginConstraints
+  # none; the PenaltyFunction line above is still required
+EndConstraints
+
+RandomSeed 20101
+
+BeginDDSAlg
+  PerturbationValue 0.20
+  MaxIterations     1000
+  UseInitialParamValues
+EndDDSAlg
