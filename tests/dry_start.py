@@ -7,8 +7,8 @@ in every active cell, while layer 1 keeps wet upland-till cells and layer 3 is c
       GWModelSummary.txt;
   D2  the same model with :GWInitialization STEADY_STATE: no warning (the steady-state period sets the heads);
   D3  the example as shipped (INITIAL_HEAD_DEPTH 3 m): no warning and no summary line; with RAVEN_EXE_REF its outputs,
-      Raven_errors.txt and GWModelSummary.txt included (dates, paths and timings aside), equal the reference build's
-      (otherwise SKIP).
+      Raven_errors.txt and GWModelSummary.txt included (dates, paths and timings aside; solution.rvc the same state,
+      testconfig.rvc_same), equal the reference build's (otherwise SKIP).
 Runs of 2 days, in quick and full mode alike.
 """
 import os, sys, re, shutil, subprocess
@@ -71,6 +71,9 @@ if tc.REF:
             continue
         if not os.path.exists(pb):
             diffs.append(f); continue
+        if f.endswith('.rvc'):
+            if not tc.rvc_same(pa, pb): diffs.append(f)
+            continue
         la = [l for l in open(pa, 'rb').read().decode(errors='replace').split('\n') if not skip.search(l)]
         lb = [l for l in open(pb, 'rb').read().decode(errors='replace').split('\n') if not skip.search(l)]
         if la != lb:

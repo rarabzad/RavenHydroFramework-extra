@@ -57,7 +57,7 @@ for i in range(N):
             if ('Successful' in ra) and ('Successful' in rb):
                 C=pd.read_csv(d+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]']); B=pd.read_csv(b+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]'])
                 m=C.merge(B,on='date',suffixes=('_c','_r'))
-                dev=max(((m[x+'_c']-m[x+'_r']).abs()/(m[x+'_c'].abs().max()+1e3)).max() for x in ['seepage to Raven [m3/d]','storage release [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
+                dev=max(tc.max_diff(m[x+'_c'],m[x+'_r'],m[x+'_c'].abs().max()+1e3) for x in ['seepage to Raven [m3/d]','storage release [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
                 rec['restart']=(k,float(dev)); rec['pass']=bool(rec['pass'] and dev<1e-4)
             else: rec['restart']=(k,'FAILED '+ra[:40]+' / '+rb[:40]); rec['pass']=False
     else: rec['pass']=False

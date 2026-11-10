@@ -15,7 +15,7 @@ Cases (metres/days model md, feet/seconds model fs, linked through :MF6CRS):
   all_ft    the same on the feet/seconds model, equal to all
   restart   all, restarted half-way from solution.rvc (heads, :GWReservoirSeepage in transit): equal to the continuous run
   plain     (with RAVEN_EXE_REF) the coupled case without these options: outputs and the mf6 folder identical to the
-            reference build
+            reference build (solution.rvc the same state, testconfig.rvc_same)
 Dry and specified-head cells under the exchanges (the md model edited with flopy; 6 days, 15 in the full mode):
   et_dry    the model without NEWTON, layer 1 made 4 m thick, heads 5 m deep (in layer 2), EXTINCTION_DEPTH 6 m: MODFLOW
             moves the ET of each dry top cell to the cell below; GWBudget.csv's water-table ET is MODFLOW's (budget file,
@@ -380,7 +380,7 @@ if tc.REF:
             fa, fb = p1 + '/' + sub + '/' + fn, p2 + '/' + sub + '/' + fn
             if os.path.isdir(fb) or fn.endswith('.lst') or fn.endswith('.cache') or fn in ('Raven_errors.txt', 'GWModelSummary.txt', 'mfsim.stdout'):
                 continue
-            if not os.path.exists(fa) or not filecmp.cmp(fa, fb, shallow=False): diffs.append(sub + '/' + fn)
+            if not tc.same_output(fa, fb): diffs.append(sub + '/' + fn)
         extra = set(os.listdir(p1 + '/' + sub)) - set(os.listdir(p2 + '/' + sub))
         diffs += [sub + '/' + x + ' (extra)' for x in extra]
     flt = lambda f: [l.replace(p1, 'X').replace(p2, 'X') for l in open(f, errors='replace') if not re.search(r'Build date|BuildDate|HRU/grid linkage|time|library|Version', l, re.I)]

@@ -66,6 +66,22 @@ I21 a head boundary on steps whose :BoundaryHead value lies at or below a cell's
        (97 m): no cell is held at the bottom of layer 1.
    (c) CHD, LAYERS ALL, series 99, 99, 99, 90, 90, 90: the 6-day run against 3 + 3 days restarted from its solution.rvc:
        the same number of CHD cells, and CHD flow and heads equal on days 4-6 (1e-6).
+   (d) a column with no cell held: 8 HRUs of 100 m (HRU 8 lies wholly on the boundary's column), CHD LAYERS ALL, rain
+       20 mm/d, a series of 99 m on days 1-2 and 70 m (below the aquifer's bottom) on days 3-6, CONCEPTUAL and :SoilZone
+       PHYSICAL: on days 3-6 the CHD flow is 0, nothing is booked onto CHD cells ('recharge onto CHD cells', and the soil
+       zone's exchange with specified heads), MODFLOW's recharge equals Raven's (CONCEPTUAL), the column's soil-zone link
+       exchanges with the aquifer (PHYSICAL), and every identity of combinations.check_run holds; on days 1-2 the boundary
+       holds the column as before.
+   (e) cells placed by the series alone: CHD and GHB, LAYERS TOP, HEAD 90 and a series of 99 m on every day: the boundary
+       has the cells of layer 1 only (GWModelSummary.txt "GHB cells / CHD cells" 2), as a HEAD of 99 m gives, and none off.
+   (f) a steady-state first period (:GWInitialization STEADY_STATE) whose series value (90 m, then 99, 99, 90, 90, 99)
+       lies below the layer-1 cells' bottom: "head boundaries off" counts its 2 cells too (8 cell-steps against 6 without
+       the steady period).
+I22 strict numbers in the .rvc: ":InitialGWHeads ELEVATION 98,5" (a decimal comma: the tokens 98 and 5) stops with the
+   surplus value '5', ":InitialGWHeads ELEVATION H98.5" and "0x62" (hexadecimal) stop with "'H98.5' is not a number", all
+   naming the command; ":InitialGWHeads FROM_PROFILE 0" stops ("FROM_PROFILE takes no value"); ":InitialGWHeads ELEVATION
+   98.5", "98.5# note" and "98.5 # note" (a trailing comment) run and start at 98.5 m; a :GWHeads value "98.5x" stops ("is
+   not a finite number").
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -470,7 +486,7 @@ def main():
     if g:
         q = gwb(da)['GHB [m3/d]'].values; qs = gwb(ds)['GHB [m3/d]'].values
         a, b = gwb(ds).select_dtypes('number'), gwb(d9).select_dtypes('number')
-        same = bool((a - b).abs().max().max() <= 1e-9 * max(a.abs().max().max(), 1.0))
+        same = len(a) == len(b) and list(a.columns) == list(b.columns) and sz_check.tc.max_diff(a, b, max(a.abs().max().max(), 1.0)) <= 1e-9
         offl = re.search(r'head boundaries off\s*:\s*(\d+)', sz_check.summary(da))
         g = bool((q[1:] <= 0.0).all()) and bool((qs <= 0.0).all()) and same and offl is not None and int(offl.group(1)) > 0
         print('  I21a: GHB series 99, 90 m against an aquifer at 95 m: GHB on days 2-6 %s m3/d (HEAD 90 alone %s); series of 90 m = HEAD 90 alone: %s; '
@@ -499,13 +515,94 @@ def main():
         a = gwb(dc).set_index('date'); b = gwb(d2).set_index('date')
         ha = pd.read_csv(os.path.join(dc, 'out', 'GWHRUState.csv')).set_index('date'); hb = pd.read_csv(os.path.join(d2, 'out', 'GWHRUState.csv')).set_index('date')
         ix = b.index
-        dq = float((a.loc[ix, 'CHD [m3/d]'] - b['CHD [m3/d]']).abs().max() / max(a['CHD [m3/d]'].abs().max(), 1.0))
-        dh = float((ha.loc[ix, 'head_4 [m]'] - hb['head_4 [m]']).abs().max())
+        dq = sz_check.tc.max_diff(a.loc[ix, 'CHD [m3/d]'], b['CHD [m3/d]'], max(a['CHD [m3/d]'].abs().max(), 1.0))
+        dh = sz_check.tc.max_diff(ha.loc[ix, 'head_4 [m]'], hb['head_4 [m]'])
         g = cells(dc) == cells(d2) and dq < 1e-6 and dh < 1e-6
         print('  I21c: restart on day 4: CHD cells %s against %s; CHD flow within %.2g, heads within %.2g m -> %s' % (cells(d2)[1], cells(dc)[1], dq, dh, 'ok' if g else 'FAIL'))
     else:
         print('  I21c: run FAILED')
     res.append(('I21c boundary cells the same on a restart', g))
+    # I21d: a column all of whose CHD cells are switched off is an ordinary column on those steps
+    import numpy as np
+    sys.path.insert(0, os.path.dirname(HERE)); import combinations as C
+    for phys in (False, True):
+        tag = 'phys' if phys else 'conc'
+        d = os.path.join(W, 'I21d_' + tag); shutil.rmtree(d, ignore_errors=True)
+        sz_models.make_case(d, days=6, physical=phys, top=3.0, rain=20.0, perc=20.0, nhru=8, hru_w=100.0, init_depth=1.0, chd=90.0, phi0=(200.0, 200.0))
+        edit(os.path.join(d, 'm.rvg'), 'HEAD 90', 'HEAD 90 LAYERS ALL')
+        open(os.path.join(d, 'm.rvt'), 'a').write('\n:BoundaryHead EDGE m\n  2000-01-01 00:00:00 1.0 6\n' + ''.join('  %g\n' % v for v in (99, 99, 70, 70, 70, 70)) + ':EndBoundaryHead\n')
+        ok, txt = sz_check.run(d); g = ok
+        if g:
+            bad, _ = C.check_run(d, txt); b = gwb(d)
+            gcol = lambda c: b[c].values if c in b else 0.0 * b['CHD [m3/d]'].values
+            onto = np.abs(gcol('recharge onto CHD cells [m3/d]')) + np.abs(gcol('soil zone to specified heads [m3/d]')) + np.abs(gcol('specified heads to soil zone [m3/d]'))
+            q = b['CHD [m3/d]'].values
+            if phys: sx = gcol('soil zone to aquifer [m3/d]') + gcol('aquifer to soil zone [m3/d]'); extra = bool((sx[2:] > 0.0).all())
+            else: extra = bool(np.abs(b['MF6 recharge [m3/d]'].values[2:] - b['Raven recharge [m3/d]'].values[2:]).max() <= 1e-6 * b['Raven recharge [m3/d]'].abs().max())
+            g = not bad and bool((np.abs(q[:2]) > 0.0).all()) and float(np.abs(q[2:]).max()) == 0.0 and float(onto[2:].max()) == 0.0 and extra
+            print('  I21d %s: days 1-2 CHD %s m3/d, onto CHD cells %s; days 3-6 CHD %s, booked onto CHD cells %s m3/d; %s; check_run %s -> %s'
+                  % (tag, ', '.join('%.0f' % x for x in q[:2]), ', '.join('%.0f' % x for x in onto[:2]), ', '.join('%.0f' % x for x in q[2:]),
+                     ', '.join('%.0f' % x for x in onto[2:]), ('soil zone <-> aquifer on days 3-6 %s m3/d' % ', '.join('%.0f' % x for x in sx[2:])) if phys
+                     else ('MF6 recharge = Raven recharge on days 3-6: %s' % extra), bad or 'ok', 'ok' if g else 'FAIL'))
+        else:
+            print('  I21d %s: run FAILED' % tag)
+        res.append(('I21d %s: no cell held: an ordinary column' % tag, g))
+    # I21e: a series that never reaches below layer 1 places the cells of layer 1 only
+    for kind in ('CHD', 'GHB'):
+        de, oke = bnd('I21e_' + kind.lower(), kind, 'TOP', [99.0] * 6, 2.0)
+        g = oke
+        if g:
+            n = cells(de)[1 if kind == 'CHD' else 0]; m = re.search(r'head boundaries off\s*:\s*(\d+)', sz_check.summary(de))
+            g = n == 2 and m is not None and int(m.group(1)) == 0
+            print('  I21e %s: series 99 m on every day, HEAD 90: %d cells (layer 1: 2), %s cell-steps off -> %s' % (kind, n, m.group(1) if m else 'MISSING', 'ok' if g else 'FAIL'))
+        else:
+            print('  I21e %s: run FAILED' % kind)
+        res.append(('I21e %s cells placed by the series' % kind, g))
+    # I21f: the steady-state period counts in the run total of cells switched off
+    S3 = [90.0, 99.0, 99.0, 90.0, 90.0, 99.0]; offs = {}
+    for tag, st in (('ss', 1.0), ('nos', None)):
+        dd = case('I21f_' + tag, days=6, physical=False, top=3.0, rain=0.0, perc=0.0, nhru=4, init_depth=2.0, chd=90.0, steady=st)
+        edit(os.path.join(dd, 'm.rvg'), ':SpecifiedHeadBoundary EDGE edge.geojson HEAD 90', ':SpecifiedHeadBoundary EDGE edge.geojson HEAD 90 LAYERS TOP')
+        open(os.path.join(dd, 'm.rvt'), 'a').write('\n:BoundaryHead EDGE m\n  2000-01-01 00:00:00 1.0 6\n' + ''.join('  %g\n' % v for v in S3) + ':EndBoundaryHead\n')
+        ok, _ = sz_check.run(dd); m = re.search(r'head boundaries off\s*:\s*(\d+)', sz_check.summary(dd))
+        offs[tag] = int(m.group(1)) if (ok and m) else -1
+    g = offs['nos'] == 6 and offs['ss'] == offs['nos'] + 2
+    print('  I21f: cell-steps off with a steady-state first period %d, without %d (the steady period at 90 m: 2 cells) -> %s' % (offs['ss'], offs['nos'], 'ok' if g else 'FAIL'))
+    res.append(('I21f steady-state period in the cell-steps off', g))
+    # I22: :InitialGWHeads and :GWHeads values read strictly
+    good = True
+    for val, want in (('98,5', "has the surplus value '5'"), ('H98.5', "'H98.5' is not a number"), ('0x62', "'0x62' is not a number"),
+                      ('98.5', None), ('98.5# note', None), ('98.5 # note', None)):
+        d = case('I22_' + re.sub(r'\W', '_', val), days=2, physical=False, init_depth=2.0)
+        open(os.path.join(d, 'm.rvc'), 'a').write('\n:InitialGWHeads ELEVATION %s\n' % val)
+        ok, txt = run_err(d)
+        if want:
+            g = (not ok) and want in txt and ':InitialGWHeads' in [l for l in txt.split('\n') if want in l][0] if want in txt else False
+            print('  I22 :InitialGWHeads ELEVATION %s: %s -> %s' % (val, 'stops: ' + [l for l in txt.split('\n') if want in l][0].strip()[:140] if want in txt else ('runs' if ok else 'stops without the message'), 'ok' if g else 'FAIL'))
+        else:
+            h = None
+            if ok:
+                ic = open(os.path.join(d, 'out', 'mf6', 'gwf.ic')).read().split('INTERNAL FACTOR 1.0')[1].split('END')[0]
+                h = max(float(x) for x in ic.split())   # (the active cells' starting head; inactive cells 0)
+            g = ok and h is not None and abs(h - 98.5) < 1e-9
+            print('  I22 :InitialGWHeads ELEVATION %s: %s, starting head %s m -> %s' % (val, 'runs' if ok else 'FAILED', h, 'ok' if g else 'FAIL'))
+        good &= g
+    d = case('I22_from_profile_0', days=2, physical=False, init_depth=2.0)
+    open(os.path.join(d, 'm.rvc'), 'a').write('\n:InitialGWHeads FROM_PROFILE 0\n')
+    ok, txt = run_err(d); want = "has the surplus value '0' (FROM_PROFILE takes no value)"; g = (not ok) and want in txt
+    print('  I22 :InitialGWHeads FROM_PROFILE 0: %s -> %s' % ('stops: FROM_PROFILE takes no value' if g else ('runs' if ok else 'stops without the message'), 'ok' if g else 'FAIL'))
+    good &= g
+    d = case('I22_gwheads', days=2, physical=False, init_depth=2.0)
+    ok0, _ = sz_check.run(d); g = ok0
+    if g:
+        rvc = open(os.path.join(d, 'out', 'solution.rvc')).read()
+        i = rvc.index(':GWHeads'); j = rvc.index('\n', i) + 1; k = rvc.index('\n', j)
+        w = rvc[j:k].split(); i0 = [n for n, x in enumerate(w) if float(x) != 0.0][0]; w[i0] = w[i0] + 'x'; rvc = rvc[:j] + '  ' + ' '.join(w) + rvc[k:]
+        open(os.path.join(d, 'm.rvc'), 'w').write(rvc)
+        ok, txt = run_err(d); g = (not ok) and ':GWHeads: the value %s is not a finite number' % w[i0] in txt
+        print('  I22 :GWHeads value %s: %s -> %s' % (w[i0], 'stops with the message' if g else ('runs' if ok else 'stops without the message'), 'ok' if g else 'FAIL'))
+    good &= g
+    res.append(('I22 strict numbers in the .rvc', good))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

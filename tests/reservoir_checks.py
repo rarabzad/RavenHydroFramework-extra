@@ -17,7 +17,7 @@ R2 a generated model whose lake (HRU 4) lies half over the cells of a :Specified
 R3 :SoilZone PHYSICAL against CONCEPTUAL, generated and existing: a lake on the ground of a soil-zone HRU has its bed on the
    ground (as surface stores), not at the soil-zone base D below it: the same seepage on day 2 as the CONCEPTUAL run of the
    same model (1e-6; it was 3.25 times the CONCEPTUAL value).
-R4 a lake 4 m below the ground over dry top cells (combinations.py's CONC_NONE_res_dry): its gain is computed but MODFLOW
+R4 a lake 4 m below the ground over dry top cells (combinations.py's CONC_NONE_res_dry, the lake lowered): its gain is computed but MODFLOW
    does not supply it; GWModelSummary.txt has the run total 'reservoir gain not supplied' (equal to its GWBudget.csv
    column) and Raven_errors.txt a warning.
 Quick mode (RAVEN_TEST_QUICK=1): 8-day runs (15 days in the full mode, where R1 also runs in feet and seconds).
@@ -102,7 +102,7 @@ def r1(res):
         ef, badf = out['ft']
         g3 = not badf
         if g3:
-            bf = gwb(ef); dev = float((bf['reservoir seepage delivered [m3/d]'] - b['reservoir seepage delivered [m3/d]']).abs().max() / max(b['reservoir seepage delivered [m3/d]'].abs().max(), 1.0))
+            bf = gwb(ef); dev = C.tc.max_diff(bf['reservoir seepage delivered [m3/d]'], b['reservoir seepage delivered [m3/d]'], max(b['reservoir seepage delivered [m3/d]'].abs().max(), 1.0))
             g3 = dev < 1e-5
             print('  R1 feet/seconds: seepage within %.2g of the metres/days run -> %s' % (dev, 'ok' if g3 else 'FAIL'))
         else:
@@ -123,7 +123,7 @@ def r1(res):
     if g4:
         a = b.set_index('date'); c = gwb(p2).set_index('date'); a = a.loc[c.index]
         cols = [x for x in c.columns if ('reservoir' in x or x in ('storage release [m3/d]', 'other model packages [m3/d]', 'seepage to Raven [m3/d]'))]
-        dev = max(float((a[x] - c[x]).abs().max() / max(a[x].abs().max(), 1.0)) for x in cols)
+        dev = max(C.tc.max_diff(a[x], c[x], max(a[x].abs().max(), 1.0)) for x in cols)
         g4 = dev < 1e-6
         print('  R1c: restart on day %d (specified heads under the lake): reservoir and aquifer columns within %.2g of the continuous run -> %s' % (k + 1, dev, 'ok' if g4 else 'FAIL'))
     else:
@@ -171,6 +171,7 @@ def r3(res):
 
 def r4(res):
     s = spec('CONC_NONE_res_dry'); d = C.generated(os.path.join(W, 'R4'), s)
+    at_ground(d, s, C.land(C.XS + 0.5 * C.HW) - 4.0)   # (4 m below the ground: the lake gains from the water table in layer 2)
     txt = C.run(d); bad, _ = C.check_run(d, txt)
     if bad:
         print('  R4: run FAILED: %s' % bad); res.append(('R4', False)); return

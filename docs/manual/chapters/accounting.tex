@@ -176,8 +176,13 @@ including the \cmd{.rvc}, have been read.
 At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states it contains \cmd{:GWHeads} (the head in
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
 transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), and with unsaturated columns \cmd{:GWVadoseColumns} (\cmd{:GWVadoseClassColumns} with depth classes) and \cmd{:GWVadoseColumnTops} (each column's top and water). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
-run --- continues exactly: in the tests the restarted run matched a continuous run to within $6\times10^{-6}$ in all flows.
-Two details make this hold:
+run --- continues exactly. In a coupled run every value of the file is written with 17 significant digits (the HRU
+states of \cmd{:HRUStateVariableTable}, the channel and reservoir states of \cmd{:BasinStateVariables} and every
+groundwater block), so the restarted run starts from the states the continuous run had, bit for bit; a run without
+groundwater writes Raven's usual 5 decimals (and reservoir stages and flows with 12 digits, one of the corrections to Raven
+itself of Table~\ref{tab:ravendiff}). In the tests a restarted coupled run matches the continuous run exactly
+(\cmd{test\_restart.py} RS5, among them a run whose soil-zone redistribution switches on a change of $10^{-5}$~mm in the
+soil water) and otherwise to within $6\times10^{-6}$ in all flows. Three details make this hold:
 \begin{itemize}
 \item Without \cmd{:SoilZone PHYSICAL}, seepage is added to its target store (\cmd{:SeepageReturnTo}, by default the
 lowest soil layer) with no capacity limit, so that layer can hold more than its capacity for a while. On reading the
@@ -185,6 +190,10 @@ lowest soil layer) with no capacity limit, so that layer can hold more than its 
 the value as written, so the restart carries the same water as the continuous run. The same holds for the store of a
 \cmd{:SurfaceWaterExchange} (for example \cmd{DEPRESSION} above \cmd{DEP\_MAX}), which groundwater discharge fills with no
 capacity limit.
+\item With \cmd{:SoilZone PHYSICAL} the soil water of an HRU is the mean of its soil-zone columns. When the \cmd{.rvc}'s soil
+water equals the mean of its \cmd{:GWSoilZoneColumns} (within $10^{-9}$~mm, as a file written at full precision does), the
+columns start as written; otherwise (an edited file, or a file with fewer digits) the difference is shared among the columns as Raven's
+processes share a step's change.
 \item The unsaturated columns are restored with the contents as written (\cmd{:GWVadoseColumns},
 \cmd{:GWVadoseClassColumns}), floored only at what the method can hold: the air-dry content
 $\theta(\psi=-10^5$\,m$)$ for \cmd{RICHARDS} and \cmd{LAG}, zero for \cmd{KINEMATIC} (whose reference content

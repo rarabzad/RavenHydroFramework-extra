@@ -210,8 +210,8 @@ def i7():
     a, b, ok = restart_pair('i7', 'LAG', 3, 4, lambda t: t.replace(':SoilZoneVadose LAG', ':SoilZoneVadose NONE'))
     if not ok: print('  runs FAILED'); return False
     v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); e = errs(b)
-    m = re.search(r'hotstart columns unused: (\d+) unsaturated columns of the hotstart file, (\S+) m3', sz_check.summary(b))
-    good = v0 > 0.0 and m is not None and abs(float(m.group(2)) - v0) <= 1e-6 * v0 and 'is dropped' in e and ':SoilZoneVadose NONE' in e
+    m = re.search(r'hotstart columns unused: (\d+) unsaturated columns of the hotstart file, (\S+) m3', sz_check.summary(b))   # (6 significant digits)
+    good = v0 > 0.0 and m is not None and abs(float(m.group(2)) - v0) <= 5e-6 * v0 and 'is dropped' in e and ':SoilZoneVadose NONE' in e
     print('  first run ends with %.3f m3 in its columns; restart: warning %s, run total %s -> %s'
           % (v0, 'present' if 'is dropped' in e else 'MISSING', ('%s lines, %s m3' % (m.group(1), m.group(2))) if m else 'MISSING', 'ok' if good else 'FAIL'))
     return good

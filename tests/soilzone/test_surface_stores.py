@@ -122,7 +122,7 @@ def main():
                 d0 = abs(float(wc.loc[wc['date'] == '2000-01-11', 'Depression [mm]'].iloc[0]) - float(wr.loc[wr['date'] == '2000-01-11', 'Depression [mm]'].iloc[0]))
                 k = 'aquifer discharge to surface stores [m3/d]'
                 bc = pd.read_csv(os.path.join(c, 'out', 'GWBudget.csv')).set_index('date'); br = pd.read_csv(os.path.join(b, 'out', 'GWBudget.csv')).set_index('date')
-                dq = float((bc.loc[br.index, k] - br[k]).abs().max() / max(bc[k].abs().max(), 1.0))
+                dq = sz_check.tc.max_diff(bc.loc[br.index, k], br[k], max(bc[k].abs().max(), 1.0))
                 gg = gg and d0 < 1e-6 and dq < 1e-6
                 print('  SW4: restart on day 11 with a store at %.2f mm (DEP_MAX 50): Depression %.2g mm from the continuous run, discharge into the stores within %.2g -> %s'
                       % (dep, d0, dq, 'ok' if gg else 'FAIL'))

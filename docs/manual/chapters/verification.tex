@@ -225,7 +225,10 @@ Malformed groundwater command in \cmd{.rvg}, \cmd{.rvt} or \cmd{.rvc} & stops; n
 Hotstart heads for a different grid; cells larger than the HRUs & stops; explains the mismatch\\
 Monitoring well outside the model; unknown \cmd{.rvg} command & runs with a warning\\
 \cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\
-Malformed numbers in the \cmd{.rvg} (\cmd{:GridCellSize 2,000.0}, \cmd{2km}, \cmd{HEAD H1146}, \cmd{1146.85m}, \cmd{50.5} iterations, a \cmd{:Wells} value); a cell or refinement size giving more than $10^7$ cells per layer & stops before the grid is built; names the command and the value (\cmd{tests/input\_checks.py})\\
+Malformed numbers in the \cmd{.rvg} (\cmd{:GridCellSize 2,000.0}, \cmd{2km}, \cmd{HEAD H1146}, \cmd{1146.85m}, \cmd{50.5} iterations, a \cmd{:Wells} value); a cell size giving more than $5\times10^6$ cells per layer (\cmd{:GridCellSize 50} and \cmd{60} on Liard), a refinement size giving more on a regular grid or, by its estimate, on a quadtree grid (\cmd{:GridRefinement RIVERS 0.1}) & stops before the grid is built; names the command and the value or the estimated cells per layer (\cmd{tests/input\_checks.py})\\
+A quadtree grid within the limit that needs more memory than there is (\cmd{RIVERS 0.5} on Liard, about $4.6\times10^6$ cells per layer, under a 3~GB limit) & stops naming \cmd{:GridRefinement} and the estimated cells per layer (no crash)\\
+Overlapping and adjacent refinement features: 200 copies of one line (\cmd{LINES 0.1}) and 20 adjacent squares (\cmd{POLYGONS 0.5}) on a 4-HRU strip & built (the estimate counts each square once)\\
+Malformed numbers in the \cmd{.rvc}: \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5} or \cmd{0x62}, \cmd{:InitialGWHeads FROM\_PROFILE 0}, a \cmd{:GWHeads} value \cmd{98.5x} & stops; names the command and the token (\cmd{test\_inputs.py} I22)\\
 \cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
 A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule
 \end{tabularx}
@@ -443,24 +446,32 @@ in the hotstart code. valgrind reports uninitialised reads in two routines of Ra
 \section{Option combinations}\label{sec:vcombinations}
 \cmd{tests/combinations.py} runs small synthetic models (four HRUs on a slope, 100~m cells) across a matrix of options and
 checks every water identity on each run. The exchanges (water-table ET, a river, surface stores, a reservoir, a well, a
-general-head and a specified-head boundary) are combined all together and one at a time; each under plain conditions, dry
-top cells (a 1~m top layer above the water table) and negative recharge (\cmd{PERC\_GR4JEXCH}); with \cmd{CONCEPTUAL} and
-\cmd{:SoilZone PHYSICAL} (with \cmd{:SurfaceWaterExchange} on the surface stores). The unsaturated columns (\cmd{RICHARDS},
-\cmd{KINEMATIC}, \cmd{LAG}, one and three depth classes) run under negative recharge, a water table rising through them (the
-columns vanish) and dry top cells. Each case runs with the model Raven builds and as an existing model (with \cmd{NEWTON},
-without it for \cmd{CONCEPTUAL}, and converted to feet and seconds). On every run: MODFLOW's balance, the recharge,
-soil-zone and unsaturated-column identities, Raven's balance, the river, surface-store and reservoir books, the seepage
-returned, the run totals against their columns, and no HDRY or NaN in the groundwater outputs. A moving-water group must
-also move the water it tests: a lake that loses water to the aquifer (with an existing model's own specified heads switching
-on under it: its seepage returned on that day and none piled into a sliver of another HRU's cell), \cmd{:BoundaryHead}
-series that switch boundary cells off and on, and water-table ET from a water table within the extinction depth. The quick
-mode runs 260 runs of 8 days (about a minute), the full mode 398 runs of 15 days, with half-day steps too.
+general-head and a specified-head boundary, each placed at the height of the ground where it lies) are combined all
+together and one at a time; each under plain conditions, dry top cells (a 1~m top layer above the water table) and
+negative recharge (\cmd{PERC\_GR4JEXCH}); with \cmd{CONCEPTUAL} and \cmd{:SoilZone PHYSICAL} (with
+\cmd{:SurfaceWaterExchange} on the surface stores). The lake loses water where it lies on the ground (its stage above the
+ground of its cells) and gains it as a pit lake half over the specified-head cells (its stage below the specified head);
+water-table ET draws on a PET the soil cannot meet from a water table within the extinction depth. The unsaturated
+columns (\cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}, one and three depth classes) run under negative recharge, a water table
+rising through them (the columns vanish) and dry top cells. A boundary group switches cells off and on with
+\cmd{:BoundaryHead} series (also every cell of a column, which is then an ordinary column) and switches an existing
+model's own specified heads on under a lake. Every case runs with the model Raven builds and as an existing model (with
+\cmd{NEWTON}, without it for \cmd{CONCEPTUAL}, and converted to feet and seconds, the model's own river, well and boundaries
+included). On every run: MODFLOW's balance, the recharge, soil-zone and unsaturated-column identities, Raven's balance, the
+river, surface-store and reservoir books, the seepage returned, the run totals against their columns, and no HDRY or NaN in
+the groundwater outputs. Every run must also move water through each exchange and stress its case names, and lists the
+volumes moved: a case whose exchange moves none fails (in an existing model without \cmd{NEWTON} with dry top cells, which
+MODFLOW takes out of its solve, the surface stores, the lake and the river must move none). The quick mode runs 311 runs
+of 8 days (a few minutes), the full mode 393 runs of 15 days, with half-day steps too.
 \cmd{tests/reservoir\_checks.py} checks the reservoir exchange where a lake's cells cannot all take seepage (existing and
 generated models), its bed under \cmd{:SoilZone PHYSICAL}, and the run total of gains MODFLOW does not supply. One result is reported
 apart as known: where a reservoir's stage falls back below its weir crest while groundwater feeds it, Raven's balance error
 equals the reservoir routing's own balance error (a few m$^3$, \cmd{ReservoirMassBalance.csv}); the coupling's books hold.
 The error comes from Raven's reservoir routine, which stops its stage iteration at a change of 0.1~mm next to the kink of the
-weir's outflow curve; base Raven gives the same without groundwater (Section~\ref{ch:limits}).
+weir's outflow curve; base Raven gives the same without groundwater (Section~\ref{ch:limits}). It is excused only on steps
+whose stage lies within 5~mm of the crest and only up to $2.5\times10^{-4}$~m times the lake's area per step (10~m$^3$ for
+the test lake); any other balance error fails. A self-test checks the rule on a run's outputs: an unbooked 5\,000~m$^3$
+added to the lake's routing error fails, as does 2~m$^3$ on a step 0.3~m below the crest; 2~m$^3$ at the crest is known.
 
 \section{Running the tests}\label{sec:runtests}
 \cmd{python3 tests/run\_all.py} runs every test of this chapter (the unit tests, the file and input checks, the Thiem,

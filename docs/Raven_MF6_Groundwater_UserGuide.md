@@ -366,20 +366,35 @@ plots the exchange (with specified heads too, where there are soil-zone columns 
 
 Observed heads at date D are compared with the simulated head at D (end of the previous step).
 
+A boundary with a `:BoundaryHead` series is placed in the layers its series reaches (its highest value; `HEAD` as well
+only where the series is blank), down to the series' lowest value with `LAYERS TOP`. On a step whose head lies at or
+below a placed cell's bottom the cell is switched off (GHB conductance 0, CHD cell not held); the cell-steps switched
+off, a steady-state first period included, are reported in `GWModelSummary.txt`. A column whose specified-head cells
+are all switched off is an ordinary column on that step: its recharge, soil zone, surface stores and lake exchange with
+its cells, and nothing is booked onto specified-head cells (manual, "Where boundaries go").
+
 ### 4.5 `.rvc`
 
 ```
 :InitialGWHeads DEPTH_BELOW_SURFACE 5.0   # or FROM_PROFILE (default), or ELEVATION [m]
 ```
 
-Raven's `solution.rvc` also contains `:GWHeads nlay nrow ncol` (the head of every cell; 12 significant digits, 17 with
-`:SoilZone PHYSICAL`), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
+The value is a plain decimal number in metres (`98.5`; not `98,5`, `H98.5` or `0x62`), optionally followed by a `#`
+comment; `FROM_PROFILE` takes no value.
+
+The value is read strictly, as the numbers of the `.rvg`: `98,5` (a decimal comma: two values) or `H98.5` stop the run
+naming the command.
+
+In a coupled run Raven's `solution.rvc` holds every value with 17 significant digits (the HRU states, the channel and
+reservoir states and the groundwater blocks; a run without groundwater writes Raven's usual 5 decimals, and reservoir stages and flows with 12 digits, with or without groundwater). It also contains
+`:GWHeads nlay nrow ncol` (the head of every cell), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
 seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
 (unsaturated columns; a column whose top differs starts at rest) and `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
 `:GWHeads` header, a value that is not a finite number in any of these blocks, or negative water in the soil-zone or
 unsaturated columns stops the run with a message. Using `solution.rvc` as the `.rvc`
-of the next run continues exactly where the previous run stopped: seepage held above the capacity of its target soil
+of the next run continues exactly where the previous run stopped (the restarted run starts from the states as they
+were, bit for bit): seepage held above the capacity of its target soil
 layer (without `:SoilZone PHYSICAL`) and a surface store filled above its maximum by groundwater are kept, and the
 unsaturated columns start with the contents as written (a run without columns warns and reports their water as dropped). With an age
 tracer, `:StartTime` is the start of the run that wrote the file and `:AgeTracerDatum` (when earlier) the start of the
@@ -448,8 +463,9 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "RECHARGE_DELAY ... cannot be used with :SoilZone PHYSICAL" | set `RECHARGE_DELAY` to 0 in the profiles of HRUs with a soil zone; for a delay through a deep unsaturated zone use `:SoilZoneVadose LAG` |
 | "GeoJSON file ... is in EPSG:n" / "... outside the longitude/latitude range" / "well ... is given by X and Y" | a projected input file: give `:InputCRS` with its projection (all input files in that projection; a projection that is not built in by its TMERC, ALBERS or LCC parameters) |
 | "... looks like longitude/latitude" | with `:InputCRS` a GeoJSON file or raster is still in lon/lat: reproject it (or remove `:InputCRS` if every input is lon/lat) |
-| "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | give plain numbers in the `.rvg`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0) |
-| ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid of about ..." | more than 10 million cells per layer: give the sizes in metres; refine locally with QUADTREE or HRU_MESH |
+| "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | give plain numbers in the `.rvg`, and for `:InitialGWHeads` in the `.rvc`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0; 98.5, not 98,5) |
+| ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid (or a quadtree grid) of about ..." | more than 5 million cells per layer, before the grid is built (a quadtree's size is estimated from the squares the refinement features touch, and refused before the build only beyond 1.5 times the limit; the build stops at the limit: "... of more than 5e+06 cells per layer (the build stopped there)"): give the sizes in metres as plain numbers; refine locally with QUADTREE or HRU_MESH, or limit the levels with `:QuadtreeMaxLevel` |
+| "not enough memory to build the groundwater model (about ... cells per layer, from ...)" / "... to couple the existing model" | the grid is within the limit but the computer's memory is not enough for it (or for the model's files): larger `:GridCellSize` or `:GridRefinement` sizes; for an existing model, more memory |
 | ":WellFlowRate ...: units ... are not supported" / ":BoundaryHead ...: units ..." | well rates in m3/d, m3/s or L/s; heads in m |
 | "... a name Raven reserves for the packages it adds" | an existing model's package is named like one of Raven's (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN, RES_RAVEN, SZ*_RAVEN): rename it, or remove the line if Raven wrote it |
 | warning "layer ... starts dry" | the initial heads leave a whole layer dry (INITIAL_HEAD_DEPTH deeper than the layers above); start from `:GWInitialization STEADY_STATE`, a smaller INITIAL_HEAD_DEPTH or `:InitialGWHeads` |

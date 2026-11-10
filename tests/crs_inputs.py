@@ -21,7 +21,8 @@ Checks:
     member, files in EPSG:32610 with :InputCRS EPSG:32609, and a well given by X and Y without :InputCRS stop Raven with a
     message naming the file or :InputCRS; with :InputCRS, a DEM raster, an HRU file and a boundary file left in
     longitude/latitude stop with "looks like longitude/latitude";
-  - with RAVEN_EXE_REF: the lon/lat run is byte-identical to the reference build (otherwise SKIP).
+  - with RAVEN_EXE_REF: the lon/lat run is byte-identical to the reference build (solution.rvc the same state,
+    testconfig.rvc_same; otherwise SKIP).
 Quick mode (RAVEN_TEST_QUICK=1): 10 days; full mode: 120 days.
 """
 import os, sys, re, json, shutil, subprocess, filecmp
@@ -327,7 +328,7 @@ if not NOLIB:
                     pa, pb = os.path.join(dl, 'out', f), os.path.join(dr, 'out', f)
                     if os.path.isdir(pa) or f in ('GWModelSummary.txt', 'Raven_errors.txt'):
                         continue
-                    if not os.path.exists(pb) or not filecmp.cmp(pa, pb, shallow=False):
+                    if not tc.same_output(pa, pb):
                         diffs.append(f)
                 report('lon/lat run byte-identical to RAVEN_EXE_REF (outputs except the two text logs)', not diffs, ', '.join(diffs))
             else:

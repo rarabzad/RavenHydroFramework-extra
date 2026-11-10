@@ -628,8 +628,10 @@ Over the step the column receives exactly MODFLOW's booked exchange; only the or
 scales with $q^n-q^{n-1}$ instead of $q^n$. If the column cannot give back $D_c$ (the processes used more of the lent
 water than the step's exchange supplied), the remainder is a \emph{debt} that the aquifer repays in the following
 steps through \cmd{SZQ\_RAVEN}; nothing is created or lost (\emph{lagged-exchange debt}, \emph{lagged-exchange
-repayment}). The last step's exchange and any open debt are saved in \cmd{solution.rvc} (\cmd{:GWSoilZoneLag}), so a
-restart continues exactly. On the hillslope test the mean head difference to the MODFLOW-only reference falls from
+repayment}). A column that was a specified head in the last step exchanged exactly, so it has no lagged source in the
+next step, whether or not its head is held in that step (a \cmd{:BoundaryHead} series can switch it). The last step's
+exchange (0 for such a column) and any open debt are saved in \cmd{solution.rvc} (\cmd{:GWSoilZoneLag}), so a restart
+continues exactly, also at a switch of the specified heads. On the hillslope test the mean head difference to the MODFLOW-only reference falls from
 1.8~cm to 0.7~cm and the largest from 6.6~cm to 2.5~cm, with 20\% fewer outer iterations (Figure~\ref{fig:sztiming}).
 
 \subsection{Raven's processes on each part of an HRU}\label{sec:szclasses}
@@ -1150,20 +1152,30 @@ A specified-head boundary holds the head of its cells at $h_c$; MODFLOW calculat
 Boundaries are drawn in a GeoJSON file: polygons select the cells whose centre lies inside (tested with the even--odd
 ray-crossing rule, so holes work), lines select the cells they cross. With \cmd{LAYERS ALL} the boundary is placed in
 every active layer whose bottom lies below its highest head; with \cmd{LAYERS TOP}, in the highest such layer (the top
-active cell when the head lies above it). The highest head is \cmd{HEAD} and, with a \cmd{:BoundaryHead} series, every value
-of the series (the whole series, not only the run's days, so a restarted run gets the same cells; \cmd{HEAD} applies where
-the series has no value). With a series, \cmd{LAYERS TOP} also places the layers below, down to the first one whose bottom
-lies below the series' lowest head.
+active cell when the head lies above it). The highest head is \cmd{HEAD} or, with a \cmd{:BoundaryHead} series, the
+highest value of the series (the whole series, not only the run's days, so a restarted run gets the same cells), and
+\cmd{HEAD} as well where the series has blank values (\cmd{HEAD} applies there). With a series, \cmd{LAYERS TOP} also places
+the layers below, down to the first one whose bottom lies below the series' lowest head; layers only \cmd{HEAD} would
+reach are not placed when the series has no blank value.
 
 On each step, a placed cell whose bottom lies at or above the step's head is switched off: a general-head cell gets
 conductance 0, and a specified-head cell is left out of MODFLOW's list for the step (it is an ordinary active cell then).
 So the boundary neither holds the water table at the cell bottom nor feeds the aquifer from a head the series does not
 have. With \cmd{LAYERS TOP} only the highest placed layer whose bottom lies below the step's head is used; the boundary
 follows its head down and up through the layers. A step head within 0.01~m above a cell's bottom is held 0.01~m above
-it. The cell-steps switched off are counted in \cmd{GWModelSummary.txt} (\emph{head boundaries off}); the boundary's flow in
-\cmd{GWBudget.csv} (\emph{GHB}, \emph{CHD}) is that of the cells used. For the coupling, a column whose top cell is a placed
-specified head stays a specified-head column on every step (recharge, soil zone and stores there go to the specified
-head). A boundary that selects cells but has none left, because its head lies below all of them, is reported with a
+it. The cell-steps switched off, those of a steady-state first period included, are counted in \cmd{GWModelSummary.txt}
+(\emph{head boundaries off}); the boundary's flow in \cmd{GWBudget.csv} (\emph{GHB}, \emph{CHD}) is that of the cells used.
+For the coupling, a column whose top cell is a placed specified head is a specified-head column (recharge, soil zone,
+stores and the lake there go to the specified head) on every step on which one of its cells is held. A column whose
+specified-head cells all follow a \cmd{:BoundaryHead} series has, on a step when the series switches all of them off, no
+specified head: it is an ordinary column on that step. Its recharge enters its top cell (\cmd{RCH\_RAVEN}), groundwater
+seeps out through its drain or soil-zone link, and its surface stores and lake exchange with its cells; the entries exist
+on every step and carry nothing while a cell is held, and nothing is booked onto specified-head cells on the other steps.
+A lake over such a column takes seepage only while the column holds no cell; the seepage computed for the column's
+share of the bed on the step a cell is held again is returned to the reservoir's subbasin and booked in \cmd{GWBudget.csv}
+(\emph{reservoir seepage not delivered by MODFLOW}, with its run total), as for an existing model's own specified heads.
+Unsaturated columns on such a column end when a cell is held (their water to the specified head) and form again, at
+rest, when none is. A boundary that selects cells but has none left, because its head lies below all of them, is reported with a
 warning naming the head and the highest cell bottom.
 
 \subsection{Monitoring (observation) wells}
