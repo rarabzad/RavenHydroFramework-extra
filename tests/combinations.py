@@ -296,7 +296,7 @@ def lake_error_known(d):
     o = os.path.join(d, 'out'); rm = os.path.join(o, 'ReservoirMassBalance.csv')
     if not os.path.exists(rm): return False, 0.0, 'no reservoir balance file'
     w = pd.read_csv(os.path.join(o, 'WatershedStorage.csv')); w.columns = [c.strip() for c in w.columns]
-    res_mm = (w['MB Error [mm]'] - (w['Deep Groundwater [mm]'] - w['Deep Groundwater [mm]'].iloc[0])).values
+    res_mm = (w['MB Error [mm]'] - w['MB Error [mm]'].iloc[0]).values
     rmb = pd.read_csv(rm); col = [c for c in rmb.columns if 'MB error' in c]; stc = [c for c in rmb.columns if 'stage' in c]
     err = rmb[col].fillna(0.0).sum(axis=1).values   # [m3] per step
     cum = np.cumsum(err) / (NHRU * HW * HW) * 1000.0   # [mm] (the lake's balance error, sign: lost)

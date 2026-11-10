@@ -31,7 +31,7 @@ def pct(v):
     return '--' if v is None else ('$%s$'%sci(v).strip('$') if abs(v)<0.001 and v!=0 else '%.3g'%v)
 cols=[('Steps','steps',lambda v:'{:,}'.format(int(v)).replace(',','\\,')),('Recharge','recharge: (Raven - MF6 - dStore - toCHD)/Raven',sci),
       ('\\shortstack[r]{MODFLOW\\\\residual}','MF6 cumulative residual / gross flow',sci),('\\shortstack[r]{Worst\\\\step [\\%]}','MF6 worst step error [%]',pct),
-      ('\\shortstack[r]{Failed\\\\steps}','unconverged steps',lambda v:'%d'%v),('River','river: applied - net MF6 - carry change (rel)',sci),('\\shortstack[r]{Raven\\\\balance [mm]}','Raven MB error max [mm]',lambda v:'%.2f'%v)]
+      ('\\shortstack[r]{Failed\\\\steps}','unconverged steps',lambda v:'%d'%v),('River','river: applied - net MF6 - carry change (rel)',sci)]   # (Raven's balance: Section "Raven's balance" of the accounting chapter)
 out=[r'\begin{table}[!htbp]\centering',
      r'\caption{Automatic checks of the behaviour-test runs (\cmd{tools\_audit.py}). Relative errors are shares of the water moved. In every run the seepage returned to Raven equals MODFLOW\textquotesingle s seepage exactly, the surface-store bookkeeping is exact, no river loss is carried at the end and the output dates are contiguous. The one failed step is the rewetting day of the deliberately extreme drying test (Section~\ref{sec:behaviour}).}\label{tab:audit}',
      r'\footnotesize\setlength{\tabcolsep}{2.8pt}\begin{tabular}{l'+'r'*len(cols)+r'}\toprule\hdr',

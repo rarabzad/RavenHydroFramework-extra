@@ -73,7 +73,10 @@ with the soil-zone terms of Section~\ref{sec:accsz} when \cmd{:SoilZone PHYSICAL
 \item \textbf{Raven's balance:} the largest mass-balance error in \cmd{Watershed\allowbreak Storage.csv};
 \item \textbf{outputs:} finite heads, contiguous end-of-step dates, a $t=0$ row for monitoring wells.
 \end{enumerate}
-Table~\ref{tab:audit} gives the results for the behaviour tests of Section~\ref{sec:behaviour}.
+Table~\ref{tab:audit} gives the results for the behaviour tests of Section~\ref{sec:behaviour}. Raven's balance of the
+20-year Liard run is 0.431~mm, base Raven's first-step value for this model, on every step but 34 snowmelt days, on which
+it is raised to at most 0.437~mm (Section~\ref{sec:accraven}); a year restarted from the first year's \cmd{solution.rvc} has
+0.000~mm.
 
 \input{tables/run_checks}
 
@@ -82,7 +85,7 @@ Table~\ref{tab:audit} gives the results for the behaviour tests of Section~\ref{
 \caption{Behaviour tests.}\label{tab:behaviour}
 \begin{tabularx}{\linewidth}{P{0.19\linewidth}P{0.27\linewidth}Y}\toprule\hdr
 Test & Set-up & Result\\\midrule
-Full Liard model & 20 years, 85 coupled HRUs, 3\,252 active columns & recharge exact; MODFLOW residual $10^{-10}$; no failed step; Raven balance 0.52 mm\\
+Full Liard model & 20 years, 85 coupled HRUs, 3\,252 active columns & recharge exact; MODFLOW residual $10^{-10}$; no failed step; Raven balance 0.431 mm (up to 0.437 mm on a few snowmelt days)\\
 Pumping & 100\,000 m$^3$/d well, 5 years & 93\% delivered; seasonal drawdown 0.8--8 m in the pumped cell, none 12 km away; 91--98\% of the water captured from rivers (Figure~\ref{fig:pumping})\\
 Monitoring wells & synthetic heads with 5 cm noise & RMSE 4.9 cm; NSE 0.991--0.9997\\
 Fixed-head lake & 9 cells & heads held exactly; recharge on them redistributed\\
@@ -170,7 +173,10 @@ example with a pumping well) MODFLOW's budget file holds \cmd{FLOW-JA-FACE}, the
 every package at every step, and its package totals equal \cmd{GWBudget.csv} within $4\times10^{-10}$; \cmd{gwf.porosity}
 holds each cell's class porosity. The solution is the same with and without the option, and without it the \cmd{mf6}
 folder equals the reference build's. \cmd{tools/make\_prt.py} runs MODFLOW~6 PRT on these files through the library:
-eight particles around the well, tracked forward and backward, move in opposite directions.
+eight particles around the well, tracked forward and backward, move in opposite directions; with a steady-state first
+period each is released once, at the start (forward) or end (backward) of Raven's run, and ends within it. With flows
+saved every fifth step only (\cmd{:HeadSaveFrequency 5}) the script stops, in both directions, with a message naming
+\cmd{:HeadSaveFrequency 1}.
 
 \subsection{Exchanged flows against MODFLOW's own budget}
 MODFLOW writes its own volume budget in its list file. For runs covering every package, every flow the coupling exchanged
@@ -193,16 +199,17 @@ Drying & + water-table ET & $4.1\times10^{-8}$\\\bottomrule
 \subsection{Grid size and time step}
 The accounts stay exact for any cell size and time step (Table~\ref{tab:invariance}; subbasin 52, one year). The first
 rows use a head tolerance of 0.01~m; with it the worst single step on 4~km cells is 0.47\% of the flow, and the default
-tolerance of 0.00001~m brings it down to 0.002\%.
+tolerance of 0.00001~m brings it down to 0.002\%. Raven's balance stays at its first step's value on every step (base
+Raven's for this model: 0.431~mm with daily steps, 0.216~mm with half-day steps).
 \begin{table}[!htbp]\centering
 \caption{Invariance to cell size and time step.}\label{tab:invariance}
 \begin{tabular}{lrlrr}\toprule\hdr
 Set-up & Active columns & Recharge & Worst step & Raven balance\\\midrule
-1 km cells & 2\,147 & exact & 0.029\% & 0.456 mm\\
-2 km cells & 545 & exact & 0.092\% & 0.456 mm\\
-4 km cells & 142 & exact & 0.47\% & 0.456 mm\\
-4 km cells, default tolerance & 142 & exact & 0.002\% & 0.456 mm\\
-2 km cells, half-day steps & 545 & exact & 0.059\% & 0.219 mm\\\bottomrule
+1 km cells & 2\,147 & exact & 0.029\% & 0.431 mm\\
+2 km cells & 545 & exact & 0.092\% & 0.431 mm\\
+4 km cells & 142 & exact & 0.47\% & 0.431 mm\\
+4 km cells, default tolerance & 142 & exact & 0.002\% & 0.431 mm\\
+2 km cells, half-day steps & 545 & exact & 0.059\% & 0.216 mm\\\bottomrule
 \end{tabular}
 \end{table}
 

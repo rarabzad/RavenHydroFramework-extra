@@ -3,10 +3,9 @@
 run(d) runs Raven in folder d; checks(d) returns a dict of the balance identities (all must be ~0):
   mf6_err_rel      max |MODFLOW balance error| [m3/d] / max Raven recharge [m3/d] (a percentage of the gross aquifer flow
                    is meaningless when nearly all recharge is rejected and the aquifer flow is tiny)
-  raven_mb_mm      max |Raven's water-balance error - (GROUNDWATER store - its initial value)| / max(1, store) [-]:
-                   Raven counts the end-of-step GROUNDWATER pass-through store both as storage and as outflow, so its
-                   MB error equals the change of that store (WatershedStorage.csv carries 6 significant digits, hence
-                   the relative form)
+  raven_mb_mm      max |Raven's water-balance error (WatershedStorage.csv 'MB Error [mm]') - its value at the start|
+                   [mm]: Raven's own balance closes (the GROUNDWATER pass-through store counts as storage at the end of a
+                   step and as outflow when the next step empties it)
   rch_identity     max |Raven recharge - MF6 recharge - rejected - CHD - delay change (- column inflow + column outflow)|
                    / (sum of the magnitudes of those terms, at least 1 m3), per step
   sz_identity      max |soil-zone exchange applied to Raven - rejected - (aquifer to soil - soil to aquifer)*dt - shortfall
@@ -120,9 +119,7 @@ def checks(d, dt=1.0):
     res = {}
     res['mf6_err_rel'] = float(b['MF6 balance error [m3/d]'].abs().max() / max(b['Raven recharge [m3/d]'].abs().max(), 1.0))   # (1 m3/d floor: dry spells)
     mb = [c for c in w.columns if 'MB Error' in c]
-    gw = [c for c in w.columns if 'Deep Groundwater' in c]
-    g = (w[gw[0]] - w[gw[0]].iloc[0]) if gw else 0.0
-    res['raven_mb_mm'] = float(((w[mb[0]] - g).abs() / np.maximum(1.0, np.abs(w[gw[0]] if gw else 0.0))).max()) if mb else float('nan')
+    res['raven_mb_mm'] = float((w[mb[0]] - w[mb[0]].iloc[0]).abs().max()) if mb else float('nan')
     rr = b['Raven recharge [m3/d]'] * dt
     dl = b['recharge delay storage [m3]'].diff().fillna(b['recharge delay storage [m3]'])
     rej = b['rejected recharge [m3]'] if 'rejected recharge [m3]' in b else 0.0

@@ -275,9 +275,12 @@ These files let MODFLOW~6's particle-tracking model (PRT) or MODPATH run on the 
 \cmd{tools/make\_prt.py OUTPUT\_FOLDER [-{}-backward] [-{}-points file] [-{}-run libmf6]} builds a PRT simulation in
 \cmd{OUTPUT\_FOLDER/prt/}: release points around each well of \cmd{:Wells} (or from a file), the flow model's periods, and
 the head and budget files, reversed with FloPy for backward tracking (capture zones and times of travel). With \cmd{-{}-run}
-it runs PRT through the MODFLOW~6 library and writes \cmd{endpoints.csv} (travel time and end point of every particle). PRT
-tracks particles on DIS and DISV grids (regular and quadtree grids); for tracking through time, save the flows every step
-(\cmd{:HeadSaveFrequency 1}). An existing model keeps its own output control: add \cmd{BUDGET FILEOUT} and
+it runs PRT through the MODFLOW~6 library and writes \cmd{endpoints.csv} (release time, end point and travel time of every
+particle). Each point is released once: forward at the start of Raven's run, backward at its end; with
+\cmd{:GWInitialization STEADY\_STATE} the steady-state period before Raven's first step is outside that window (forward
+tracking releases after it, backward tracks end where Raven's run starts). PRT
+tracks particles on DIS and DISV grids (regular and quadtree grids) and needs the flows and heads of every time step
+(\cmd{:HeadSaveFrequency 1}); the script checks this and stops with a message when steps are missing. An existing model keeps its own output control: add \cmd{BUDGET FILEOUT} and
 \cmd{SAVE BUDGET} to its OC file instead (Chapter~\ref{ch:existing}).
 
 \section{A complete example set-up}

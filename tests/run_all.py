@@ -206,6 +206,7 @@ STEPS = [
     ('ext_inputs', True, [PY, 'existing/ext_inputs.py'], last_line(r'existing-model input forms: ALL PASSED'), 3 * 3600),
     ('budget_file', True, [PY, 'budget_file.py'], last_line(r'budget file checks: ALL PASSED'), 3600),
     ('tools_check', False, [PY, 'tools_check.py'], last_line(r'tool checks: ALL PASSED'), 1800),
+    ('watershed_balance', True, [PY, 'watershed_balance.py'], last_line(r'watershed balance: ALL PASSED'), 1800),
     ('combinations', True, [PY, 'combinations.py'], last_line(r'option combinations: \d+ runs, 0 failed.*'), 4 * 3600),
     ('reservoir_checks', True, [PY, 'reservoir_checks.py'], last_line(r'reservoir checks: ALL PASSED'), 3600),
     ('usgs_sagehen', True, lambda: [PY, 'existing/usgs_sagehen.py', USGS], last_line(r'Sagehen checks: ALL PASSED'), 6 * 3600),
@@ -353,8 +354,8 @@ json.dump([list(r) for r in rows], open(RES, 'w'), indent=1)
 rep = os.path.join(tc.WORK, 'run_all_report.md')
 with open(rep, 'w') as f:
     f.write('# Verification report\n\n')
-    f.write('- Raven: `%s`\n- MODFLOW 6 library: `%s`\n- scratch folder: `%s`\n- date: %s\n- mode: %s\n\n' % (
-        tc.RAVEN, tc.MF6LIB if have_lib else '(not used)', tc.WORK, time.strftime('%Y-%m-%d %H:%M'),
+    f.write('- Raven: `%s`\n- reference build (RAVEN_EXE_REF, byte-identity checks): `%s`\n- MODFLOW 6 library: `%s`\n- scratch folder: `%s`\n- date: %s\n- mode: %s\n\n' % (
+        tc.RAVEN, tc.REF or '(not set: those checks skipped)', tc.MF6LIB if have_lib else '(not used)', tc.WORK, time.strftime('%Y-%m-%d %H:%M'),
         'no library' if NOLIB else ('quick' if QUICK else 'full')))
     f.write('| Step | Result | Time [s] | Summary | Run |\n|---|---|---|---|---|\n')
     for name, status, dt, summary, _, when in rows:
@@ -369,5 +370,6 @@ nskip = sum(int(re.findall(r'\((\d+) skipped\)', r[1])[0]) for r in rows if 'ski
 print('steps: %d passed, %d failed, %d not run; %d checks skipped inside passing or failing steps'
       % (sum(1 for r in rows if r[1].startswith('PASS')), sum(1 for r in rows if r[1].startswith('FAIL')),
          sum(1 for r in rows if r[1] == 'skipped'), nskip))
+print('reference build (RAVEN_EXE_REF):', tc.REF or '(not set)')
 print('report:', rep)
 sys.exit(sum(1 for r in rows if r[1].startswith('FAIL')))

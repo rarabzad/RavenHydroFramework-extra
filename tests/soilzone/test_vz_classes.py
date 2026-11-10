@@ -355,10 +355,9 @@ def c10():
         miss = 3 * len(links) - len(lines)                                   # (class columns of those links without a line)
         start = '2000-01-%02d' % (n1 + 1)
         sec = case('c10_second_%d' % n1, extra_rvg=vz('RICHARDS', 3), start=start, rvc=rvc, rain=rain[n1:], days=len(rain) - n1, **cfg)
-        # (raven_mb_mm left out of the restart: its Raven MB error starts at 0 under a GROUNDWATER store of 20 mm read from the
-        # .rvc, and WatershedStorage.csv's 6 digits of an MB error of -18.484 mm over a store of 1.5 mm give 3e-5 by the
-        # check's scale max(1, store); the continuous run checks it)
-        g = check('c10_second_%d' % n1, sec, {k: v for k, v in LIM.items() if k != 'raven_mb_mm'})
+        # (the restart reads a GROUNDWATER store of about 20 mm from the .rvc: Raven's balance books it when the first
+        # step empties the store, so raven_mb_mm holds here too)
+        g = check('c10_second_%d' % n1, sec, LIM)
         if sec:
             w = warnings(sec); bad = 'do not match the columns' in w
             a, b = budget(full).iloc[n1:].reset_index(drop=True), budget(sec)

@@ -18,15 +18,18 @@ BeginParams
   par_K_till     2.0     0.01    5.0     none   log10   none
 EndParams
 
-# one response per monitoring well: RMSE of GW_HEAD in Raven's Diagnostics.csv
-# (row = order of the observation series in Diagnostics.csv; column 5 = DIAG_RMSE with
-#  :EvaluationMetrics NASH_SUTCLIFFE RMSE KLING_GUPTA - adjust to your file)
+# one response per monitoring well: RMSE of GW_HEAD in Raven's Diagnostics.csv. Ostrich counts lines from 0 (the header
+# is line 0) and columns from 1. With :EvaluationMetrics NASH_SUTCLIFFE RMSE KLING_GUPTA the columns are
+# observed_data_series, filename, DIAG_NASH_SUTCLIFFE, DIAG_RMSE (column 4), DIAG_KLING_GUPTA. A series' line is its
+# place among the observations: lines 1-4 when the four GW_HEAD series are the model's only observations (as here); with
+# four monitoring wells added to the Liard example, whose 29 streamflow series come first, they are lines 30-33. Check both
+# against your Diagnostics.csv.
 BeginResponseVars
   #name   filename                        keyword   line  col  token
-  RMSE1   model/output/Diagnostics.csv ;  OST_NULL  1     5    ','
-  RMSE2   model/output/Diagnostics.csv ;  OST_NULL  2     5    ','
-  RMSE3   model/output/Diagnostics.csv ;  OST_NULL  3     5    ','
-  RMSE4   model/output/Diagnostics.csv ;  OST_NULL  4     5    ','
+  RMSE1   model/output/Diagnostics.csv ;  OST_NULL  1     4    ','
+  RMSE2   model/output/Diagnostics.csv ;  OST_NULL  2     4    ','
+  RMSE3   model/output/Diagnostics.csv ;  OST_NULL  3     4    ','
+  RMSE4   model/output/Diagnostics.csv ;  OST_NULL  4     4    ','
 EndResponseVars
 
 BeginTiedRespVars

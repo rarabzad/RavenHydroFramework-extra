@@ -20,8 +20,11 @@ You never edit MODFLOW files; Raven writes them to `<output>/mf6/` so you can in
      exchange is added to or taken from the reaches.
 
 Raven owns the soil and vadose zone; MODFLOW owns the saturated zone. In coupled HRUs `GROUNDWATER` is a
-pass-through store: its end-of-step value is the recharge sent to MODFLOW, and Raven's water balance
-counts it as leaving Raven. Groundwater storage itself is reported by the files in section 5.
+pass-through store: its end-of-step value is the recharge sent to MODFLOW. Raven's water balance counts it as
+storage at the end of the step (`Deep Groundwater` in `WatershedStorage.csv`) and as leaving Raven when the next step
+empties it, so each volume is counted once. An initial `GROUNDWATER` value in the `.rvc` of a cold start (no `:GWHeads`)
+is emptied by the first step before any exchange, so MODFLOW never receives it; Raven warns: set it to 0. Groundwater
+storage itself is reported by the files in section 5.
 
 ## 2. Requirements and building
 
@@ -451,10 +454,11 @@ by a constant (a known issue of Raven itself, section 9).
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |
 | `GWModelSummary.txt` | MODFLOW library and version, grid, active cells, profiles, river/well/boundary cells, HRU-to-grid linkage per HRU; run totals at the end (unconverged steps, discharge withheld on unconverged steps, soil-zone counts) |
 | `mf6/` | the generated MODFLOW 6 model, list file (`mfsim.lst`) and head file (`gwf.hds`); with `:WriteGWBudgetFile` also `gwf.cbc` and `gwf.porosity` |
-| `prt/` | written by `tools/make_prt.py OUTPUT [--backward] [--points file] [--run libmf6]`: a MODFLOW 6 PRT simulation on the run's flows (release points around the `:Wells`, or from a file), and after `--run` its tracks (`prt.trk.csv`) and `endpoints.csv` (travel time and end point of each particle). PRT needs DIS or DISV grids (REGULAR, QUADTREE); save the flows every step (`:HeadSaveFrequency 1`) to track through time |
+| `prt/` | written by `tools/make_prt.py OUTPUT [--backward] [--points file] [--run libmf6]`: a MODFLOW 6 PRT simulation on the run's flows (release points around the `:Wells`, or from a file), and after `--run` its tracks (`prt.trk.csv`) and `endpoints.csv` (release time, end point and travel time of each particle; one release per point, forward at the start of Raven's run, backward at its end, a steady-state initialization period left out of the window). PRT needs DIS or DISV grids (REGULAR, QUADTREE); PRT needs the flows of every step (`:HeadSaveFrequency 1`); the script stops with a message when steps are missing |
 
 All rows are stamped with the date at the end of the step (with the time of day, e.g. `1985-10-01 12:00`, for sub-daily time steps). Groundwater discharge returned to Raven is
-counted as input to Raven's water balance (`WatershedStorage.csv`), recharge as output.
+counted as input to Raven's water balance (`WatershedStorage.csv`), recharge as output (when the next step empties
+`GROUNDWATER`; until then it is storage).
 
 ## 6. Calibration with Ostrich
 
@@ -560,6 +564,10 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   `solution.rvc` can be negative in some subbasins; on the day after a reservoir has been drawn empty by a minimum flow its
   outflow still averages in the previous release rate (most of such a reservoir's balance error); valgrind reports
   uninitialised reads in `RVPParameterWarning` and `CVegetationClass::RecalculateRootParams` while the `.rvp` file is read;
+  Raven's `MB Error` of the first step is not zero in some models and stays at that value (0.431 mm in the Liard example,
+  0.216 mm with half-day steps, also in base Raven 4.15); without `:GroundwaterModel`, Raven empties the `GROUNDWATER`
+  store every step without booking it as an output, so `MB Error` falls by the store's content each step (-7.48 mm after
+  the first year of the Liard example without groundwater; the flows are not affected);
   after a hotstart of a model whose reservoir spills, Raven's `MB Error` (`WatershedStorage.csv`) is offset by a
   constant, half the water that crossed the reservoir in the step before the restart (its outflow, and reservoir seepage
   returned to the subbasin or a gain MODFLOW did not supply on its way into the reservoir), because Raven's initial storage
@@ -567,3 +575,7 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   2,364 m3 in that step (without groundwater, in base Raven and with the coupling alike), +14.92 mm coupled (4,776 m3), about 50 mm for a
   lake spilling 16,100 m3/d, 0.1 to 0.6 mm for seepage in transit. The restarted run's states, flows and stages are the
   continuous run's (exactly in a coupled run); only that column, and the Raven balance `tools_audit.py` reports, is offset.
+  A restart right after a step in which a river loss was taken from a reach's upstream inflow (a loss larger than the
+  runoff reaching the reach) offsets `MB Error` by minus half that take in the same way (this one needs the coupling's river exchange: the loss is
+  booked in its step, Raven's channel storage takes in half of it in the next step; -0.0011 mm in the Liard example
+  after a take of 591,414 m3); the flows are not affected.

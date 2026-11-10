@@ -29,19 +29,34 @@ OUT, at least 1~m$^3$/d. This percentage is half MODFLOW's PERCENT DISCREPANCY, 
 audit tool's cumulative ratio uses signed package totals, a stricter figure. In the tests of Chapter~\ref{ch:verification}
 the worst single-day error is about $5\times10^{-6}$\% and the cumulative error about $10^{-10}$.
 
-\subsection{Raven's balance}
+\subsection{Raven's balance}\label{sec:accraven}
 Raven tracks cumulative input $I$ and output $O$ and reports $\mathrm{MB}=\left(S-S_0\right)+\left(O-I\right)$ in mm over
 the watershed. The coupling adds:
 \begin{itemize}
-\item \textbf{to output}: recharge (the end-of-day \cmd{GROUNDWATER} value of coupled HRUs, as Raven already does), and
-reservoir seepage (already counted by Raven as a reservoir loss);
+\item \textbf{to output}: recharge, and reservoir seepage (already counted by Raven as a reservoir loss). Raven's processes
+fill the \cmd{GROUNDWATER} store of coupled HRUs during a step, the coupling hands its contents to MODFLOW, and the next
+step empties it. Its water counts as storage at the end of the step (\emph{Deep Groundwater} in
+\cmd{Watershed\allowbreak Storage.csv}) and as output when the next step empties it (a negative content, from negative
+recharge, as input), so each volume is counted once; the \cmd{GROUNDWATER} of a hotstart's \cmd{.rvc} is booked when the
+first step empties it. In a cold start (an \cmd{.rvc} without \cmd{:GWHeads}) an initial \cmd{GROUNDWATER} is emptied the
+same way before any exchange: it is booked as leaving Raven but never reaches MODFLOW, and Raven warns; set it to 0;
 \item \textbf{to input}: every volume the coupling adds to Raven in the step --- seepage returned to HRU stores, the net
 river exchange applied to reaches, the net surface-store exchange, and with \cmd{:SoilZone PHYSICAL} the soil-zone
 exchange applied to the soil layers (rejected recharge plus the net exchange). A net loss (for example a losing river)
 is a negative input.
 \end{itemize}
-With these, Raven's own balance closes exactly as without groundwater (0.43--0.52 mm maximum over 20 years in the Liard
-example, the same as uncoupled).
+With these, Raven's own balance closes as without groundwater. In the Liard example its MB error is 0.431~mm from the first
+step to the last of 20 years: the value of base Raven's first step for this model, the same without groundwater
+(Section~\ref{ch:limits}). On 34 days of six snowmelt seasons it is raised, by up to 0.006~mm, and on the day after the
+last of a run of such days it is back at 0.431~mm (43 days with these returns). On those 34 days a river's loss to the
+aquifer is more than the runoff reaching the reach and is taken from the reach's upstream inflow; the loss is booked in
+the step, while Raven's channel storage, whose inflow term is the mean of the inflow at the start and at the end of the
+step, takes in half of the change in the step and half in the next. The rise is half the take of that day, exactly (to
+the 6 digits of the file); in Example B, whose stream losses are taken from the inflow on most days, it explains the
+whole variation of the MB error (0.431 to 0.4376~mm). Without river exchange (\cmd{:RiverGeometry} left out; the first
+300 days, which hold the first of these rises) the MB error stays at 0.431~mm on every step. Over a run nothing is lost,
+but a hotstart written right after such a day starts with the second half still to come: the restarted run's MB error
+is offset by minus half that take (Section~\ref{ch:limits}).
 
 \subsection{The whole system}
 The water that leaves Raven as recharge enters MODFLOW (directly or via the delay store); the water MODFLOW sends back
@@ -122,7 +137,9 @@ channel's outflow at the start of the step. It is positive when the river's rout
 that (a receding river), or when a reservoir gain MODFLOW does not supply is taken from the reach; the carry is taken
 from the river the next step. An existing model's stream package has no supply limit, so there it can stay positive for
 months (Section~\ref{sec:extlimits}).
-\item Raven's \cmd{Watershed\allowbreak Storage.csv} MB error should be as small as without groundwater.
+\item Raven's \cmd{Watershed\allowbreak Storage.csv} MB error stays at the first step's value (Raven's own, the same
+without groundwater), apart from the brief rises while a river loss is taken from a reach's inflow (Section~\ref{sec:accraven})
+and Raven's own errors (Section~\ref{ch:limits}).
 \end{enumerate}
 The tool \cmd{tools\_audit.py} checks all of these automatically.
 

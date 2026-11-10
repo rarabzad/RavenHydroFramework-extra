@@ -15,6 +15,11 @@ Checks:
       forward and backward: every particle is tracked and moves (travel times > 0), and each backward track runs against
       its forward track
   BF6  :WriteGWBudgetFile with an existing model stops (the model keeps its own output control)
+  BF7  with :GWInitialization STEADY_STATE (two stress periods: the steady state, then the run) make_prt.py releases each
+      point once, forward at the start of Raven's run (the end of the steady-state period) and backward at its end, and
+      every endpoint lies within Raven's run (0 < travel time <= the run's length, counted from the release)
+  BF8  the BF7 run again with :HeadSaveFrequency 5: make_prt.py stops before running PRT, forward and backward, with a
+      message naming :HeadSaveFrequency 1 and the steps saved (no traceback, no PRT run)
 Quick mode (RAVEN_TEST_QUICK=1): 10 days; full mode 60 days.
 Usage: python3 budget_file.py     (prints 'budget file checks: ALL PASSED')"""
 import os, sys, re, json, shutil, subprocess, filecmp
@@ -152,6 +157,38 @@ if len(disp) == 2:   # backward tracking reverses the flow field: each particle 
     dot = (disp['forward'] * disp['backward']).sum(axis=1)
     check('BF5 backward tracks run against the forward ones (8 particles)', (dot < 0).all(), 'cosines %.3f to %.3f' % tuple(
         (dot / np.maximum(np.hypot(*disp['forward'].T) * np.hypot(*disp['backward'].T), 1e-30))[[0, -1]]))
+# BF7 one release per particle with a steady-state first period (:GWInitialization STEADY_STATE: two stress periods)
+s = setup(W + '/steady'); open(s + '/Liard.rvg', 'a').write(':GWInitialization STEADY_STATE 0.45\n'); ms = tc.run(s)
+check('BF7 run with :GWInitialization STEADY_STATE', 'Successful' in ms, ms[-100:] if 'Successful' not in ms else '')
+if 'Successful' in ms:
+    per = [float(l.split()[0]) for l in open(s + '/out/mf6/sim.tdis').read().split('BEGIN PERIODDATA')[1].split('END PERIODDATA')[0].strip().split('\n')]
+    check('BF7 the flow model has two stress periods (steady state, then the run)', len(per) == 2, '%s' % per)
+    for mode, t_rel in (('forward', per[0]), ('backward', 0.0)):
+        shutil.rmtree(s + '/out/prt', ignore_errors=True)
+        r = subprocess.run([sys.executable, MP, s + '/out', '--run', tc.MF6LIB] + (['--backward'] if mode == 'backward' else []), capture_output=True, text=True, timeout=1800)
+        ep, tk = s + '/out/prt/endpoints.csv', s + '/out/prt/prt.trk.csv'
+        if r.returncode != 0 or not os.path.exists(ep):
+            check('BF7 %s: make_prt.py' % mode, False, (r.stdout + r.stderr).strip().split('\n')[-1][:160]); continue
+        T, E = pd.read_csv(tk), pd.read_csv(ep)
+        rel = sorted(T['trelease'].unique())
+        check('BF7 %s: each point released once, at %g d (%s)' % (mode, t_rel, 'the start of Raven\'s run' if mode == 'forward' else 'its end'),
+              rel == [t_rel] and T.groupby('irpt')['trelease'].nunique().max() == 1 and len(E) == 8, 'release times %s, %d endpoints' % (rel, len(E)))
+        check('BF7 %s: endpoints within Raven\'s run: 0 < travel time <= %d d, from the release' % (mode, DAYS),
+              (E['release_time_d'] == t_rel).all() and (E['travel_time_d'] > 0).all() and (E['travel_time_d'] <= DAYS + 1e-9).all(),
+              'travel times %.4g-%.4g d' % (E['travel_time_d'].min(), E['travel_time_d'].max()))
+# BF8 flows not saved every step: make_prt.py stops with a message, in both directions
+s8 = W + '/sparse'; shutil.rmtree(s8, ignore_errors=True); shutil.copytree(s, s8, ignore=shutil.ignore_patterns('out'))
+g8 = open(s8 + '/Liard.rvg').read(); open(s8 + '/Liard.rvg', 'w').write(re.sub(r':HeadSaveFrequency\s+\S+', ':HeadSaveFrequency  5', g8))
+m8 = tc.run(s8)
+check('BF8 run with :HeadSaveFrequency 5', 'Successful' in m8, m8[-100:] if 'Successful' not in m8 else '')
+if 'Successful' in m8:
+    for mode in ('forward', 'backward'):
+        r = subprocess.run([sys.executable, MP, s8 + '/out', '--run', tc.MF6LIB] + (['--backward'] if mode == 'backward' else []), capture_output=True, text=True, timeout=1800)
+        msg = (r.stdout + r.stderr).strip()
+        check('BF8 %s: make_prt.py stops with a message naming :HeadSaveFrequency 1' % mode,
+              r.returncode != 0 and ':HeadSaveFrequency 1' in msg and 'Traceback' not in msg and not os.path.exists(s8 + '/out/prt/prt.trk.csv'),
+              msg.split('\n')[-1][:150])
+shutil.rmtree(s8, ignore_errors=True)
 # BF6 existing model
 if not os.path.exists(W + '/Liard_groundwater'): os.symlink(tc.LIARD, W + '/Liard_groundwater')   # (the example reads ../Liard_groundwater/data_forcing)
 e = tc.copy_case(tc.EXISTING, W + '/existing', duration=2)
@@ -159,5 +196,5 @@ open(e + '/Liard.rvg', 'a').write('\n:WriteGWBudgetFile\n')
 m3 = tc.run(e)
 check('BF6 existing model: :WriteGWBudgetFile stops', ':WriteGWBudgetFile' in m3 and 'existing model' in m3, m3[:140])
 shutil.rmtree(e, ignore_errors=True)
-if ok_all: shutil.rmtree(W + '/with', ignore_errors=True)
+if ok_all: shutil.rmtree(W + '/with', ignore_errors=True); shutil.rmtree(W + '/steady', ignore_errors=True)
 print('budget file checks: %s' % ('ALL PASSED' if ok_all else 'FAILED'))

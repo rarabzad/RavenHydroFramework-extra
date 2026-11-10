@@ -358,6 +358,20 @@ in base Raven and with the coupling alike, and $+14.92$~mm coupled (half of 4\,7
 50~mm; returned or unsupplied reservoir seepage in transit gives 0.1 to 0.6~mm. The restarted run's states, flows and stages
 are the continuous run's (exactly in a coupled run, to the digits of Raven's \cmd{solution.rvc} without groundwater); only
 this column is offset, and with it the Raven balance that \cmd{tools\_audit.py} reports (\emph{Raven MB error max}).
+\item Hotstart right after a step in which a river loss was taken from a reach's upstream inflow (a loss larger than the
+runoff reaching the reach, Section~\ref{sec:accraven}): the restarted run's balance error is offset, from its first step on
+and by a constant, by minus half that take. Unlike the items around it this one needs the coupling (its river exchange),
+but it comes from Raven's channel-storage term: the run that wrote \cmd{solution.rvc} booked the whole take, while Raven's
+channel storage takes in its second half in the next step, which is the restarted run's first. In the Liard example a
+restart on 1986-05-24, after a take of 591\,414~m$^3$, gives $-0.0011$~mm; the flows of the restarted run are the
+continuous run's.
+\item Raven's balance error (\emph{MB Error} of \cmd{WatershedStorage.csv}) of the first step is not zero in some models and
+stays at that value afterwards: 0.431~mm in the Liard example with daily steps and 0.216~mm with half-day steps, in base
+Raven~4.15 without groundwater and in a coupled run alike (Section~\ref{sec:accraven}).
+\item Without \cmd{:GroundwaterModel}, Raven empties the \cmd{GROUNDWATER} store at the start of every step without booking
+its water as an output (base Raven books it only for model types other than a surface-water model), so a model that sends
+water to \cmd{GROUNDWATER} shows a balance error that falls by the store's content every step: $-7.48$~mm after the first
+year of the Liard example without groundwater. The flows are not affected.
 \item In ensemble mode, \cmd{WatershedStorage.csv} shows channel and rivulet storages that differ from a single run, also
 without groundwater; the hydrographs, reservoir stages and groundwater outputs of each member equal the single run's
 (Section~\ref{sec:behaviour}).

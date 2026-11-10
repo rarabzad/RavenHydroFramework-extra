@@ -79,7 +79,8 @@ The original package was built for Raven 2.9.1; for Raven 4.x, Windows `\` paths
 
 ## 4. Results you should see (tools_audit.py)
 Recharge transferred exactly; MODFLOW cumulative balance residual about -1e-10 of the gross flow; worst day 4e-6 %;
-every step converged; no river asked for more water than it carried; Raven balance error 0.52 mm.
+every step converged; no river asked for more water than it carried; Raven balance error at most 0.437 mm (0.431 mm,
+base Raven's first-step value for this model, on all but a few snowmelt days).
 NSE at gauges 10BE004 / 10BE005 / 10BE010: 0.850 / 0.821 / 0.634 (uncoupled 0.867 / 0.835 / 0.681;
 not recalibrated, stand-in geometry).
 

@@ -5,7 +5,9 @@
 The run must use :WriteGWBudgetFile (Raven then writes mf6/gwf.cbc with every package's flows, the specific discharge
 and the saturation, and mf6/gwf.porosity with the porosity of every cell) and a regular or quadtree grid (PRT needs DIS
 or DISV; HRU meshes, imported grids and :LayerConnection ELEVATION use DISU). For tracking through time, save the flows
-every step (:HeadSaveFrequency 1); with a coarser frequency PRT stops at the first step without saved flows.
+every step (:HeadSaveFrequency 1, which tracking needs): the script checks that mf6/gwf.cbc and mf6/gwf.hds hold every
+time step of the flow model and stops with a message before writing the PRT files when they do not (a coarser
+:HeadSaveFrequency saves only some steps, and PRT can follow the flows only through saved steps).
 
     python3 make_prt.py OUTPUT_FOLDER [--backward] [--points FILE] [--radius F] [--run LIBMF6]
 
@@ -21,8 +23,16 @@ every step (:HeadSaveFrequency 1); with a coarser frequency PRT stops at the fir
   --run LIBMF6   run the PRT simulation through the MODFLOW 6 library (no mf6 executable needed); otherwise run
                  mf6 in OUTPUT_FOLDER/prt yourself
 
+Every point is released once: forward, at the start of Raven's run; backward, at its end. With :GWInitialization
+STEADY_STATE the flow model's first stress period is the steady state solved before Raven's first step: forward tracking
+releases after it (at the start of the second period), and backward tracking ends where Raven's run starts (the
+tracking window is Raven's run; the steady-state period stays in the PRT time discretization, after the window, only
+because PRT reads the flow files period by period).
+
 Writes OUTPUT_FOLDER/prt/ (mfsim.nam, prt.* files); after a run, prt.trk.csv (PRT's track file) and endpoints.csv
-(per particle: release point, end point, travel time [d], the reason the track ended).
+(per particle: release point and time, the end point within the tracking window, travel time [d] = end - release, PRT's
+status code of the track at that point, and why the endpoint was taken there: 'terminated' (PRT ended the track, e.g.
+at a well, a boundary or in a weak sink) or 'end of the tracking window').
 """
 import os, sys, re, csv, shutil, ctypes, argparse
 import numpy as np
@@ -93,8 +103,29 @@ def main():
         cid = (lay, c[0] + 1, c[1] + 1) if dis_type == 'DIS6' else (lay, c + 1)
         xl, yl = mg.get_local_coords(x, y)   # (PRT reads release points in the grid's own frame, before XORIGIN/YORIGIN/ANGROT)
         rows.append((n + 1,) + tuple(int(v) for v in cid) + (float(xl), float(yl), float(z), name))
-    # time: the flow model's periods (reversed for backward tracking)
+    # time: the flow model's periods (reversed for backward tracking). A first steady-state period followed by others is
+    # the steady-state initialization before Raven's run: not part of the tracking window
     per = [l.split() for l in read_block(os.path.join(mf, 'sim.tdis'), 'PERIODDATA')]
+    sto = open(os.path.join(mf, 'gwf.sto')).read().upper() if os.path.exists(os.path.join(mf, 'gwf.sto')) else ''
+    m = re.search(r'BEGIN\s+PERIOD\s+1\s+(STEADY-STATE|TRANSIENT)', sto)
+    steady0 = (len(per) > 1) and (m is not None) and (m.group(1) == 'STEADY-STATE')
+    plen = [float(p[0]) for p in per]
+    # PRT reads the flows of every time step: the head and budget files must hold each of them (:HeadSaveFrequency 1)
+    want = [(k, j) for j, p in enumerate(per) for k in range(int(p[1]))]   # (time step, period), from 0 as FloPy counts
+    have_c = set(tuple(int(v) for v in x) for x in flopy.utils.CellBudgetFile(os.path.join(mf, 'gwf.cbc'), precision='double').get_kstpkper())
+    have_h = set(tuple(int(v) for v in x) for x in flopy.utils.HeadFile(os.path.join(mf, 'gwf.hds')).get_kstpkper())
+    miss_c, miss_h = [w for w in want if w not in have_c], [w for w in want if w not in have_h]
+    if miss_c or miss_h:
+        sys.exit('make_prt: the flow model has %d time steps, but mf6/gwf.cbc holds flows for %d of them and mf6/gwf.hds heads for '
+                 '%d (first missing: time step %d of period %d). PRT needs the flows and heads of every step: run Raven again with '
+                 ':HeadSaveFrequency 1 (and :WriteGWBudgetFile) in the .rvg'
+                 % (len(want), len(want) - len(miss_c), len(want) - len(miss_h), (miss_c or miss_h)[0][0] + 1, (miss_c or miss_h)[0][1] + 1))
+    if a.backward:
+        release_per, t0 = 1, 0.0                                       # (reversed: period 1 is the last period of the run)
+        t1 = sum(plen) - (plen[0] if steady0 else 0.0)                 # Raven's start, in reversed time
+    else:
+        release_per = 2 if steady0 else 1
+        t0 = plen[0] if steady0 else 0.0; t1 = sum(plen)
     if a.backward:
         per = per[::-1]
         flopy.utils.HeadFile(os.path.join(mf, 'gwf.hds')).reverse(filename=os.path.join(prt, 'gwf_rev.hds'))
@@ -114,10 +145,15 @@ def main():
     shutil.copy(os.path.join(mf, 'gwf.porosity'), os.path.join(prt, 'prt.mip'))
     W('prt.fmi', 'BEGIN PACKAGEDATA\n  GWFHEAD  FILEIN  %s\n  GWFBUDGET  FILEIN  %s\nEND PACKAGEDATA\n' % (hds, cbc))
     W('prt.prp', 'BEGIN OPTIONS\n  BOUNDNAMES\n  EXIT_SOLVE_TOLERANCE 1e-5\nEND OPTIONS\n\nBEGIN DIMENSIONS\n  NRELEASEPTS %d\nEND DIMENSIONS\n\n'
-      'BEGIN PACKAGEDATA\n%sEND PACKAGEDATA\n\nBEGIN PERIOD 1\n  FIRST\nEND PERIOD\n'
-      % (len(rows), ''.join('  ' + ' '.join(str(v) if not isinstance(v, float) else repr(v) for v in r) + '\n' for r in rows)))
+      'BEGIN PACKAGEDATA\n%sEND PACKAGEDATA\n\n%s'
+      % (len(rows), ''.join('  ' + ' '.join(str(v) if not isinstance(v, float) else repr(v) for v in r) + '\n' for r in rows),
+         # one release, in release_per; a PERIOD block's setting carries over to later periods, so the next period has an
+         # empty block (no release)
+         ''.join('BEGIN PERIOD %d\n%sEND PERIOD\n\n' % (p, '  FIRST\n' if p == release_per else '')
+                 for p in range(1, len(per) + 1) if p in (release_per, release_per + 1))))
     W('prt.oc', 'BEGIN OPTIONS\n  TRACK FILEOUT prt.trk\n  TRACKCSV FILEOUT prt.trk.csv\nEND OPTIONS\n')
-    print('make_prt: PRT simulation with %d release points written to %s (%s tracking)' % (len(rows), prt, 'backward' if a.backward else 'forward'))
+    print('make_prt: PRT simulation with %d release points written to %s (%s tracking, released at PRT time %g d, tracking window %g to %g d)'
+          % (len(rows), prt, 'backward' if a.backward else 'forward', t0, t0, t1))
     if not a.run:
         return
     lib = ctypes.CDLL(os.path.abspath(a.run)); cwd = os.getcwd(); os.chdir(prt)
@@ -138,11 +174,17 @@ def main():
     import pandas as pd
     T = pd.read_csv(trk)
     out = []
-    for irpt, g in T.groupby('irpt'):
-        g = g.sort_values('t'); s, e = g.iloc[0], g.iloc[-1]
+    for (irpt, trel), g in T.groupby(['irpt', 'trelease']):
+        g = g[g['t'] <= t1 + 1e-9].sort_values('t'); s, e = g.iloc[0], g.iloc[-1]
+        # (PRT's status 1: still active, 10: stopped at the end of the simulation; any other: the track ended there)
+        last = (len(T[(T['irpt'] == irpt) & (T['trelease'] == trel)]) == len(g)) and (int(e['istatus']) not in (1, 10))
         (x0, y0), (x1, y1) = mg.get_coords(s['x'], s['y']), mg.get_coords(e['x'], e['y'])   # (back to the coordinates of gwf.dis(v))
-        out.append(dict(particle=int(irpt), name=rows[int(irpt) - 1][-1], x0=x0, y0=y0, z0=s['z'], x1=x1, y1=y1, z1=e['z'],
-                        travel_time_d=e['t'] - s['t'], ended=int(e['istatus'])))
+        out.append(dict(particle=int(irpt), name=rows[int(irpt) - 1][-1], release_time_d=float(trel), x0=x0, y0=y0, z0=s['z'],
+                        x1=x1, y1=y1, z1=e['z'], travel_time_d=e['t'] - trel, ended=int(e['istatus']),
+                        end='terminated' if last else 'end of the tracking window'))
+    if len(out) != len(rows) or any(abs(r['release_time_d'] - t0) > 1e-9 for r in out):
+        sys.exit('make_prt: %d tracks for %d release points, released at %s d (expected one release each at %g d)'
+                 % (len(out), len(rows), sorted({r['release_time_d'] for r in out}), t0))
     pd.DataFrame(out).to_csv(os.path.join(prt, 'endpoints.csv'), index=False)
     print('make_prt: %d particles tracked; endpoints in %s' % (len(out), os.path.join(prt, 'endpoints.csv')))
 

@@ -331,7 +331,7 @@ BeginParams                         # name, start, lower, upper, transformations
   par_K_till     2.0  0.01 5.0    none log10 none
 EndParams
 BeginResponseVars                   # values read from Diagnostics.csv
-  RMSE1  model/output/Diagnostics.csv ; OST_NULL 1 5 ','
+  RMSE1  model/output/Diagnostics.csv ; OST_NULL 1 4 ','  # line 1 (header = 0), column 4
   ...
 EndResponseVars
 BeginTiedRespVars                   # objective = sum of the RMSEs
@@ -344,8 +344,11 @@ BeginDDSAlg
   MaxIterations 150
 EndDDSAlg
 \end{lstlisting}
-Check the row and column of each response in your own \cmd{Diagnostics.csv}; they depend on the order of observations and on
-\cmd{:EvaluationMetrics}. To combine heads and streamflow, add NSE or KGE responses of the hydrographs with suitable weights.
+Ostrich counts the lines of \cmd{Diagnostics.csv} from 0 (the header is line 0) and its columns from 1. With
+\cmd{:EvaluationMetrics NASH\_SUTCLIFFE RMSE KLING\_GUPTA} the columns are the series, the file, NSE, RMSE (column 4) and
+KGE, and the four \cmd{GW\_HEAD} series are lines 1--4 when they are the model's only observations (with four monitoring
+wells added to the Liard example, whose 29 streamflow series come first, lines 30--33). Check the line and column of each response in your own
+\cmd{Diagnostics.csv}; they depend on the order of observations and on \cmd{:EvaluationMetrics}. To combine heads and streamflow, add NSE or KGE responses of the hydrographs with suitable weights.
 
 \section{Troubleshooting}\label{ch:trouble}
 \begin{table}[!htbp]\centering
