@@ -398,11 +398,9 @@ its cells, and nothing is booked onto specified-head cells (manual, "Where bound
 :InitialGWHeads DEPTH_BELOW_SURFACE 5.0   # or FROM_PROFILE (default), or ELEVATION [m]
 ```
 
-The value is a plain decimal number in metres (`98.5`; not `98,5`, `H98.5` or `0x62`), optionally followed by a `#`
-comment; `FROM_PROFILE` takes no value.
-
-The value is read strictly, as the numbers of the `.rvg`: `98,5` (a decimal comma: two values) or `H98.5` stop the run
-naming the command.
+The value is a plain decimal number in metres (`98.5`), optionally followed by a `#` comment; `FROM_PROFILE` takes no
+value. It is read strictly, as the numbers of the `.rvg`: `98,5` (a decimal comma: two values), `H98.5` or `0x62` stop
+the run naming the command.
 
 In a coupled run Raven's `solution.rvc` holds every value with 17 significant digits (the HRU states, the channel and
 reservoir states and the groundwater blocks; a run without groundwater writes Raven's usual 5 decimals, and reservoir stages and flows with 12 digits, with or without groundwater). It also contains

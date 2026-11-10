@@ -180,7 +180,7 @@ are always in metres and days.
 \section{Packages}
 \begin{table}[!htbp]\centering
 \caption{How the model's packages are treated.}\label{tab:extpkgs}
-\begin{tabularx}{\linewidth}{P{0.30\linewidth}Y}\toprule\hdr
+\begin{tabularx}{\linewidth}{P{0.24\linewidth}Y}\toprule\hdr
 Package & Treatment\\\midrule
 Recharge, evapotranspiration, UZF & must be named in \cmd{:RavenTakesOver} (removed; Raven supplies recharge) or in \cmd{:KeepPackages} (they stay). An undeclared one stops the run, so recharge is never counted twice\\
 Stream package (\cmd{:StreamPackage}) & a RIV, DRN or GHB package whose flows go to Raven's reaches: to the subbasin in an auxiliary variable (\cmd{AUX} name, default \cmd{SUBBASIN}), or to the subbasin of the dominant HRU of the cell (\cmd{DOMINANT\_HRU}). Losing reaches take the water from the channel; a loss that cannot be supplied is carried to the next step\\
