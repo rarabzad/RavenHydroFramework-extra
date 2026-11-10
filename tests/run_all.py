@@ -205,6 +205,7 @@ STEPS = [
     ('ext_exchanges', True, [PY, 'existing/ext_exchanges.py'], last_line(r'existing-model exchanges: ALL PASSED'), 3 * 3600),
     ('ext_inputs', True, [PY, 'existing/ext_inputs.py'], last_line(r'existing-model input forms: ALL PASSED'), 3 * 3600),
     ('budget_file', True, [PY, 'budget_file.py'], last_line(r'budget file checks: ALL PASSED'), 3600),
+    ('tools_check', False, [PY, 'tools_check.py'], last_line(r'tool checks: ALL PASSED'), 1800),
     ('combinations', True, [PY, 'combinations.py'], last_line(r'option combinations: \d+ runs, 0 failed.*'), 4 * 3600),
     ('reservoir_checks', True, [PY, 'reservoir_checks.py'], last_line(r'reservoir checks: ALL PASSED'), 3600),
     ('usgs_sagehen', True, lambda: [PY, 'existing/usgs_sagehen.py', USGS], last_line(r'Sagehen checks: ALL PASSED'), 6 * 3600),
@@ -281,7 +282,7 @@ def selftest():
     lg = 'regular 2 km (default) FAILED\nliard grids: 4 of 5 finished, converged and balanced\nresults in x\n'
     check('liard_grids: a FAILED grid is judged FAIL', not J['liard_grids'](lg)[0])
     # soil-zone restart: the last line is PASS only when R2-R4 pass too
-    r = subprocess.run([PY, '-c', 'import sys; sys.path.insert(0, "soilzone"); import test_restart as t; t.verdict(True, True, False, True)'],
+    r = subprocess.run([PY, '-c', 'import sys; sys.path.insert(0, "soilzone"); import test_restart as t; t.verdict(True, True, False, True, True)'],
                        cwd=HERE, capture_output=True, text=True, env=tc.ENV)
     o = r.stdout + r.stderr
     check('soilzone_restart: RS3 failing makes the last line FAIL', ('restart test: FAIL' in o) and not J['soilzone_restart'](o)[0], o.strip().split('\n')[-1][:100])

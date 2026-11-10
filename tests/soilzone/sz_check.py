@@ -194,6 +194,7 @@ def same_file(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
         cy = [c for c in y.columns if c not in skip and c not in added]
         if cx != cy or len(x) != len(y): return False
         return x[cx].astype(str).equals(y[cy].astype(str))
+    if a.endswith('.rvc'): return tc.rvc_same(a, b)   # (the same state, to the digits either file holds)
     return open(a, 'rb').read() == open(b, 'rb').read()
 
 def same_outputs(a, b, skip=DIAGNOSTIC_COLUMNS, added=()):
@@ -229,12 +230,6 @@ def ext_case(g, e, cfg, newton=True, model_edit=None):
     rvg += '\n:MF6Simulation %s/mfsim.nam\n:MF6GridFile cells.geojson cell\n:MF6StartDate 2000-01-01\n:SeepageToRaven ON\n' % m
     open(os.path.join(e, 'm.rvg'), 'w').write(rvg)
     return e
-
-def rvc_text(p):
-    """the text of a solution.rvc without its :GWVadoseColumnTops block (the columns' tops and water, written since the
-    restart match checks the tops): byte-identity checks against a reference build that does not write it compare the rest"""
-    import re
-    return re.sub(r':GWVadoseColumnTops[^\n]*\n.*?:EndGWVadoseColumnTops\n', '', open(p).read(), flags=re.S)
 
 def errors(d):
     p = os.path.join(d, 'out', 'Raven_errors.txt')

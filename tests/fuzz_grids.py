@@ -160,7 +160,7 @@ for i in range(N):
                 cols=['seepage to Raven [m3/d]','MF6 recharge [m3/d]','storage release [m3/d]','river exchange applied to Raven [m3]']
                 # deviation relative to each flow's largest value in the run (as in existing/fuzz_ext.py): a small net flow such
                 # as the storage release can differ by a fraction of a cubic metre, which is not a restart error
-                dev=max(((m[x+'_c']-m[x+'_h']).abs()/(m[x+'_c'].abs().max()+1e3)).max() for x in cols)
+                dev=max(tc.max_diff(m[x+'_c'],m[x+'_h'],m[x+'_c'].abs().max()+1e3) for x in cols)
                 rec['hotstart_dev']=float(dev); rec['pass']=bool(rec['pass'] and dev<1e-4)
             else: rec['pass']=False; rec['hot_msg']=m2
     else: rec['pass']=False

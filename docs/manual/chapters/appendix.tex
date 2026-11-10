@@ -254,7 +254,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{lagged-exchange debt [m3]}, \cmd{lagged-exchange repayment [m3]} & \cmd{LAGGED} timing: lent water Raven's processes used that the step's exchange did not supply; the aquifer's repayment in the step (Section~\ref{sec:sztiming})\\
 \cmd{soil zone to specified heads [m3/d]}, \cmd{specified heads to soil zone [m3/d]} & soil-zone columns over specified heads, or an existing model (Section~\ref{sec:szchd})\\
 \cmd{recharge not applied by MODFLOW [m3/d]} & an existing model without \cmd{NEWTON}: recharge MODFLOW did not apply (dry cells, specified heads), signed\\
-\cmd{reservoir seepage not delivered by MODFLOW [m3]} & an existing model with \cmd{:ReservoirExchange}: reservoir seepage MODFLOW did not take (cells under the lake that are specified heads or inactive), returned to the reservoir's subbasin in the same step (normally 0)\\\bottomrule
+\cmd{reservoir seepage not delivered by MODFLOW [m3]} & an existing model with \cmd{:ReservoirExchange}, or a generated one with a lake over specified heads that follow a \cmd{:BoundaryHead} series: reservoir seepage MODFLOW did not take (cells under the lake that are specified heads or inactive), returned to the reservoir's subbasin in the same step (normally 0)\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
 water level, water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
@@ -270,7 +270,8 @@ recharge the soil zone did not hold}, with \cmd{:SoilZone PHYSICAL}; the unsatur
 with \cmd{LAGGED} timing; the specified-head columns where soil-zone columns lie over specified heads; and, last,
 \cmd{recharge not applied by MODFLOW} for an existing model without \cmd{NEWTON} (signed: negative where a negative recharge
 was taken out of \cmd{GROUNDWATER} without MODFLOW supplying it), then \cmd{reservoir seepage not delivered by MODFLOW} for an
-existing model with \cmd{:ReservoirExchange}. \cmd{MF6 balance error [\%]} divides by the gross flow
+existing model with \cmd{:ReservoirExchange} (and a generated one with a lake over specified heads that follow a
+\cmd{:BoundaryHead} series). \cmd{MF6 balance error [\%]} divides by the gross flow
 (Section~\ref{ch:balance}). Every row is stamped with the end of its step.
 
 \paragraph{Run totals.} At the end of a run Raven appends to \cmd{GWModelSummary.txt}: time steps and MODFLOW-unconverged steps; with
@@ -280,10 +281,12 @@ supply-limited link updates and the largest take beyond the free water, and the 
 and those followed by a plain update); without \cmd{:SoilZone PHYSICAL} the discharge withheld on unconverged steps for
 MODFLOW's negative residual (only when such steps occurred); the negative recharge cut and the part not held (only when not zero); the
 unsaturated columns of the hotstart file a run without columns did not use, with their water (only when there were such
-columns); for an existing model with unsaturated columns, the columns that ended on cells that were specified heads and
-their water; with a \cmd{:BoundaryHead} series, the boundary cell-steps switched off; with \cmd{:ReservoirExchange} the reservoir
-gain not supplied; for an existing model with \cmd{:ReservoirExchange} the reservoir seepage not delivered, and for an existing
-model without \cmd{NEWTON} the recharge not applied (these always written, also 0).
+columns); for an existing model with unsaturated columns, and a generated one whose specified heads follow a
+\cmd{:BoundaryHead} series, the columns that ended on cells that were specified heads and their water; with a
+\cmd{:BoundaryHead} series, the boundary cell-steps switched off (a steady-state first period included); with
+\cmd{:ReservoirExchange} the reservoir gain not supplied; for an existing model with \cmd{:ReservoirExchange}, and a
+generated one with a lake over specified heads that follow a \cmd{:BoundaryHead} series, the reservoir seepage not
+delivered, and for an existing model without \cmd{NEWTON} the recharge not applied (these always written, also 0).
 
 
 \section{Hotstart blocks (\texttt{solution.rvc})}\label{app:hotstart}
@@ -292,7 +295,7 @@ model without \cmd{NEWTON} the recharge not applied (these always written, also 
 \toprule\hdr Block & Content\\\midrule\endfirsthead
 \caption[]{Hotstart blocks written to \cmd{solution.rvc} (continued)}\\
 \toprule\hdr Block & Content\\\midrule\endhead
-\cmd{:GWHeads nlay nrow ncol} & MODFLOW head of every cell (raw values, 12 significant digits; 17 with \cmd{:SoilZone PHYSICAL}); checked against the grid (counts that are not positive, or whose product exceeds $10^9$, stop the run with a message)\\
+\cmd{:GWHeads nlay nrow ncol} & MODFLOW head of every cell (raw values, 17 significant digits, as every value of a coupled run's \cmd{solution.rvc}); checked against the grid (counts that are not positive, or whose product exceeds $10^9$, stop the run with a message)\\
 \cmd{:GWRechargeStore} & HRU ID, water in the recharge-delay reservoir [m$^3$]\\
 \cmd{:GWReservoirSeepage} & subbasin ID, reservoir seepage in transit [m$^3$], share of the lake's cells able to take seepage when it was computed (read as 1 when absent)\\
 \cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\
@@ -302,7 +305,7 @@ model without \cmd{NEWTON} the recharge not applied (these always written, also 
 \cmd{:GWVadoseColumnTops} & with either block above: HRU ID, cell, depth class (1 without classes), column top [m], water above the column's reference profile [m$^3$]. A column whose top differs by more than 1~mm from the restarted run's (another \cmd{:SoilZoneSubgrid}, ground or soil-zone thickness) does not match and starts at rest, with a warning; a run without columns reports the water it drops\\
 \cmd{:GWSoilZoneLag} & \cmd{LAGGED} timing: HRU ID, cell, exchange of the last step into the aquifer [m$^3$/d], debt the aquifer still repays [m$^3$]\\
 \cmd{:AgeTracerDatum date time} & with an age tracer (Raven core, also without groundwater), when the datum of the tracer's entry times is before the run's start: that datum (the start of the first run of a chain of restarts); \cmd{:StartTime} is the start of the run that wrote the file\\\bottomrule
-\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWVadoseColumnTops}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning. A value that is not a finite number in any block, or negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or \cmd{:GWVadoseClassColumns}, stops the run with a message naming the block.}\\
+\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWVadoseColumnTops}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning. A value that is not a finite number in any block (the whole token must be a number: \cmd{98.5x} is not), or negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or \cmd{:GWVadoseClassColumns}, stops the run with a message naming the block.}\\
 \end{longtable}
 
 \section{Error messages}\label{app:errors}
@@ -328,8 +331,11 @@ top layer cannot be an AQUICLUDE; layer thickness must be positive & correct the
 improper format of command \dots & correct the command syntax\\
 command \dots\ in \dots: '\emph{token}' is not a number / is not a whole number / is not a whole-number ID & give a plain number, in the units of the manual, without units or thousands separators\\
 command \dots\ has the surplus value '\emph{token}' & remove it; a comma separates values (2000.0, not 2,000.0)\\
+command \cmd{:InitialGWHeads} in \dots: '\emph{token}' is not a number / has the surplus value '\emph{token}' (\cmd{.rvc}) & give the value as a plain decimal number in metres (98.5, not 98,5, H98.5 or 0x62; a comment may follow after \#); \cmd{FROM\_PROFILE} takes no value\\
 boundary \dots: the values after the file must come in keyword-value pairs / unknown keyword & \cmd{HEAD}, \cmd{CONDUCTANCE} and \cmd{LAYERS}, each with its value\\
-\cmd{:GridCellSize} \dots\ m gives about \dots\ cells per layer over the HRUs' extent \dots, more than 1e+07 / the \cmd{:GridRefinement} sizes give a regular grid of about \dots\ cells per layer & give the sizes in metres as plain numbers; for refinement around features only use \cmd{QUADTREE} or \cmd{HRU\_MESH}\\
+\cmd{:GridCellSize} \dots\ m gives about \dots\ cells per layer over the HRUs' extent \dots, more than 5e+06 / the \cmd{:GridRefinement} sizes give a regular grid of about \dots\ cells per layer & give the sizes in metres as plain numbers; for refinement around features only use \cmd{QUADTREE} or \cmd{HRU\_MESH}\\
+the \cmd{:GridRefinement} sizes (smallest \dots\ m, \dots\ levels below the \cmd{:GridCellSize} \dots\ m) give a quadtree grid of about \dots\ cells per layer (estimated), more than 5e+06 / of more than 5e+06 cells per layer (the build stopped there) & give the refinement sizes in metres as plain numbers (500, not 0.5), or a \cmd{:QuadtreeMaxLevel}\\
+not enough memory to build the groundwater model (about \dots\ cells per layer, from \dots) / to couple the existing model (\dots\ cells per layer) & a larger \cmd{:GridCellSize} or larger \cmd{:GridRefinement} sizes; for an existing model, more memory\\
 \cmd{:WellFlowRate} \emph{id}: units \dots\ are not supported / \cmd{:BoundaryHead} \emph{name}: units \dots & rates in \cmd{m3/d}, \cmd{m3/s} or \cmd{L/s}; heads in \cmd{m}\\
 boundary \dots\ needs a HEAD value / positive CONDUCTANCE & complete the boundary command\\
 two wells / observation wells / boundaries have the same ID or name & make IDs unique\\

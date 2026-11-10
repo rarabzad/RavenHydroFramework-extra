@@ -17,7 +17,8 @@ X7  specific yield of an existing model: the x1 model with a confined STO packag
 X8  a steady existing model (the x7 model without STO) with :SoilZoneAquiferClass: the class's SPEC_YIELD (0.1) replaces
     the 0.2 (warning naming it; the Sy/drainable-porosity range of GWModelSummary.txt halves; identities hold); a class
     without SPEC_YIELD keeps 0.2 (the outputs of the x7 run without a class, byte for byte); with RAVEN_EXE_REF the x7 run
-    without a class is byte-identical to the reference build (otherwise SKIP).
+    without a class is byte-identical to the reference build (solution.rvc the same state, testconfig.rvc_same;
+    otherwise SKIP).
 X9  unsaturated columns on the existing model's own specified heads: the 'rise' column case of combinations.py (flat, a
     specified head 0.3 m below the ground on the outlet cells, wet columns from :SoilZoneVadoseInitialFlux 30) generated
     and as its existing twin (:SoilZoneAquiferClass SAND). The existing model learns its specified heads in its first
@@ -148,10 +149,9 @@ def sy_ratio(d):
     return (float(m.group(1)), float(m.group(2))) if m else None
 
 def same_outputs(a, b, skip=('GWModelSummary.txt', 'Raven_errors.txt')):
-    import filecmp
     pa, pb = os.path.join(a, 'out'), os.path.join(b, 'out')
     return [f for f in sorted(os.listdir(pa)) if not os.path.isdir(os.path.join(pa, f)) and f not in skip
-            and not (os.path.exists(os.path.join(pb, f)) and filecmp.cmp(os.path.join(pa, f), os.path.join(pb, f), shallow=False))]
+            and not sz_check.tc.same_output(os.path.join(pa, f), os.path.join(pb, f))]
 
 def sy_x8():
     """X8: a steady existing model (no STO) takes SPEC_YIELD of :SoilZoneAquiferClass when the class gives it"""

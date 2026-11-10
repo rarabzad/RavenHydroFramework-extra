@@ -104,7 +104,7 @@ for m in (1, 2):
         if any((a[k].astype(str) != c[k].astype(str)).any() for k in txt):
             print('  ens_%d/%s: text columns (dates) differ  FAIL' % (m, f)); ok_all = False
         for k in num:
-            v = float(((a[k] - c[k]).abs() / (a[k].abs().max() + 1e-9)).max())
+            v = tc.max_diff(a[k], c[k], a[k].abs().max() + 1e-9)
             if v > worst:
                 worst, where = v, '%s %s' % (f, k)
         compared.append(f)

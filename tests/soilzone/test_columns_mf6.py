@@ -7,7 +7,7 @@ M2  an unsaturated column under steady rain delivers its inflow to MODFLOW's top
     4 m deep water table, the columns' outflow to the aquifer is at least 0.9 of their inflow (qA) and MODFLOW's recharge at
     least 0.9 of it too (the column's water reaches MODFLOW's cell, not only its books).
 M3  CONCEPTUAL runs are unchanged against the reference build (RAVEN_EXE_REF; SKIP without it), apart from GWBudget's
-    "MF6 balance error [%]" (gross flow redefined) and the run log.
+    "MF6 balance error [%]" (gross flow redefined) and the run log (solution.rvc the same state, testconfig.rvc_same).
 M4  the check of M1 fails when the GWModelSummary.txt line is missing (kept_its returns None).
 Quick mode (RAVEN_TEST_QUICK=1): M2 runs 75 days instead of 120 (the same check over its last 30 days).
 """

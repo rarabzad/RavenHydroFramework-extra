@@ -9,7 +9,8 @@ Checks:
   B3  gwf.porosity holds, in every active cell, the POROSITY of the aquifer class of that cell (classes told apart by K)
   B4  the same run without the option: the solution is the same (GWBudget.csv, heads identical) and the option changes
       only gwf.nam, gwf.npf and gwf.oc of the mf6 folder (and adds gwf.cbc, gwf.porosity); with RAVEN_EXE_REF the run
-      without the option is identical to the reference build (outputs and mf6 folder)
+      without the option is identical to the reference build (outputs and mf6 folder; solution.rvc the same state,
+      testconfig.rvc_same)
   B5  make_prt.py builds a PRT simulation (8 particles around the well) and runs it through the MODFLOW 6 library,
       forward and backward: every particle is tracked and moves (travel times > 0), and each backward track runs against
       its forward track
@@ -122,7 +123,7 @@ if tc.REF:
             p, q = c + '/' + sub + '/' + f, r + '/' + sub + '/' + f
             if os.path.isdir(q) or skip(f) or f in ('Raven_errors.txt', 'GWModelSummary.txt'):
                 continue
-            if not os.path.exists(p) or not filecmp.cmp(p, q, shallow=False): diffs.append(sub + '/' + f)
+            if not tc.same_output(p, q): diffs.append(sub + '/' + f)
     flt = lambda f, base: [l.replace(base, 'X') for l in open(f, errors='replace') if not re.search(r'Build date|BuildDate|HRU/grid linkage|time|library|Version', l, re.I)]
     for f in ('Raven_errors.txt', 'GWModelSummary.txt'):
         if flt(c + '/out/' + f, c) != flt(r + '/out/' + f, r): diffs.append(f)

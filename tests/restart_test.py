@@ -28,7 +28,7 @@ for name,extra in V.items():
     if not ok: print('%-28s FAILED'%name); continue
     C=pd.read_csv(c+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]']); H=pd.read_csv(b+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]'])
     m=C.merge(H,on='date',suffixes=('_c','_h'))
-    dev=max(((m[x+'_c']-m[x+'_h']).abs()/(m[x+'_c'].abs()+1e3)).max() for x in ['seepage to Raven [m3/d]','storage release [m3/d]','river exchange applied to Raven [m3]','MF6 recharge [m3/d]'])
+    dev=max(tc.max_diff(m[x+'_c'],m[x+'_h'],m[x+'_c'].abs()+1e3) for x in ['seepage to Raven [m3/d]','storage release [m3/d]','river exchange applied to Raven [m3]','MF6 recharge [m3/d]'])
     A=audit.audit(c+'/out')
     res,rch,riv,nf=A['MF6 cumulative residual / gross flow'],abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),abs(A['river: applied - net MF6 - carry change (rel)']),A['unconverged steps']
     good=(dev<1e-4) and (nf==0) and (abs(res)<1e-8) and (rch<1e-8) and (riv<1e-8) and len(m)>0

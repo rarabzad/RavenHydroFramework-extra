@@ -17,8 +17,18 @@ RS4 unsaturated columns restored as written: one HRU, water table 4 m deep, SPEC
 reference content ths - Sy is 0, below the air-dry content of the retention curve), 20 days in one go and as 10 + 10
 days, KINEMATIC and LAG: the restart's columns start with the storage the first part ended with (GWModelSummary.txt
 against GWBudget.csv, to 1e-6 relative), and its 'unsaturated zone storage' equals the continuous run's.
+RS5 a coupled run continues exactly from its solution.rvc (HRU, channel and reservoir states and every groundwater block
+written with 17 significant digits): combinations.py's PHYS_RICHARDS1_chd-res_neg-rise (RICHARDS columns, a reservoir, a
+specified head, negative recharge and a water table rising through the columns; its soil-zone redistribution switches
+on a change of 1e-5 mm in the soil water) and CONC_NONE_chd-et-ghb-res-riv-swx-wel_plain, 8 days against 4 + 4 days:
+every column of GWBudget.csv and GWHRUState.csv and the stores of WatershedStorage.csv equal the continuous run's on days
+5-8 within 1e-9 (relative to each column's largest value + 1). The same for PHYS_NONE1_chd-et-swx_bho-neg (LAGGED exchange,
+negative recharge) whose :BoundaryHead series holds the outlet column at 91.9 m (0.1 m below its soil-zone base) or
+switches every cell off, in the pattern held, off, held, off, off, held, held, off, restarted on day 3 (off to held), day
+4 (held to off) and day 6 (off to held): a column held in the restart's first step still receives the lagged exchange of
+the last step, in which it was an ordinary column.
 Quick mode (RAVEN_TEST_QUICK=1): the hillslope runs 120 days against 60 + 60 (the first 120 days of the same rain);
-RS2-RS4 are the same in both modes (seconds).
+RS2-RS5 are the same in both modes (seconds).
 """
 import os, sys, shutil, re, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -165,31 +175,74 @@ def rs4_vz():
         good &= g
     return good
 
-def verdict(hill, r2, r3, r4):
-    """the last line: PASS only when the hillslope restart RS1 and RS2, RS3 and RS4 all pass"""
-    ok = bool(hill) and bool(r2) and bool(r3) and bool(r4)
-    print('restart test: %s (RS1 hillslope restart %s, RS2 %s, RS3 %s, RS4 %s)' % tuple(['PASS' if ok else 'FAIL'] +
-          ['PASS' if x else 'FAIL' for x in (hill, r2, r3, r4)]))
+def rs5_exact():
+    """RS5: a coupled restart continues exactly (combinations.py cases, 8 days against 4 + 4)"""
+    sys.path.insert(0, os.path.dirname(HERE)); import combinations as C
+    good = True
+    PAT = '10100110'   # the switched case: 1 = held at 91.9 m, 0 = 30 m lower (every cell off)
+    def switched(d):
+        p = os.path.join(d, 'm.rvt'); tt = open(p).read()
+        v = [91.9 if c == '1' else 61.9 for c in PAT]
+        tt = re.sub(r':BoundaryHead EDGE m\n.*?:EndBoundaryHead\n', ':BoundaryHead EDGE m\n  2000-01-01 00:00:00 1.0 %d\n' % len(v) + ''.join('  %.3f\n' % x for x in v) + ':EndBoundaryHead\n', tt, flags=re.S)
+        open(p, 'w').write(tt)
+    for s, splits, edit in ((dict(sz='PHYS', vz='RICHARDS', K=1, x={'chd', 'res'}, st={'neg', 'rise'}, dt=1.0), (4,), None),
+                            (dict(sz='CONC', vz='NONE', K=1, x={'et', 'riv', 'swx', 'res', 'wel', 'ghb', 'chd'}, st=set(), dt=1.0), (4,), None),
+                            (dict(sz='PHYS', vz='NONE', K=1, x={'chd', 'et', 'swx'}, st={'bho', 'neg'}, dt=1.0), (2, 3, 5), switched)):
+      nm = C.name(s); n = 8
+      for k in splits:
+        def part(tag, start, days, rvc=None):
+            d = os.path.join(W, 'r5_%s_%s' % (nm, tag)); shutil.rmtree(d, ignore_errors=True)
+            sz_models.make_case(d, **dict(C.cfg_of(s), days=n)); C.options(d, s)
+            if edit: edit(d)
+            p = os.path.join(d, 'm.rvi'); tt = open(p).read()
+            tt = re.sub(r':Duration \d+', ':Duration %d' % days, tt).replace(':StartDate 2000-01-01', ':StartDate ' + start); open(p, 'w').write(tt)
+            if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+            return d if 'Successful Simulation' in C.run(d) else None
+        full = part('full', '2000-01-01', n); first = part('first', '2000-01-01', k)
+        sec = part('second', '2000-01-%02d' % (k + 1), n - k, os.path.join(first, 'out', 'solution.rvc')) if first else None
+        if not (full and sec):
+            print('  RS5 %s: run FAILED' % nm); good = False; continue
+        worst = (0.0, '')
+        for f in ('GWBudget.csv', 'GWHRUState.csv', 'WatershedStorage.csv'):
+            a = pd.read_csv(os.path.join(full, 'out', f)).rename(columns=lambda c: c.strip()); b = pd.read_csv(os.path.join(sec, 'out', f)).rename(columns=lambda c: c.strip())
+            m = a.merge(b, on='date', suffixes=('_f', '_r'))
+            for c in a.columns:
+                if c in ('date', 'time [d]', 'hour') or c.startswith(('Cum.', 'MB Error', 'Total', 'Atmosphere', 'Atmos')) or c + '_r' not in m or not pd.api.types.is_numeric_dtype(a[c]): continue
+                v = sz_check.tc.max_diff(m[c + '_f'], m[c + '_r'], a[c].abs().max() + 1.0)
+                if v > worst[0]: worst = (v, '%s %s' % (f, c))
+            if len(m) < n - k: worst = (float('inf'), f + ' rows')
+        g = worst[0] <= 1e-9
+        sw = (' (specified head %s on day %d, %s on day %d)' % (('held', 'off')[PAT[k - 1] == '0'], k, ('held', 'off')[PAT[k] == '0'], k + 1)) if edit else ''
+        print('  RS5 %s: %d + %d days against 8%s: largest relative difference %.2g%s -> %s' % (nm, k, n - k, sw, worst[0], (' (%s)' % worst[1]) if worst[0] > 0 else '', 'ok' if g else 'FAIL'))
+        good &= g
+    return good
+
+def verdict(hill, r2, r3, r4, r5=True):
+    """the last line: PASS only when the hillslope restart RS1 and RS2-RS5 all pass"""
+    ok = bool(hill) and bool(r2) and bool(r3) and bool(r4) and bool(r5)
+    print('restart test: %s (RS1 hillslope restart %s, RS2 %s, RS3 %s, RS4 %s, RS5 %s)' % tuple(['PASS' if ok else 'FAIL'] +
+          ['PASS' if x else 'FAIL' for x in (hill, r2, r3, r4, r5)]))
     return ok
 
 def main():
-    r3 = rs3_clip(); r4 = rs4_vz()
+    r3 = rs3_clip(); r4 = rs4_vz(); r5 = rs5_exact()
     print('RS3 restart with seepage above soil capacity: %s' % ('PASS' if r3 else 'FAIL'))
     print('RS4 unsaturated columns restored as written: %s' % ('PASS' if r4 else 'FAIL'))
-    if '--rs3rs4' in sys.argv:          # (only these two)
-        print('restart test: %s' % ('PASS' if (r3 and r4) else 'FAIL'))
-        return r3 and r4
+    print('RS5 a coupled restart continues exactly: %s' % ('PASS' if r5 else 'FAIL'))
+    if '--rs3rs4' in sys.argv:          # (only RS3-RS5)
+        print('restart test: %s' % ('PASS' if (r3 and r4 and r5) else 'FAIL'))
+        return r3 and r4 and r5
     r2 = ext_restart()
     full = case('full', NT, RAIN[:NT])
     first = case('first', N1, RAIN[:N1])
     if not (full and first):
-        return verdict(False, r2, r3, r4)
+        return verdict(False, r2, r3, r4, r5)
     rvc = os.path.join(first, 'out', 'solution.rvc')
     has = ':GWSoilZoneColumns' in open(rvc).read()
     start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=N1)).isoformat()
     second = case('second', NT - N1, RAIN[N1:NT], start, rvc)
     if not second:
-        return verdict(False, r2, r3, r4)
+        return verdict(False, r2, r3, r4, r5)
     cols = ['water table [m]', 'soil water level [m]', 'saturated fraction [-]', 'soil-zone water [mm]',
             'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]']
     a = pd.read_csv(os.path.join(full, 'out', 'GWSoilExchange.csv'))
@@ -207,7 +260,7 @@ def main():
     flows = ('saturated fraction [-]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]')
     good &= has and len(m) == (NT - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
     print('RS1 hillslope restart: %s' % ('PASS' if good else 'FAIL'))
-    return verdict(good, r2, r3, r4)
+    return verdict(good, r2, r3, r4, r5)
 
 if __name__ == '__main__':
     sys.exit(0 if main() else 1)

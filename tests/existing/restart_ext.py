@@ -1,9 +1,10 @@
 import os,sys; sys.path.insert(0,os.path.dirname(os.path.dirname(os.path.abspath(__file__)))); import testconfig as tc
 # Restarts of an existing model (the md model of make_ext_model.py): 200 days in one go against splits at day 30 and 150,
 # and 6-hour steps restarted at 12:00 on day 10. A comparison passes when its runs finish, the deviation (relative to the
-# column's largest value + 1000) is below 1e-4, the restarted run has no unconverged step and its accounts are exact
-# (recharge identity and MODFLOW's cumulative residual below 1e-8). The last line gives the count of the three; the exit
-# code is 1 unless all pass. Quick mode (RAVEN_TEST_QUICK=1): the sub-daily case runs 20 days instead of 60.
+# column's largest value + 1000; a value missing in one run fails) is below 1e-4, and the restarted and the continuous run
+# both have no unconverged step and exact accounts (recharge identity and MODFLOW's cumulative residual below 1e-8;
+# testconfig.restart_verdict). The last line gives the count of the three; the exit code is 1 unless all pass. Quick mode
+# (RAVEN_TEST_QUICK=1): the sub-daily case runs 20 days instead of 60.
 import os,shutil,subprocess,re,sys,datetime,pandas as pd
 audit=tc.audit
 tc.need_mf6(); X=tc.ext_models(); ENV=tc.ENV; RV=tc.RAVEN
@@ -17,15 +18,15 @@ def prep(d,start,dur,rvc=None,crs=True,dt=None,clock='00:00:00'):
 def run(d):
     r=subprocess.run([RV,'Liard','-o','out/'],cwd=d,capture_output=True,text=True,env=ENV); return (re.findall(r'Exiting Gracefully: (.*)',r.stdout + r.stderr) or ['?'])[-1]
 npass=0; ncmp=3
-def judged(dev,A,extra=True):
-    """one comparison: deviation below 1e-4, no unconverged step, exact accounts"""
+def judged(dev,A,extra=True,Ac=None):
+    """one comparison: deviation below 1e-4, no unconverged step and exact accounts in the restarted and the continuous run"""
     global npass
-    rch,res,nf=abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),A['MF6 cumulative residual / gross flow'],A['unconverged steps']
-    good=extra and dev<1e-4 and nf==0 and rch<1e-8 and abs(res)<1e-8
+    good=tc.restart_verdict(dev,A,Ac if Ac is not None else Acont,extra)
     npass+=good
     return 'ok' if good else 'FAIL'
-c=X+'/rs_cont'; prep(c,'1985-10-01',200); rcont=run(c); print('continuous:',rcont)
-if 'Successful' not in rcont: print('existing-model restarts: 0 of %d pass (the continuous run FAILED)'%ncmp); sys.exit(1)
+c=X+'/rs_cont'; prep(c,'1985-10-01',200); rcont=run(c)
+if 'Successful' not in rcont: print('continuous:',rcont); print('existing-model restarts: 0 of %d pass (the continuous run FAILED)'%ncmp); sys.exit(1)
+Acont=audit.audit(c+'/out'); print('continuous: %s; unconverged steps %d'%(rcont,Acont['unconverged steps']))
 C=pd.read_csv(c+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]'])
 for split in (30,150):
     a=X+'/rs_a%d'%split; b=X+'/rs_b%d'%split
@@ -34,7 +35,7 @@ for split in (30,150):
     prep(b,start,200-split,a+'/out/solution.rvc'); rb=run(b)
     if 'Successful' not in ra+rb: print('split',split,'FAILED',ra,rb); continue
     B=pd.read_csv(b+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]']); m=C.merge(B,on='date',suffixes=('_c','_r'))
-    dev=max(((m[x+'_c']-m[x+'_r']).abs()/(m[x+'_c'].abs().max()+1e3)).max() for x in ['seepage to Raven [m3/d]','storage release [m3/d]','aquifer discharge to rivers [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
+    dev=max(tc.max_diff(m[x+'_c'],m[x+'_r'],m[x+'_c'].abs().max()+1e3) for x in ['seepage to Raven [m3/d]','storage release [m3/d]','aquifer discharge to rivers [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
     w=m['other model packages [m3/d]_c']; jump=w.diff().abs().max()
     A=audit.audit(b+'/out')
     print('split at day %3d (%s): %d days compared, max deviation %.1e; wells/boundaries flow change seen in restarted run: %s; audit recharge %.0e residual %.1e failed %s  %s'%(
@@ -49,12 +50,12 @@ b=X+'/rs_sd_b'; prep(b,'1985-10-11',ND-10.5,a+'/out/solution.rvc',dt='0.25',cloc
 if 'Successful' not in rc+ra or 'Successful' not in rb: print('sub-daily split FAILED (max deviation 1.0e+00)',rc,ra,rb)
 else:
     C=pd.read_csv(c+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]']); B=pd.read_csv(b+'/out/GWBudget.csv').dropna(subset=['Raven recharge [m3/d]']); m=C.merge(B,on='date',suffixes=('_c','_r'))
-    dev=max(((m[x+'_c']-m[x+'_r']).abs()/(m[x+'_c'].abs().max()+1e3)).max() for x in ['seepage to Raven [m3/d]','storage release [m3/d]','aquifer discharge to rivers [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
-    A=audit.audit(b+'/out'); st=[l.strip() for l in open(b+'/out/mf6/ext.tdis').read().split('\n') if 'START_DATE_TIME' in l]
+    dev=max(tc.max_diff(m[x+'_c'],m[x+'_r'],m[x+'_c'].abs().max()+1e3) for x in ['seepage to Raven [m3/d]','storage release [m3/d]','aquifer discharge to rivers [m3/d]','MF6 recharge [m3/d]','other model packages [m3/d]'])
+    A=audit.audit(b+'/out'); Asd=audit.audit(c+'/out'); st=[l.strip() for l in open(b+'/out/mf6/ext.tdis').read().split('\n') if 'START_DATE_TIME' in l]
     ok=len(m)==len(B)==int(round((ND-10.5)*4))
-    print('sub-daily split at day 10.5 (6-hour steps): %d steps compared%s, max deviation %.1e; audit recharge %.0e residual %.1e failed %s; %s  %s'%(
-        len(m),'' if ok else ' (EXPECTED %d)'%int(round((ND-10.5)*4)),dev if ok else 1.0,abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),A['MF6 cumulative residual / gross flow'],A['unconverged steps'],st[:1],
-        judged(dev,A,ok)))
+    print('sub-daily split at day 10.5 (6-hour steps): %d steps compared%s, max deviation %.1e; audit recharge %.0e residual %.1e failed %s (continuous run: failed %s); %s  %s'%(
+        len(m),'' if ok else ' (EXPECTED %d)'%int(round((ND-10.5)*4)),dev if ok else 1.0,abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']),A['MF6 cumulative residual / gross flow'],A['unconverged steps'],Asd['unconverged steps'],st[:1],
+        judged(dev,A,ok,Asd)))
 for x in (c,a,b): shutil.rmtree(x,ignore_errors=True)
 print('existing-model restarts: %d of %d pass'%(npass,ncmp))
 sys.exit(0 if npass==ncmp else 1)

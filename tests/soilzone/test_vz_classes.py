@@ -5,9 +5,10 @@ spread grouping of the samples' soil-zone bases); class c has the area share a_c
 and takes the unsaturated share a_c (1 - F_c) of the link's recharge. The test cases are synthetic strips (sz_models) with
 irregular land (dem_fn: hummocks, terraces) over a generated MODFLOW model.
 
-C1  K = 1 byte-identical to the reference build (RAVEN_EXE_REF; every out/*.csv and solution.rvc, the diagnostic column
-    'interface change [m]' and solution.rvc's :GWVadoseColumnTops block left out) for RICHARDS and NONE on a planar and a hummocky case; without a reference build
-    SKIP, and K = 1 given explicitly vs the default only.
+C1  K = 1 equals the reference build (RAVEN_EXE_REF, the build of the commit before your change): every out/*.csv byte
+    for byte (the diagnostic column 'interface change [m]' left out) and solution.rvc the same state (sz_check's rule: to
+    the digits either file holds, without the :GWVadoseColumnTops block), for RICHARDS and NONE on a planar and a hummocky
+    case, each difference a failure; without a reference build SKIP, and K = 1 given explicitly vs the default only.
 C2  hummocky cell whose mean soil-zone base is near the water table while the hummocks are well above it: with K = 1 the
     hummocks' recharge reaches MODFLOW in the step (no column), with K = 3 and 5 it is delayed (recharge centroid later).
 C3  convergence: the result approaches a reference in which the depth classes are modelled separately (one HRU per
@@ -117,7 +118,7 @@ def same_outputs(a, b):
             A = A.drop(columns=[c for c in DIAG if c in A]); B = B.drop(columns=[c for c in DIAG if c in B])
             if list(A.columns) != list(B.columns) or not A.equals(B):
                 bad.append(f)
-        elif sz_check.rvc_text(pa) != sz_check.rvc_text(pb):   # (solution.rvc: without the column tops, which the reference may not write)
+        elif not sz_check.tc.rvc_same(pa, pb):   # (solution.rvc: the same state to the digits either file holds, the column tops when both files hold them)
             bad.append(f)
     return bad
 
@@ -127,16 +128,13 @@ def centroid(d, col='MF6 recharge [m3/d]'):
 
 # --------------------------------------------------------------------------------------------------------------------
 def c1():
-    print('C1 K = 1 byte-identical')
+    print('C1 K = 1 equals the reference build')
     rain = [0.0] * 5 + [30.0] * 3 + [0.0] * (12 if QUICK else 32)
     cases = [('plan', dict(BASE, init_depth=4.0, rain=rain, days=len(rain))),
              ('hum', dict(BASE, init_depth=1.6, rain=rain, days=len(rain), dem_fn=hummocks(1.0)))]
-    # RICHARDS on the hummocky case differs from a build without rule (i) by design wherever the water table reaches, during a step,
-    # ground that was unsaturated at its start (rule (i): the columns' outputs there go back to the soil zone): compared, reported, not required identical against a pre-rule reference (C1_STRICT=1 does)
     ok = True
     for nm, cfg in cases:
         for meth in ('RICHARDS', 'NONE'):
-            strict = not (nm == 'hum' and meth == 'RICHARDS') or os.environ.get('C1_STRICT', '') == '1'
             a = case('c1_%s_%s' % (nm, meth), extra_rvg=vz(meth), **cfg)
             b = case('c1_%s_%s_k1' % (nm, meth), extra_rvg=vz(meth, 1), **cfg)
             ok &= check('c1_%s_%s' % (nm, meth), a)
@@ -146,11 +144,9 @@ def c1():
             if REF and os.path.exists(REF):
                 r = case('c1_%s_%s_ref' % (nm, meth), exe=REF, extra_rvg=vz(meth), **cfg)
                 if a and r:
-                    bad = same_outputs(a, r)
-                    if strict: ok &= not bad
+                    bad = same_outputs(a, r); ok &= not bad
                     dr = (budget(a)['rejected recharge [m3]'] - budget(r)['rejected recharge [m3]']).abs().max()
-                    print('    vs reference build: %s%s' % ('identical' if not bad else 'DIFFER ' + ', '.join(bad),
-                          '' if strict else ' (informational: rule (i) hand-back; rejected recharge differs by up to %.1f m3)' % dr))
+                    print('    vs reference build: %s' % ('identical' if not bad else 'DIFFER %s (rejected recharge differs by up to %.3g m3)' % (', '.join(bad), dr)))
                 else:
                     ok = False
             else:

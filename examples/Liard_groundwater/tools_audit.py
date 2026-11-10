@@ -6,7 +6,8 @@ def audit(run,dt=1.0):
     o=(run+'/') if os.path.exists(run+'/GWBudget.csv') else run+'/out/'; R={}
     b=rd(o+'GWBudget.csv')
     tt=b['time [d]'].dropna().values
-    if len(tt)>1: dt=float(sorted(abs(tt[1:]-tt[:-1]))[len(tt)//2])
+    if len(tt)>1: d=abs(tt[1:]-tt[:-1]); dt=float(sorted(d)[len(d)//2])   #(the median step length, also of a run of two steps)
+    elif len(tt)==1 and tt[0]>0: dt=float(tt[0])                            #(one step: its end time from the run's start)
     R['steps']=len(b); R['rows_complete']=int(b.notna().all(axis=1).sum())
     b=b.dropna()
     R['time step [d]']=dt; R['dates_contiguous']=bool((abs(b['time [d]'].diff().dropna()-dt)<1e-6).all()) and b['date'].is_unique

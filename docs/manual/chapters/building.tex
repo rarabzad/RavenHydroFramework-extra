@@ -381,7 +381,14 @@ them connected directly.
 :GridRefinement POLYGONS wetlands.geojson  250   # inside and around polygons
 \end{lstlisting}
 Sizes must be smaller than \cmd{:GridCellSize}. Refinement applies to regular (variable spacing), quadtree and HRU-mesh
-grids; an imported grid is used as it is.
+grids; an imported grid is used as it is. A grid is limited to 5 million cells per layer: a cell size or refinement that
+gives more stops the run before the grid is built, naming the command and the number of cells. For a regular grid the
+count is exact. For a quadtree it is estimated level by level from the squares the refinement features touch, each square
+counted once however many features touch it (overlapping or adjacent features add no more), plus about a fifth for the
+2:1 balance: 6\% below the cells built on the Liard example's grids, and between a third below and a fifth above on small
+test grids of lines and polygons. So the estimate stops the run only beyond 1.5 times the limit; a grid nearer the limit
+is built, and the build stops once it passes the limit. A grid within the limit that still needs more memory than the
+computer has stops with a message naming the command and the estimated size.
 
 \cmd{LAKES} needs no extra file: the outline of the lake HRU of every Raven reservoir (\cmd{:Reservoir \dots\ :HRUID}) is taken
 from \cmd{:HRUGeometry}. Fine cells around a lake place its seepage (\cmd{:ReservoirExchange}) and the exchange along its shore

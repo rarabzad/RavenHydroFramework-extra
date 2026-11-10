@@ -29,8 +29,8 @@ L7  the leak check: the L1 storm with LAG 2 passes, and the same outputs with a 
     script's checks.
 S   speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from U).
 B   byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the T2/T3 hillslope,
-    RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change; out/*.csv and solution.rvc compared byte for byte except the diagnostic column
-    `interface change [m]` and solution.rvc's :GWVadoseColumnTops block (sz_check.rvc_text). Without RAVEN_EXE_REF B prints SKIP (never "ok").
+    RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change; out/*.csv compared byte for byte except the diagnostic column
+    `interface change [m]`, solution.rvc the same state (testconfig.rvc_same). Without RAVEN_EXE_REF B prints SKIP (never "ok").
 Identities use the standard limits (sz_check.STD_LIMITS) and sz_check's column identity
 (sz_check.vz_identity: scaled by the step's flows, less the CSV rounding of its values) from step 1: every run must give
 the start storage of the columns (GWModelSummary.txt), otherwise it fails (vz_step1_missing).
@@ -279,7 +279,7 @@ def test_s():
 def same_csv(a, b):
     """byte-identical, apart from the diagnostic columns; returns (equal, note)"""
     ta, tb = open(a).read(), open(b).read()
-    if a.endswith('.rvc'): ta, tb = sz_check.rvc_text(a), sz_check.rvc_text(b)   # (without the column tops, which the reference may not write)
+    if a.endswith('.rvc'): return sz_check.tc.rvc_same(a, b), 'values differ'   # (the same state to the digits either file holds, the column tops when both files hold them)
     if ta == tb:
         return True, ''
     la, lb = ta.split('\n'), tb.split('\n')

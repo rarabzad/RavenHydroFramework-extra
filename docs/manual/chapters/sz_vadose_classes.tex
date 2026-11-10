@@ -43,9 +43,9 @@ its base in the last step) has no line; the restart builds it at rest, as the co
 this is not a mismatch (\cmd{test\_vz\_classes.py} C10).
 
 \paragraph{Verification} (\texttt{tests/soilzone/test\_vz\_classes.py}; Figure~\ref{fig:vzclasses}). C1: with $K=1$
-the outputs are byte-identical to a build without depth classes (\cmd{NONE}, and \cmd{RICHARDS} where the water table does
-not reach, within a step, ground unsaturated at its start; elsewhere the hand-back of rule (i), Section~\ref{sec:szvadose},
-is the only difference), the diagnostic column \emph{interface change} left out. C2: a cell with hummocks of $\pm2.5$~m
+the outputs equal those of the reference build (\cmd{RAVEN\_EXE\_REF}, the build before a change), for \cmd{NONE} and
+\cmd{RICHARDS} on a planar and a hummocky case: every CSV byte for byte, the diagnostic column \emph{interface change} left
+out, and \cmd{solution.rvc} the same state; any difference fails. C2: a cell with hummocks of $\pm2.5$~m
 whose mean base is 3~cm above the water table: with $K=1$ no water passes through a column; with $K=3$ 949~m$^3$ pass
 through the hummocks' columns, their outflow 1.79~d after their inflow, with $K=5$ 5\,558~m$^3$ (0.35~d: more of the
 area is in short columns). C3: the recharge to MODFLOW approaches the one with every sub-area modelled by its own column

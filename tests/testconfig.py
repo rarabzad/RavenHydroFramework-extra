@@ -16,7 +16,7 @@ Otherwise set:
 
 The Liard examples in examples/ are the base cases; each test copies them into the scratch folder and edits the copy.
 """
-import os, sys, shutil, subprocess, re
+import math, os, sys, shutil, subprocess, re
 
 TESTS = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(TESTS)                                        # the RavenHydroFramework-extra repository
@@ -71,6 +71,77 @@ def need_mf6():
 def skip(what, why='RAVEN_EXE_REF not set'):
     """reports a check that was not made: one line 'SKIP <what>: <why>' (run_all.py counts these lines), never 'ok'"""
     print('SKIP %s: %s' % (what, why))
+
+
+def max_diff(a, b, scale=1.0):
+    """largest |a - b| / scale of two runs' values (pandas Series or DataFrames, or arrays, of equal size; scale a number
+    or an array of the same size). A value that is NaN (empty) or infinite in one run and not in the other is an infinite
+    difference, so a comparison of an ensemble member or a restarted run never passes on values one of them lacks; empty
+    in both (an observation column without data) is no difference."""
+    import numpy as np
+    a = np.asarray(a, dtype=float).ravel(); b = np.asarray(b, dtype=float).ravel()
+    if a.shape != b.shape:
+        return float('inf')
+    na, nb = np.isnan(a), np.isnan(b); fa, fb = np.isfinite(a), np.isfinite(b)
+    if (na != nb).any() or (fa != fb).any() or (a[~fa & ~na] != b[~fb & ~nb]).any():
+        return float('inf')
+    s = np.broadcast_to(np.asarray(scale, dtype=float).ravel() if np.ndim(scale) else np.asarray(scale, dtype=float), a.shape)
+    d = np.abs(a[fa] - b[fa]) / s[fa]
+    return float(d.max()) if d.size else 0.0
+
+
+def _ulp(tok):
+    """the unit of the last digit a number was written with (1e-5 for '127.90182', 1e-21 for '1.2345678901234567e-05'; 0 for
+    a whole number written without a decimal point, which a writer of significant digits gives exactly)"""
+    m = re.match(r'^[-+]?(\d*)(\.?)(\d*)(?:[eE]([-+]?\d+))?$', tok)
+    if not m or (not m.group(2) and m.group(4) is None): return 0.0
+    return 10.0 ** ((int(m.group(4)) if m.group(4) else 0) - len(m.group(3)))
+
+
+def rvc_same(a, b):
+    """two solution.rvc files hold the same state: the same text apart from the numbers; two numbers written with the same
+    number of decimals must be the same, others may differ by the two roundings of one value (half a unit of the last digit
+    of each, and a unit of a double for each number read back: a coupled run writes its states with 17 significant digits,
+    a run without groundwater with fewer); the
+    :GWVadoseColumnTops block
+    (written with the unsaturated columns) is compared when both files hold it and left out when only one does"""
+    if not (os.path.exists(a) and os.path.exists(b)): return False
+    ta, tb = open(a).read(), open(b).read()
+    tops = re.compile(r':GWVadoseColumnTops[^\n]*\n.*?:EndGWVadoseColumnTops\n', re.S)
+    if bool(tops.search(ta)) != bool(tops.search(tb)): ta, tb = tops.sub('', ta), tops.sub('', tb)
+    if ta == tb: return True
+    sa, sb = re.split(r'([\s,]+)', ta), re.split(r'([\s,]+)', tb)
+    if len(sa) != len(sb): return False
+    for x, y in zip(sa, sb):
+        if x == y: continue
+        try:
+            fx, fy = float(x), float(y)
+        except ValueError:
+            return False
+        ux, uy = _ulp(x), _ulp(y)   # (two roundings of one value: each within half its last digit, and the two
+                                    # numbers read back within a unit of a double each)
+        if (ux == uy) or not (abs(fx - fy) <= 0.5 * (ux + uy) + 2.0 * math.ulp(max(abs(fx), abs(fy)))):
+            return False
+    return True
+
+
+def same_output(a, b):
+    """an output file of two runs is the same: byte for byte, solution.rvc by rvc_same"""
+    import filecmp
+    if not (os.path.exists(a) and os.path.exists(b)): return False
+    if a.endswith('.rvc'): return rvc_same(a, b)
+    return filecmp.cmp(a, b, shallow=False)
+
+
+def restart_verdict(dev, restarted, continuous, complete=True):
+    """a restart comparison passes: deviation below 1e-4 (NaN or infinite fails), every row compared (complete), and both
+    the restarted and the continuous run (their tools_audit.audit results) without unconverged steps and with exact
+    accounts (recharge identity and MODFLOW's cumulative residual below 1e-8)"""
+    ok = bool(complete) and (dev < 1e-4)
+    for A in (restarted, continuous):
+        ok = ok and A.get('unconverged steps', 1) == 0 and abs(A.get('recharge: (Raven - MF6 - dStore - toCHD)/Raven', 1.0)) < 1e-8 \
+            and abs(A.get('MF6 cumulative residual / gross flow', 1.0)) < 1e-8
+    return bool(ok)
 
 
 def work(*parts):
