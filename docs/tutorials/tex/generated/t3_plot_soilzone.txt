@@ -1,0 +1,2 @@
+$ python3 $TOOLS/plot_soilzone.py out_physical 6 1 --png soilzone.png
+wrote soilzone.png

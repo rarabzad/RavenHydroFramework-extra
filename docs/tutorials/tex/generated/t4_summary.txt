@@ -1,0 +1,21 @@
+$ grep -v "computed in" out_coupled/GWModelSummary.txt | head -n 19
+Raven-MODFLOW 6 groundwater model summary
+  MODFLOW 6 files       : /home/user/work/t4/out_coupled/mf6
+  MODFLOW 6 library     : /home/user/Raven_MF6_linux/bin/libmf6.so (version 6.8.1)
+  existing model        : CREEK in model/mfsim.nam (DIS, 2 layers x 588 cells per layer; feet, days)
+  cells linked by       : cell outlines from MODFLOW, Transverse Mercator (lon0 -117, lat0 0, k0 0.9996, FE 500000, FN 0, WGS84)
+  packages taken over   : RCH_MODEL EVT_MODEL
+  packages in balance   : WEL_PUMP GHB_OUTLET
+  stream package        : RIV_CREEK (subbasin from auxiliary SUBBASIN)
+  HRU coverage          : 96.29% of the coupled HRUs' polygon area lies on active model cells; 0 HRUs below 50%
+  active columns        : 468 (inactive 120)
+  active cells          : 936   vertical pass-through cells: 0
+  coupled HRUs          : 8
+  recharge/seepage cells: 468
+  river/well/boundary cells: those of the model's own packages listed above (none added by Raven)
+  observation wells     : 0
+  input coordinates     : Transverse Mercator (lon0 -117, lat0 0, k0 0.9996, FE 500000, FN 0, WGS84) (:InputCRS)
+  profile VALLEY_FILL: layers from the model, 130 columns
+  profile SLOPE_TILL: layers from the model, 338 columns
+
+...

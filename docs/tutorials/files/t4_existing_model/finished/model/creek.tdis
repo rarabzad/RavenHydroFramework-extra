@@ -1,0 +1,47 @@
+# Tutorial Creek groundwater model: a steady first day, then monthly stress periods, 2010-2012
+BEGIN OPTIONS
+  TIME_UNITS DAYS
+  START_DATE_TIME 2010-01-01
+END OPTIONS
+BEGIN DIMENSIONS
+  NPER 37
+END DIMENSIONS
+BEGIN PERIODDATA
+  1.0 1 1.0
+  30.0 1 1.0
+  28.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  31.0 1 1.0
+  28.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  31.0 1 1.0
+  29.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+  30.0 1 1.0
+  31.0 1 1.0
+END PERIODDATA

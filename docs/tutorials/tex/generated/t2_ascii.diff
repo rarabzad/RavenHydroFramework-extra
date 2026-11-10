@@ -1,0 +1,7 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -7,2 +7,2 @@
+-:LandSurface       dem.tif                         # land surface (GeoTIFF; ESRI ASCII grids work too)
+-:BedrockSurface    bedrock.tif                     # base of the aquifer
++:LandSurface       dem.asc                         # land surface (GeoTIFF; ESRI ASCII grids work too)
++:BedrockSurface    bedrock.asc                     # base of the aquifer

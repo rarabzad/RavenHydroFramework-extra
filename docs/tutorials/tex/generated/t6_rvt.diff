@@ -1,0 +1,5 @@
+--- Creek.rvt (tutorial 2)
++++ model/Creek.rvt
+@@ -3 +3,2 @@
+ :RedirectToFile CreekGW.rvt
++:RedirectToFile CreekObs.rvt

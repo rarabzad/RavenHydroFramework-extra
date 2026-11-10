@@ -1,0 +1,12 @@
+--- Creek.rvh
++++ Creek.rvh
+@@ -25,2 +25,5 @@
+ :EndHRUGroup
++:HRUGroup WetlandHRUs
++  9
++:EndHRUGroup
+ 
+@@ -35,2 +38,3 @@
+   :AbsoluteCrestHeight 982.0
++  :SeepageParameters   0.05 978.0
+ :EndReservoir

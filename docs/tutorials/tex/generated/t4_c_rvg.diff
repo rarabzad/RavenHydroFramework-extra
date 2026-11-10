@@ -1,0 +1,6 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -9 +9,3 @@
+ :SeepageToRaven    ON                          # groundwater seeping out at the top returns to Raven
++:SurfaceWaterExchange DEPRESSION WetlandHRUs LEAKANCE 0.01   # the wetland's DEPRESSION store <-> aquifer
++:ReservoirExchange                                         # CreekLake (lake HRU 5) <-> aquifer

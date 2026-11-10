@@ -1,0 +1,14 @@
+--- Creek.rvi (start)
++++ Creek.rvi
+@@ -13,2 +13,5 @@
+ :OroPrecipCorrect   OROCORR_NONE
++
++:GroundwaterModel  MODFLOW6
++:DefineHRUGroups   AquiferHRUs
+ 
+@@ -32,2 +35,5 @@
+   :Percolation          PERC_LINEAR      SUBSOIL       DEEP_STORE
++    :-->Conditional HRU_GROUP IS_NOT AquiferHRUs
++  :Percolation          PERC_LINEAR      SUBSOIL       GROUNDWATER
++    :-->Conditional HRU_GROUP IS AquiferHRUs
+   :Baseflow             BASE_LINEAR      DEEP_STORE    SURFACE_WATER

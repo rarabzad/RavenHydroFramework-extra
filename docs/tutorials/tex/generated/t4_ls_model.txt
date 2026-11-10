@@ -1,0 +1,2 @@
+$ ls model
+creek.dis  creek.evta  creek.ghb  creek.ic  creek.ims  creek.nam  creek.npf  creek.oc  creek.rcha  creek.riv  creek.sto  creek.tdis  creek.wel  mfsim.nam

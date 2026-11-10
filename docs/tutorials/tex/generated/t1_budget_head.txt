@@ -1,0 +1,4 @@
+$ head -n 3 out/GWBudget.csv | cut -d, -f1-7
+time [d],date,Raven recharge [m3/d],MF6 recharge [m3/d],seepage to Raven [m3/d],storage release [m3/d],MF6 balance error [m3/d]
+1,1985-10-02,669495.3684,669495.3684,0,93170319.03,-0.0001332163811
+2,1985-10-03,1435794.787,1435794.787,0,46727446.61,-1.915544271e-05

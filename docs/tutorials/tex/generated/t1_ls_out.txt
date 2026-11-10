@@ -1,0 +1,4 @@
+$ ls out
+Diagnostics.csv  GWBudget.csv  GWConnectivity.csv  GWHRUState.csv  GWModelSummary.txt  Hydrographs.csv  RAINFALL_Daily_Average_BySubbasin.csv  Raven_errors.txt  SNOWFALL_Daily_Average_BySubbasin.csv  SNOW_Daily_Average_BySubbasin.csv  SOIL[0]_Daily_Average_BySubbasin.csv  WatershedStorage.csv  mf6  solution.rvc
+$ ls out/mf6
+grid_cells.geojson  gwf.dis  gwf.dis.grb  gwf.drn  gwf.hds  gwf.ic  gwf.lst  gwf.nam  gwf.npf  gwf.oc  gwf.rch  gwf.riv  gwf.sto  linkage.cache  mfsim.lst  mfsim.nam  mfsim.stdout  sim.ims  sim.tdis

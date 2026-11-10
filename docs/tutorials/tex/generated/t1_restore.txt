@@ -1,0 +1,3 @@
+$ sed -i 's/^:Duration           365 /:Duration           7305 /' Liard.rvi
+$ grep :Duration Liard.rvi
+:Duration           7305 00:00:00

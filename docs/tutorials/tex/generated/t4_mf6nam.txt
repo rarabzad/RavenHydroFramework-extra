@@ -1,0 +1,18 @@
+$ cat out_coupled/mf6/creek.nam
+BEGIN OPTIONS
+  NEWTON
+END OPTIONS
+BEGIN PACKAGES
+  DIS6   creek.dis   DIS
+  IC6    creek.ic    IC
+  NPF6   creek.npf   NPF
+  STO6   creek.sto   STO
+#   RCH6   creek.rcha  RCH_MODEL   # taken over by Raven
+#   EVT6   creek.evta  EVT_MODEL   # taken over by Raven
+  RIV6   creek.riv   RIV_CREEK
+  WEL6   creek.wel   WEL_PUMP
+  GHB6   creek.ghb   GHB_OUTLET
+  OC6    creek.oc    OC
+  RCH6  raven.rch  RCH_RAVEN   # added by Raven
+  DRN6  raven.drn  DRN_RAVEN   # added by Raven
+END PACKAGES

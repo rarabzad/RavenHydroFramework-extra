@@ -1,0 +1,13 @@
+--- Creek.rvp
++++ Creek.rvp
+@@ -77,5 +77,5 @@
+-  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY
+-  :Units,      m/d,     m/d,    1/m,          none,       none
+-  GRAVEL,      40.0,    4.0,    1.0E-5,       0.20,       0.30
+-  SAND,        8.0,     0.8,    1.0E-5,       0.15,       0.32
+-  TILL,        2.0,     0.2,    1.0E-4,       0.08,       0.30
++  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY, CLAPP_B, AIR_ENTRY_PRESSURE
++  :Units,      m/d,     m/d,    1/m,          none,       none,     none,    m
++  GRAVEL,      40.0,    4.0,    1.0E-5,       0.20,       0.30,     3.0,     0.15
++  SAND,        8.0,     0.8,    1.0E-5,       0.15,       0.32,     4.0,     0.25
++  TILL,        2.0,     0.2,    1.0E-4,       0.08,       0.30,     5.0,     0.30

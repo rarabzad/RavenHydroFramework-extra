@@ -1,0 +1,6 @@
+$ grep RAVEN out/mf6/creek.nam
+  RCH6  raven.rch  RCH_RAVEN   # added by Raven
+  DRN6  raven.drn  DRN_RAVEN   # added by Raven
+  EVT6  raven.evt  EVT_RAVEN   # added by Raven (water-table ET)
+  RIV6  raven.swx  SWX_RAVEN   # added by Raven (:SurfaceWaterExchange)
+  WEL6  raven.res  RES_RAVEN   # added by Raven (:ReservoirExchange)

@@ -1,0 +1,5 @@
+$ $RAVEN Creek -o out_nocrs/
+...
+Exiting Gracefully: CGroundwaterModel: well PW_1 is given by X and Y: give :InputCRS (their projection) in the .rvg file, or LATITUDE and LONGITUDE
+$ grep ERROR out_nocrs/Raven_errors.txt
+ERROR    : CGroundwaterModel: well PW_1 is given by X and Y: give :InputCRS (their projection) in the .rvg file, or LATITUDE and LONGITUDE

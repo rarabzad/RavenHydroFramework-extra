@@ -1,0 +1,7 @@
+--- Creek.rvi
++++ Creek.rvi
+@@ -15,3 +15,3 @@
+ :GroundwaterModel  MODFLOW6
+-:DefineHRUGroups   AquiferHRUs
++:DefineHRUGroups   AquiferHRUs, WetlandHRUs
+ 

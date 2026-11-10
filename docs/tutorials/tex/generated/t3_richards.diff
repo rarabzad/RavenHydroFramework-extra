@@ -1,0 +1,4 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -31,0 +32 @@
++:SoilZoneVadose    RICHARDS                        # unsaturated columns between the soil zone and a deeper water table

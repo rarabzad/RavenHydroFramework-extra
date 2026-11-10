@@ -1,0 +1,11 @@
+# Creek.rvg - Raven coupled to an existing MODFLOW 6 model of Tutorial Creek
+:InputCRS          EPSG:32611                  # hrus.geojson is in UTM zone 11N
+:HRUGeometry       hrus.geojson  HRU_ID        # HRU polygons; HRU_ID matches the .rvh
+:MF6Simulation     model/mfsim.nam             # the existing simulation (Raven runs a copy in out/mf6/)
+:MF6CRS            EPSG:32611                  # projection of the model's coordinates (here in feet)
+:MF6StartDate      2010-01-01                  # calendar date of the model's time zero
+:RavenTakesOver    RCH_MODEL EVT_MODEL         # Raven supplies the recharge; the model's own ET is removed
+:StreamPackage     RIV_CREEK AUX SUBBASIN      # river cells: their flows go to the Raven subbasin in SUBBASIN
+:SeepageToRaven    ON                          # groundwater seeping out at the top returns to Raven
+:SurfaceWaterExchange DEPRESSION WetlandHRUs LEAKANCE 0.01   # the wetland's DEPRESSION store <-> aquifer
+:ReservoirExchange                                         # CreekLake (lake HRU 5) <-> aquifer

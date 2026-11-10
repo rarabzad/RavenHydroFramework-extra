@@ -1,0 +1,26 @@
+--- Creek.rvp (start)
++++ Creek.rvp (finished)
+@@ -73 +73,23 @@
+ :EndChannelProfile
++
++# --- groundwater (Raven-MODFLOW 6) ---------------------------------------------
++:AquiferClasses
++  :Attributes, K_HORIZ, K_VERT, SPEC_STORAGE, SPEC_YIELD, POROSITY
++  :Units,      m/d,     m/d,    1/m,          none,       none
++  GRAVEL,      40.0,    4.0,    1.0E-5,       0.20,       0.30
++  SAND,        8.0,     0.8,    1.0E-5,       0.15,       0.32
++  TILL,        2.0,     0.2,    1.0E-4,       0.08,       0.30
++:EndAquiferClasses
++
++:AquiferProfiles
++  # name,      #layers, {class, thickness [m] or TO_BEDROCK, layer type} x #layers
++  VALLEY_FILL, 2, GRAVEL, 12.0, AQUIFER, SAND, TO_BEDROCK, AQUIFER
++  SLOPE_TILL,  2, TILL,   4.0,  AQUIFER, TILL, TO_BEDROCK, AQUIFER
++:EndAquiferProfiles
++
++:AquiferProfileParameters
++  :Attributes, INITIAL_HEAD_DEPTH, SEEPAGE_LEAKANCE
++  :Units,      m,                  1/d
++  VALLEY_FILL, 2.0,                1.0
++  SLOPE_TILL,  5.0,                1.0
++:EndAquiferProfileParameters

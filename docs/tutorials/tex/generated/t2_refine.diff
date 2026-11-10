@@ -1,0 +1,4 @@
+--- Creek.rvg
++++ Creek.rvg
+@@ -11,0 +12 @@
++:GridRefinement    RIVERS 125.0                    # 125 m cells along the creek

@@ -1,0 +1,4 @@
+$ head -n 3 out_physical/GWSoilExchange.csv | cut -d, -f1-9
+time [d],date,HRU_ID,soil-zone base [m],soil water level [m],water table [m],saturated fraction [-],soil zone to aquifer [m3/d],aquifer to soil zone [m3/d]
+1,2010-01-02,1,992.299256,992.5624835,991.037603,0.0761989389,137178.1792,0
+1,2010-01-02,2,1039.116757,1038.824089,1017.053243,0.009107791955,10939.23324,0
