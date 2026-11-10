@@ -12,7 +12,8 @@ W4  rough-terrain regression cases: SKIP (permanent; the regression cases RT1-RT
 W5  case Dc: an existing NEWTON model, layers 0.5/0.3/0.5 m with ICELLTYPE 1/0/1 and ICONVERT 1, a
     20 % slope draining to a specified head, 20 dry days then 30 mm/d: no interface update from a diverged iterate (the
     model's confined middle layer drains below its bottom, MODFLOW's first iterate of the first rain step diverges): every
-    step completes, MODFLOW and the interface converge (before: "head 4.9e39 m ... the solve diverged").
+    step completes, MODFLOW and the interface converge (an update from that iterate would stop the run: "head 4.9e39 m ... the
+    solve diverged").
 W6  the far-head warning once per ensemble member: SKIP (not implemented; ResetState resets _farWarned, see the code).
 W7  heads far outside the model that converge (all cells ICELLTYPE 0 / ICONVERT 0, a well taking 1e4 m3/d out of a confined
     cell resupplied by a specified head, :SoilZone PHYSICAL, NEWTON): the run completes, the far head is warned about once

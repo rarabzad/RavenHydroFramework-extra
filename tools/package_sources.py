@@ -3,17 +3,20 @@
 README says.
 
     python3 package_sources.py <package folder> <code repo> <code revision> <extra repo> <extra revision>
-                               [--branch soil-zone] [--readme <package folder>/README.md] [--update-readme]
+                               [--code-branch mf6-coupling] [--extra-branch main]
+                               [--readme <package folder>/README.md] [--update-readme]
 
 <code revision> and <extra revision> are branches or commits of the two repositories (worktrees work too).
 
 Writes into <package folder>/source/:
   raven_code_src.tar.gz         git archive of the code revision, unpacks as raven-soil-zone/
   raven_code_history.bundle     the complete history of the code revision (back to Raven's first commit) as branch
-                                --branch (default soil-zone)
+                                --code-branch (default mf6-coupling, the branch of the public repository
+                                https://github.com/rarabzad/RavenHydroFramework)
   raven_extra_docs_tests.tar.gz git archive of the extra revision without docs/design (the developer records stay in the
                                 repository and its history), unpacks as raven-mf6-extra/
-  raven_extra_history.bundle    the complete history of the extra revision, as branch --branch
+  raven_extra_history.bundle    the complete history of the extra revision, as branch --extra-branch (default main, the
+                                default branch of https://github.com/rarabzad/RavenHydroFramework-extra)
   RESTORE_HISTORY.md            the "Restore the git history" section of the package README: the clone commands and what
                                 they give (commits and tip of each bundle)
   COMMITS.txt                   the commit, branch and commit count of each archive and bundle
@@ -25,8 +28,9 @@ upstream history does not reach the shallow boundary.
 
 Check: the package README (--readme, default <package folder>/README.md) must have a section "## Restore the git
 history". Its "git clone" commands are run as written, from an empty folder holding a copy of source/; together they must
-clone both bundles, and each clone must be complete (not shallow, git fsck --full clean), be on branch --branch, have the
-recorded tip and the same number of commits as the full history. Every "<n> commits ... (to <tip>)" statement of the
+clone both bundles, and each clone must be complete (not shallow, git fsck --full clean), be on its bundle's branch, have
+the recorded tip and the same number of commits as the full history. The clones are the checkouts the public repositories
+give (RavenHydroFramework on mf6-coupling, RavenHydroFramework-extra on main), for use offline. Every "<n> commits ... (to <tip>)" statement of the
 section must match the bundles. With --update-readme the section is first replaced by RESTORE_HISTORY.md's text.
 Exit code 0 when the check passes.
 """
@@ -36,6 +40,8 @@ UPSTREAM = os.environ.get('RAVEN_UPSTREAM', 'https://github.com/rchlumsk/RavenHy
 UPSTREAM_BRANCH = os.environ.get('RAVEN_UPSTREAM_BRANCH', 'main')
 SECTION = '## Restore the git history'
 BUNDLES = {'code': 'raven_code_history.bundle', 'extra': 'raven_extra_history.bundle'}
+CLONES = {'code': 'RavenHydroFramework', 'extra': 'RavenHydroFramework-extra'}   # the folder names of the public clones
+PUBLIC = {'code': 'https://github.com/rarabzad/RavenHydroFramework', 'extra': 'https://github.com/rarabzad/RavenHydroFramework-extra'}
 EXCLUDE_EXTRA = ['docs/design']      # developer records: in the repository and its history, not in the source archive
 
 
@@ -83,12 +89,13 @@ def bundle(pub, branch, out):
         sys.exit('%s holds %s, not only refs/heads/%s' % (out, heads, branch))
 
 
-def restore_text(branch, rec):
-    cmds = ['git clone source/%s raven-code -b %s' % (BUNDLES['code'], branch),
-            'git clone source/%s raven-extra -b %s' % (BUNDLES['extra'], branch)]
-    txt = (SECTION + '\nFrom the package folder:\n\n    %s\n    %s\n\n' % tuple(cmds) +
-           'raven-code holds the whole Raven history (%d commits to %s), raven-extra %d commits (to %s), both on branch %s.\n'
-           % (rec['code'][1], rec['code'][0][:7], rec['extra'][1], rec['extra'][0][:7], branch))
+def restore_text(branches, rec):
+    cmds = ['git clone source/%s %s -b %s' % (BUNDLES[k], CLONES[k], branches[k]) for k in ('code', 'extra')]
+    txt = (SECTION + '\nFrom the package folder (offline; the same checkouts as cloning %s, branch %s, and %s, branch %s):\n\n'
+           '    %s\n    %s\n\n' % (PUBLIC['code'], branches['code'], PUBLIC['extra'], branches['extra'], cmds[0], cmds[1]) +
+           '%s holds the whole Raven history (%d commits to %s) on branch %s, %s %d commits (to %s) on branch %s.\n'
+           % (CLONES['code'], rec['code'][1], rec['code'][0][:7], branches['code'],
+              CLONES['extra'], rec['extra'][1], rec['extra'][0][:7], branches['extra']))
     return txt
 
 
@@ -102,13 +109,13 @@ def readme_section(text):
     return text[i:j], i, j
 
 
-def check_clone(cmd, folder, branch, rec):
+def check_clone(cmd, folder, branches, rec):
     """runs one README clone command as written; returns (which bundle, problems)"""
     w = cmd.split()
     which = [k for k, b in BUNDLES.items() if any(x.endswith(b) for x in w)]
     if len(w) < 4 or not which:
         return None, ['"%s" clones neither bundle' % cmd]
-    tip, n = rec[which[0]]
+    tip, n = rec[which[0]]; branch = branches[which[0]]
     r = subprocess.run(cmd, shell=True, cwd=folder, capture_output=True, text=True)
     if r.returncode != 0:
         return which[0], ['"%s" failed: %s' % (cmd, (r.stdout + r.stderr).strip())]
@@ -132,13 +139,13 @@ def check_clone(cmd, folder, branch, rec):
 def check_statements(section, rec):
     """every '<n> commits ... <tip>' statement of the section names a bundle's count and tip"""
     bad, seen = [], set()
-    names = (('raven-code', 'code'), ('raven-extra', 'extra'))
+    names = ((CLONES['code'], 'code'), (CLONES['extra'], 'extra'))
     for m in re.finditer(r'([0-9][0-9,]*) commits\s*\(?(?:to\s+)?([0-9a-f]{7,40})\b', section):
         before = section[:m.start()]
-        pos = [(before.rfind(name), name, k) for name, k in names]
-        p, name, k = max(pos)
+        pos = [(max(before.rfind(name + ' '), before.rfind(name + ',')), name, k) for name, k in names]   # (the name itself,
+        p, name, k = max(pos)                                                                               #  not a prefix of it)
         if p < 0:
-            bad.append('"%s" names neither raven-code nor raven-extra before it' % m.group(0))
+            bad.append('"%s" names neither %s nor %s before it' % (m.group(0), CLONES['code'], CLONES['extra']))
             continue
         seen.add(k)
         n, tip = int(m.group(1).replace(',', '')), m.group(2)
@@ -153,10 +160,12 @@ def check_statements(section, rec):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('pkg'); ap.add_argument('code'); ap.add_argument('code_rev'); ap.add_argument('extra'); ap.add_argument('extra_rev')
-    ap.add_argument('--branch', default='soil-zone', help='branch name of both bundles (default soil-zone)')
+    ap.add_argument('--code-branch', default='mf6-coupling', help='branch of the code bundle (default mf6-coupling)')
+    ap.add_argument('--extra-branch', default='main', help='branch of the extra bundle (default main)')
     ap.add_argument('--readme', default=None, help='the package README to check (default <pkg>/README.md)')
     ap.add_argument('--update-readme', action='store_true', help='replace its restore section by RESTORE_HISTORY.md first')
     a = ap.parse_args()
+    br = {'code': a.code_branch, 'extra': a.extra_branch}
     src = os.path.join(a.pkg, 'source')
     readme = a.readme or os.path.join(a.pkg, 'README.md')
     os.makedirs(src, exist_ok=True)
@@ -164,7 +173,7 @@ def main():
     try:
         rec, pubs = {}, {}
         for k, repo, rev in (('code', a.code, a.code_rev), ('extra', a.extra, a.extra_rev)):
-            pub, tip, n = publish_repo(repo, rev, a.branch, tmp, k)
+            pub, tip, n = publish_repo(repo, rev, br[k], tmp, k)
             pubs[k] = pub; rec[k] = (tip, n)
         git(['archive', '--format=tar.gz', '--prefix=raven-soil-zone/', '-o',
              os.path.abspath(os.path.join(src, 'raven_code_src.tar.gz')), rec['code'][0]], pubs['code'])
@@ -172,15 +181,15 @@ def main():
              os.path.abspath(os.path.join(src, 'raven_extra_docs_tests.tar.gz')), rec['extra'][0], '--', '.']
             + [':(exclude)%s' % p for p in EXCLUDE_EXTRA], pubs['extra'])
         for k in ('code', 'extra'):
-            bundle(pubs[k], a.branch, os.path.abspath(os.path.join(src, BUNDLES[k])))
-        txt = restore_text(a.branch, rec)
+            bundle(pubs[k], br[k], os.path.abspath(os.path.join(src, BUNDLES[k])))
+        txt = restore_text(br, rec)
         with open(os.path.join(src, 'RESTORE_HISTORY.md'), 'w') as f:
             f.write(txt)
         with open(os.path.join(src, 'COMMITS.txt'), 'w') as f:
             f.write('raven_code_src.tar.gz and %s: commit %s, branch %s in the bundle, %d commits\n'
-                    % (BUNDLES['code'], rec['code'][0], a.branch, rec['code'][1]))
+                    % (BUNDLES['code'], rec['code'][0], br['code'], rec['code'][1]))
             f.write('raven_extra_docs_tests.tar.gz and %s: commit %s, branch %s in the bundle, %d commits '
-                    '(the archive without %s)\n' % (BUNDLES['extra'], rec['extra'][0], a.branch, rec['extra'][1],
+                    '(the archive without %s)\n' % (BUNDLES['extra'], rec['extra'][0], br['extra'], rec['extra'][1],
                                                     ', '.join(EXCLUDE_EXTRA)))
         # the package README
         fails = []
@@ -204,10 +213,10 @@ def main():
                 shutil.copytree(src, os.path.join(chk, 'source'))
                 seen = set()
                 for c in cmds:
-                    k, bad = check_clone(c, chk, a.branch, rec)
+                    k, bad = check_clone(c, chk, br, rec)
                     seen.add(k)
                     print('%-5s %s: %s' % (k or '?', c, ('ok (%d commits, %s, branch %s, not shallow, fsck clean)'
-                                                          % (rec[k][1], rec[k][0][:7], a.branch)) if not bad else 'FAIL: ' + '; '.join(bad)))
+                                                          % (rec[k][1], rec[k][0][:7], br[k])) if not bad else 'FAIL: ' + '; '.join(bad)))
                     fails += bad
                 for k in BUNDLES:
                     if k not in seen:

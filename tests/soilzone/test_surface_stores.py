@@ -15,7 +15,7 @@ SW3 control: specified head 92 m at the outlet, above the ground of the last cel
    depressions there (discharge > 0); identities.
 SW4 restart of SW3: 10 days, then 10 days from its solution.rvc. Groundwater discharge fills a depression above DEP_MAX
    (the precondition is checked: a DEPRESSION above 50 mm in the solution.rvc); the restart keeps it (the store of a
-   :SurfaceWaterExchange is not clipped to its maximum when the .rvc is read: 583 m3 were lost), so the watershed's
+   :SurfaceWaterExchange is not clipped to its maximum when the .rvc is read: a clip would lose 583 m3), so the watershed's
    Depression on day 11 and the discharge into the stores on days 12-20 equal the continuous SW3 run (1e-6).
 Quick mode (RAVEN_TEST_QUICK=1): the same cases (each run takes seconds).
 Usage: python3 test_surface_stores.py      (prints 'surface-store tests: ALL PASSED')"""

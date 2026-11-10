@@ -117,7 +117,11 @@ step; a step that did not converge is also reported in \cmd{Raven\_errors.txt} w
 (water created) can appear only on steps where MODFLOW stopped at a low \cmd{:SolverMaxOuterIterations} (below about
 20) without converging, together with a MODFLOW balance error; raise the limit.
 \item \emph{returned to Raven} equals \emph{seepage to Raven}.
-\item \emph{river loss carried to next step} is normally zero; when not, it is taken from the river the next day.
+\item \emph{river loss carried to next step} is normally 0 for rivers Raven builds: their loss is supply-limited by the
+channel's outflow at the start of the step. It is positive when the river's routed water in the step falls short of
+that (a receding river), or when a reservoir gain MODFLOW does not supply is taken from the reach; the carry is taken
+from the river the next step. An existing model's stream package has no supply limit, so there it can stay positive for
+months (Section~\ref{sec:extlimits}).
 \item Raven's \cmd{Watershed\allowbreak Storage.csv} MB error should be as small as without groundwater.
 \end{enumerate}
 The tool \cmd{tools\_audit.py} checks all of these automatically.
@@ -172,15 +176,17 @@ exist --- for example when wells pump more than the aquifer can supply --- and t
 warns and starts from the initial heads instead, as if \cmd{:GWInitialization} had not been given. The groundwater model is built after \emph{all} input files,
 including the \cmd{.rvc}, have been read.
 
-\subsection{Restarting a run (hotstart)}
+\subsection{Restarting a run (hotstart)}\label{sec:hotstart}
 At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states it contains \cmd{:GWHeads} (the head in
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any) and \cmd{:GWReservoirSeepage} (reservoir seepage in
 transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), and with unsaturated columns \cmd{:GWVadoseColumns} (\cmd{:GWVadoseClassColumns} with depth classes) and \cmd{:GWVadoseColumnTops} (each column's top and water). Using this file as the \cmd{.rvc} of a new run --- with \cmd{:StartDate} set to the end of the first
-run --- continues exactly. In a coupled run every value of the file is written with 17 significant digits (the HRU
-states of \cmd{:HRUStateVariableTable}, the channel and reservoir states of \cmd{:BasinStateVariables} and every
-groundwater block), so the restarted run starts from the states the continuous run had, bit for bit; a run without
-groundwater writes Raven's usual 5 decimals (and reservoir stages and flows with 12 digits, one of the corrections to Raven
-itself of Table~\ref{tab:ravendiff}). In the tests a restarted coupled run matches the continuous run exactly
+run --- continues the run. In a coupled run it carries on exactly: every value of the file is written with 17 significant
+digits (the HRU states of \cmd{:HRUStateVariableTable}, the channel and reservoir states of \cmd{:BasinStateVariables} and
+every groundwater block), so the restarted run starts from the states the continuous run had, bit for bit. A run without
+groundwater is base Raven's hotstart: it writes Raven's usual 5 decimals (and reservoir stages and flows with 12 digits, one
+of the corrections to Raven itself of Table~\ref{tab:ravendiff}), so it continues from states rounded to 5 decimals. In
+either case Raven's own balance error of a restarted run with a spilling reservoir is offset by a constant (a known issue
+of Raven itself, Section~\ref{ch:limits}). In the tests a restarted coupled run matches the continuous run exactly
 (\cmd{test\_restart.py} RS5, among them a run whose soil-zone redistribution switches on a change of $10^{-5}$~mm in the
 soil water) and otherwise to within $6\times10^{-6}$ in all flows. Three details make this hold:
 \begin{itemize}

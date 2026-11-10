@@ -1,34 +1,33 @@
-""":SoilZoneVadoseInitialFlux and the columns' initial state (I1-I6).
+""":SoilZoneVadoseInitialFlux and the columns' initial state (VI1-VI8).
 
-I1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
+VI1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
     (K = 3) too, and for KINEMATIC and LAG (gwvz::InitSteadyKinematic, the LAG cascade's S_i = q k_i). Enforced: step-1
     outflow = inflow (1e-6) and a positive start storage; the storage change over the run is printed, not enforced (the
     water table rises under the recharge in this closed model, so the columns shorten). A build whose steady start is a
     stub ("not available in this build") gives SKIP.
-I2  a hotstart taken before any column exists (water table above the soil-zone base at the end of the first run), the
+VI2  a hotstart taken before any column exists (water table above the soil-zone base at the end of the first run), the
     second run with the initial flux: the flux is ignored with the warning "... start at rest (their reference profile)",
     no steady profile is put in, identities from step 1.
-I4  columns' balance of step 1 (vz_identity from step 1, start value = previous run's end for a hotstart; a hotstart with
+VI4  columns' balance of step 1 (vz_identity from step 1, start value = previous run's end for a hotstart; a hotstart with
     heads +1 m so every bottom moves up in step 1); a deliberately moved start value must fail the check.
-I5  the steady start is for the flux each column receives, (1 - F) q: 2 HRUs, hummocks +-3 m, the water
+VI5  the steady start is for the flux each column receives, (1 - F) q: 2 HRUs, hummocks +-3 m, the water
     table 3 m deep held by a specified head (F = 0.16), PERC_CONSTANT 2 mm/d, :SoilZoneVadoseInitialFlux 2, K = 1 (and
     K = 3, where the classes with F_c > 0 have no column), RICHARDS, KINEMATIC and LAG: the columns' step-1 outflow equals
-    their inflow (1e-6), the saturated share rejected. (Started for q, the columns drained 120.0 m3 against an inflow of
-    100.8 m3 on step 1: an artificial recharge pulse.)
-I6  a RICHARDS column that cannot carry q: K_VERT 1 mm/d under :SoilZoneVadoseInitialFlux 2: the column
+    their inflow (1e-6), the saturated share rejected. (Started for q, the columns would drain 120.0 m3 against an inflow
+    of 100.8 m3 on step 1: an artificial recharge pulse.)
+VI6  a RICHARDS column that cannot carry q: K_VERT 1 mm/d under :SoilZoneVadoseInitialFlux 2: the column
     starts at its backed-up steady profile for the flux it passes (warning "cannot carry the flux"); step 1: storage
-    unchanged (1e-9 of the storage), outflow = inflow = K_VERT A, the rest rejected. (The profile for q had positive
-    pressure up to the top: step 1 drained 0.8 m3 of it, outflow 40.27 against 40.00 m3.)
-I7  a restart without columns from a file that holds them: the combinations.py column case (negative recharge, 3 depth
+    unchanged (1e-9 of the storage), outflow = inflow = K_VERT A, the rest rejected. (The profile for q would have
+    positive pressure up to the top: step 1 would drain 0.8 m3 of it, outflow 40.27 against 40.00 m3.)
+VI7  a restart without columns from a file that holds them: the combinations.py column case (negative recharge, 3 depth
     classes, LAG) run 4 days writes :GWVadoseClassColumns and :GWVadoseColumnTops; restarted with :SoilZoneVadose NONE
     the run warns that the columns' water is dropped and names the volume, and GWModelSummary.txt reports it ('hotstart
-    columns unused'): the volume equals the first run's final 'unsaturated zone storage' (1e-6). (It was dropped silently:
-    507 m3.)
-I8  a restart whose columns have other tops: the same case with RICHARDS, written with :SoilZoneSubgrid 5 and restarted
+    columns unused'): the volume equals the first run's final 'unsaturated zone storage' (1e-6).
+VI8  a restart whose columns have other tops: the same case with RICHARDS, written with :SoilZoneSubgrid 5 and restarted
     with :SoilZoneSubgrid 8. Lines whose column top differs by more than 1 mm do not match (the warning names the column
-    top); the restart starts with no more unsaturated water than the file holds (it started with 18.2 m3 from 7.4 m3
-    written). Restarted with :SoilZoneSubgrid 5 the columns are read and start with the written water (1e-9).
+    top); the restart starts with no more unsaturated water than the file holds (columns of other tops given the written
+    water would start with 18.2 m3 from 7.4 m3 written). Restarted with :SoilZoneSubgrid 5 the columns are read and start with the written water (1e-9).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -79,7 +78,7 @@ def errs(d):
     f = os.path.join(d, 'out', 'Raven_errors.txt'); return open(f).read() if os.path.exists(f) else ''
 
 def i1():
-    print('I1 steady start')
+    print('VI1 steady start')
     days = 10 if QUICK else 30
     ok = True
     for meth, K in (('RICHARDS', 1), ('RICHARDS', 3), ('KINEMATIC', 1), ('LAG', 1)):
@@ -89,7 +88,7 @@ def i1():
             cfg['dem_fn'] = lambda x, y: 0.8 * np.sin(2 * np.pi * (x + 25.0) / 100.0) * np.sin(2 * np.pi * (y + 25.0) / 100.0); cfg['dem_res'] = 400
         d = case('i1_%s_k%d' % (meth, K), ex, **cfg)
         if d and ('not available in this build' in errs(d)):
-            tc.skip('I1 %s steady start' % meth, 'the method\'s steady start is a stub until its solver is merged (columns start at rest)')
+            tc.skip('VI1 %s steady start' % meth, 'the method\'s steady start is a stub until its solver is merged (columns start at rest)')
             ok &= check('i1_%s_k%d' % (meth, K), d); continue
         good = check('i1_%s_k%d' % (meth, K), d)
         if d:
@@ -99,11 +98,11 @@ def i1():
             print('    step 1: inflow %.3f m3, outflow %.3f m3 (%.2g); storage %.3f -> %.3f m3 (%.2g)' % (qin, qout, rel, s0, s.iloc[-1], dst))
             good &= (qin > 0) and rel < 1e-6 and s0 > 0     # (later steps: the water table rises under the recharge, no outlet)
         ok &= good
-    print('I1 %s' % ('ok' if ok else 'FAIL'))
+    print('VI1 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
 def i2():
-    print('I2 hotstart taken before any column exists: the initial flux is ignored')
+    print('VI2 hotstart taken before any column exists: the initial flux is ignored')
     ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
     first = case('i2_first', ex, **dict(BASE, init_depth=0.5, rain=[0.0] * 5, days=5))
     ok = check('i2_first', first)
@@ -119,11 +118,11 @@ def i2():
             print('    first run wrote %s block; second run: warning %s, storage at the start %s m3 -> %s'
                   % ('a' if blk else 'no', 'present' if 'at rest (their reference profile)' in w else 'MISSING', s0, 'ok' if good else 'FAIL'))
             ok &= good
-    print('I2 %s' % ('ok' if ok else 'FAIL'))
+    print('VI2 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
 def i4():
-    print('I4 columns\' balance of step 1 (start line, hotstart, bottoms moving up in step 1)')
+    print('VI4 columns\' balance of step 1 (start line, hotstart, bottoms moving up in step 1)')
     ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
     rain = [0.0] * 3 + [20.0] * 3 + [0.0] * 4
     cfg = dict(BASE, init_depth=4.0, rain=rain, days=len(rain), perc_type='PERC_GAWSER_CONSTRAIN', perc=50.0)
@@ -146,11 +145,11 @@ def i4():
             print('    step-1 release to the aquifer %.1f m3; a start value moved by %.3g m3 gives vz_identity %.2g -> %s'
                   % (fl, moved - s0, v, 'fails as it must (limit 1e-8)' if v > 1e-5 else 'NOT DETECTED'))
             ok &= v > 1e-5
-    print('I4 %s' % ('ok' if ok else 'FAIL'))
+    print('VI4 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
 def i5():
-    print('I5 steady start for the flux the columns receive, (1 - F) q')
+    print('VI5 steady start for the flux the columns receive, (1 - F) q')
     ok = True
     dem = lambda x, y: 3.0 * np.sin(2 * np.pi * (x + 25.0) / 100.0) * np.sin(2 * np.pi * (y + 25.0) / 100.0)
     for meth, K in (('RICHARDS', 1), ('KINEMATIC', 1), ('LAG', 1)) + ((() if QUICK else (('RICHARDS', 3), ('KINEMATIC', 3), ('LAG', 3)))):
@@ -164,11 +163,11 @@ def i5():
             print('    %s K=%d step 1: inflow %.4f m3, outflow %.4f m3 (%.2g), rejected %.3f m3' % (meth, K, qin, qout, rel, rej))
             good &= qin > 0 and rel < 1e-6 and (K > 1 or rej > 0)
         ok &= good
-    print('I5 %s' % ('ok' if ok else 'FAIL'))
+    print('VI5 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
 def i6():
-    print('I6 RICHARDS steady start beyond the column\'s capacity: the backed-up steady profile')
+    print('VI6 RICHARDS steady start beyond the column\'s capacity: the backed-up steady profile')
     ex = ':SoilZoneVadose RICHARDS\n:SoilZoneVadoseInitialFlux 2\n'
     cfg = dict(BASE, init_depth=3.0, Kv=0.001, rain=[0.0] * 3, days=3, phi0=(200.0, 200.0))
     d = case('i6_backed', ex, **cfg); ok = check('i6_backed', d)
@@ -182,7 +181,7 @@ def i6():
         print('    step 1: storage %.6f -> %.6f m3, inflow %.6f, outflow %.6f m3 (K_VERT A = %.1f), rejected %.6f m3 (want %.1f); warning %s -> %s'
               % (s0 or 0.0, s1, qin, qout, f, rej, q - f, 'present' if w else 'MISSING', 'ok' if good else 'FAIL'))
         ok &= good
-    print('I6 %s' % ('ok' if ok else 'FAIL'))
+    print('VI6 %s' % ('ok' if ok else 'FAIL'))
     return ok
 
 def restart_pair(name, m, K, n1, second_rvg=None):
@@ -206,7 +205,7 @@ def restart_pair(name, m, K, n1, second_rvg=None):
     return a, b, 'Successful Simulation' in C.run(b)
 
 def i7():
-    print('I7 restart with :SoilZoneVadose NONE from a file with columns')
+    print('VI7 restart with :SoilZoneVadose NONE from a file with columns')
     a, b, ok = restart_pair('i7', 'LAG', 3, 4, lambda t: t.replace(':SoilZoneVadose LAG', ':SoilZoneVadose NONE'))
     if not ok: print('  runs FAILED'); return False
     v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); e = errs(b)
@@ -217,7 +216,7 @@ def i7():
     return good
 
 def i8():
-    print('I8 restart whose columns have other tops (:SoilZoneSubgrid)')
+    print('VI8 restart whose columns have other tops (:SoilZoneSubgrid)')
     a, b, ok = restart_pair('i8', 'RICHARDS', 3, 4, lambda t: t.replace(':SoilZoneSubgrid 5', ':SoilZoneSubgrid 8'))
     a2, b2, ok2 = restart_pair('i8s', 'RICHARDS', 3, 4)
     if not (ok and ok2): print('  runs FAILED'); return False
@@ -229,7 +228,7 @@ def i8():
 
 def main():
     tc.need_mf6()
-    res = {'I1': i1(), 'I2': i2(), 'I4': i4(), 'I5': i5(), 'I6': i6(), 'I7': i7(), 'I8': i8()}
+    res = {'VI1': i1(), 'VI2': i2(), 'VI4': i4(), 'VI5': i5(), 'VI6': i6(), 'VI7': i7(), 'VI8': i8()}
     print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
     good = all(res.values())
     print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')

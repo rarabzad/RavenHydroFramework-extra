@@ -494,7 +494,7 @@ of Section~\ref{sec:vsoilzone} and the rough-terrain suite: in full mode 400 see
 1\,620 runs, and the same again with three depth classes) and writes one report; \cmd{-{}-nolib} runs only the checks that
 need no MODFLOW library. \cmd{-{}-quick} runs fewer randomized set-ups (the grid harnesses 8 and 4 set-ups instead of
 72 and 24, the existing-model harness 6 instead of 20, the rough-terrain suite 40 seeds instead of 400, the Liard soil-zone
-run T7 30 days instead of 365) and sets \cmd{RAVEN\_TEST\_QUICK=1} for every script: the scripts that have a quick mode
+run LP1 30 days instead of 365) and sets \cmd{RAVEN\_TEST\_QUICK=1} for every script: the scripts that have a quick mode
 (every soil-zone script, the behaviour, budget-file, option-combination, projected-input, GeoTIFF, input and version-guard checks,
 and the existing-model exchange, input-form and restart tests) run shorter cases, each described in its header; the
 others run their usual cases (\cmd{tests/README.md} lists both groups). On two cores the quick mode takes about 35

@@ -232,7 +232,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{recharge onto CHD cells [m3/d]} & recharge of HRUs lying wholly on fixed-head cells\\
 \cmd{river leakage to aquifer [m3/d]}, \cmd{aquifer discharge to rivers [m3/d]} & river exchange by direction\\
 \cmd{river exchange applied to Raven [m3]} & net volume applied to Raven reaches\\
-\cmd{river loss carried to next step [m3]} & unsupplied loss taken next step (normally 0)\\
+\cmd{river loss carried to next step [m3]} & unsupplied loss taken next step (normally 0 for rivers Raven builds; an existing model's stream package can carry it for months)\\
 \cmd{water-table ET [m3/d]} & evaporation from the water table\\
 \cmd{wells specified [m3/d]}, \cmd{wells actual [m3/d]} & requested and delivered well rates\\
 \cmd{GHB [m3/d]}, \cmd{CHD [m3/d]} & boundary flows (positive into the aquifer)\\
@@ -258,8 +258,9 @@ Column & Meaning\\\midrule\endhead
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
 water level, water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
-water and capacity [mm], interface updates and change, and with specified heads the exchange with them both ways; the
-exchange columns summed over the HRUs equal those of \cmd{GWBudget.csv}; Table~\ref{tab:outputs}), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
+water and capacity [mm], and with specified heads the exchange with them both ways; the exchange columns summed over the
+HRUs equal those of \cmd{GWBudget.csv}; two model-wide values of the step, interface updates and change, are repeated on
+every row; Table~\ref{tab:outputs}), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
 $-1.2345$ when dry), \cmd{GWConnectivity.csv} (wet areas, wet fraction per profile), \cmd{GWModelSummary.txt}, \cmd{GWHeads.nc}
 (optional), \cmd{mf6/} (MODFLOW model, list files, binary heads).
 

@@ -18,7 +18,7 @@ failed steps.
 Mode: --quick (or RAVEN_TEST_QUICK=1 in the environment) sets RAVEN_TEST_QUICK=1 for every step; otherwise every step runs
 with RAVEN_TEST_QUICK=0, its full mode, also when the variable is set to something else outside. In quick mode this script
 runs fewer randomized set-ups (fuzz_grids 8 instead of 72, fuzz_lakes 4 instead of 24, ext_fuzz 6 instead of 20, the
-rough-terrain suite 40 seeds instead of 400, T7 30 days instead of 365), and the scripts with a quick mode run shorter
+rough-terrain suite 40 seeds instead of 400, LP1 30 days instead of 365), and the scripts with a quick mode run shorter
 cases: every soil-zone script (soilzone/; spike_xmi, test_hillslope, test_surface_stores and test_plot_tool run the same
 case in both modes), behaviour_check, budget_file, combinations, crs_inputs, geotiff_check (fewer damaged files), input_checks, mf6version_check and
 existing/ext_exchanges, ext_inputs and restart_ext (its sub-daily case). The other scripts (edge, liard_grids,
@@ -218,7 +218,7 @@ STEPS = [
     ('soilzone_check_selftest', False, [PY, 'soilzone/sz_check.py'], last_line(r'vz_identity self-test: .* -> ok'), 300),
     ('soilzone_spike', True, [PY, 'soilzone/spike_xmi.py'], last_line(r'spike: ALL PASSED'), 1800),
     ('soilzone_column', True, [PY, 'soilzone/test_column.py'], last_line(r'column tests: ALL PASSED'), 1800),
-    ('soilzone_hillslope', True, [PY, 'soilzone/test_hillslope.py', '--selftest'], last_line(r'T2/T3 hillslope: PASS'), 1800),
+    ('soilzone_hillslope', True, [PY, 'soilzone/test_hillslope.py', '--selftest'], last_line(r'HS1/HS2 hillslope: PASS'), 1800),
     ('soilzone_dynamics', True, [PY, 'soilzone/test_dynamics.py'], last_line(r'dynamics tests: ALL PASSED'), 3600),
     ('soilzone_restart', True, [PY, 'soilzone/test_restart.py'], last_line(r'restart test: PASS'), 1800),
     ('soilzone_inputs', True, [PY, 'soilzone/test_inputs.py'], last_line(r'input tests: ALL PASSED'), 1800),
@@ -243,7 +243,7 @@ STEPS = [
     ('soilzone_rough_terrain_k3', True, [PY, 'soilzone/test_rough_terrain.py'] + (['--quick'] if QUICK else []) + ['--methods', 'NONE,RICHARDS,KINEMATIC,LAG', '--vzclasses', '3'],
      last_line(r'rough terrain: \d+ runs, 0 failed'), 4 * 3600),
     ('soilzone_existing', True, [PY, 'soilzone/test_sz_existing.py'], last_line(r'soil-zone existing-model tests: ALL PASSED'), 3600),
-    ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py'] + ([] if QUICK else ['365']), last_line(r'T7 Liard physical: PASS'), 4 * 3600),
+    ('soilzone_liard', True, [PY, 'soilzone/test_liard_physical.py'] + ([] if QUICK else ['365']), last_line(r'LP1 Liard physical: PASS'), 4 * 3600),
 ]
 
 def selftest():
@@ -281,7 +281,7 @@ def selftest():
     check('lake: a run with unconverged steps (count 4 of 5) is judged FAIL', not J['lake'](lk)[0])
     lg = 'regular 2 km (default) FAILED\nliard grids: 4 of 5 finished, converged and balanced\nresults in x\n'
     check('liard_grids: a FAILED grid is judged FAIL', not J['liard_grids'](lg)[0])
-    # soil-zone restart: the last line is PASS only when R2-R4 pass too
+    # soil-zone restart: the last line is PASS only when RS2-RS5 pass too
     r = subprocess.run([PY, '-c', 'import sys; sys.path.insert(0, "soilzone"); import test_restart as t; t.verdict(True, True, False, True, True)'],
                        cwd=HERE, capture_output=True, text=True, env=tc.ENV)
     o = r.stdout + r.stderr

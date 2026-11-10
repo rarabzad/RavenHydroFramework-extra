@@ -5,10 +5,10 @@
 Output files written here with the column names of GWSoilExchange.csv and GWBudget.csv: seven HRUs exchange with the
 aquifer (10 to 70 m3/d), and HRU 8 lies wholly over specified heads, so its exchange (1,000 m3/d up) is only in the
 columns "specified heads to soil zone" / "soil zone to specified heads".
-P1 the default choice of HRUs (largest exchange) puts HRU 8 first;
-P2 HRU 8's exchange panel and the model-wide exchange panel draw the specified-head exchange (lines "specified heads to
+PT1 the default choice of HRUs (largest exchange) puts HRU 8 first;
+PT2 HRU 8's exchange panel and the model-wide exchange panel draw the specified-head exchange (lines "specified heads to
    soil" and "soil to specified heads (neg.)"), and the model-wide upward lines add up to GWBudget.csv's total;
-P3 output without those columns (CONCEPTUAL-only specified heads) still plots, with the aquifer exchange only.
+PT3 output without those columns (CONCEPTUAL-only specified heads) still plots, with the aquifer exchange only.
 The same in both modes (RAVEN_TEST_QUICK has no effect: the check takes a second).
 """
 import os, sys, shutil
@@ -74,24 +74,24 @@ except Exception as e:   # (a tool that fails on the columns)
     hrus, fig = None, None
     report('plot_soilzone.py runs', False, repr(e)[:120])
 if fig is not None:
-    report('P1 HRU 8 (exchange only with specified heads) is chosen first', len(hrus) > 0 and hrus[0] == 8, 'HRUs %s' % hrus)
+    report('PT1 HRU 8 (exchange only with specified heads) is chosen first', len(hrus) > 0 and hrus[0] == 8, 'HRUs %s' % hrus)
     ax = fig.axes
     i8 = hrus.index(8) if 8 in hrus else -1
     l8 = labels(ax[2 * i8 + 1]) if i8 >= 0 else []
     n = len(hrus); lw = labels(ax[2 * n])
-    report('P2 HRU 8 panel draws the specified-head exchange', 'specified heads to soil' in l8 and 'soil to specified heads (neg.)' in l8, ', '.join(l8))
+    report('PT2 HRU 8 panel draws the specified-head exchange', 'specified heads to soil' in l8 and 'soil to specified heads (neg.)' in l8, ', '.join(l8))
     lines = {l.get_label(): l.get_ydata() for l in ax[2 * n].get_lines()}
     tot = lines.get('aquifer to soil', 0) + lines.get('specified heads to soil', 0)
     want = (b['aquifer to soil zone [m3/d]'] + b[CHD_UP]).values
-    report('P2 model-wide panel: upward lines add up to the total (aquifer + specified heads)', 'specified heads to soil' in lw and np.allclose(tot, want),
+    report('PT2 model-wide panel: upward lines add up to the total (aquifer + specified heads)', 'specified heads to soil' in lw and np.allclose(tot, want),
            ', '.join(lw))
 d = os.path.join(W, 'without_chd'); write(d, False)
 try:
     hrus, fig = plot(d)
-    report('P3 output without the specified-head columns plots (aquifer exchange only)', 8 not in hrus[:1] and 'specified heads to soil' not in labels(fig.axes[1]),
+    report('PT3 output without the specified-head columns plots (aquifer exchange only)', 8 not in hrus[:1] and 'specified heads to soil' not in labels(fig.axes[1]),
            'HRUs %s' % hrus)
 except Exception as e:
-    report('P3 output without the specified-head columns plots', False, repr(e)[:120])
+    report('PT3 output without the specified-head columns plots', False, repr(e)[:120])
 shutil.rmtree(W, ignore_errors=True)
 print('plot tool tests: ALL PASSED' if fails == 0 else 'plot tool tests: %d FAILED' % fails)
 sys.exit(1 if fails else 0)

@@ -1,7 +1,7 @@
 """MODFLOW's budget as Raven books it.
 
 B1  a steady existing model without STO6, :SoilZone PHYSICAL, converged: Raven's residual is MODFLOW's (storage 0; the
-    residual sum includes the soil-zone terms: before, the balance error was the whole MF6 recharge, 50 %); B1a no
+    residual sum includes the soil-zone terms: without them the balance error would be the whole MF6 recharge, 50 %); B1a no
     "storage flows not accessible ... inferred" warning for such a model, and the S_y 0.2 warning; B1b the same model with
     OUTER_MAXIMUM 3: Raven's residual equals the list file's IN - OUT on every step, and the outer-iteration warning names
     "OUTER_MAXIMUM 3 in the model's IMS file (MODFLOW's MXITER)".

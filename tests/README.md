@@ -8,8 +8,9 @@ reads its settings from `testconfig.py`, which finds the repository from its own
 The tests run Raven from a separate RavenHydroFramework checkout (with the MODFLOW 6 coupling). Put the two side by
 side, build Raven, and get the MODFLOW 6 library:
 
-    <folder>/RavenHydroFramework         cmake -S . -B build && cmake --build build   (or make in src/)
-    <folder>/RavenHydroFramework-extra   this repository
+    <folder>/RavenHydroFramework         git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
+                                         cmake -S . -B build && cmake --build build   (or make in src/)
+    <folder>/RavenHydroFramework-extra   this repository (git clone https://github.com/rarabzad/RavenHydroFramework-extra.git)
     python3 tools/get_mf6.py          # MODFLOW 6 library into RavenHydroFramework/lib/mf6
     pip install numpy pandas shapely pyproj flopy
 
@@ -41,7 +42,7 @@ lists which steps give the numbers quoted in the manual.
 
 Quick mode (`--quick`, or `RAVEN_TEST_QUICK=1` for a single script): `run_all.py` runs fewer randomized set-ups
 (`fuzz_grids` 8 instead of 72, `fuzz_lakes` 4 instead of 24, `ext_fuzz` 6 instead of 20, the rough-terrain suite 40
-seeds instead of 400, T7 30 days instead of 365). The scripts with a quick mode run shorter cases, each described in its
+seeds instead of 400, LP1 30 days instead of 365). The scripts with a quick mode run shorter cases, each described in its
 header: every soil-zone script (`spike_xmi.py`, `test_hillslope.py`, `test_surface_stores.py` and `test_plot_tool.py`
 run the same case in both modes), `behaviour_check.py`, `budget_file.py`, `combinations.py`, `crs_inputs.py`, `geotiff/geotiff_check.py`,
 `input_checks.py`, `mf6version_check.py`, and `existing/ext_exchanges.py`, `ext_inputs.py` and `restart_ext.py` (its
@@ -55,7 +56,7 @@ The coupled tests of the sections below start from the shipped Liard examples (`
 `examples/Liard_existing_model`), copy them into the scratch folder and edit the copies; the examples themselves are never
 changed. Each run is checked with the audit tool shipped with the example (`examples/Liard_groundwater/tools_audit.py`).
 The soil-zone tests (`soilzone/`, last section) instead build small synthetic models (`soilzone/sz_models.py`,
-`rough_models.py`, `rough_ext.py`) and check every run with `soilzone/sz_check.py` (except T7, which uses the Liard
+`rough_models.py`, `rough_ext.py`) and check every run with `soilzone/sz_check.py` (except LP1, which uses the Liard
 example and the audit tool).
 
 ## Unit tests (no MODFLOW needed)
@@ -80,7 +81,7 @@ run stops, with a message, right after that, so these checks need only Raven, Py
 | `mf6files_check.py [OLD_RAVEN]` | 16 generated set-ups (every grid type, rotation, refinement, layers by elevation, aquicludes, boundaries, wells, lakes, imported cells): FloPy reads the model; cells valid and not overlapping; DIS origin and rotation, DISV/DISU vertices, DISU symmetry and face angles against the cell file; no vertical connection through an aquiclude; drains inside the top cell; boundary polygons select the right cells. With an older Raven as argument, also shows which input files changed |
 | `crs_inputs.py --nolib` | the input checks of `crs_inputs.py` (below): projected GeoJSON or rasters without `:InputCRS`, files in another projection than `:InputCRS`, wells given by X and Y without `:InputCRS`, and with `:InputCRS` a DEM, bedrock raster, HRU file or boundary line left in lon/lat stop Raven while it reads the geometry |
 | `run_all.py --selftest` (`run_all_selftest`) | the pass criteria of `run_all.py` fail on outputs with failed or unconverged runs, `test_restart.py`'s last line fails when RS2-RS5 fail, and the restart, lake, Thiem, Liard-grid and existing-model restart scripts end with a failing count line and exit code 1 when Raven fails |
-| `soilzone/test_plot_tool.py` (`soilzone_plot_tool`) | `tools/plot_soilzone.py` with soil-zone columns over specified heads: their exchange counts in the choice of HRUs and is drawn per HRU and model-wide |
+| `soilzone/test_plot_tool.py` (`soilzone_plot_tool`) | PT1-PT3: `tools/plot_soilzone.py` with soil-zone columns over specified heads: their exchange counts in the choice of HRUs and is drawn per HRU and model-wide |
 | `edge.py --nolib` | the faulty and unusual set-ups of `edge.py` (below), judged by the message Raven stops with; valid existing-model preparations checked in detail (stress periods split at the start date, restart renumbering, original model untouched) |
 
 ## Generated models (Raven builds the groundwater model)
@@ -96,15 +97,15 @@ case once (3 km cells, half-day steps, a pumping and a monitoring well).
 | `lake_test.py` | `:GridRefinement LAKES` (and `POLYGONS`) around a reservoir on each refinable grid: cell sizes near the lake, water accounts, reservoir identity, no unconverged step ("lake runs: k of 5 pass", exit code) |
 | `liard_grids.py [--table]` | the Liard example on every grid type for two years, and the manual's grid table (cells, run time, NSE, seepage, rivers); every grid must converge with exact accounts ("liard grids: k of 5 ...", exit code) |
 | `behaviour_check.py` | a 50 km² reservoir with seepage and a pumping well on the full Liard example for two years (reservoir identity, exact accounts), and the same set-up as a two-member ensemble: each member equal to the single run in GWBudget, GWHeads, Hydrographs, ReservoirStages and GWHRUState. Quick mode: 120 days |
-| `input_checks.py` | strict reading of the inputs: malformed numbers in the `.rvg` (`:GridCellSize 2,000.0`, `2km`, `HEAD H1146`, `1146.85m`, ...); the grid-size limit of 5 million cells per layer, checked before the grid is built (`:GridCellSize 2`, `50` and `60` on Liard, refinement sizes on a regular grid, a quadtree's estimated size for `:GridRefinement RIVERS 0.1`) and a quadtree within it that needs more memory than 3 GB (`RIVERS 0.5`: a stop naming `:GridRefinement` and the estimated size, no crash); a quadtree of 200 copies of one line and one of 20 adjacent squares built (each square counted once in the estimate); units of `:WellFlowRate` and `:BoundaryHead` series; reserved package names (each stop case runs under a 3 GB address-space limit) |
+| `input_checks.py` | N1-N16, U0-U4, RN1-RN2: strict reading of the inputs: malformed numbers in the `.rvg` (`:GridCellSize 2,000.0`, `2km`, `HEAD H1146`, `1146.85m`, ...); the grid-size limit of 5 million cells per layer, checked before the grid is built (`:GridCellSize 2`, `50` and `60` on Liard, refinement sizes on a regular grid, a quadtree's estimated size for `:GridRefinement RIVERS 0.1`) and a quadtree within it that needs more memory than 3 GB (`RIVERS 0.5`: a stop naming `:GridRefinement` and the estimated size, no crash); a quadtree of 200 copies of one line and one of 20 adjacent squares built (each square counted once in the estimate); units of `:WellFlowRate` and `:BoundaryHead` series; reserved package names (each stop case runs under a 3 GB address-space limit) |
 | `edge.py [--nolib]` | faulty set-ups (each must stop with a message naming the problem) and unusual valid ones (each must run), for generated and existing models |
 | `fuzz_grids.py SEED N [lakes]` | N random set-ups of the subbasin-52 model over every grid type, with wells, boundaries, reservoirs, wetlands and lake refinement, checked with the accounting identities, MODFLOW's list-file budget and restarts; `lakes` puts a reservoir and lake refinement in every set-up |
 | `crs_inputs.py [--nolib]` | `:InputCRS`: the Liard example with every geometry and raster input in UTM zone 10 against the lon/lat example. Without rasters the grid, the HRU-cell overlaps (within 1e-6 of a cell), the monitoring well's cell (given by X and Y), the GHB and CHD cells (both non-zero: the GHB head lies above its cells, the CHD lake is placed by a `:BoundaryHead` series) and the outputs agree (Hydrographs and HRU states within 1e-6, GWBudget within 1e-5); with the DEM and bedrock resampled to UTM the model top agrees within the resampling (mean below 0.05 m). Input checks as in `--nolib`; with `RAVEN_EXE_REF` the lon/lat run equals the reference build |
 | `dry_start.py` | the warning for a layer that starts completely dry (Liard with INITIAL_HEAD_DEPTH 25 m: layer 2 named, summary line), none with `:GWInitialization STEADY_STATE` or for the example as shipped (with `RAVEN_EXE_REF`: equal to the reference build) |
 | `combinations.py` | option combinations: small synthetic models across a matrix (exchanges ET, river, surface stores, reservoir, well, GHB, CHD together and alone; plain, dry top cells, negative recharge, rising water table; CONCEPTUAL and `:SoilZone PHYSICAL` with `RICHARDS`/`KINEMATIC`/`LAG` and 1 or 3 depth classes; every case generated, existing with NEWTON, without it (CONCEPTUAL) and in feet/seconds); every run: MODFLOW, recharge, soil-zone and column identities, Raven's balance, river, surface-store and reservoir books, run totals, no HDRY or NaN, no groundwater into surface stores while the water table is below the ground; every run must move through each exchange and stress its case names at least half the volume recorded for it in `combinations_floors.json` (`--record`), so an exchange scaled down fails as one dropped (a losing lake on the ground and a pit lake gaining from a specified head, water-table ET, the river, well and boundaries, negative recharge, dry top cells, vanishing columns, `:BoundaryHead` series switching cells off and on and switching every cell of a column off, an existing model's specified heads switching on under a lake); the KNOWN reservoir exception only for the lake's own small routing error at its weir crest, with a self-test (an injected 5,000 m3 fails); quick 311 runs of 8 days, full 393 runs of 15 days with half-day steps |
-| `reservoir_checks.py` | `:ReservoirExchange` on lakes whose cells cannot all take seepage: an existing model's own specified heads under a lake linked to a sliver of another HRU (seepage of the sliver's share only, the day's seepage returned, no jump when the sliver is a specified head too, feet/seconds, a restart inside the specified-head period), a generated lake half over a `:SpecifiedHeadBoundary` (seepage constant scaled by the bed left); the lake's bed on the ground under `:SoilZone PHYSICAL` (seepage equal to CONCEPTUAL); an unsupplied reservoir gain warned about and totalled |
-| `budget_file.py` | `:WriteGWBudgetFile`: FloPy reads `mf6/gwf.cbc` (FLOW-JA-FACE, specific discharge, saturation, every package each step), its totals equal `GWBudget.csv`, `gwf.porosity` holds each cell's class POROSITY; without the option the solution and the `mf6` folder are unchanged (and, with `RAVEN_EXE_REF`, identical to the reference build); `tools/make_prt.py` builds and runs a PRT simulation through the MODFLOW 6 library, forward and backward; the option is refused with an existing model |
-| `tools_check.py` | the tools and comparison rules: `tools_audit.py` on runs of one, two and three steps; `mf6_to_feet.py` on whole-number heads and on GHB, RIV, WEL and DRN lists, and its stop for a time-series name in a list, a package it does not convert and a DISV grid; `testconfig.max_diff` (a NaN in one run is a difference), `restart_verdict` (the continuous run's unconverged steps fail a restart comparison) and `rvc_same` (`solution.rvc` against a reference build's, numbers written with the same decimals equal, others within the two roundings of one value; `:GWVadoseColumnTops` compared when both files hold it) |
+| `reservoir_checks.py` | RV1-RV4: `:ReservoirExchange` on lakes whose cells cannot all take seepage: an existing model's own specified heads under a lake linked to a sliver of another HRU (seepage of the sliver's share only, the day's seepage returned, no jump when the sliver is a specified head too, feet/seconds, a restart inside the specified-head period), a generated lake half over a `:SpecifiedHeadBoundary` (seepage constant scaled by the bed left); the lake's bed on the ground under `:SoilZone PHYSICAL` (seepage equal to CONCEPTUAL); an unsupplied reservoir gain warned about and totalled |
+| `budget_file.py` | BF1-BF6: `:WriteGWBudgetFile`: FloPy reads `mf6/gwf.cbc` (FLOW-JA-FACE, specific discharge, saturation, every package each step), its totals equal `GWBudget.csv`, `gwf.porosity` holds each cell's class POROSITY; without the option the solution and the `mf6` folder are unchanged (and, with `RAVEN_EXE_REF`, identical to the reference build); `tools/make_prt.py` builds and runs a PRT simulation through the MODFLOW 6 library, forward and backward; the option is refused with an existing model |
+| `tools_check.py` | TC1-TC5: the tools and comparison rules: `tools_audit.py` on runs of one, two and three steps; `mf6_to_feet.py` on whole-number heads and on GHB, RIV, WEL and DRN lists, and its stop for a time-series name in a list, a package it does not convert and a DISV grid; `testconfig.max_diff` (a NaN in one run is a difference), `restart_verdict` (the continuous run's unconverged steps fail a restart comparison) and `rvc_same` (`solution.rvc` against a reference build's, numbers written with the same decimals equal, others within the two roundings of one value; `:GWVadoseColumnTops` compared when both files hold it) |
 | `budget_xcheck.py OUT [OUT ...]` | the coupler's budget against MODFLOW's own list-file budget, package by package (read by package name from the list file), for any output folders |
 
 ## Existing MODFLOW 6 models (`existing/`)
@@ -136,8 +137,8 @@ days and in feet and seconds, with an independent `:OverlapWeights` table from `
 
 The tests of `:SoilZone PHYSICAL` (manual, chapter "Verification", sections "The soil zone" and "Rough terrain"). Each
 script supports the quick mode (`RAVEN_TEST_QUICK=1`, which `run_all.py --quick` sets) and the full mode: in quick mode the
-scripts run shorter cases (for example T7 30 days instead of 365, the restart hillslope 60 + 60 days instead of 150 + 150,
-T4 without the hourly step), and the scripts whose cases take a few seconds (`spike_xmi.py`, the T2/T3 hillslope,
+scripts run shorter cases (for example LP1 30 days instead of 365, the restart hillslope 60 + 60 days instead of 150 + 150,
+DY1 without the hourly step), and the scripts whose cases take a few seconds (`spike_xmi.py`, the HS1/HS2 hillslope,
 `test_surface_stores.py`, `test_plot_tool.py`) run the same case in both modes; each script's header lists its quick mode. Every coupled run is checked by `sz_check.py`
 at the standard limits (`sz_check.ID_LIMITS`: recharge identity 5e-9, soil-zone and unsaturated-zone identities 1e-8 from
 the first step, the negative recharge not held), MODFLOW's and Raven's balance, and no shortfall.
@@ -155,11 +156,11 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 
 | Script (run_all step) | Tests |
 |---|---|
-| `test_column.py` (`soilzone_column`) | T1/T1b: flat column, the water table rising into the soil zone (50 / 125 mm/d below the base, 50 inside, full on day 41) |
-| `test_hillslope.py --selftest` (`soilzone_hillslope`) | T2/T3: hillslope wetting and drying against a MODFLOW-only reference (`sz_reference.py`); T3 drying checks and their self-test |
-| `test_dynamics.py` (`soilzone_dynamics`) | T4 time step (1 d, 6 h, 1 h), T5 stiff contact (iterated vs explicit), SG sub-grid saturated fraction |
+| `test_column.py` (`soilzone_column`) | CT1/CT1b: flat column, the water table rising into the soil zone (50 / 125 mm/d below the base, 50 inside, full on day 41) |
+| `test_hillslope.py --selftest` (`soilzone_hillslope`) | HS1/HS2: hillslope wetting and drying against a MODFLOW-only reference (`sz_reference.py`); HS2 drying checks and their self-test |
+| `test_dynamics.py` (`soilzone_dynamics`) | DY1 time step (1 d, 6 h, 1 h), DY2 stiff contact (iterated vs explicit), SG sub-grid saturated fraction |
 | `test_restart.py` (`soilzone_restart`) | RS1 the hillslope, 300 d against 150 + 150 d (`:GWSoilZoneColumns`); RS2 an existing model with specified heads, 10 d against 5 + 5; RS3 seepage holding the lowest soil layer above capacity (no `:SoilZone PHYSICAL`); RS4 KINEMATIC and LAG columns restored as written; RS5 a coupled restart continues exactly (RICHARDS columns with a reservoir, a specified head, negative recharge and a rising water table, CONCEPTUAL with every exchange, and LAGGED soil-zone exchange with negative recharge under a `:BoundaryHead` series that holds the outlet column on some days and switches every cell off on others, restarted at off-to-held and held-to-off switches: identical to the continuous run, limit 1e-9) (`--rs3rs4`: only RS3-RS5) |
-| `test_liard_physical.py [days]` (`soilzone_liard`) | T7: the Liard example with `:SoilZone PHYSICAL`, one year (quick mode: 30 days) |
+| `test_liard_physical.py [days]` (`soilzone_liard`) | LP1: the Liard example with `:SoilZone PHYSICAL`, one year (quick mode: 30 days) |
 
 **The water table in every position, and existing models**
 
@@ -176,7 +177,7 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 | `test_confined_wet.py` (`soilzone_confined_wet`) | W1-W12: confined layers below their bottoms, drained columns, heads far outside the model and the stop rule (W4, W6, W11 reported as skipped) |
 | `test_columns_mf6.py` (`soilzone_columns_mf6`) | M1-M4: drained columns kept wet, a column delivers its inflow, CONCEPTUAL against a reference build (`RAVEN_EXE_REF`) |
 | `test_mf6_budget.py` (`soilzone_mf6_budget`) | B1-B9: MODFLOW's residual and gross flow as Raven books them, dated warnings, guard counts, B8 unconverged steps without a soil zone (only MODFLOW's negative residual withheld; the row residual is the withheld volume, also with rivers: the Liard example), B9 `GWSoilExchange.csv` per HRU sums to `GWBudget.csv` (specified heads included) |
-| `test_robustness.py` (`soilzone_robustness`) | R1-R13 hard cases (stiff column, one HRU over ten cells, explicit mode, late updates, frozen boundaries, unconverged steps), R14-R22 negative recharge (N1-N9: N8 the hand-back of vanishing columns in a negative step, N9 the top-cell limit with depth classes), R15b a negative-recharge cut on a draining soil zone |
+| `test_robustness.py` (`soilzone_robustness`) | R1-R13 hard cases (stiff column, one HRU over ten cells, explicit mode, late updates, frozen boundaries, unconverged steps), R14-R22 negative recharge (R21 the hand-back of vanishing columns in a negative step, R22 the top-cell limit with depth classes), R15b a negative-recharge cut on a draining soil zone |
 | `test_surface_stores.py` (`soilzone_surface_stores`) | SW1-SW4: `:SurfaceWaterExchange` on `DEPRESSION` of `:SoilZone PHYSICAL` HRUs: the stores' bed at the ground (model top + soil-zone thickness), no discharge into the stores while every water table is below the ground, generated and existing model, a control with the water table above the ground, a restart that keeps a store filled above DEP_MAX by groundwater |
 
 **Unsaturated-zone methods, depth classes and steady starts**
@@ -184,15 +185,15 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 | Script (run_all step) | Tests |
 |---|---|
 | `test_vz_kinematic.py`, `vadose_kw_unit.cpp` (`soilzone_vz_kinematic`) | `:SoilZoneVadose KINEMATIC` (unit and model tests K1-K8); K9: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
-| `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (unit tests, L1-L6, cost, byte identity); L7: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
+| `test_vz_lag.py`, `vadose_lag_unit.cpp` (`soilzone_vz_lag`) | `:SoilZoneVadose LAG` (LU unit tests, L1-L6, LS cost, LB byte identity); L7: a column leak of 1e-5 m3 per step written into a run's `GWBudget.csv` fails the script's checks |
 | `test_vz_classes.py` (`soilzone_vz_classes`) | C1-C11: depth classes of the unsaturated columns (C1: K = 1 equals the reference build, any difference a failure); C9 RT20 with three classes; C10 hotstart after a dropped class column; C11 the columns' upflow and the rise from the water table share one source-cell limit |
-| `test_vz_initial.py` (`soilzone_vz_initial`) | I1, I2, I4-I8: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1, a restart without columns from a file with columns (warned, volume reported), a restart whose columns have other tops (not matched) |
+| `test_vz_initial.py` (`soilzone_vz_initial`) | VI1, VI2, VI4-VI8: `:SoilZoneVadoseInitialFlux` steady starts (for (1-F) q; backed-up columns), hotstarts, the columns' balance from step 1, a restart without columns from a file with columns (warned, volume reported), a restart whose columns have other tops (not matched) |
 
 **Inputs and hotstarts**
 
 | Script (run_all step) | Tests |
 |---|---|
-| `test_inputs.py` (`soilzone_inputs`) | I1-I19: missing HYDRAUL_COND, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart columns, `.rvc` blocks without groundwater, surface exchange on a soil layer, damaged `:GWHeads` header, `:StartTime` under valgrind, orphan `:BoundaryHead`/`:WellFlowRate`, options that do nothing, messages, age tracer across chained hotstarts (I14, ages within 2e-4 d plus 1e-5 of the age); I15 chains across year boundaries; I16 age tracer from a spin-up without it; I17 EnKF members' extra `.rvt` series; I18 damaged soil-zone hotstart values; I19 `:Transport` in a coupled run stops; I20 a head boundary placed by its `:BoundaryHead` series, the warning for a boundary left with no cells; I21 boundary cells switched off on steps whose head is at or below their bottom (GHB drains as with HEAD alone, CHD not held at a cell bottom, the same cells on a restart; a column with no cell held is an ordinary column, nothing booked onto CHD cells; cells placed by the series alone; the steady-state period counted); I22 strict numbers in the `.rvc` (`:InitialGWHeads ELEVATION 98,5` and `H98.5` stop, a `:GWHeads` value `98.5x` stops) |
+| `test_inputs.py` (`soilzone_inputs`) | I1-I22: missing HYDRAUL_COND, short `:SoilZoneIteration`, last `:SoilZone` counts, ignored options, mismatched and reordered hotstart columns, `.rvc` blocks without groundwater, surface exchange on a soil layer, damaged `:GWHeads` header, `:StartTime` under valgrind, orphan `:BoundaryHead`/`:WellFlowRate`, options that do nothing, messages, age tracer across chained hotstarts (I14, ages within 2e-4 d plus 1e-5 of the age); I15 chains across year boundaries; I16 age tracer from a spin-up without it; I17 EnKF members' extra `.rvt` series; I18 damaged soil-zone hotstart values; I19 `:Transport` in a coupled run stops; I20 a head boundary placed by its `:BoundaryHead` series, the warning for a boundary left with no cells; I21 boundary cells switched off on steps whose head is at or below their bottom (GHB drains as with HEAD alone, CHD not held at a cell bottom, the same cells on a restart; a column with no cell held is an ordinary column, nothing booked onto CHD cells; cells placed by the series alone; the steady-state period counted); I22 strict numbers in the `.rvc` (`:InitialGWHeads ELEVATION 98,5` and `H98.5` stop, a `:GWHeads` value `98.5x` stops) |
 
 **Rough terrain**
 
@@ -200,5 +201,5 @@ the first step, the negative recharge not held), MODFLOW's and Raven's balance, 
 |---|---|
 | `test_rough_terrain.py` (`soilzone_rough_terrain`, `_k3`) | regression cases RT1-RT20 and random rough-terrain seeds (quick 40, full 400) with all four methods; `_k3` with three depth classes |
 
-A comparison with GSFLOW's Sagehen model is not part of the suite; the soil zone with existing models is covered by X1-X8
+A comparison with GSFLOW's Sagehen model is not part of the suite; the soil zone with existing models is covered by X1-X9
 and the existing-model cases of the rough-terrain suite.

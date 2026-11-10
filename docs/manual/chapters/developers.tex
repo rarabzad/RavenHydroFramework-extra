@@ -117,9 +117,18 @@ lives in a separate repository.
       (Section~\ref{sec:coreflix}). Until the pull requests are merged, the branch \cmd{mf6-coupling} of
       \url{https://github.com/rarabzad/RavenHydroFramework} holds them all.
 \item \textbf{RavenHydroFramework-extra}: this manual, the user guide, the Liard examples, the tests
-      (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}, at\\ \url{https://github.com/rarabzad/RavenHydroFramework-extra}.
+      (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}, at\\ \url{https://github.com/rarabzad/RavenHydroFramework-extra}
+      (branch \cmd{main}).
 \end{itemize}
-Clone the two side by side in one folder; the tests and \cmd{get\_mf6.py} then find Raven without any setting.
+Clone the two side by side in one folder; the tests and \cmd{get\_mf6.py} then find Raven without any setting:
+\begin{lstlisting}
+git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
+git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
+\end{lstlisting}
+Without network access, the release package's \cmd{source/} folder holds both repositories with their whole history as
+git bundles (\cmd{tools/package\_sources.py}); the two \cmd{git clone} commands of its README (section ``Restore the git
+history'') make the same two checkouts. \cmd{tools/make\_handover.py} writes the kit from which the two repositories are
+published, with the steps to push and check them (\cmd{HANDOVER.md}).
 
 \section{Building}\label{sec:building}
 Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}; with a
@@ -339,6 +348,16 @@ area times 0.1~mm (a few m$^3$ on a 0.04~km$^2$ lake), shown as the reservoir's 
 \cmd{ReservoirMassBalance.csv} and in Raven's balance. Base Raven gives the same without groundwater (3 to 7~m$^3$ on such a
 lake whose stage falls slowly through the crest, with a fixed \cmd{:SeepageParameters} level); with \cmd{:ReservoirExchange}
 it appears where the aquifer holds a lake near its crest (Section~\ref{sec:vcombinations}).
+\item Hotstart of a model whose reservoir spills: Raven's balance error (\emph{MB Error} of \cmd{WatershedStorage.csv}) of a
+run started from \cmd{solution.rvc} is offset, from its first step on and by a constant, by half the water that crossed the
+reservoir in the step before the restart: half its outflow and, where reservoir seepage returned to the subbasin or a gain
+MODFLOW did not supply flows on into the reservoir (Section~\ref{ch:reservoirs}), half that inflow. Raven's initial storage
+at a hotstart leaves this half step out; base Raven 4.15 does the same without groundwater. On a 0.16~km$^2$ test watershed
+whose lake spills 2\,364~m$^3$ in the step before the restart, the offset is $+7.39$~mm (1\,182~m$^3$) without groundwater,
+in base Raven and with the coupling alike, and $+14.92$~mm coupled (half of 4\,776~m$^3$); a lake spilling 16\,100~m$^3$/d gives about
+50~mm; returned or unsupplied reservoir seepage in transit gives 0.1 to 0.6~mm. The restarted run's states, flows and stages
+are the continuous run's (exactly in a coupled run, to the digits of Raven's \cmd{solution.rvc} without groundwater); only
+this column is offset, and with it the Raven balance that \cmd{tools\_audit.py} reports (\emph{Raven MB error max}).
 \item In ensemble mode, \cmd{WatershedStorage.csv} shows channel and rivulet storages that differ from a single run, also
 without groundwater; the hydrographs, reservoir stages and groundwater outputs of each member equal the single run's
 (Section~\ref{sec:behaviour}).

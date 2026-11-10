@@ -1,6 +1,6 @@
 """Restart (hotstart) of the soil-zone columns.
 
-RS1: the T2/T3 hillslope runs 300 days in one go, and again as 150 days plus 150 days started from the first run's
+RS1: the HS1/HS2 hillslope runs 300 days in one go, and again as 150 days plus 150 days started from the first run's
 solution.rvc (Raven's state, MODFLOW heads and the :GWSoilZoneColumns block). Both must give the same heads and
 soil water on days 151-300 to 1e-6 relative, and the same flows to 1e-4 (within the interface's tolerances).
 

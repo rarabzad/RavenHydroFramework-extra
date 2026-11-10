@@ -30,7 +30,7 @@ Loam ($K_s=0.25$~m/d, $S_y=0.15$, $b=5.4$, $\varepsilon=13.8$): $S_{e,r}=0.670$,
 Clay ($K_s=2\times10^{-4}$~m/d $<q_r$, $S_y=0.05$, $b=11$, $\varepsilon=25$): $t_m=0.05/(25\times2\times10^{-4})=10.0$~d/m.
 A 5~m unsaturated zone in the sand delays recharge by about 52 days on average. The three are similar because a
 large $S_y$ (much water to move) offsets a large $K_s$ at the same small flux; at a larger flux the wave is faster
-(here the derivation fixes $q_r$). These values are unit test U of \cmd{test\_vz\_lag.py}.
+(here the derivation fixes $q_r$). These values are unit test LU of \cmd{test\_vz\_lag.py}.
 \end{example}
 
 \paragraph{Spreading.} The spread of the response is set by the node count: its variance is $\sum_ik_i^2$, so the
@@ -134,7 +134,7 @@ $\theta_s$, $\psi_a$ & \cmd{POROSITY}, \cmd{AIR\_ENTRY\_PRESSURE} & aquifer clas
 \cmd{GWModelSummary.txt}: the method and its nodes.
 \end{refcard}
 
-\paragraph{Verification.} \cmd{test\_vz\_lag.py}: U (unit tests: travel times, mass balance to $5\times10^{-16}$ of the
+\paragraph{Verification.} \cmd{test\_vz\_lag.py}: LU (unit tests: travel times, mass balance to $5\times10^{-16}$ of the
 flows and storage over 16\,000 random steps of 400 random columns, no content above $\theta_s$, nodes below
 equilibrium, inactive columns, tiny residence times, steady start, Erlang response of equal reservoirs within 0.6\%,
 impulse responses of grid columns against the exact cascade within 1.1\%), L1 (above), L2 (a water table rising
@@ -142,5 +142,5 @@ through the columns into the soil zone and falling again), L3 (a column across t
 (restart 60 + 60 days against 120 days: $2\times10^{-8}$), L5 (existing-model round trip: $2.4\times10^{-4}$), L6 (a water table rising into a nearly full top cell releases at
 most the room the cell has left), L7 (a column leak of $10^{-5}$ or $10^{-4}$~m$^3$ per step written into a run's
 \cmd{GWBudget.csv} fails the script's checks: every run is checked with the column identity of \cmd{sz\_check} from
-the first step), S (cost) and B
+the first step), LS (cost) and LB
 (\cmd{NONE}, \cmd{RICHARDS} and \cmd{CONCEPTUAL} runs byte-identical to a reference build, \cmd{RAVEN\_EXE\_REF}).

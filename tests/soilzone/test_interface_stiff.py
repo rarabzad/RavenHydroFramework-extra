@@ -210,7 +210,7 @@ def s5():
     global LIM
     keep = LIM; LIM = dict(sz_check.ID_LIMITS, mf6_not_conv=0)
     try:
-        return run('s5_iter1', ':SoilZoneIteration 1\n', top=0.8, itmax=1e9, need_cap='updates',
+        return run('s5_cap', ':SoilZoneIteration 1\n', top=0.8, itmax=1e9, need_cap='updates',
                    **dict(S3, perc_type='PERC_CONSTANT', perc=5.0, pet=5.0, init_depth=1.0))
     finally:
         LIM = keep

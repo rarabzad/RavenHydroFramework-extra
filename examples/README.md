@@ -43,7 +43,10 @@ git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
 git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 ```
 
-(After the coupling is merged into Raven, clone https://github.com/CSHS-CWRA/RavenHydroFramework without `-b mf6-coupling`.)
+(RavenHydroFramework-extra's branch is `main`, the default. After the coupling is merged into Raven, clone
+https://github.com/CSHS-CWRA/RavenHydroFramework without `-b mf6-coupling`.) Without network access, the release package's `source/` folder holds both repositories with their whole history as
+git bundles; its README's section "Restore the git history" gives the two `git clone` commands, which make the same
+two checkouts (`RavenHydroFramework` on `mf6-coupling`, `RavenHydroFramework-extra` on `main`).
 
 ### Step 3. Build Raven
 
@@ -214,7 +217,11 @@ python ..\Liard_groundwater\tools_audit.py output
 ```
 
 Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gross flow` about -1.9e-11,
-`unconverged steps` 0, river bookkeeping about -5e-12, `ERROR lines` 0.
+`unconverged steps` 0, river bookkeeping about -5e-12, `ERROR lines` 0, `max outer iterations` 245 (the first step).
+`river loss carried max` is about 1.06e+08 m3: the model's stream package keeps its own conductance and has no supply
+limit, so its losing reaches take more than the channels hold (on 288 of the 731 days, from the first day); the part a
+channel cannot supply is carried to the next step and taken then (`river loss carried at end` 0). The manual explains
+this under "Limits" in the chapter "Coupling an existing MODFLOW 6 model".
 
 ---
 

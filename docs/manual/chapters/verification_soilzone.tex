@@ -6,7 +6,7 @@ relation on their own against independent solutions; small coupled models that p
 positions of Figure~\ref{fig:szregimes}; and the same models coupled again as existing MODFLOW models. The tests in
 \cmd{tests/soilzone} build small synthetic models (\cmd{sz\_models.py}: a generated MODFLOW model under Raven HRUs with
 soil, forcing written by the script) and compare them with exact values or with a MODFLOW-only reference in which the soil
-zone is a MODFLOW layer and a drain at the land surface takes the overflow (\cmd{sz\_reference.py}); only T7 starts from the
+zone is a MODFLOW layer and a drain at the land surface takes the overflow (\cmd{sz\_reference.py}); only LP1 starts from the
 Liard example. Every coupled run is also checked by \cmd{sz\_check.py}, which closes, step by step, MODFLOW's balance,
 Raven's balance and the recharge, soil-zone and unsaturated-zone identities of Section~\ref{sec:accsz} at their standard
 limits (recharge $5\times10^{-9}$, soil zone and columns $10^{-8}$ relative, from the first step; \cmd{sz\_check.ID\_LIMITS}),
@@ -23,15 +23,15 @@ of the full mode of \cmd{tests/run\_all.py} with MODFLOW~6.8.1, except where a t
 \toprule\hdr Test & What is checked & Result\\\midrule\endhead
 Unit & \cmd{soilzone\_unit.cpp}: filling and draining of the layers, the sub-grid level and its inverse, the contact weights and flux derivatives against finite differences, continuity across the sample bases, the local solve (monotone, root, mass), the Robin slope; 20\,000 random cases each & 57 checks, 0 failed\\
 XMI & \cmd{spike\_xmi.py}: values written between MODFLOW's outer iterations through XMI (GHB \cmd{BHEAD}/\cmd{COND}, RCH \cmd{RECHARGE}) reach the solver; the coefficients are recomputed every outer iteration; a solve after convergence is a normal iteration & all three hold (MODFLOW 6.8.1)\\
-T1 flat column & closed column, $S_y$ = drainable porosity = 0.2, recharge 10~mm/d: the water table rises 50~mm/d below the soil base and inside the soil; water table and soil level agree once connected; the soil zone (400~mm of capacity) is full on day~41 & rise 49.95~mm/d below and inside; largest difference $1.3\times10^{-4}$~m; full on day 41\\
-T1b & the same with $S_y=0.08$: 125~mm/d below the base, 50~mm/d inside, storage-consistency warning & 124.7 and 49.95~mm/d; warning given\\
-T2 hillslope, wetting & ten 100~m HRUs on a 0.5\,\% slope over a closed 20~m aquifer, rain 10~mm/d for 150 days (Figure~\ref{fig:szhillslope}): against the MODFLOW-only reference & heads within 3.3~cm (mean 0.67~cm), soil level within 3.9~cm, total outflow within $2.5\times10^{-5}$; overflow begins on day 16 in both; the toe connects first (day 7), HRU 2 last (day 73), HRU 1 never\\
-T3 hillslope, drying & the 150 dry days that follow: HRUs that connected and whose reference head ends below their base lose their saturation; those whose head stays above it stay saturated; no overflow where the water table is below the land; the upslope overflow stops with the rain; the toe's seepage recedes; \cmd{-{}-selftest} shows that each check fails on altered results & HRUs 2--7: $F=0$ at the end; 8--10: $F=1$; upslope overflow ends on day 150; toe 814~m$^3$/d on day 161, 173.5 on day 300 (reference 173.6); saturated HRUs 9 $\to$ 3; each of the four self-test mutations fails\\
-T4 time step & the hillslope with steps of 1~d, 6~h and 1~h, each against the reference with the same step: the splitting error of Raven's processes ahead of the exchange shrinks with the step & mean head difference 0.67, 0.24 and 0.14~cm; outflow within $6\times10^{-5}$\\
-T5 stiff contact & a thin, conductive soil--aquifer contact ($\dt/t_c\approx48$ for daily steps): the iterated interface against one explicit pass & iterated: at most 9 updates, heads within 4.2~cm of the reference, outflow $8\times10^{-5}$; one pass: 0.99~m and 1.3\,\%\\
+CT1 flat column & closed column, $S_y$ = drainable porosity = 0.2, recharge 10~mm/d: the water table rises 50~mm/d below the soil base and inside the soil; water table and soil level agree once connected; the soil zone (400~mm of capacity) is full on day~41 & rise 49.95~mm/d below and inside; largest difference $1.3\times10^{-4}$~m; full on day 41\\
+CT1b & the same with $S_y=0.08$: 125~mm/d below the base, 50~mm/d inside, storage-consistency warning & 124.7 and 49.95~mm/d; warning given\\
+HS1 hillslope, wetting & ten 100~m HRUs on a 0.5\,\% slope over a closed 20~m aquifer, rain 10~mm/d for 150 days (Figure~\ref{fig:szhillslope}): against the MODFLOW-only reference & heads within 3.3~cm (mean 0.67~cm), soil level within 3.9~cm, total outflow within $2.5\times10^{-5}$; overflow begins on day 16 in both; the toe connects first (day 7), HRU 2 last (day 73), HRU 1 never\\
+HS2 hillslope, drying & the 150 dry days that follow: HRUs that connected and whose reference head ends below their base lose their saturation; those whose head stays above it stay saturated; no overflow where the water table is below the land; the upslope overflow stops with the rain; the toe's seepage recedes; \cmd{-{}-selftest} shows that each check fails on altered results & HRUs 2--7: $F=0$ at the end; 8--10: $F=1$; upslope overflow ends on day 150; toe 814~m$^3$/d on day 161, 173.5 on day 300 (reference 173.6); saturated HRUs 9 $\to$ 3; each of the four self-test mutations fails\\
+DY1 time step & the hillslope with steps of 1~d, 6~h and 1~h, each against the reference with the same step: the splitting error of Raven's processes ahead of the exchange shrinks with the step & mean head difference 0.67, 0.24 and 0.14~cm; outflow within $6\times10^{-5}$\\
+DY2 stiff contact & a thin, conductive soil--aquifer contact ($\dt/t_c\approx48$ for daily steps): the iterated interface against one explicit pass & iterated: at most 9 updates, heads within 4.2~cm of the reference, outflow $8\times10^{-5}$; one pass: 0.99~m and 1.3\,\%\\
 SG sub-grid & \cmd{:SoilZoneSubgrid 5} on the same slope: the saturated fraction changes smoothly instead of cell by cell & largest daily change of $F$ 0.42 (1.0 with one point per cell); outflow within 0.4\,\% of the one-point run\\
 Restart & RS1: 300 days against 150 + 150 days from \cmd{solution.rvc} (\cmd{:GWSoilZoneColumns}); RS2: an existing model with a specified-head toe and unsaturated columns, 10 days against 5 + 5; RS3: no \cmd{:SoilZone PHYSICAL}, seepage holding the lowest soil layer above capacity, 30 days against 12 + 18; RS4: \cmd{KINEMATIC} and \cmd{LAG} with $S_y$ equal to the porosity, 20 days against 10 + 10; RS5: a coupled restart continues exactly, \cmd{RICHARDS} columns with a reservoir, a specified head, negative recharge and a rising water table, \cmd{CONCEPTUAL} with every exchange, 8 days against 4 + 4, and \cmd{LAGGED} exchange with negative recharge under a \cmd{:BoundaryHead} series that holds the outlet column on some days and switches every cell off on others, restarted on days 3, 4 and 6 (off to held, held to off, off to held) & 1\,500 rows: water table and soil level $2\times10^{-10}$, $F$ $1.2\times10^{-7}$, exchange $2.4\times10^{-6}$ (limit $10^{-4}$); RS2 $2.5\times10^{-7}$; RS3 soil storage identical, recharge and seepage within $3.4\times10^{-9}$; RS4 column storage as written, restart identical to the continuous run; RS5 every column of \cmd{GWBudget.csv}, \cmd{GWHRUState.csv} and the stores of \cmd{WatershedStorage.csv} identical (limit $10^{-9}$)\\
-T7 Liard & the Liard example with \cmd{:SoilZone PHYSICAL SOIL[0] SOIL[1]} (85 coupled HRUs, 2~km grid, one year from 1985-10-01; soils of drainable porosity 0.02 against $S_y=0.25$, a stiff interface, storage warning expected) & 365 steps, 0 unconverged (MODFLOW and interface), 3\,509 outer iterations (at most 72 in a step), residual $8\times10^{-12}$ of the gross flow, no shortfall; 80 of 85 HRUs more than 20\,\% saturated at some time\\\bottomrule
+LP1 Liard & the Liard example with \cmd{:SoilZone PHYSICAL SOIL[0] SOIL[1]} (85 coupled HRUs, 2~km grid, one year from 1985-10-01; soils of drainable porosity 0.02 against $S_y=0.25$, a stiff interface, storage warning expected) & 365 steps, 0 unconverged (MODFLOW and interface), 3\,509 outer iterations (at most 72 in a step), residual $8\times10^{-12}$ of the gross flow, no shortfall; 80 of 85 HRUs more than 20\,\% saturated at some time\\\bottomrule
 \end{longtable}
 \noindent The soil zone with existing models is verified by X1--X9 (Table~\ref{tab:vszpositions}) and by the
 existing-model cases of the rough-terrain suite (Section~\ref{sec:vrough}).
@@ -100,10 +100,10 @@ processes on 1, 5 and 10 classes of its columns (test P6).}\label{fig:sztiming}\
 \subsection{The interface iteration and MODFLOW's side}\label{sec:vszinterface}
 Six scripts test the interface iteration, drained columns, heads far outside the model, negative recharge, MODFLOW's
 budget as Raven books it and surface stores on soil-zone HRUs (Table~\ref{tab:vszinterface}; numbers of the quick mode, \cmd{RAVEN\_TEST\_QUICK=1}). The negative
-recharge cases N1--N9 run in \cmd{test\_robustness.py} as R14--R22.
+recharge cases run in \cmd{test\_robustness.py} as R14--R22.
 \begin{longtable}{P{0.13\linewidth}P{0.42\linewidth}P{0.36\linewidth}}
 \caption{The interface and MODFLOW's side (\cmd{test\_interface\_stiff}, \cmd{test\_confined\_wet}, \cmd{test\_columns\_mf6},
-\cmd{test\_robustness} N1--N9, \cmd{test\_mf6\_budget}, \cmd{test\_surface\_stores}).}\label{tab:vszinterface}\\
+\cmd{test\_robustness} R14--R22, \cmd{test\_mf6\_budget}, \cmd{test\_surface\_stores}).}\label{tab:vszinterface}\\
 \toprule\hdr Test & Case & Result\\\midrule\endfirsthead
 \caption[]{The interface and MODFLOW's side (continued).}\\
 \toprule\hdr Test & Case & Result\\\midrule\endhead
@@ -121,9 +121,9 @@ W7 & confined model with a 10$^4$~m$^3$/d well, far heads that converge; W7c lim
 W9, W10 & the same with limits 2 and 1 & stop: residual 2\,\% of the gross flow / the solve moved the head 1\,241~m; messages name head, cell (1 2 2), residual and causes\\
 W12 & existing model with an inactive top layer, limit 2 & every interface warning names layer 2\\
 M1--M4 & drained columns kept wet; a column delivers its inflow; \cmd{CONCEPTUAL} against a reference build; missing summary line & kept in 5 outer iterations; outflow 1.02 of the inflow; byte-identical except the balance-error \%\\
-N1--N7 (R14--R20) & negative recharge (\cmd{PERC\_GR4JEXCH}): split, cut by the top cell, hand-back, not held, existing model without \cmd{NEWTON} (confined variant), column upflow, sibling columns & identities at round-off; cut 437\,045~m$^3$; not held 3\,793 (LAGGED) / 2\,870 (AFTER)~m$^3$; not applied $-408\,000$~m$^3$, 0 with confined cells; not held only where the HRU's soil is empty (334~m$^3$)\\
-N8 (R21) & a step with negative recharge in which wet unsaturated columns vanish under a water table raised by a specified head (\cmd{RICHARDS}; \cmd{KINEMATIC} in the full mode) & the vanished columns' water beyond $S_y\,\Delta h$ goes back to the soil zone as the link's rejected recharge; recharge identity 0\\
-N9 (R22) & negative recharge with three depth classes, the hollow classes without a column (\cmd{RICHARDS}; \cmd{LAG} in the full mode) & MODFLOW's recharge on step 1 equals the top-cell limit (ratio 1.000000, as with one class); the cut, 2\,620~m$^3$, back to the soil zone\\
+R14--R20 & negative recharge (\cmd{PERC\_GR4JEXCH}): split, cut by the top cell, hand-back, not held, existing model without \cmd{NEWTON} (confined variant), column upflow, sibling columns & identities at round-off; cut 437\,045~m$^3$; not held 3\,793 (LAGGED) / 2\,870 (AFTER)~m$^3$; not applied $-408\,000$~m$^3$, 0 with confined cells; not held only where the HRU's soil is empty (334~m$^3$)\\
+R21 & a step with negative recharge in which wet unsaturated columns vanish under a water table raised by a specified head (\cmd{RICHARDS}; \cmd{KINEMATIC} in the full mode) & the vanished columns' water beyond $S_y\,\Delta h$ goes back to the soil zone as the link's rejected recharge; recharge identity 0\\
+R22 & negative recharge with three depth classes, the hollow classes without a column (\cmd{RICHARDS}; \cmd{LAG} in the full mode) & MODFLOW's recharge on step 1 equals the top-cell limit (ratio 1.000000, as with one class); the cut, 2\,620~m$^3$, back to the soil zone\\
 SW1--SW3 & \cmd{:SurfaceWaterExchange} on \cmd{DEPRESSION} of \cmd{:SoilZone PHYSICAL} HRUs, generated and existing model; a control with the water table above the ground at the outlet & stores' bed at the ground (model top + 1.0~m of soil zone); no discharge into the stores while every water table is below the ground; leakage 6\,135~m$^3$; existing model within $5\times10^{-6}$; control: discharge 1\,399~m$^3$\\
 SW4 & restart of the control after 10 days, with a depression filled by groundwater to 64.6~mm (\cmd{DEP\_MAX} 50~mm) & the store is kept, not clipped to its maximum: Depression and the discharge into the stores equal the continuous run ($2.5\times10^{-9}$; 583~m$^3$ were lost and the discharge was 9\,\% off)\\
 B1--B7 & steady existing model without STO (converged and OUTER\_MAXIMUM 3), gross flow, hourly dates, specified head under a dry cell, \cmd{:SoilZoneClasses 3}, audit guard counts & balance error $6\cdot10^{-12}$; residual equals the list file's IN$-$OUT within $1.3\cdot10^{-8}$ of the gross flow; gross flow equals TOTAL IN$+$TOTAL OUT within $5\cdot10^{-10}$; dates with times; warning names 2 columns over specified heads; no round-off as not held; guard counts 12 and 2\\
@@ -135,31 +135,31 @@ far-head warning once per ensemble member) and W11 (a head crossing the model) a
 
 \subsection{Unsaturated-zone methods, depth classes and steady starts}\label{sec:vszmethods}
 The \cmd{KINEMATIC} and \cmd{LAG} methods and the depth classes have their own tests, described with each method:
-\cmd{test\_vz\_kinematic.py} K1--K9 (Section~\ref{sec:szvadosekw}), \cmd{test\_vz\_lag.py} U, L1--L7 and the byte-identity
-check B (Section~\ref{sec:szvadoselag}), and \cmd{test\_vz\_classes.py} C1--C11 (Section~\ref{sec:vzclasses}). Among the
+\cmd{test\_vz\_kinematic.py} K1--K9 (Section~\ref{sec:szvadosekw}), \cmd{test\_vz\_lag.py} LU, L1--L7, LS and the byte-identity
+check LB (Section~\ref{sec:szvadoselag}), and \cmd{test\_vz\_classes.py} C1--C11 (Section~\ref{sec:vzclasses}). Among the
 latter, C9 runs the rough-terrain case RT20 (stored existing model e43, \cmd{LAG}) with three depth classes through
 \cmd{test\_rough\_terrain.py}: the saturated fraction stays within 0.0001 of the closure (limit 0.004) and no run fails; C10
 writes a hotstart after a step that dropped a class column ($K=3$; after 4, 10 and 13 days): no mismatch warning, and the
 restart within $7.5\times10^{-7}$ of the continuous run. \cmd{test\_vz\_initial.py} checks the steady start of
 \cmd{:SoilZoneVadoseInitialFlux} (Section~\ref{sec:szvadose}):
 \begin{itemize}
-\item I1, I2, I4: columns started at the steady profile carry their flux from the first step, with the storage at the start
+\item VI1, VI2, VI4: columns started at the steady profile carry their flux from the first step, with the storage at the start
 in \cmd{GWModelSummary.txt}; hotstarts restore the columns; the columns' balance closes from step 1;
-\item I5: the steady start is for the flux each column receives, $(1-F)\,q$ (hummocks $\pm3$~m, water table 3~m deep,
+\item VI5: the steady start is for the flux each column receives, $(1-F)\,q$ (hummocks $\pm3$~m, water table 3~m deep,
 $F=0.16$, 2~mm/d, \cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}, $K=1$ and 3): step-1 outflow = inflow = 100.8~m$^3$, 25.6~m$^3$
 rejected;
-\item I6: a column that cannot carry $q$ (\cmd{K\_VERT} 1~mm/d under 2~mm/d) starts backed up: storage unchanged, outflow =
+\item VI6: a column that cannot carry $q$ (\cmd{K\_VERT} 1~mm/d under 2~mm/d) starts backed up: storage unchanged, outflow =
 inflow = 40.000~m$^3$, 40.000 rejected, with a warning;
-\item I7: a restart with \cmd{:SoilZoneVadose NONE} from a file holding columns (\cmd{LAG}, $K=3$, negative recharge, 4 days):
+\item VI7: a restart with \cmd{:SoilZoneVadose NONE} from a file holding columns (\cmd{LAG}, $K=3$, negative recharge, 4 days):
 a warning names the columns and their water, and \cmd{GWModelSummary.txt} reports it (248~m$^3$, the first run's final
 unsaturated storage);
-\item I8: a restart with \cmd{:SoilZoneSubgrid 8} from a file written with 5 (\cmd{RICHARDS}, $K=3$): the columns' tops differ,
+\item VI8: a restart with \cmd{:SoilZoneSubgrid 8} from a file written with 5 (\cmd{RICHARDS}, $K=3$): the columns' tops differ,
 so they start at rest with a warning (0 against 5.37~m$^3$ written); with \cmd{:SoilZoneSubgrid 5} the written water is read exactly.
 \end{itemize}
 
 \subsection{Input handling}\label{sec:vszinputs}
 \begin{longtable}{P{0.07\linewidth}P{0.55\linewidth}P{0.30\linewidth}}
-\caption{Soil zone and hotstarts: input handling (\cmd{test\_inputs.py}; short runs of the T1 column unless stated).}\label{tab:vszinputs}\\
+\caption{Soil zone and hotstarts: input handling (\cmd{test\_inputs.py}; short runs of the CT1 column unless stated).}\label{tab:vszinputs}\\
 \toprule\hdr Test & Case & Result\\\midrule\endfirsthead
 \caption[]{Soil zone and hotstarts: input handling (continued).}\\
 \toprule\hdr Test & Case & Result\\\midrule\endhead
@@ -183,7 +183,7 @@ I17 & EnKF, 3 members, one well, \cmd{:ExtraRVTFilename} with $-100$, $-200$, $-
 I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\
 I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\
 I20 & a specified head with \cmd{HEAD} 0 (below every cell) and a \cmd{:BoundaryHead} series of 99.5~m; the same without the series & placed by the series: 2 cells, flow 1\,390~m$^3$; without it no cell and a warning naming the boundary, its head and the highest cell bottom\\
-I21 & head boundary \cmd{EDGE} (\cmd{HEAD} 90) with a series of 99~m on day 1, then 90~m; layer 1 from 100 to 97~m: (a) a GHB (\cmd{LAYERS TOP}) against an aquifer at 95~m; (b) a CHD (\cmd{LAYERS TOP}); (c) a CHD (\cmd{LAYERS ALL}, 99~m for 3 days), restarted on day 4 & (a) the GHB drains on days 2--6 ($-7\,915$ to $-2\,275$~m$^3$/d; it fed the aquifer, $+659$ to $+895$), a series of 90~m gives the outputs of \cmd{HEAD} 90; (b) the water table falls below 97~m (93.8 to 92.9~m; it was held at 97.5~m); (c) the same 4 CHD cells and the same flows and heads as the continuous run (it had 2 cells)\\
+I21 & head boundary \cmd{EDGE} (\cmd{HEAD} 90) with a series of 99~m on day 1, then 90~m; layer 1 from 100 to 97~m: (a) a GHB (\cmd{LAYERS TOP}) against an aquifer at 95~m; (b) a CHD (\cmd{LAYERS TOP}); (c) a CHD (\cmd{LAYERS ALL}, 99~m for 3 days), restarted on day 4 & (a) the GHB drains on days 2--6 ($-7\,915$ to $-2\,275$~m$^3$/d), as with \cmd{HEAD} 90 alone; a series of 90~m gives the outputs of \cmd{HEAD} 90; (b) the water table falls below 97~m (93.8 to 92.9~m): no cell is held at the bottom of layer 1; (c) the restarted run has the same 4 CHD cells and the same flows and heads as the continuous run\\
 I21 (d) & a column with no cell held: 8 HRUs, the last wholly on \cmd{EDGE} (\cmd{LAYERS ALL}), rain 20~mm/d, a series of 99~m on days 1--2 and 70~m (below the aquifer) on days 3--6; \cmd{CONCEPTUAL} and \cmd{PHYSICAL} & days 3--6: CHD flow 0 and nothing booked onto specified-head cells; MODFLOW's recharge equals Raven's (\cmd{CONCEPTUAL}); the column's soil-zone link exchanges 425 to 42~m$^3$/d with the aquifer (\cmd{PHYSICAL}); every identity holds\\
 I21 (e) & \cmd{LAYERS TOP}, \cmd{HEAD} 90 and a series of 99~m on every day, CHD and GHB & the cells of layer 1 only (2), none switched off\\
 I21 (f) & a steady-state first period at 90~m (series 90, 99, 99, 90, 90, 99~m) & the run total counts the steady period's 2 cells: 8 cell-steps against 6 without it\\
@@ -192,8 +192,8 @@ I22 & \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5}, \cmd{0x62}, \cmd{98.5},
 
 \subsection{Robustness}\label{sec:vszrobust}
 \begin{longtable}{P{0.07\linewidth}P{0.55\linewidth}P{0.30\linewidth}}
-\caption{Soil zone: robustness (\cmd{test\_robustness.py}; hard cases of the interface). R14--R22 are the negative-recharge
-cases N1--N9 of Table~\ref{tab:vszinterface}.}\label{tab:vszrobust}\\
+\caption{Soil zone: robustness (\cmd{test\_robustness.py}; hard cases of the interface). R14--R22, the negative-recharge
+cases, are in Table~\ref{tab:vszinterface}.}\label{tab:vszrobust}\\
 \toprule\hdr Test & Case & Result\\\midrule\endfirsthead
 \caption[]{Soil zone: robustness (continued).}\\
 \toprule\hdr Test & Case & Result\\\midrule\endhead

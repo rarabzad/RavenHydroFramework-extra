@@ -244,7 +244,8 @@ keep the seepage drain (Section~\ref{ch:seepage}); \cmd{SOIL\_ZONE\_DEPTH} and, 
 An HRU usually spans several cells, and the water table differs between them. The soil zone of HRU $k$ is therefore kept
 as one \emph{column} per overlapping cell (GSFLOW's gravity reservoir per HRU--cell), including cells with a specified
 head (Section~\ref{sec:szchd}), plus one column for the rest of the HRU (outside the grid). The column of HRU $k$ in cell $i$ has its own soil water $\phi_{k,i,m}$ [mm] in every layer $m$;
-Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see the HRU as before (or, with
+Raven's \cmd{SOIL[$m$]} of the HRU is their area-weighted mean, so Raven's processes see one soil store per HRU, as
+without the soil zone (or, with
 \cmd{:SoilZoneClasses}, each class of its columns separately; Section~\ref{sec:szclasses}). Between
 exchanges Raven changes the HRU totals, and the changes are shared among the columns as the processes would have made
 them there: the recharge leaves the columns as the percolation takes it (every column alike for \cmd{PERC\_CONSTANT},
@@ -331,15 +332,15 @@ arrows show each point's share of the exchange. Bottom: $F$, the mean contact $\
 ($h^{\mathrm{sz}}=h$) against the water table. Computed with the model's formulas
 (script \texttt{make\_sz\_subgrid\_figures.py} in the manual's figures folder).}\label{fig:szsubgrid}\end{figure}
 
-Figure~\ref{fig:szhillslope} shows a coupled run: the hillslope of test T2/T3 (ten 100~m HRUs on a 0.5\,\% slope) with a hump
+Figure~\ref{fig:szhillslope} shows a coupled run: the hillslope of test HS1/HS2 (ten 100~m HRUs on a 0.5\,\% slope) with a hump
 at 300~m and hollows at 620 and 850~m added to its DEM, 25 points per cell and $d_s=0.1$~m. The water table is a step
 per cell (MODFLOW's flat head). Under rain the saturated area spreads up from the foot of the slope and from the
 hollows; over the hump (HRUs 3--4) and near the top (HRU 2) the cells are only partly saturated for months
 ($0<F<1$). Water moves down the slope in the aquifer: it rises into the soil of the lower cells, which fill and
 overflow to surface water (saturation-excess runoff and exfiltration). After the rain the saturated area retreats
-downslope, the hollows last. (In the closed aquifer of test T3 the overflow stops upslope when the rain does, but the water
+downslope, the hollows last. (In the closed aquifer of test HS2 the overflow stops upslope when the rain does, but the water
 still draining from upslope seeps out at the toe for the rest of the run, about 174~m$^3$/d on day 300, as in the
-MODFLOW-only reference; T3 checks that the HRUs that drain lose their saturation and that the toe follows a recession.) The run closes every balance of Section~\ref{sec:accsz} to $10^{-9}$ or better (Section~\ref{sec:vszbasic}).
+MODFLOW-only reference; HS2 checks that the HRUs that drain lose their saturation and that the toe follows a recession.) The run closes every balance of Section~\ref{sec:accsz} to $10^{-9}$ or better (Section~\ref{sec:vszbasic}).
 
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_hillslope.png}
 \caption{Coupled hillslope with irregular land (rain 10~mm/d for 150 days, then dry). Top: land surface, soil-zone base and
@@ -384,7 +385,7 @@ Two soil-zone layers of 0.5 m with $\eta=0.4$, $\mathit{SF}=0$, $S_{\mathrm{fc}}
 $S_d=0.2$ in each. The top aquifer layer has $S_y=0.2$ and receives 10 mm/d of recharge. Below the soil the water table
 rises $10/0.2=50$ mm/d. When it reaches the soil base the recharge is rejected and stays in the soil, where it raises
 the soil water level by $10/0.2=50$ mm/d as well; the 400 mm of capacity hold the remaining 200 mm of free water after 20
-more days, after which all recharge overflows (test T1, Section~\ref{sec:vszbasic}: 49.95~mm/d, full on day 41). Exchange: with
+more days, after which all recharge overflows (test CT1, Section~\ref{sec:vszbasic}: 49.95~mm/d, full on day 41). Exchange: with
 $K_{\mathrm{sat}}=100$ mm/d, a 10 m top cell with $K_v=1$ m/d and a 100$\times$100 m column,
 $C^{\mathrm{sz}}=10^4/(0.5/0.2+10/2)=1\,333$ m$^2$/d. Soil water 0.2 m and water table 0.1 m above the base ($F=1$) give
 $q^{\mathrm{sz}}=1\,333\times0.1=133$ m$^3$/d into the aquifer, 13 mm/d over the column.
@@ -463,7 +464,7 @@ $K_s$ is below the flux holds a saturated, perched zone above it). Where the flu
 $\psi=0$ at its top, that profile would put positive pressure at the top; the column then starts at the backed-up steady
 state instead, for the largest flux $f$ it passes with a saturated top, and its top rejects the rest from the first step
 (Raven warns, with the number of such columns). Either way the start is steady to the solver's tolerance: the first
-step's outflow equals its inflow and the storage does not change (\cmd{test\_vz\_initial.py} I1, I5, I6).
+step's outflow equals its inflow and the storage does not change (\cmd{test\_vz\_initial.py} VI1, VI5, VI6).
 
 \paragraph{A moving water table.} The water table's own rise and fall is MODFLOW's: its specific yield stores and
 releases the water. The column therefore carries only what differs from the hydrostatic (equilibrium) profile above
@@ -972,8 +973,9 @@ C=\min\!\left(\Lambda\sum_kA_{k,i},\ \frac{V^{\mathrm{st}}_i}{\dt\,\bar d^{\,\ma
 After MODFLOW solves, leakage is removed from each HRU's store in proportion to $V^{\mathrm{st}}_{k,i}$, and groundwater discharge is
 added in proportion to area. Because the shares come from the same fixed volumes used for the limit, no store can be
 over-drawn and the volumes on both sides match exactly. A store of an HRU may be connected by only one
-\cmd{:SurfaceWater\allowbreak Exchange}; Raven stops if two exchanges would draw on the same store. Groundwater that reaches the surface under an \emph{empty} store is
-still returned to Raven by the seepage drain (Section~\ref{ch:seepage}).
+\cmd{:SurfaceWater\allowbreak Exchange}; Raven stops if two exchanges would draw on the same store. Groundwater that reaches the surface under an \emph{empty} store
+returns to Raven through the seepage drain (Section~\ref{ch:seepage}); under \cmd{:SoilZone PHYSICAL} the HRUs with a soil zone
+have no seepage drain, and there it rises into the soil zone and leaves it as overflow (Section~\ref{ch:soilzone}).
 \begin{example}[: wetland leakage]
 Group HRUs cover 3 km$^2$ of a cell, $\Lambda=0.05$ d$^{-1}$: $C\le0.05\times3\times10^6=150\,000$ m$^2$/d. The wetland holds
 20 mm ($\bar d^{\,\mathrm{st}}=0.02$ m, $V^{\mathrm{st}}=60\,000$ m$^3$ in this cell). The supply limit is $60\,000/(1\times0.02)=3\times10^6$ m$^2$/d, so

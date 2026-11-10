@@ -397,7 +397,8 @@ near the lake; an HRU mesh places cells of the target size inside the lake and i
 shortens the spacing of its cells along the shore. \cmd{POLYGONS} works the same way for any outline in a file.
 
 \subsection{Rivers and boundaries on any grid}
-On the default grid river and boundary lines are cut into cells as before. On every other grid each piece of a line is cut exactly at the edges of the cells it crosses (rectangles along their
+On the default grid each segment of a river or boundary line is cut into pieces of at most a twentieth of the cell size,
+and each piece goes to the cell that holds its middle. On every other grid each piece of a line is cut exactly at the edges of the cells it crosses (rectangles along their
 sides, other cells along their edges or triangle by triangle). River lengths per cell are therefore exact and do not
 depend on the cell size. A stretch lying exactly on a shared cell edge
 is counted once. A boundary line may be drawn along the edge of the modelled area, where the edge cells can be inactive because too little

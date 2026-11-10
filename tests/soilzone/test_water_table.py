@@ -11,7 +11,7 @@ P2  capillary rise from a shallow water table (no unsaturated column) into a soi
 P3  a water table that rises through the unsaturated column into the soil zone (the column collapses into the contact
      exchange) and falls again (the column re-forms): all identities hold throughout.
 P4  restart: 60 + 60 days from the first run's solution.rvc (with its :GWVadoseColumns block) equal 120 days in one go.
-P5  :SoilZoneExchangeTiming LAGGED on the T2/T3 hillslope: heads closer to the MODFLOW-only reference than with AFTER
+P5  :SoilZoneExchangeTiming LAGGED on the HS1/HS2 hillslope: heads closer to the MODFLOW-only reference than with AFTER
      (the splitting error of Raven's processes ahead of the exchange); a restart with the :GWSoilZoneLag block is exact.
 P6  :SoilZoneClasses on the hillslope as one HRU over all ten cell columns: with 10 classes the HRU behaves like ten
      HRUs of one column each (heads within 1 mm of that run); with 5 classes the heads are closer to the reference
@@ -29,7 +29,7 @@ P10 upward flows out of a lower cell: a specified head in layer 2 under a dried 
      is not pumped dry (no MODFLOW non-convergence), with and without unsaturated columns.
 P11 water-table ET under :SoilZone PHYSICAL counts its extinction depth from the ground, as under CONCEPTUAL: one HRU,
      soil zone 1 m, EXTINCTION_DEPTH 1.5 m, PET 5 mm/d unmet (dry soil). With the water table 2.2 m below the ground there
-     is no water-table ET (it was 39 m3/d, the depth counted from the soil-zone base); with it 1.2 m below the ground the
+     is no water-table ET (counted from the soil-zone base it would be 39 m3/d); with it 1.2 m below the ground the
      ET equals the CONCEPTUAL run's (1e-3) and is positive; the existing-model twin gives the generated run's ET (1e-4).
 All runs: MODFLOW's balance, Raven's balance, the recharge, soil-zone and unsaturated-zone identities and the negative
 recharge not held at the standard limits (sz_check.ID_LIMITS), and no unconverged MODFLOW or interface step.

@@ -1,7 +1,7 @@
-"""Input handling of :SoilZone PHYSICAL (short runs of the T1 column).
+"""Input handling of :SoilZone PHYSICAL (short runs of the CT1 column).
 
 I1 HYDRAUL_COND missing for the class of the bottom soil-zone layer: the run stops (Raven's automatic value is a
-   placeholder, so the soil zone must not run on it). Classes outside the soil zone do not need it (the Liard test T7
+   placeholder, so the soil zone must not run on it). Classes outside the soil zone do not need it (the Liard test LP1
    has such classes).
 I2 :SoilZoneIteration with only the update count is accepted (here 0: explicit coupling, no interface update in any step;
    the tolerances keep their defaults, which explicit coupling does not use).
@@ -23,7 +23,7 @@ I10 :StartTime of the .rvc: the offset of the run's start from the
    "uninitialised value" in ParseInitialConditionsFile / TimeDifference (SKIP when valgrind is not installed).
 I11 a :BoundaryHead or :WellFlowRate time series that names no boundary or well: ":BoundaryHead NOPE"
    beside a specified-head boundary EDGE, and ":WellFlowRate 7" when the only well is 1, stop the run naming the series
-   and the boundaries / wells there are (they were dropped silently: EDGE kept its constant HEAD); the correct names run.
+   and the boundaries / wells there are (a series left unused would leave EDGE at its constant HEAD); the correct names run.
 I12 options given where they do nothing: on a model Raven builds, :SeepageToRaven, :KeepPackages, :MF6StartDate and
    :MF6Model each stop the run ("apply only to an existing model"); :SoilZoneVadoseClasses and :SoilZoneVadoseInitialFlux
    with :SoilZoneVadose NONE, and :SoilZoneAquiferClass on a generated model, are reported as ignored (Raven_errors.txt);
@@ -71,7 +71,7 @@ I21 a head boundary on steps whose :BoundaryHead value lies at or below a cell's
        PHYSICAL: on days 3-6 the CHD flow is 0, nothing is booked onto CHD cells ('recharge onto CHD cells', and the soil
        zone's exchange with specified heads), MODFLOW's recharge equals Raven's (CONCEPTUAL), the column's soil-zone link
        exchanges with the aquifer (PHYSICAL), and every identity of combinations.check_run holds; on days 1-2 the boundary
-       holds the column as before.
+       holds the column.
    (e) cells placed by the series alone: CHD and GHB, LAYERS TOP, HEAD 90 and a series of 99 m on every day: the boundary
        has the cells of layer 1 only (GWModelSummary.txt "GHB cells / CHD cells" 2), as a HEAD of 99 m gives, and none off.
    (f) a steady-state first period (:GWInitialization STEADY_STATE) whose series value (90 m, then 99, 99, 90, 90, 99)

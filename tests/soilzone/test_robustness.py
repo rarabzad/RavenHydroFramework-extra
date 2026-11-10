@@ -20,20 +20,20 @@ R9 hotstart columns that cannot hold the .rvc layer split (wet columns with a fu
    redistribution 50 mm over the HRU).
 R10 water rising into a thin soil on a steep, low-storage hillslope with an update budget of 1 and in explicit mode:
    the boundary MODFLOW keeps never takes more from a column than it holds (no shortfall). A slope kept at the secant
-   to the end of the contact let the frozen boundary reverse when the head fell and drain empty columns.
+   to the end of the contact would let the frozen boundary reverse when the head falls and drain empty columns.
 R11 explicit mode on the R2 hillslope (ten HRUs) gives the iterated run's total outflow within 3%: the kept boundary
-   neither reverses nor lifts water from below the contact (a line there was 30-50% off).
+   neither reverses nor lifts water from below the contact (a linear boundary there would be 30-50% off).
 R12 explicit mode with 15 outer iterations where water rises into cells that are dry at the head of linearization
    (steep hillslope draining to a specified head near the surface): MODFLOW converges and the outflow is the iterated
-   run's within 3% (a drain inactive at that head let MODFLOW's head run away: 10^7 m3/d booked).
+   run's within 3% (a drain inactive at that head would let MODFLOW's head run away: 10^7 m3/d booked).
 R13 a stiff, very low-storage hillslope with an update budget of 1 and 12 outer iterations, on which MODFLOW does not
-   converge: neither MODFLOW's residual nor the soil-zone shortfall is handed to Raven, so the outflow stays within 1.5 times the iterated run's (it was
-   17 times).
-R14 (N1) negative recharge: :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER with GR4J_X2 3 mm/d (Raven's processes take water
+   converge: neither MODFLOW's residual nor the soil-zone shortfall is handed to Raven, so the outflow stays within 1.5 times the iterated run's (handing
+   them on gives 17 times).
+R14 negative recharge: :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER with GR4J_X2 3 mm/d (Raven's processes take water
    out of GROUNDWATER) on an egg-crate hillslope, NONE and RICHARDS (all methods in the full mode, and three depth classes): it
    is never split by the saturated fraction, all of it goes to MODFLOW; identities and Raven's balance at round-off (a
    negative rejection booked with Fill would create water in the soil).
-R15 (N2) negative recharge limited by what the top cell can give: a 2 m aquifer 2.5 m deep, 40 dry days, slope 0.03, no
+R15 negative recharge limited by what the top cell can give: a 2 m aquifer 2.5 m deep, 40 dry days, slope 0.03, no
    specified head: the cut goes back to the soil zone (run total "negative recharge cut"); the run completes (without the limit the head
    diverges, to -10 586 m).
 R15b a negative-recharge cut on a draining soil zone: GR4J_X2 60 mm/d imports 23.7 mm/d out of GROUNDWATER
@@ -43,26 +43,26 @@ R15b a negative-recharge cut on a draining soil zone: GR4J_X2 60 mm/d imports 23
    is at least its field-capacity water (120 mm), as the local solve and MODFLOW's line may drain only free water; and the
    identities. (The local solve put the cut back with Fill, a no-op for a negative volume: it saw a wetter column by the
    cut, and the soil zone ended at 117.5 mm, drained below field capacity.)
-R16 (N3) the hand-back of a column's outputs with one depth class follows the link's own fraction:
+R16 the hand-back of a column's outputs with one depth class follows the link's own fraction:
    a RICHARDS run with negative recharge and rain; identities at round-off.
-R17 (N4) not held: the N2 import with the soil drained in the same step by :Baseflow BASE_LINEAR from SOIL[1] and SOIL[0]
+R17 not held: the R15 import with the soil drained in the same step by :Baseflow BASE_LINEAR from SOIL[1] and SOIL[0]
    after the import: the cut the soil zone does not hold is booked as "negative recharge the soil zone did not hold" (own
    column, warning, run total), soil-zone shortfall 0, identities; :SoilZoneExchangeTiming AFTER books it too (the process
    after the import, not the lagged timing, is the cause).
-R18 (N5) an existing model without NEWTON (CONCEPTUAL) whose cells the negative recharge dries: booked (signed, negative) as
+R18 an existing model without NEWTON (CONCEPTUAL) whose cells the negative recharge dries: booked (signed, negative) as
    recharge not applied by MODFLOW, the warning keeps the sign and says the water held by the dried cells is in neither
    balance; R18c the same with confined cells (ICELLTYPE 0): they never dry, MODFLOW applies all of it, nothing booked as
    not applied.
-R19 (N7) RICHARDS with three depth classes drawing upflow from a nearly empty top cell (R17 setup): all steps converged, no
+R19 RICHARDS with three depth classes drawing upflow from a nearly empty top cell (R17 setup): all steps converged, no
    head far outside the model (the column took 16.4 m3/d from a cell that could give 2.6e-9).
-R20 (N6) sibling columns: one HRU over 8 cells, BASEFLOW_COEFF 0.5, a 2 m aquifer from 1.8 m deep, 30 days, AFTER and LAGGED:
+R20 sibling columns: one HRU over 8 cells, BASEFLOW_COEFF 0.5, a 2 m aquifer from 1.8 m deep, 30 days, AFTER and LAGGED:
    "not held" is booked only on steps whose HRU soil zone is empty (the cut is first taken from the HRU's other columns) and no round-off is booked.
-R21 (N8) rule (ii) hand-back in a step with negative recharge: one HRU of 400 x 200 m whose wet unsaturated columns (initial
+R21 rule (ii) hand-back in a step with negative recharge: one HRU of 400 x 200 m whose wet unsaturated columns (initial
    flux 30 mm/d, column 0.4 m) vanish under a water table raised by a specified head 0.3 m below the ground, while
    PERC_GR4JEXCH takes water out of GROUNDWATER (GR4J_X2 1e-4 mm/d, and 60 mm/d in the full mode); RICHARDS (and
    KINEMATIC in the full mode): the water of the vanished columns beyond S_y dh goes back to the soil zone as the link's
    rejected recharge, so the recharge identity holds at round-off (0.31 m3 per vanishing step otherwise missing).
-R22 (N9) the top-cell limit of a negative recharge with depth classes: one HRU of 200 x 200 m with +-0.5 m hummocks, a
+R22 the top-cell limit of a negative recharge with depth classes: one HRU of 200 x 200 m with +-0.5 m hummocks, a
    0.6 m top cell (S_y 0.05) and the water table 1.2 m deep, so the hollow classes have no column; PERC_GR4JEXCH with
    GR4J_X2 250 mm/d. MODFLOW's recharge on step 1 is at most the limit 0.5 S_y A (h - z_bot) (400 m3/d) with one class
    and with three classes (RICHARDS, and LAG in the full mode), the cut goes back to the soil zone, identities hold.
@@ -281,14 +281,14 @@ def main():
         print('  R13: unconverged steps, outflow %.0f m3 vs iterated %.0f m3 (x%.2f)' % (out['R13_b1'], out['R13_it'], out['R13_b1'] / out['R13_it']))
     res.append(('R13 MODFLOW residual not handed to Raven', g))
 
-    # ---- negative recharge (N1-N7 = R14-R20) ------------------------------------------------------------------------
+    # ---- negative recharge (R14-R20) --------------------------------------------------------------------------------------
     import re, pandas as pd
     QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
     def egg(amp, lam=50.0):
         import math
         return lambda x, y: amp * math.sin(2 * math.pi * x / lam) * math.sin(2 * math.pi * y / lam)
     GR = dict(extra_proc='  :Percolation PERC_GR4JEXCH SOIL[1] GROUNDWATER\n', extra_soil={'GR4J_X2': 60.0, 'GR4J_X3': 150.0})
-    N1 = dict(nhru=5, hru_w=200.0, slope=0.03, rain=[6.0] * 10 + [0.0] * 10 + [12.0] * 10, days=30, init_depth=1.2, perc=1.0,
+    NEG = dict(nhru=5, hru_w=200.0, slope=0.03, rain=[6.0] * 10 + [0.0] * 10 + [12.0] * 10, days=30, init_depth=1.2, perc=1.0,
               ksat=200.0, aq_b=4.0, aq_psia=0.3, demf=egg(0.3), **GR)
     LIM = dict(sz_check.ID_LIMITS)
     def ident(d, lim=LIM, skip=()):
@@ -299,7 +299,7 @@ def main():
     g = True
     meths = [('NONE', 1), ('RICHARDS', 1)] if QUICK else [('NONE', 1), ('RICHARDS', 1), ('KINEMATIC', 1), ('LAG', 1), ('RICHARDS', 3), ('LAG', 3)]
     for m, k in meths:
-        d = case('R14_%s%d' % (m.lower(), k), extra_rvg=vz(m, k), **N1); ok, txt = sz_check.run(d)
+        d = case('R14_%s%d' % (m.lower(), k), extra_rvg=vz(m, k), **NEG); ok, txt = sz_check.run(d)
         if not ok: print('  R14 %s: run FAILED\n%s' % (m, txt[-600:])); g = False; continue
         good, r = ident(d); b = sz_check.outputs(d)[0]
         neg = float((b['Raven recharge [m3/d]'] < 0).sum())
@@ -332,7 +332,7 @@ def main():
     else: print('  R15b: run FAILED\n' + txt[-600:])
     res.append(('R15b negative-recharge cut on a draining soil zone: no drainage below field capacity', g))
 
-    d = case('R16_handback_richards', extra_rvg=vz('RICHARDS'), **dict(N1, rain=15.0, init_depth=1.25)); ok, txt = sz_check.run(d); g = False
+    d = case('R16_handback_richards', extra_rvg=vz('RICHARDS'), **dict(NEG, rain=15.0, init_depth=1.25)); ok, txt = sz_check.run(d); g = False
     if ok: g, r = ident(d); print('  R16: hand-back with one depth class, identities %s' % ('ok' if g else 'FAIL'))
     else: print('  R16: run FAILED\n' + txt[-600:])
     res.append(('R16 one-class hand-back', g))

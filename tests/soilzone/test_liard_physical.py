@@ -1,4 +1,4 @@
-"""T7 (plan §9.2): the Liard example with :SoilZone PHYSICAL SOIL[0] SOIL[1].
+"""LP1: the Liard example with :SoilZone PHYSICAL SOIL[0] SOIL[1].
 
 The example's recharge comes from FAST_RESERVOIR (a 100 m conceptual store), which cannot be a soil zone. The variant
 lets the aquifer HRUs percolate SOIL[0] -> SOIL[1] (VADOSE) -> GROUNDWATER instead (PERC_GAWSER) and gives the soil
@@ -44,7 +44,7 @@ def main(days=None):
     tc.need_mf6()
     d = make(tc.work('soilzone', 'liard_physical'), days)
     msg = tc.run(d)
-    print('T7 Liard physical (%d days): %s' % (days, msg))
+    print('LP1 Liard physical (%d days): %s' % (days, msg))
     if 'Successful' not in msg:
         print(open(os.path.join(d, 'out', 'Raven_errors.txt')).read()[-3000:]); return False
     A = audit.audit(os.path.join(d, 'out'))
@@ -66,7 +66,7 @@ def main(days=None):
         and A['soil zone: applied - rejected - net exchange - shortfall (rel)'] < 1e-8 and A['soil zone: shortfall [m3]'] < 1e-6 \
         and A['soil zone: interface not converged (steps)'] == 0 and A['unconverged steps'] == 0 and A.get('ERROR lines', 0) == 0 \
         and dn > 0 and up > 0 and rej > 0 and hrus > 0
-    print('T7 Liard physical: %s' % ('PASS' if good else 'FAIL'))
+    print('LP1 Liard physical: %s' % ('PASS' if good else 'FAIL'))
     return bool(good)
 
 if __name__ == '__main__':

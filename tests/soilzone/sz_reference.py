@@ -1,4 +1,4 @@
-"""MODFLOW-only reference of a soil-zone test case (plan §9.2, T2).
+"""MODFLOW-only reference of a soil-zone test case (HS1).
 
 The soil zone becomes one extra MODFLOW layer on top of the aquifer (both soil layers have the same properties in
 the tests): layer 1 = SOIL[0..1] (thickness H0+H1), specific yield = drainable porosity n(1-S_fc), horizontal K ~ 0

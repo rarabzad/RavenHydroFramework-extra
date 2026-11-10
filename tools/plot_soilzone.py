@@ -3,8 +3,9 @@
     python3 tools/plot_soilzone.py OUTPUT_FOLDER [HRU_ID ...] [--png FILE]
 
 Per HRU (default: up to six HRUs with the largest exchange): water table and soil water level against the soil-zone
-base and the land surface, connected fraction, exchange up and down, rejected recharge and overflow. Below, the
-model-wide totals of GWBudget.csv and the interface updates per step. When the model has soil-zone columns over
+base (dashed), and the exchange up and down with the connected fraction (dotted). Below, model-wide from GWBudget.csv:
+the exchange, the rejected recharge and overflow, the interface updates per step and the last interface change (steps
+whose interface did not converge marked). When the model has soil-zone columns over
 specified heads, their exchange (the columns "soil zone to specified heads" and "specified heads to soil zone") is drawn
 as lines of its own beside the exchange with the aquifer, and counts in the choice of HRUs. Use it to inspect the dynamics of a case: the
 soil level should follow the water table once connected, the exchange should change sign only at physical turning

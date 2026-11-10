@@ -1,6 +1,6 @@
 """Shared run and check helpers of the soil-zone tests.
 
-run(d) runs Raven in folder d; checks(d) returns a dict of the identities of plan §7 (all must be ~0):
+run(d) runs Raven in folder d; checks(d) returns a dict of the balance identities (all must be ~0):
   mf6_err_rel      max |MODFLOW balance error| [m3/d] / max Raven recharge [m3/d] (a percentage of the gross aquifer flow
                    is meaningless when nearly all recharge is rejected and the aquifer flow is tiny)
   raven_mb_mm      max |Raven's water-balance error - (GROUNDWATER store - its initial value)| / max(1, store) [-]:

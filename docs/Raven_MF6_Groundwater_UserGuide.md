@@ -35,7 +35,14 @@ counts it as leaving Raven. Groundwater storage itself is reported by the files 
   https://github.com/MODFLOW-ORG/modflow6/releases and keeps only the library. MODFLOW 6.8 is released for Linux
   x86_64, Windows 64-bit and Apple Silicon Macs; Intel Macs need an earlier release.
 - Raven with the coupling: the RavenHydroFramework source (the coupling is a pull request to it; until it is merged, use
-  the `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework). Build it as usual: CMake
+  the `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework), cloned beside this repository
+  (https://github.com/rarabzad/RavenHydroFramework-extra, branch `main`):
+
+      git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
+      git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
+
+  Offline, the release package's `source/` folder holds both as git bundles (its README, "Restore the git history").
+  Build it as usual: CMake
   (`cmake -S . -B build` and `cmake --build build --config Release`; a single-configuration generator without
   `CMAKE_BUILD_TYPE` builds Release) or `make` in `src/` (both link `-ldl`); on Windows also `src/Raven.sln`. CMake also
   gets the MODFLOW 6 library (option `RAVEN_MF6`): by default it builds it from source (`SOURCE`) when a Fortran compiler,
@@ -277,6 +284,17 @@ existing MODFLOW 6 model".
   cells, so the model's own EVT/UZF must be taken over, not kept), `:SurfaceWaterExchange` (`SWX_RAVEN`) and
   `:ReservoirExchange` (`RES_RAVEN`), all in the model's units. Raven warns when the model has its own LAK or SFR package
   (the same lake must not be in both).
+- **Reservoir seepage** (`:ReservoirExchange`): only the part of the lake over cells that can take seepage in the step
+  exchanges water. Those are the lake HRU's linked cells that are not the model's specified heads in the step and (in a
+  model without NEWTON) not inactive; with F their share of the lake's linked area, the reservoir's seepage is computed
+  with the constant k F (k from `:SeepageParameters`; F = 1 when every cell can take seepage, and with none the lake
+  exchanges nothing). The next step the volume is delivered (`RES_RAVEN`) to the cells that can take it then, each at
+  most at the rate it had when the seepage was computed. A loss MODFLOW does not take (cells that have become specified
+  heads or inactive, or the part beyond those rates) is returned to the reservoir's subbasin in the same step and flows
+  on into the reservoir (`GWBudget.csv`: `reservoir seepage not delivered by MODFLOW [m3]`; a warning and a run total in
+  `GWModelSummary.txt`); a gain (groundwater into the lake) MODFLOW does not supply is taken back from the water reaching
+  the subbasin (`reservoir gain not supplied by MODFLOW [m3]`; a warning and a run total). The seepage in transit and its
+  share F are saved in `solution.rvc` (`:GWReservoirSeepage`). Manual: "Reservoirs".
 - **Later starts and restarts:** stress periods already simulated are dropped and the rest renumbered; TS6 time series are
   shifted to Raven's start (earlier entries keep negative times); TDIS and water-mover period data may sit in OPEN/CLOSE
   files; sub-daily steps work (the start must fall on a Raven step). TAS6, TVK6/TVS6, simulations with several models
@@ -362,7 +380,8 @@ to the soil zone and storage; with capillary rise the rise from the water table;
 debt and repayment; with columns over specified heads (or an existing model) the exchange with specified heads; for an
 existing model without NEWTON (CONCEPTUAL only) the recharge not applied by MODFLOW. `GWSoilExchange.csv` gives per HRU
 and step the soil-zone base, soil water level, water table, saturated fraction, exchange both ways, rejected recharge,
-overflow, soil water and capacity, and the interface updates and change. `GWModelSummary.txt` ends with run totals
+overflow, soil water and capacity, and two model-wide values of the step repeated on every row (interface updates and
+change). `GWModelSummary.txt` ends with run totals
 (unconverged steps, substeps, supply-limited updates, withheld discharge, ...). `tools/plot_soilzone.py OUTPUT_FOLDER`
 plots the exchange (with specified heads too, where there are soil-zone columns over them). Manual: Section "The soil zone and the water table", the reference table of the soil-zone commands
 (chapter "Inputs and outputs") and the setup guide "A water table in the soil, on sloping and irregular land".
@@ -409,14 +428,16 @@ seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), and wit
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
 (unsaturated columns; a column whose top differs starts at rest) and `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
 `:GWHeads` header, a value that is not a finite number in any of these blocks, or negative water in the soil-zone or
-unsaturated columns stops the run with a message. Using `solution.rvc` as the `.rvc`
-of the next run continues exactly where the previous run stopped (the restarted run starts from the states as they
+unsaturated columns stops the run with a message. In a coupled run, a run continued from `solution.rvc` (as the `.rvc`
+of the next run) carries on exactly where the previous run stopped (the restarted run starts from the states as they
 were, bit for bit): seepage held above the capacity of its target soil
 layer (without `:SoilZone PHYSICAL`) and a surface store filled above its maximum by groundwater are kept, and the
 unsaturated columns start with the contents as written (a run without columns warns and reports their water as dropped). With an age
 tracer, `:StartTime` is the start of the run that wrote the file and `:AgeTracerDatum` (when earlier) the start of the
 first run of the chain, from which the tracer's entry times count; a file without age-tracer masses (a spin-up without
-the tracer) starts the ages at 0.
+the tracer) starts the ages at 0. A run without groundwater is base Raven's hotstart: its HRU and channel states are
+written with 5 decimals (reservoir stages and flows with 12 digits), so it continues from rounded states. Raven's own `MB Error` of a restarted run whose reservoir spills is offset
+by a constant (a known issue of Raven itself, section 9).
 
 ## 5. Outputs
 
@@ -424,7 +445,7 @@ the tracer) starts the ages at 0.
 | --- | --- |
 | `GWBudget.csv` | per step: Raven recharge, MODFLOW recharge, seepage, storage release, balance error (m3/d and % of the gross flow), returned to Raven, outer iterations and convergence, river leakage and discharge, river exchange applied to Raven, river loss carried to next step, water-table ET, wells (specified, actual), GHB, CHD, recharge-delay storage, recharge onto CHD cells, surface-store and reservoir exchange; existing models: other model packages; soil-zone columns (section 4.3c) |
 | `GWHRUState.csv` | per coupled HRU: mean water-table head and depth below land surface |
-| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level and water table (means over all the HRU's soil-zone columns, those over specified heads included; empty for an HRU without a column), saturated fraction, exchange with the aquifer both ways, rejected recharge, overflow, soil water and capacity, interface updates and change; with specified heads also the exchange with them both ways. Summed over the HRUs, the exchange columns equal those of `GWBudget.csv` |
+| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level and water table (means over all the HRU's soil-zone columns, those over specified heads included; empty for an HRU without a column), saturated fraction, exchange with the aquifer both ways, rejected recharge, overflow, soil water and capacity; with specified heads also the exchange with them both ways. Summed over the HRUs, the exchange columns equal those of `GWBudget.csv`. Two model-wide values of the step, `interface updates` and `interface change [m]`, are repeated on every row |
 | `GWHeads.csv` | head at each observation well, starting at t = 0 (a monitoring well whose screened cell is dry reports the missing value -1.2345) |
 | `GWConnectivity.csv` | saturated fraction of the top layer per profile; number of connected saturated areas |
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |
@@ -527,7 +548,10 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   entries before the start (TS6 series are shifted; their rows must be listed in the TS6 file itself); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
   files are read); the stream package keeps the model's stage and has no conductance (supply) limit; undefined length or
   time units are taken as metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`.
-  Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model.
+  Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model, except on cells that
+  are the model's specified heads in a step (and, without NEWTON, inactive cells): they move no water there, and the
+  reservoir seepage those cells cannot take is returned to the reservoir's subbasin (section 4.3b). The stream package's
+  loss the channel cannot supply is carried to the next step (`river loss carried to next step`), for months in Example B.
 - Not available: groundwater transport, particle tracking during the run (offline tracking: `:WriteGWBudgetFile` and
   `tools/make_prt.py`, DIS/DISV grids), demand-driven wells. Frozen ground acts on recharge only through Raven's own
   processes.
@@ -535,4 +559,11 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 - Known issues in Raven itself (also without groundwater; left to the Raven developers): channel storage in
   `solution.rvc` can be negative in some subbasins; on the day after a reservoir has been drawn empty by a minimum flow its
   outflow still averages in the previous release rate (most of such a reservoir's balance error); valgrind reports
-  uninitialised reads in `RVPParameterWarning` and `CVegetationClass::RecalculateRootParams` while the `.rvp` file is read.
+  uninitialised reads in `RVPParameterWarning` and `CVegetationClass::RecalculateRootParams` while the `.rvp` file is read;
+  after a hotstart of a model whose reservoir spills, Raven's `MB Error` (`WatershedStorage.csv`) is offset by a
+  constant, half the water that crossed the reservoir in the step before the restart (its outflow, and reservoir seepage
+  returned to the subbasin or a gain MODFLOW did not supply on its way into the reservoir), because Raven's initial storage
+  at a hotstart leaves that half step out (base Raven 4.15 too): +7.39 mm for a 0.16 km2 test watershed whose lake spills
+  2,364 m3 in that step (without groundwater, in base Raven and with the coupling alike), +14.92 mm coupled (4,776 m3), about 50 mm for a
+  lake spilling 16,100 m3/d, 0.1 to 0.6 mm for seepage in transit. The restarted run's states, flows and stages are the
+  continuous run's (exactly in a coupled run); only that column, and the Raven balance `tools_audit.py` reports, is offset.

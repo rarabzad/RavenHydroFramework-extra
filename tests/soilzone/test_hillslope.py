@@ -1,12 +1,12 @@
-"""T2 / T3 (plan §9.2): hillslope with the water table rising into the soil zone and out of the land surface, then
+"""HS1 / HS2: hillslope with the water table rising into the soil zone and out of the land surface, then
 falling again (James Craig's second drawing: a water table crossing sloping soil layers).
 
 Ten HRUs (one cell column each, two rows) on a 0.5 % slope over a closed 20 m aquifer. Rain 10 mm/d for 150 days,
 then none for 150 days. Percolation drains only water above field capacity (PERC_GAWSER_CONSTRAIN), so a soil
 zone that is not connected to the water table passes the rain through and keeps no free water.
-  wetting (T2): the water table reaches the soil base first at the toe, the saturated zone spreads upslope, the
+  wetting (HS1): the water table reaches the soil base first at the toe, the saturated zone spreads upslope, the
                 soil fills and water leaves through the land surface (overflow), first at the toe;
-  drying  (T3): the saturated zone drains back into the aquifer: on the upslope HRUs that connected during the rain
+  drying  (HS2): the saturated zone drains back into the aquifer: on the upslope HRUs that connected during the rain
                 (HRUs 2-7) the saturated fraction falls to 0 by day 300 and the overflow stops when the rain does; the
                 aquifer is closed, so the water still draining from upslope seeps out at the toe: the HRUs whose water
                 table stays above their soil-zone base (8-10) stay saturated, and the toe, whose water table stays above
@@ -17,11 +17,11 @@ zone that is not connected to the water table passes the rain through and keeps 
                 below the land and overflow where it lies above; the outflow after day 160 does not rise; the saturated
                 HRUs (F > 0.5) fall from at least 8 at the end of the rain to at most 4. (HRU 1 never connects, and
                 the reference keeps overflow on the toe after the rain, so "overflow stops" holds upslope only.)
-  --selftest    the T3 checks on altered results (an upslope HRU left saturated, upslope overflow after the rain, a
+  --selftest    the HS2 checks on altered results (an upslope HRU left saturated, upslope overflow after the rain, a
                 rising recession, a connected-HRU list that is empty) must fail.
 The coupled run is compared with a MODFLOW-only model in which the soil zone is a MODFLOW layer (sz_reference); with
-daily steps they differ by the splitting error of Raven's processes ahead of the exchange (see test_dynamics T4).
-Balance identities of plan §7 must close in every step.
+daily steps they differ by the splitting error of Raven's processes ahead of the exchange (see test_dynamics DY1).
+The balance identities (sz_check) must close in every step.
 Quick mode (RAVEN_TEST_QUICK=1) runs the same 300-day case: the drying checks need the whole wet and dry season, and
 the run with its MODFLOW-only reference takes about ten seconds.
 """
@@ -37,7 +37,7 @@ CFG = dict(nhru=10, hru_w=100.0, width=200.0, cell=100.0, slope=0.005, Kh=50.0, 
            n=0.4, sfc=0.5)
 
 def t3_checks(F, ovf, wt, land, base, head_ref_end, out_c, tconn):
-    """the drying checks (T3) on the per-HRU daily series (nt x nh): returns {name: (passed, detail)}"""
+    """the drying checks (HS2) on the per-HRU daily series (nt x nh): returns {name: (passed, detail)}"""
     nh = F.shape[1]; c = {}
     drained = [k for k in range(nh) if tconn[k] < 10**6 and head_ref_end[k] < base[k] - 0.05]
     wet = [k for k in range(nh) if head_ref_end[k] > base[k] + 0.05]
@@ -59,7 +59,7 @@ def t3_checks(F, ovf, wt, land, base, head_ref_end, out_c, tconn):
     return c
 
 def selftest(F, ovf, wt, land, base, href, out_c, tconn, drained):
-    """each alteration must make the T3 checks fail"""
+    """each alteration must make the HS2 checks fail"""
     alts = []
     F1 = F.copy(); F1[-1, drained[0]] = 1.0; alts.append(('an upslope HRU left saturated', (F1, ovf, out_c, tconn)))
     o2 = ovf.copy(); o2[-1, drained[1]] = 0.5; alts.append(('upslope overflow on day 300', (F, o2, out_c, tconn)))
@@ -73,11 +73,11 @@ def selftest(F, ovf, wt, land, base, href, out_c, tconn, drained):
     return ok
 
 def main():
-    print('T2/T3: %s mode (the same 300-day case in both)' % ('quick' if os.environ.get('RAVEN_TEST_QUICK', '') == '1' else 'full'))
+    print('HS1/HS2: %s mode (the same 300-day case in both)' % ('quick' if os.environ.get('RAVEN_TEST_QUICK', '') == '1' else 'full'))
     d = os.path.join(W, 'coupled'); shutil.rmtree(d, ignore_errors=True)
     sz_models.make_case(d, **CFG)
     ok, txt = sz_check.run(d)
-    print('T2/T3 hillslope: coupled run %s' % ('ok' if ok else 'FAILED'))
+    print('HS1/HS2 hillslope: coupled run %s' % ('ok' if ok else 'FAILED'))
     if not ok:
         print(txt[-3000:]); return False
     b, s, w = sz_check.outputs(d)
@@ -131,8 +131,8 @@ def main():
               'overflow_day_by_hru', 'overflow_starts_at_toe', 'reference_drain_day300_m3d', 'coupled_outflow_day300_m3d'):
         print('  %-30s %s' % (k, res[k]))
     for k, (g, det) in t3.items():
-        print('  T3 %-32s %-4s %s' % (k, 'ok' if g else 'FAIL', det))
-    # daily steps: a first-order splitting error remains (test_dynamics T4 shows it vanishing with the step)
+        print('  HS2 %-32s %-4s %s' % (k, 'ok' if g else 'FAIL', det))
+    # daily steps: a first-order splitting error remains (test_dynamics DY1 shows it vanishing with the step)
     lim = {'max_head_diff_m': 0.08, 'mean_head_diff_m': 0.02, 'max_soil_level_diff_m': 0.10,
            'outflow_total_rel_diff': 0.002, 'outflow_max_cum_diff_rel': 0.005}
     good &= sz_check.report('hillslope vs MODFLOW-only reference', res, lim)
@@ -142,7 +142,7 @@ def main():
     if '--selftest' in sys.argv:
         drained = [k for k in range(nh) if tconn[k] < 10**6 and head_ref_end[k] < top[k] - 0.05]
         good &= selftest(F, ovf, wt, land, top, head_ref_end, out_c, tconn, drained)
-    print('T2/T3 hillslope: %s' % ('PASS' if good else 'FAIL'))
+    print('HS1/HS2 hillslope: %s' % ('PASS' if good else 'FAIL'))
     return bool(good)
 
 if __name__ == '__main__':

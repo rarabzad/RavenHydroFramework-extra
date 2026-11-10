@@ -11,12 +11,13 @@ wrong.
 \section{Tutorial: the Liard River model}\label{ch:tutorial}
 This chapter walks through the example supplied in \cmd{examples/Liard\_groundwater}: the Liard River model (65 subbasins,
 1\,107 HRUs, northern British Columbia and Yukon) with an aquifer added under three nested subbasins (52, 48 and 43;
-about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as before.
+about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as they do without groundwater.
 
 \subsection{Step 0: prepare}
 \begin{enumerate}
-\item Build Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch
-of \url{https://github.com/rarabzad/RavenHydroFramework}) with CMake: \cmd{cmake -S . -B build}, \cmd{cmake --build build
+\item Get Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch
+of \url{https://github.com/rarabzad/RavenHydroFramework}) and, beside it, RavenHydroFramework-extra (branch \cmd{main} of
+\url{https://github.com/rarabzad/RavenHydroFramework-extra}; Section~\ref{sec:building}). Build Raven with CMake: \cmd{cmake -S . -B build}, \cmd{cmake --build build
 --config Release} (an optimised \cmd{Release} build by default). With a Fortran compiler, meson~$\geq$~1.7, ninja and git,
 and the MODFLOW~6 repository reachable, this also builds the MODFLOW~6 library from source; otherwise (also offline) it
 downloads the official release library (Linux x86\_64, Windows x64, Apple Silicon Macs); either
@@ -373,15 +374,20 @@ Aquifer steadily emptying for years & initial heads too high; use a steady-state
 \paragraph{Do I need MODFLOW experience?} No. Raven writes and runs the MODFLOW model. It helps to know the concepts of
 Chapter~\ref{ch:c2}; the generated files can be inspected by anyone who knows MODFLOW.
 \paragraph{Can only part of my watershed have groundwater?} Yes. Only HRUs with an \cmd{AQUIFER\_PROFILE} are coupled; all
-others run exactly as before.
+others run exactly as they do without groundwater.
 \paragraph{Can two aquifer systems exchange water?} Yes, when their cells touch: lateral flow between neighbouring profiles and
 leakage between layers are computed by MODFLOW like any other flow.
 \paragraph{What happens where the water table reaches the surface?} The seepage drains return the water to Raven, where it
 follows Raven's processes (for example baseflow to the river).
-\paragraph{Can the aquifer take more water than a river carries?} No: the supply limit caps each river cell's largest
-possible loss at its share of the reach's flow.
+\paragraph{Can the aquifer take more water than a river carries?} Hardly from a river Raven builds: the supply limit caps
+each river cell's largest possible loss at its share of the reach's flow at the start of the step (on a receding river
+a small rest can be carried to the next step). An existing model's stream package keeps its own
+conductance and has no supply limit (Section~\ref{sec:extlimits}): a losing reach can take more than the channel holds, and
+the part the channel cannot supply is carried to the next step (\emph{river loss carried to next step}; exactly accounted).
+Example~B does this for months: the carry reaches about $10^{8}$~m$^3$ and is repaid by the end of the run.
 \paragraph{How do I restart a long run?} Use \cmd{solution.rvc} of the finished run as the \cmd{.rvc} of the next, with
-\cmd{:StartDate} set to the end of the first run.
+\cmd{:StartDate} set to the end of the first run. A coupled run continued this way carries on exactly
+(Section~\ref{sec:hotstart}); a run without groundwater continues from Raven's 5-decimal states.
 \paragraph{How fine should the grid be?} Fine enough that valleys and well spacings span two or three cells
 (Section~\ref{ch:grid}). Coarser grids run faster.
 \paragraph{Does frozen ground limit recharge?} Recharge is whatever Raven's processes send to \cmd{GROUNDWATER}, so frozen

@@ -107,7 +107,7 @@ int main(int argc,char **argv)
     qb=StepLag(c,S,1.0,0.0004,rej,0,1.0);                                //(0.4 mm cannot fill the top node's 0.02 dz deficit)
     check((qb<1e-15) && (Excess(c,S,0)<0.0) && (std::fabs(c.th[0]-th0[0]-0.0004/c.dz[0])<1e-15),"inflow fills a node below equilibrium first",qb,0);
   }
-  //-- 5. tiny residence times: N = 200 and LAG 1e-6 (the substep count overflowed an int)
+  //-- 5. tiny residence times: N = 200 and LAG 1e-6 (the substep count would overflow an int)
   {
     vz_strat S=One(sand); vz_column c; Build(c,S,10.0,0.0,200); double rej=0; vz_step_info inf;
     const double S0=Storage(c); double qb=StepLag(c,S,1.0,0.01,rej,&inf,1e-6);

@@ -1,7 +1,7 @@
 """The soil zone with an existing MODFLOW 6 model, and columns over specified heads (manual, "The soil zone and the
 water table" and "Coupling an existing MODFLOW 6 model").
 
-X1  round trip: the T2/T3 hillslope run with :SoilZone PHYSICAL; its MODFLOW model (without Raven's packages) is then
+X1  round trip: the HS1/HS2 hillslope run with :SoilZone PHYSICAL; its MODFLOW model (without Raven's packages) is then
     coupled as an existing model (:MF6Simulation) with the same soil zone. Flows agree within the interface
     tolerances (relative 1e-3), and every identity holds.
 X2  the same with the existing model converted to feet and seconds (unit factors of heads, conductances and rates).
@@ -79,7 +79,7 @@ def outputs_x3():
     """X5, on the x3 runs (unsaturated columns, a specified-head toe): GWSoilExchange.csv
     rejects recharge only where the HRU's saturated fraction is positive (the fraction is over all the HRU's columns, those
     over specified heads included, as the rejected recharge), and GWModelSummary.txt ends with the run totals, the
-    unsaturated columns' substeps counted (they were written at the start, always 0)"""
+    unsaturated columns' substeps counted there (the header, written at the start, does not count them)"""
     good = True
     for lab in ('gen', 'ext'):
         o = os.path.join(W, 'x3_' + lab, 'out')

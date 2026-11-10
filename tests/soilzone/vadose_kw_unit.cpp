@@ -49,7 +49,7 @@ static std::vector<double> OldGrid(double L,int Nmax)
 int main(int argc,char **argv)
 {
   FILE *wave=(argc>1)?fopen(argv[1],"w"):0;   //(the K1 bottom-flux series for the manual figure: N, t, qbot, analytic)
-  //-- 1. the grid: N = 3..18 bit for bit as before, from N = 19 the cap (1.3^8) fills the middle ----------------------
+  //-- 1. the grid: N = 3..18 bit for bit the plain 1.3 growth, from N = 19 the cap (1.3^8) fills the middle ----------------------
   {
     SetReference(0); vz_strat S=One(Mat(0.35,4,0.3,1.0,0.2));
     int same=0,diff=0;

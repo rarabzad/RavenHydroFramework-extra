@@ -1,4 +1,4 @@
-// Unit tests of the soil-zone interface functions (src/GWSoilZone.cpp), plan §9.1 G1-G7 plus randomized checks.
+// Unit tests of the soil-zone interface functions (src/GWSoilZone.cpp): G1-G7 plus randomized checks.
 // build: g++ -std=c++11 -O2 -I$RAVEN_SRC/src soilzone_unit.cpp $RAVEN_SRC/src/GWSoilZone.cpp -o soilzone_unit
 #include "GWSoilZone.h"
 #include <cstdio>

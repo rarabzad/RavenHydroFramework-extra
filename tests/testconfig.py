@@ -37,7 +37,7 @@ def _default_raven():
 
 RAVEN = os.path.abspath(os.environ.get('RAVEN_EXE', _default_raven()))
 REF = os.environ.get('RAVEN_EXE_REF', '')                            # reference build of the byte-identity checks ('' = skipped)
-if not REF and os.environ.get('RAVEN_REF_EXE'):                      # (the name test_vz_lag.py once used)
+if not REF and os.environ.get('RAVEN_REF_EXE'):                      # (RAVEN_REF_EXE is accepted as another name for it)
     REF = os.environ['RAVEN_REF_EXE']
     print('testconfig: RAVEN_REF_EXE is read as RAVEN_EXE_REF; please use RAVEN_EXE_REF')
 REF = os.path.abspath(REF) if REF else ''

@@ -1,7 +1,7 @@
 """Tests of :SoilZoneVadose LAG {t_m} {N}, the linear storage cascade (manual
 Section sec:szvadoselag).
 
-U   unit tests (vadose_lag_unit.cpp against GWVadose.cpp and GWVadoseLag.cpp): travel time per metre (eq. lagtm, also
+LU  unit tests (vadose_lag_unit.cpp against GWVadose.cpp and GWVadoseLag.cpp): travel time per metre (eq. lagtm, also
     Ks < q_r), mass balance to round-off over random columns/materials/layering/fluxes/steps, no content above ths, nodes
     below equilibrium, inactive-column contract (rejects), tiny residence times (N = 200, LAG 1e-6: substep count clamped
     to [1, 50] before the int cast), steady start S_i = min(q k_i, Smax_i), Erlang response of equal reservoirs, N_eff of
@@ -27,14 +27,14 @@ L6  the cell-room release cap of a rising water table (VZStep): one flat HRU, Sy
 L7  the leak check: the L1 storm with LAG 2 passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3 per
     step put into "unsaturated zone storage [m3]" (on the steps above 5,000 m3, 10 significant digits) fail the
     script's checks.
-S   speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from U).
-B   byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the T2/T3 hillslope,
+LS  speed: run times of NONE, LAG and RICHARDS on the same case (and the cost per column step from LU).
+LB  byte-identity of NONE, RICHARDS and CONCEPTUAL runs (b_hill_none, b_hill_ric, b_conceptual: the HS1/HS2 hillslope,
     RICHARDS with a deep water table) against RAVEN_EXE_REF, the build of the commit before your change; out/*.csv compared byte for byte except the diagnostic column
-    `interface change [m]`, solution.rvc the same state (testconfig.rvc_same). Without RAVEN_EXE_REF B prints SKIP (never "ok").
+    `interface change [m]`, solution.rvc the same state (testconfig.rvc_same). Without RAVEN_EXE_REF LB prints SKIP (never "ok").
 Identities use the standard limits (sz_check.STD_LIMITS) and sz_check's column identity
 (sz_check.vz_identity: scaled by the step's flows, less the CSV rounding of its values) from step 1: every run must give
 the start storage of the columns (GWModelSummary.txt), otherwise it fails (vz_step1_missing).
-Quick mode (RAVEN_TEST_QUICK=1): shorter S and only b_hill_ric in B.
+Quick mode (RAVEN_TEST_QUICK=1): shorter LS and only b_hill_ric in LB.
 """
 import os, sys, shutil, re, time, datetime, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -47,7 +47,7 @@ QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 W = tc.work('soilzone', 'vz_lag')
 REF = getattr(tc, 'REF', None)
 if REF is None:
-    REF = os.environ.get('RAVEN_EXE_REF', '') or os.environ.get('RAVEN_REF_EXE', '')   # (RAVEN_REF_EXE: the name once used)
+    REF = os.environ.get('RAVEN_EXE_REF', '') or os.environ.get('RAVEN_REF_EXE', '')   # (RAVEN_REF_EXE: accepted as another name)
 LIM = dict(getattr(sz_check, 'STD_LIMITS', {}))
 LIM.update({'mf6_err_rel': 1e-5, 'raven_mb_mm': 1e-5, 'rch_identity': 5e-9, 'sz_identity': 1e-8, 'shortfall': 1e-6,
             'vz_identity': 1e-8, 'vz_step1_missing': 0})
@@ -101,7 +101,7 @@ def centroid(d):
 
 # ------------------------------------------------------------------------------------------------------------------
 def test_u():
-    print('U unit tests (vadose_lag_unit.cpp)')
+    print('LU unit tests (vadose_lag_unit.cpp)')
     os.makedirs(W, exist_ok=True)
     exe, imp = os.path.join(W, 'vadose_lag_unit'), os.path.join(W, 'lag_impulse.txt')
     c = subprocess.run('g++ -O2 -std=c++11 -I%s %s %s/GWVadose.cpp %s/GWVadoseLag.cpp -o %s'
@@ -260,7 +260,7 @@ def test_l5():
 
 
 def test_s():
-    print('S speed: NONE, LAG and RICHARDS on a 20-HRU hillslope (400 cells, 5x5 DEM samples) over a 6 m deep water table')
+    print('LS speed: NONE, LAG and RICHARDS on a 20-HRU hillslope (400 cells, 5x5 DEM samples) over a 6 m deep water table')
     days = 120 if QUICK else 365
     rain = (STORM * 5)[:days]
     cfg = dict(CFG); cfg.update(nhru=20, width=2000.0, subgrid=5, smooth=0.2, rain=rain, days=days, init_depth=6.0, aq_b=4.0,
@@ -299,9 +299,9 @@ def same_csv(a, b):
 
 
 def test_b():
-    print('B byte-identity of NONE, RICHARDS and CONCEPTUAL against the reference build')
+    print('LB byte-identity of NONE, RICHARDS and CONCEPTUAL against the reference build')
     if not REF or not os.path.exists(REF):
-        skip('B byte-identity (test_vz_lag.py)', 'no reference build (set RAVEN_EXE_REF to the build of the commit before your change)')
+        skip('LB byte-identity (test_vz_lag.py)', 'no reference build (set RAVEN_EXE_REF to the build of the commit before your change)')
         return True
     cases = [('b_hill_ric', dict(CFG, init_depth=3.0, aq_b=4.0, aq_psia=0.3, extra_rvg=':SoilZoneVadose RICHARDS\n'))]
     if not QUICK:
@@ -368,8 +368,8 @@ def test_l7():
 def main():
     tc.need_mf6() if hasattr(tc, 'need_mf6') else None
     res = {}
-    for name, f in (('U', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6),
-                    ('L7', test_l7), ('S', test_s), ('B', test_b)):
+    for name, f in (('LU', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6),
+                    ('L7', test_l7), ('LS', test_s), ('LB', test_b)):
         t0 = time.time()
         try:
             res[name] = bool(f())

@@ -22,7 +22,8 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
 | `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`), with specified heads too |
-| `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles on branch `soil-zone`; a shallow Raven clone is completed from the upstream Raven repository first; `COMMITS.txt`) and runs the clone commands of the package README's "Restore the git history" section as written, checking that each bundle clones with its whole history, branch, tip and commit count as the README states |
+| `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles on the branches of the public repositories, `mf6-coupling` and `main`; a shallow Raven clone is completed from the upstream Raven repository first; `COMMITS.txt`) and runs the clone commands of the package README's "Restore the git history" section as written, checking that each bundle clones with its whole history, branch, tip and commit count as the README states |
+| `tools/make_handover.py` | writes the kit for publishing the two repositories (bundles, source archives, `HANDOVER.md` with the steps to push them to GitHub and check them) and verifies it |
 | `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run, including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
 ## Quick start
@@ -31,7 +32,7 @@ Put Raven and this repository side by side, build Raven (with MODFLOW 6), and ru
 
 ```
 git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
-git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
+git clone https://github.com/rarabzad/RavenHydroFramework-extra.git      # default branch main
 
 cd RavenHydroFramework
 cmake -S . -B build                          # also gets MODFLOW 6.8.1 (see below)
@@ -58,7 +59,10 @@ Windows x64, Apple Silicon Macs; Intel Macs only with `--version 6.6.3`).
 
 Until the coupling is merged into the Raven repository (https://github.com/CSHS-CWRA/RavenHydroFramework), use the
 `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework, which holds the coupling and its changes to Raven's own
-files. Windows, Linux and macOS step by step: `examples/README.md`.
+files; this repository's branch is `main`. Without network access, the release package's `source/` folder holds both repositories with their whole history as
+git bundles; its README's section "Restore the git history" gives the two `git clone` commands, which make the same
+two checkouts (`RavenHydroFramework` on `mf6-coupling`, `RavenHydroFramework-extra` on `main`). Windows, Linux and macOS step by
+step: `examples/README.md`.
 
 ## Requirements
 

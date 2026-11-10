@@ -34,10 +34,10 @@ Units of the series (the subbasin-52 grid model with its 5,000 m3/d pumping well
      m3/d (U0);
   U3 ":WellFlowRate 1 ft3/s" and U4 ":BoundaryHead EDGE ft" stop: "units ... are not supported".
 Reserved package names (the existing-model example):
-  R1 a model package named DRN_RAVEN (the GHB package renamed) stops with Raven's message ("a name Raven reserves for
+  RN1 a model package named DRN_RAVEN (the GHB package renamed) stops with Raven's message ("a name Raven reserves for
      the packages it adds"), not MODFLOW's "Package name already exists";
-  R2 a recharge package named RCH_RAVEN that Raven takes over (:RavenTakesOver RCH_RAVEN) runs.
-Quick mode (RAVEN_TEST_QUICK=1): the runs U0-U2 and R2 last 2 days; full mode: 10 days.
+  RN2 a recharge package named RCH_RAVEN that Raven takes over (:RavenTakesOver RCH_RAVEN) runs.
+Quick mode (RAVEN_TEST_QUICK=1): the runs U0-U2 and RN2 last 2 days; full mode: 10 days.
 """
 import os, re, sys, json, shutil, subprocess
 import pandas as pd
@@ -211,13 +211,13 @@ if not os.path.exists(os.path.join(W, 'Liard_groundwater')):    # (the example r
     except OSError: shutil.copytree(tc.LIARD, os.path.join(W, 'Liard_groundwater'))
 d = tc.copy_case(tc.EXISTING, os.path.join(W, 'r1'))
 edit(d, 'model/gwf_liard.nam', 'GHB6  gwf_liard.ghb  ghb_outlet', 'GHB6  gwf_liard.ghb  drn_raven')
-stops('R1 a model package named DRN_RAVEN stops with Raven\'s message', d, 'a name Raven reserves for the packages it adds')
+stops('RN1 a model package named DRN_RAVEN stops with Raven\'s message', d, 'a name Raven reserves for the packages it adds')
 shutil.rmtree(d, ignore_errors=True)
 d = tc.copy_case(tc.EXISTING, os.path.join(W, 'r2'))
 edit(d, 'model/gwf_liard.nam', 'RCH6  gwf_liard.rcha  rch_model', 'RCH6  gwf_liard.rcha  rch_raven')
 edit(d, 'Liard.rvg', ':RavenTakesOver    RCH_MODEL EVT_MODEL', ':RavenTakesOver    RCH_RAVEN EVT_MODEL')
 ok, out = run(d, DAYS)
-report('R2 a recharge package named RCH_RAVEN that Raven takes over runs (%d days)' % DAYS, ok, '' if ok else out.strip().split('\n')[-1][:150])
+report('RN2 a recharge package named RCH_RAVEN that Raven takes over runs (%d days)' % DAYS, ok, '' if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 
 print('input checks: ALL PASSED' if fails == 0 else 'input checks: %d FAILED' % fails)

@@ -1,17 +1,17 @@
-"""T4 / T5 / sub-grid (plan §9.2) on the T2/T3 hillslope (test_hillslope.CFG).
+"""DY1 / DY2 / sub-grid on the HS1/HS2 hillslope (test_hillslope.CFG).
 
-T4  time step: 1 d, 6 h and 1 h, each against the MODFLOW-only reference run with the same step. Raven's own
+DY1  time step: 1 d, 6 h and 1 h, each against the MODFLOW-only reference run with the same step. Raven's own
     processes (infiltration, percolation) act before the exchange in each step, so the coupled model differs from the
     monolithic reference by a first-order splitting error (rain on a full soil runs off in Raven although the
     exchange drains the soil later in the same step). The error must shrink with the step (mean error 1 d > 6 h > 1 h,
     hourly mean below 3 mm); the balances close at every step size and the interface converges in every step.
-T5  stiffness: a thin, conductive soil-aquifer contact (C^sz/A ~ 9.5 /d against S_d = 0.2: dt/t_c ~ 48 for 1-day
+DY2  stiffness: a thin, conductive soil-aquifer contact (C^sz/A ~ 9.5 /d against S_d = 0.2: dt/t_c ~ 48 for 1-day
     steps). The iterated interface converges in a few updates and matches the reference as closely as the soft case;
     one pass without iteration (`:SoilZoneIteration 0 ...`) is less accurate. Both runs conserve water exactly.
 SG  sub-grid saturated fraction (`:SoilZoneSubgrid 5`, ramp 0.5 m) on the same slope: F changes smoothly instead of
     cell by cell, the balances close and the totals stay close to the reference.
-Quick mode (RAVEN_TEST_QUICK=1): T4 runs the 1 d and 6 h steps only (the error must shrink from 1 d to 6 h, total
-outflow within 1e-3 of the reference; the hourly limits apply in full mode); T5 and SG are the same in both modes.
+Quick mode (RAVEN_TEST_QUICK=1): DY1 runs the 1 d and 6 h steps only (the error must shrink from 1 d to 6 h, total
+outflow within 1e-3 of the reference; the hourly limits apply in full mode); DY2 and SG are the same in both modes.
 """
 import os, sys, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -59,7 +59,7 @@ def compare(a, b, days):
 def main():
     nh, days = CFG['nhru'], len(RAIN)
     ok_all = True
-    # ---------------- T4: time step, each against the reference with the same step
+    # ---------------- DY1: time step, each against the reference with the same step
     runs, errs = {}, {}
     steps = (('dt_1d', 1.0, 1), ('dt_6h', 0.25, 4)) + (() if QUICK else (('dt_1h', 1.0 / 24.0, 24),))
     for name, dt, nstp in steps:
@@ -67,7 +67,7 @@ def main():
         if d is None:
             ok_all = False; continue
         runs[name] = daily(d, nh, days)
-        print('T4 %s:' % name)
+        print('DY1 %s:' % name)
         ok_all &= sz_check.report(name, res, dict(sz_check.STD_LIMITS))
         rd = os.path.join(W, 'ref_' + name); shutil.rmtree(rd, ignore_errors=True)
         ref = sz_reference.build(d, rd, RAIN, CFG['H0'], CFG['H1'], CFG['n'], CFG['sfc'], CFG['ksat'],
@@ -80,10 +80,10 @@ def main():
         good = errs['dt_1d']['mean'] > errs['dt_6h']['mean'] and max(e['out'] for e in errs.values()) < 1e-3
         if not QUICK:
             good &= errs['dt_6h']['mean'] > errs['dt_1h']['mean'] and errs['dt_1h']['mean'] < 0.003 and errs['dt_1h']['max'] < 0.05
-        print('T4 time step convergence to the reference%s: %s' % (' (quick: 1 d and 6 h)' if QUICK else '', 'PASS' if good else 'FAIL')); ok_all &= good
+        print('DY1 time step convergence to the reference%s: %s' % (' (quick: 1 d and 6 h)' if QUICK else '', 'PASS' if good else 'FAIL')); ok_all &= good
     else:
         ok_all = False
-    # ---------------- T5: stiffness, explicit vs iterated
+    # ---------------- DY2: stiffness, explicit vs iterated
     stiff = dict(Kv=100.0, ksat=10000.0)
     d_it, r_it = run_case('stiff_iterated', **stiff)
     d_ex, r_ex = run_case('stiff_explicit', iteration=(0, 1e-4, 1e-6), **stiff)
@@ -94,14 +94,14 @@ def main():
         R = dict(wt=ref['aquifer'].mean(axis=1), cumout=np.cumsum(ref['drn']))   # daily, like the coupled runs
         a_it, a_ex = daily(d_it, nh, days), daily(d_ex, nh, days)
         e_it, e_ex = compare(a_it, R, days), compare(a_ex, R, days)
-        print('T5 iterated: %s, interface updates max %d' % (e_it, r_it['max_updates']))
-        print('T5 one pass: %s' % e_ex)
+        print('DY2 iterated: %s, interface updates max %d' % (e_it, r_it['max_updates']))
+        print('DY2 one pass: %s' % e_ex)
         lim_ex = dict(sz_check.STD_LIMITS); lim_ex.pop('iface_not_conv')     # one pass is "not converged" by design
         good = sz_check.report('stiff_iterated', r_it, dict(sz_check.STD_LIMITS))
         good &= sz_check.report('stiff_explicit (conservation only)', r_ex, lim_ex)
         good &= e_it['max_head_diff_m'] < 0.08 and e_it['cum_out_rel_diff'] < 0.002 and r_it['max_updates'] <= 15
         good &= e_it['max_head_diff_m'] <= e_ex['max_head_diff_m'] + 1e-6
-        print('T5 stiffness: %s' % ('PASS' if good else 'FAIL')); ok_all &= good
+        print('DY2 stiffness: %s' % ('PASS' if good else 'FAIL')); ok_all &= good
     # ---------------- sub-grid saturated fraction
     d_sg, r_sg = run_case('subgrid5', subgrid=5, smooth=0.5)
     if d_sg:

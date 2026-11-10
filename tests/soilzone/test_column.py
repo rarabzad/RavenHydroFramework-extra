@@ -1,8 +1,8 @@
-"""T1 / T1b (plan §9.2): flat closed column, water table rising into the soil zone (James Craig's first drawing).
+"""CT1 / CT1b: flat closed column, water table rising into the soil zone (James Craig's first drawing).
 
-T1 : S_y = drainable porosity n(1-SF)(1-S_fc) = 0.2; recharge 10 mm/d -> 50 mm/d rise below the base and inside the
+CT1 : S_y = drainable porosity n(1-SF)(1-S_fc) = 0.2; recharge 10 mm/d -> 50 mm/d rise below the base and inside the
      soil; heads and soil level agree once connected; soil full (400 mm) on day 41; the balances close.
-T1b: S_y = 0.08 -> 125 mm/d below the base, 50 mm/d inside the soil, and a storage-consistency warning.
+CT1b: S_y = 0.08 -> 125 mm/d below the base, 50 mm/d inside the soil, and a storage-consistency warning.
 Full mode: 70 days each; quick mode (RAVEN_TEST_QUICK=1): 45 days each (the soil zone is full on day 41), same checks.
 """
 import os, sys, shutil
@@ -14,7 +14,7 @@ W = sz_check.tc.work('soilzone', 'column')
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') == '1'
 DAYS = 45 if QUICK else 70
 ok_all = True
-for name, Sy, below in (('T1', 0.2, 50.0), ('T1b', 0.08, 125.0)):
+for name, Sy, below in (('CT1', 0.2, 50.0), ('CT1b', 0.08, 125.0)):
     d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
     sz_models.make_case(d, days=DAYS, Sy=Sy)
     ok, txt = sz_check.run(d)
@@ -39,7 +39,7 @@ for name, Sy, below in (('T1', 0.2, 50.0), ('T1b', 0.08, 125.0)):
     good &= abs(res['rise_below_mm_d'] - below) < 0.01 * below; print('  rise below the base %.3f mm/d (want %g)' % (res['rise_below_mm_d'], below))
     good &= abs(res['rise_in_soil_mm_d'] - 50.0) < 0.5; print('  rise inside the soil %.3f mm/d (want 50)' % res['rise_in_soil_mm_d'])
     good &= res['max_gap_connected_m'] < 0.005; print('  max |water table - soil level| once connected %.2e m (limit 5e-3)' % res['max_gap_connected_m'])
-    if name == 'T1':
+    if name == 'CT1':
         good &= res['day_full'] in (40, 41, 42); print('  soil zone full on day %d (want ~41)' % res['day_full'])
         good &= not warned
     else:
