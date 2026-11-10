@@ -207,6 +207,7 @@ STEPS = [
     ('budget_file', True, [PY, 'budget_file.py'], last_line(r'budget file checks: ALL PASSED'), 3600),
     ('tools_check', False, [PY, 'tools_check.py'], last_line(r'tool checks: ALL PASSED'), 1800),
     ('watershed_balance', True, [PY, 'watershed_balance.py'], last_line(r'watershed balance: ALL PASSED'), 1800),
+    ('tutorials', True, [PY, 'tutorials_check.py'], last_line(r'tutorials check: PASS'), 2 * 3600),
     ('combinations', True, [PY, 'combinations.py'], last_line(r'option combinations: \d+ runs, 0 failed.*'), 4 * 3600),
     ('reservoir_checks', True, [PY, 'reservoir_checks.py'], last_line(r'reservoir checks: ALL PASSED'), 3600),
     ('usgs_sagehen', True, lambda: [PY, 'existing/usgs_sagehen.py', USGS], last_line(r'Sagehen checks: ALL PASSED'), 6 * 3600),
