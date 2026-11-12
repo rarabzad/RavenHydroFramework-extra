@@ -1,0 +1,24 @@
+% 06_full_run.tex - the optional 20-year run, and where to go next
+\section{The full run (optional)}
+
+\step{Run the full \V{t1:fullYears} years}\label{st:full}
+Make a second copy of the example. It keeps the full duration of \V{t1:fullDays} days:
+\begin{shell}
+$ cp -r $WS/model/start $WS/work_full
+$ cd $WS/work_full
+$ $RAVEN Liard -o out/
+\end{shell}
+\see the same progress lines as in the one-year run. The run takes about \V{t1:fullmin}~minutes on the computer that made
+this workshop. At the end it prints \cmd{Exiting Gracefully: Successful Simulation}.
+
+\step{Check the full run}
+\term{t1_audit_full.txt}
+\begin{tocheck}
+Over \V{t1:fullYears} years: \V{t1:fullUnconv} unconverged steps and a cumulative MODFLOW residual of \V{t1:fullRes} of
+the gross flow. The streamflow at the gauges 10BE004, 10BE005 and 10BE010 has Nash--Sutcliffe efficiencies of
+\V{t1:fullNSE10BE004}, \V{t1:fullNSE10BE005} and \V{t1:fullNSE10BE010} (in \cmd{out/Diagnostics.csv}; 1 is a perfect fit).
+\end{tocheck}
+
+\section{Where to go next}
+Workshop~2 builds a groundwater model for a Raven model of your own, from the start. The file \cmd{README.md} in
+\cmd{model/start} describes how the Liard example was set up.

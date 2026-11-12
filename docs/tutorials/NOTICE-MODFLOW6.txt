@@ -1,0 +1,20 @@
+MODFLOW 6 - notice for bin/libmf6.so
+====================================
+
+libmf6.so is the MODFLOW 6 library of the U.S. Geological Survey (USGS), version 6.8.1, taken unchanged from the
+official release (mf6.8.1_linux.zip, https://github.com/MODFLOW-ORG/modflow6/releases). Source code and
+documentation: https://github.com/MODFLOW-ORG/modflow6 and https://code.usgs.gov/usgs/modflow/modflow6.
+
+Licence. MODFLOW 6 is a product of the USGS, an agency of the United States Department of the Interior. Its release
+metadata (code.json of the release) gives the licence as "Public Domain, CC0-1.0": it is in the public domain in the
+United States, and the USGS waives copyright and related rights worldwide under the Creative Commons CC0 1.0 Universal
+public domain dedication. Full text: https://code.usgs.gov/usgs/modflow/modflow6/blob/master/LICENSE.md
+
+Disclaimer. As stated by the USGS for its software (https://code.usgs.gov/usgs/modflow/modflow6/blob/master/DISCLAIMER.md):
+the software is provided "as is"; no warranty, expressed or implied, is made by the USGS or the U.S. Government as to
+the functionality of the software and related material, nor shall the fact of release constitute any such warranty,
+and neither the USGS nor the U.S. Government shall be held liable for any damages resulting from its authorized or
+unauthorized use.
+
+MODFLOW is the name of the USGS groundwater model; it is used here to describe the library only. Its use with Raven
+does not imply endorsement by the USGS.

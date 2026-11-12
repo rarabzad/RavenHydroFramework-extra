@@ -1,0 +1,31 @@
+% 07_wetland_reservoir.tex - exchange of the wetland and the reservoir with the aquifer
+\section{Couple the wetland and the reservoir}
+The wetland of Tutorial Creek (HRU~9) stores water in Raven's \cmd{DEPRESSION} store, and CreekLake (HRU~5) is a
+reservoir. Both can exchange water with the aquifer under them.
+\begin{itemize}
+\item \cmd{:SurfaceWaterExchange DEPRESSION WetlandHRUs LEAKANCE 0.01} adds \cmd{SWX\_RAVEN}, a river-type boundary at the
+  cells under the HRU group \cmd{WetlandHRUs}. Its stage is the water level of the depression store, and its conductance
+  is the leakance [1/d] times the area. It never takes more water than the store holds.
+\item \cmd{:ReservoirExchange} couples every reservoir that has \cmd{:SeepageParameters} and a lake HRU (\cmd{:HRUID}) with
+  an aquifer profile. The water table under the lake becomes the reservoir's local groundwater head, and the reservoir's
+  seepage enters the aquifer the next day (\cmd{RES\_RAVEN}). The stages must be absolute elevations
+  (\cmd{:AbsoluteCrestHeight}).
+\end{itemize}
+
+\step{Add the wetland group and the reservoir seepage, and run}\label{st:wetres}
+In \cmd{Creek.rvh}, define the group \cmd{WetlandHRUs} and give the reservoir its seepage parameters (the seepage
+coefficient and the reference head):
+\diff{t4_c_rvh.diff}
+In \cmd{Creek.rvi}, declare the new group:
+\diff{t4_c_rvi.diff}
+In \cmd{Creek.rvg}, add the two commands:
+\diff{t4_c_rvg.diff}
+Run into \cmd{out}:
+\term{t4_run_c.txt}
+\term{t4_summary_c.txt}
+\term{t4_mf6nam_c.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The files are now as in \cmd{\$WS/model/finished}.
+\why all \V{t4:nraven} packages that Raven adds are in the working copy, each marked as added by Raven. The mean flows, in
+m\textsuperscript{3}/d, are: the wetland leaks \V{t4:c:swin} into the aquifer (and receives \V{t4:c:swout}); CreekLake
+sends \V{t4:c:ressent} of seepage, and all of it is delivered (\V{t4:c:resdel}); water-table ET takes \V{t4:c:et}; the
+seepage to Raven is \V{t4:c:seep}.

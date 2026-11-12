@@ -1,2 +1,0 @@
-$ ls $TOOLS
-dev  get_mf6.py  make_handover.py  make_prt.py  package_sources.py  plot_soilzone.py

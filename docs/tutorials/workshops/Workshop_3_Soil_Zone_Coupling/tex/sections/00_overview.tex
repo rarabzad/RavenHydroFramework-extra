@@ -1,0 +1,13 @@
+% 00_overview.tex - what the workshop covers, what you need, how to read it
+\begin{goal}
+\textbf{What you do.} You let the water table of Tutorial Creek rise into Raven's soil (\cmd{:SoilZone PHYSICAL}) and see
+what changes against the default coupling (\cmd{CONCEPTUAL}). Then you add unsaturated columns between the soil and a deep
+water table (\cmd{:SoilZoneVadose RICHARDS}, \cmd{KINEMATIC} and \cmd{LAG}) and depth classes. You learn what to look at in
+\cmd{GWSoilExchange.csv}, \cmd{GWBudget.csv} and the plots of \cmd{plot\_soilzone.py}.
+
+\textbf{What you need.} A Linux computer (x86\_64) with a terminal, or Windows with WSL. Python~3 with numpy, pandas and
+matplotlib (Step~\ref{st:python}). A text editor, for example \cmd{nano}. The model is the finished model of Workshop~2;
+it is included, so you do not need to do Workshop~2 first, but it helps.
+
+\textbf{Time.} About 45 minutes. The longest run takes about \V{t3:secclasses}~seconds.
+\end{goal}

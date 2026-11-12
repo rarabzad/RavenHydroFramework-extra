@@ -1,60 +1,76 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Artistic-2.0
-"""Builds the Raven-MODFLOW 6 tutorials: runs every step of every tutorial with the given Raven (and Ostrich), writes the
-tutorial files (start and finished state of each tutorial), captures the numbers and output excerpts quoted in the text
-into generated LaTeX includes, makes the figures, compiles the PDFs and zips the tutorial files.
+"""Builds the six Raven-MODFLOW 6 student workshops (workshops/Workshop_N_<Name>/, one self-contained folder each): runs
+every step of every workshop with the given Raven (and Ostrich), writes each workshop's model files (start, finished and
+some intermediate states), its helper scripts, the numbers and output excerpts quoted in its text (tex/generated/) and its
+figures (tex/figures/), copies the shared LaTeX preamble into it, compiles its PDF, and writes one zip per workshop with
+the Linux programs in bin/.
 
-    python3 build_tutorials.py [--raven EXE] [--mf6lib LIB] [--package DIR] [--ostrich EXE] [--work DIR]
+    python3 build_tutorials.py [--raven EXE] [--mf6 LIB] [--ostrich EXE] [--raven-src DIR] [--tools DIR] [--work DIR]
                                [--only t1,t2,...] [--quick] [--check] [--no-pdf | --pdf-only]
+    python3 build_tutorials.py --package OUT_DIR --raven EXE --mf6 LIB [--raven-src DIR]
 
-  --raven EXE     Raven with the MODFLOW 6 coupling (default: $RAVEN_EXE, else bin/Raven of --package)
-  --mf6lib LIB    the MODFLOW 6 library (default: $RAVEN_MF6_LIB, else bin/libmf6.so of --package)
-  --tools DIR     the tools folder of RavenHydroFramework-extra used in the steps (make_prt.py, plot_soilzone.py;
-                  default: the tools/ of this repository)
-  --package DIR   the unpacked release package (Raven_MF6_linux: README.md, bin/, examples/, source/); used for the
-                  installation check and the Liard example. Without it, the examples of this repository and Raven's
-                  cmake/RavenMF6InstallCheck.py ($RAVEN_SRC) are used, with Raven and the library copied into one folder
-  --ostrich EXE   an OSTRICH executable for the calibration (tutorial 6). Without it (or with --quick) the calibration is
-                  not rerun: its record (files/t6_calibration/finished/OstOutput0.txt) is read as committed and only the
+  --raven EXE     Raven with the MODFLOW 6 coupling (default: $RAVEN_EXE)
+  --mf6 LIB       the MODFLOW 6 library libmf6.so (default: $RAVEN_MF6_LIB; --mf6lib is the same option)
+  --ostrich EXE   an OSTRICH executable for the calibration (workshop 6). Without it (or with --quick) the calibration is
+                  not rerun: its record (model/finished/OstOutput0.txt of workshop 6) is read as committed and only the
                   validation of the best parameter set is rerun. An executable whose ELF interpreter is missing (as the
                   Linux build of the Raven-Ostrich tutorial files) is started through the system loader
-  --work DIR      scratch folder for the runs (default: _work beside this script; deleted runs can be rebuilt)
-  --only LIST     build only these tutorials (t1..t6); the PDFs are compiled only for a full build
-  --quick         skip the long steps: the 20-year Liard run (tutorial 1) and the DDS calibration (tutorial 6)
-  --check         rerun the steps and compare every generated number, output excerpt and diff (tex/generated/) and every
-                  tutorial file (files/) with the committed ones; nothing is written outside --work. Exit code 1 on any
-                  difference. With --quick, the values of the skipped steps are taken from the committed files
-  --no-pdf        do not compile the PDFs and do not write the zip
-  --pdf-only      only compile the PDFs and write the zip, from the committed includes and figures
+  --raven-src DIR the Raven source checkout (default: $RAVEN_SRC); workshop 1 ships its cmake/RavenMF6InstallCheck.py.
+                  Without it the committed copy in workshop 1's scripts/ is used
+  --tools DIR     the tools folder of RavenHydroFramework-extra (make_prt.py, plot_soilzone.py; default: ../../tools)
+  --work DIR      scratch folder for the runs (default: _work beside this script; it can be deleted after a build)
+  --only LIST     build only these workshops (t1..t6); the PDFs are compiled for the workshops built
+  --quick         skip the long steps: the 20-year Liard run (workshop 1) and the DDS calibration (workshop 6)
+  --check         rerun the steps and compare every generated number, output excerpt and diff (tex/generated/), every
+                  model file, helper script, preamble copy and bin/README.txt with the committed ones, and compile each
+                  workshop's committed tex/ standalone in a copy (no LaTeX warnings, no overfull boxes); nothing is written
+                  outside --work. Exit code 1 on any difference. With --quick, the values of the skipped steps are taken
+                  from the committed files. --no-pdf skips the LaTeX compile
+  --no-pdf        do not compile the PDFs
+  --pdf-only      only compile the PDFs, from the committed sources, numbers and figures
+  --package DIR   write the six zips Workshop_N_<Name>.zip into DIR from the committed workshop folders, each with bin/
+                  filled: the given Raven (as bin/Raven), the given libmf6.so and a bin/README.txt with their versions and
+                  licences. Nothing is run; the zips have fixed timestamps (a rebuild with the same files gives the same
+                  zips). Run --check with the same Raven first: the numbers in the texts belong to that build
 
 Needs Python 3 with numpy, pandas, matplotlib and pyproj; pdflatex for the PDFs; FloPy for the particle tracking of
-tutorial 5 (tools/make_prt.py). Run times quoted in the text are measured on the build machine and are not compared by
+workshop 5 (make_prt.py). Run times quoted in the texts are measured on the build machine and are not compared by
 --check.
 """
-import argparse, datetime, difflib, filecmp, glob, io, json, math, os, re, shutil, struct, subprocess, sys, time, zipfile
+import argparse, calendar, ctypes, datetime, difflib, filecmp, glob, hashlib, io, json, math, os, re, shutil, struct, \
+    subprocess, sys, time, zipfile
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))           # RavenHydroFramework-extra
-FILES = os.path.join(HERE, 'files')                     # the tutorial files (zip root: Raven_MF6_Tutorials/)
-TEX = os.path.join(HERE, 'tex')
-GEN = os.path.join(TEX, 'generated')
-FIG = os.path.join(TEX, 'figures')
-PDF = os.path.join(HERE, 'pdf')
-ZIPFILE = os.path.join(HERE, 'Raven_MF6_Tutorial_Files.zip')
-SCRIPTS = os.path.join(FILES, 'scripts')
+WSROOT = os.path.join(HERE, 'workshops')                # the six workshop folders (committed)
+SCRIPTS = os.path.join(HERE, 'scripts')                 # sources of the helper scripts the workshops ship
+PREAMBLE = os.path.join(HERE, 'preamble.tex')           # source of every workshop's tex/preamble.tex
 TUTS = ['t1', 't2', 't3', 't4', 't5', 't6']
-TDIR = {'t1': 't1_getting_started', 't2': 't2_own_model', 't3': 't3_soil_zone', 't4': 't4_existing_model',
-        't5': 't5_restarts_ensembles_particles', 't6': 't6_calibration'}
+WS = {'t1': 'Workshop_1_Getting_Started', 't2': 'Workshop_2_Own_Groundwater_Model', 't3': 'Workshop_3_Soil_Zone_Coupling',
+      't4': 'Workshop_4_Existing_MODFLOW_Model', 't5': 'Workshop_5_Restarts_Ensembles_Particles',
+      't6': 'Workshop_6_Calibration_With_Ostrich'}
 TITLES = {'t1': 'Getting started', 't2': 'Your own groundwater model', 't3': 'The soil-zone coupling',
           't4': 'Coupling an existing MODFLOW 6 model', 't5': 'Restarts, ensembles and particle tracking',
-          't6': 'Calibration with Ostrich (DDS)'}
+          't6': 'Calibration with OSTRICH (DDS)'}
+# the helper scripts each workshop ships in scripts/ (and where they come from: see install_scripts)
+WS_SCRIPTS = {'t1': ['RavenMF6InstallCheck.py', 'plot_gw.py', 'tools_audit.py'],
+              't2': ['plot_gw.py', 'plot_hydrograph.py', 'tools_audit.py'],
+              't3': ['compare_runs.py', 'plot_soilzone.py', 'plot_vadose.py'],
+              't4': ['plot_gw.py', 'tools_audit.py'],
+              't5': ['compare_runs.py', 'make_prt.py', 'plot_ensemble.py', 'plot_gw.py', 'plot_tracks.py'],
+              't6': []}
+ZIP_DATE = (2026, 11, 1, 0, 0, 0)                       # the date of every file in the zips
+PDF_EPOCH = str(calendar.timegm(ZIP_DATE[:3] + (0, 0, 0, 0, 0, 0)))   # the date of the PDFs (SOURCE_DATE_EPOCH)
 
-# what the user sees: the package and the tutorial files unpacked in the home folder of a user "user"
+# what the student sees: the workshop unpacked in the home folder of a user "user", worked on in its work/ folder
 U_HOME = '/home/user'
-U_PKG = U_HOME + '/Raven_MF6_linux'
-U_TUT = U_HOME + '/Raven_MF6_Tutorials'
-U_WORK = U_HOME + '/work'
+
+
+def u_ws(t=None):
+    """the workshop folder as the student sees it ($WS)"""
+    return U_HOME + '/' + WS[t or C.cur]
 
 
 # ======================================================================================================================
@@ -72,7 +88,7 @@ def log(msg):
 
 
 class Gen:
-    """generated values (LaTeX macros) and texts (output excerpts, diffs) of all tutorials"""
+    """generated values (LaTeX macros) and texts (output excerpts, diffs) of all workshops"""
 
     def __init__(self):
         self.values, self.volatile, self.texts = {}, set(), {}
@@ -86,15 +102,36 @@ class Gen:
         s = s.rstrip('\n') + '\n'
         self.texts[name] = s
 
-    def write(self, d):
+    def write(self, t, d):
+        """the values and texts of workshop t into its tex/generated folder d: of the values, those its text uses"""
         os.makedirs(d, exist_ok=True)
+        used = used_keys(t)
+        missing = sorted(k for k in used if k not in self.values)
+        if missing:
+            raise RuntimeError('%s uses values that were not generated: %s' % (WS[t], ', '.join(missing)))
         with open(os.path.join(d, 'values.tex'), 'w') as f:
-            f.write('% generated by build_tutorials.py: every number quoted in the tutorials\n')
-            for k in sorted(self.values):
+            f.write('% generated by build_tutorials.py: every number quoted in this workshop\n')
+            for k in sorted(used):
                 f.write('\\defval{%s}{%s}%s\n' % (k, self.values[k], '  % measured on the build machine' if k in self.volatile else ''))
         for n, s in self.texts.items():
-            with open(os.path.join(d, n), 'w') as f:
-                f.write(s)
+            if n.startswith(t + '_'):
+                with open(os.path.join(d, n), 'w') as f:
+                    f.write(s)
+
+
+def tex_sources(t, root=None):
+    """the LaTeX sources of workshop t (main.tex and its sections) in the committed tree"""
+    d = os.path.join(root or WSROOT, WS[t], 'tex')
+    return [os.path.join(d, 'main.tex')] + sorted(glob.glob(os.path.join(d, 'sections', '*.tex')))
+
+
+def used_keys(t):
+    """the generated values (\\V{key}) the text of workshop t uses"""
+    keys = set()
+    for p in tex_sources(t):
+        if os.path.exists(p):
+            keys |= set(re.findall(r'\\V\{([^}]*)\}', open(p).read()))
+    return keys
 
 
 G = Gen()
@@ -126,21 +163,18 @@ def sig(x, n=3):
 
 
 def sanitize(s, cwd=None, ucwd=None):
-    """build paths -> the paths a user of the tutorial sees"""
+    """build paths -> the paths a student of the workshop sees"""
     rep = []
     if cwd and ucwd:
         rep.append((os.path.abspath(cwd), ucwd))
-    rep += [(C.work, U_WORK), (C.pkgdir or '\0', U_PKG), (os.path.dirname(C.mf6lib), U_PKG + '/bin'),
-            (os.path.dirname(C.raven), U_PKG + '/bin'), (C.tools, U_PKG + '/raven-mf6-extra/tools'), (FILES, U_TUT)]
+    rep += [(runws(C.cur), u_ws()), (C.work, U_HOME + '/scratch')]
     for a, b in rep:
-        if a and a != '\0':
-            s = s.replace(a, b)
-    s = s.replace(os.path.basename(C.raven), 'Raven') if os.path.basename(C.raven) != 'Raven' else s
+        s = s.replace(a, b)
     return s
 
 
 def run(argv, cwd, display=None, name=None, keep=None, ucwd=None, timeout=7200, check=True, env=None):
-    """runs a command as a tutorial step; name: write '$ display' and the (abridged, sanitized) output to generated/name"""
+    """runs a command as a workshop step; name: write '$ display' and the (abridged, sanitized) output to generated/name"""
     t0 = time.time()
     r = subprocess.run(argv, cwd=cwd, env=env or C.env, capture_output=True, text=True, timeout=timeout)
     dt = time.time() - t0
@@ -155,7 +189,7 @@ def run(argv, cwd, display=None, name=None, keep=None, ucwd=None, timeout=7200, 
 
 
 def sh(cmd, cwd, name, ucwd=None, keep=None):
-    """runs a shell command exactly as the tutorial shows it (bash, with $RAVEN, $TUT, $PKG, $TOOLS set)"""
+    """runs a shell command exactly as the workshop shows it (bash, with $RAVEN and $WS set)"""
     return run(['bash', '-c', cmd], cwd, cmd, name, keep, ucwd)
 
 
@@ -201,7 +235,7 @@ def excerpt(text, patterns=None, first=None, last=None, drop=None):
 
 
 def udiff(a_text, b_text, a_name, b_name, n=1):
-    """exact unified diff (the tutorials show every edit this way)"""
+    """exact unified diff (the workshops show every edit this way)"""
     d = difflib.unified_diff(a_text.splitlines(True), b_text.splitlines(True), a_name, b_name, n=n)
     return ''.join(x if x.endswith('\n') else x + '\n' for x in d)
 
@@ -258,7 +292,7 @@ RIDGE = YC + 2200.0           # bare-rock ridge of subbasin 1 (no aquifer)
 LAKE_BED = 4.0                # the lake basin lies 4 m below the valley floor
 START = datetime.date(2010, 1, 1)
 NDAYS = (datetime.date(2015, 1, 1) - START).days      # forcing 2010-2014
-DUR3 = (datetime.date(2013, 1, 1) - START).days       # the tutorials' runs: 2010-2012
+DUR3 = (datetime.date(2013, 1, 1) - START).days       # the workshops' runs: 2010-2012
 _TR = None
 
 
@@ -542,7 +576,7 @@ RVP = """# Creek.rvp - Tutorial Creek: parameters
 :EndChannelProfile
 """
 
-# the groundwater part of the .rvp (tutorial 2); the "true" parameters of the calibration (tutorial 6)
+# the groundwater part of the .rvp (workshop 2); the "true" parameters of the calibration (workshop 6)
 TRUE = {'K_GRAVEL': 40.0, 'K_TILL': 2.0, 'SY_GRAVEL': 0.20, 'PERC_SUBSOIL': 0.04, 'K_SAND': 8.0, 'SY_TILL': 0.08}
 RVP_GW = """
 # --- groundwater (Raven-MODFLOW 6) ---------------------------------------------
@@ -684,7 +718,7 @@ def write_creek_start(d, ascii_too=False):
 
 
 def write_creek_coupled(d, ascii_too=False):
-    """the finished model of tutorial 2"""
+    """the finished model of workshop 2"""
     write_creek_start(d, ascii_too)
     wfile(os.path.join(d, 'Creek.rvi'), rvi_coupled())
     wfile(os.path.join(d, 'Creek.rvp'), rvp_text())
@@ -806,14 +840,122 @@ def write_existing_model(d):
 # ======================================================================================================================
 # shared steps
 # ======================================================================================================================
+def wsdir(t, *p):
+    """path in the workshop folder being written (in --check mode a copy in the work folder, compared at the end)"""
+    return os.path.join(C.root, WS[t], *p)
+
+
+def runws(t, *p):
+    """the workshop folder the steps run in: as the student has it (bin/, scripts/, work/), in the work folder"""
+    return os.path.join(C.work, WS[t], *p)
+
+
 def tutfiles(t, *p):
-    """path in the tutorial files (in --check mode a copy in the work folder, compared at the end)"""
-    return os.path.join(C.files, TDIR[t], *p)
+    """path in the model files of workshop t (model/start, model/finished, ...)"""
+    return wsdir(t, 'model', *p)
 
 
 def figpath(name):
-    os.makedirs(C.fig, exist_ok=True)
-    return os.path.join(C.fig, name)
+    d = wsdir(name[:2], 'tex', 'figures')
+    os.makedirs(d, exist_ok=True)
+    return os.path.join(d, name)
+
+
+def script_source(name):
+    """where the helper script a workshop ships comes from"""
+    if name == 'RavenMF6InstallCheck.py':
+        if C.ravensrc:
+            return os.path.join(C.ravensrc, 'cmake', name)
+        return os.path.join(WSROOT, WS['t1'], 'scripts', name)      # the committed copy
+    if name == 'tools_audit.py':
+        return os.path.join(REPO, 'examples', 'Liard_groundwater', name)
+    if name in ('make_prt.py', 'plot_soilzone.py'):
+        return os.path.join(C.tools, name)
+    return os.path.join(SCRIPTS, name)
+
+
+BIN_README_T = """bin/ - the programs of this workshop
+====================================
+
+Raven                 Raven with the MODFLOW 6 groundwater coupling, for Linux (x86_64).
+libmf6.so             The MODFLOW 6 library, for Linux (x86_64). Raven loads it from this folder:
+                      keep the two files together.
+LICENSE-Raven.txt     the licence of Raven (Artistic License 2.0, full text)
+NOTICE-MODFLOW6.txt   the licence and disclaimer of MODFLOW 6 (public domain, U.S. Geological Survey)
+%s
+Which Linux: x86_64 with glibc 2.34 or newer, for example Ubuntu 22.04 or newer, Debian 12 or newer, RHEL/Rocky 9
+or newer, Fedora 35 or newer, and the Ubuntu of the Windows Subsystem for Linux (WSL). The limit is set by libmf6.so
+(the official MODFLOW 6 build needs glibc 2.34); Raven itself needs glibc 2.28 and contains its own C++ runtime. On
+Windows, run the programs in WSL: see the README.txt of this workshop. They do not run on macOS.
+
+If Raven does not start
+-----------------------
+- "Permission denied": make it executable with   chmod +x bin/Raven
+- A message with "version `GLIBC_2.34' not found" (for example after "cannot load MODFLOW 6 library"): your Linux
+  is older than the programs need (glibc 2.34). Check yours with   ldd --version   Use a newer Linux; on Windows install a current Ubuntu in WSL:
+      wsl --install -d Ubuntu-24.04
+- "cannot load MODFLOW 6 library": libmf6.so is not in the same folder as Raven.
+
+Licences
+--------
+Raven: Copyright 2008-2026 the Raven Development Team; the groundwater coupling Copyright 2026 Rezgar
+Arabzadeh. Licensed under the Artistic License 2.0: full text in LICENSE-Raven.txt (a copy of the LICENSE file of
+the Raven source code). This Raven is a modified version of Raven: its source code, with the changes documented, is
+in the RavenHydroFramework repository (https://github.com/rarabzad/RavenHydroFramework, branch mf6-coupling) and its
+documentation in RavenHydroFramework-extra (https://github.com/rarabzad/RavenHydroFramework-extra). It was compiled
+with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig/clang, libc++ linked statically).
+
+MODFLOW 6: software of the U.S. Geological Survey, in the public domain (licence "Public Domain, CC0-1.0"); see
+NOTICE-MODFLOW6.txt. libmf6.so is the unchanged library of the official release.
+
+Raven and MODFLOW are the names of their projects; they are used here to describe the programs only.
+"""
+
+
+def bin_readme(versions=None):
+    """bin/README.txt: committed without versions (bin/ is filled when the zips are made), in the zips with them"""
+    if versions is None:
+        v = ('\nThe programs and the two licence files are not kept in the source repository: they are put here when the\n'
+             'workshop zips are made (build_tutorials.py --package), and this file then lists the versions.\n')
+    else:
+        v = '\nVersions in this zip:\n' + ''.join('  %-10s %s\n' % (k, x) for k, x in versions) + ''
+    return BIN_README_T % v
+
+
+def install_ws_files(t):
+    """the parts of workshop t that are copies: tex/preamble.tex, scripts/, bin/README.txt"""
+    wfile(wsdir(t, 'tex', 'preamble.tex'), open(PREAMBLE).read())
+    d = wsdir(t, 'scripts')
+    if WS_SCRIPTS[t]:
+        srcs = {n: open(script_source(n), 'rb').read() for n in WS_SCRIPTS[t]}   # read first: a source may be the committed copy
+        if os.path.exists(d):
+            shutil.rmtree(d)
+        os.makedirs(d)
+        for n, b in srcs.items():
+            with open(os.path.join(d, n), 'wb') as f:
+                f.write(b)
+            os.chmod(os.path.join(d, n), 0o755)
+    wfile(wsdir(t, 'bin', 'README.txt'), bin_readme())
+
+
+def begin_ws(t):
+    """starts workshop t: its copied files, and the folder the steps run in (bin/ with Raven and the library, scripts/)"""
+    C.cur = t
+    install_ws_files(t)
+    r = fresh(runws(t))
+    os.makedirs(os.path.join(r, 'bin'))
+    for f in ('Raven', 'libmf6.so'):
+        try:
+            os.link(os.path.join(C.binmaster, f), os.path.join(r, 'bin', f))
+        except OSError:
+            shutil.copy2(os.path.join(C.binmaster, f), os.path.join(r, 'bin', f))
+    if os.path.exists(wsdir(t, 'scripts')):
+        shutil.copytree(wsdir(t, 'scripts'), os.path.join(r, 'scripts'))
+    C.raven = os.path.join(r, 'bin', 'Raven')
+    C.mf6run = os.path.join(r, 'bin', 'libmf6.so')
+    C.env['RAVEN'] = C.raven
+    C.env['WS'] = r
+    return r
 
 
 def plt_():
@@ -841,9 +983,9 @@ def summary_excerpt(out, patterns, ucwd):
 
 
 def plot_gw(t, out, ucwd, name, title, figs=('gw_budget', 'gw_watertable', 'gw_map', 'gw_obswells'), hrus=None, rel='out'):
-    disp = 'python3 $TUT/scripts/plot_gw.py %s' % rel + (' --hrus ' + ' '.join(map(str, hrus)) if hrus else '') + \
+    disp = 'python3 $WS/scripts/plot_gw.py %s' % rel + (' --hrus ' + ' '.join(map(str, hrus)) if hrus else '') + \
            (' --title "%s"' % title if title else '')
-    argv = [sys.executable, os.path.join(SCRIPTS, 'plot_gw.py'), out] + (['--hrus'] + [str(h) for h in hrus] if hrus else []) + \
+    argv = [sys.executable, runws(t, 'scripts', 'plot_gw.py'), out] + (['--hrus'] + [str(h) for h in hrus] if hrus else []) + \
            (['--title', title] if title else [])
     o, _ = run(argv, os.path.dirname(out), disp, name, ucwd=ucwd)
     for f in figs:
@@ -854,8 +996,8 @@ def plot_gw(t, out, ucwd, name, title, figs=('gw_budget', 'gw_watertable', 'gw_m
 
 
 def audit(t, out, name, ucwd, rel='out'):
-    tool = os.path.join(C.examples, 'Liard_groundwater', 'tools_audit.py')
-    o, _ = run([sys.executable, tool, out], os.path.dirname(out), 'python3 $PKG/examples/Liard_groundwater/tools_audit.py %s' % rel,
+    tool = runws(t, 'scripts', 'tools_audit.py')
+    o, _ = run([sys.executable, tool, out], os.path.dirname(out), 'python3 $WS/scripts/tools_audit.py %s' % rel,
                name, ucwd=ucwd)
     return o
 
@@ -929,10 +1071,10 @@ def basin_map(path, out=None, title='Tutorial Creek', show_grid=True, extra=None
 
 
 # ======================================================================================================================
-# tutorial 6: calibration with Ostrich (DDS), a synthetic-truth experiment
+# workshop 6: calibration with Ostrich (DDS), a synthetic-truth experiment
 # ======================================================================================================================
-# the first attempt (tutorial 6, section "A first attempt"): four parameters, the gravel's among them; its record is
-# committed in files/t6_calibration/finished/first_attempt/ (made with this set-up and FA_MAXITER runs)
+# the first attempt (workshop 6, section "A first attempt"): four parameters, the gravel's among them; its record is
+# committed in model/finished/first_attempt/ of workshop 6 (made with this set-up and FA_MAXITER runs)
 FA_INIT = {'K_GRAVEL': 10.0, 'SY_GRAVEL': 0.10, 'K_TILL': 0.5, 'PERC_SUBSOIL': 0.02}
 FA_PARS = [  # Ostrich name, key, initial, low, high, transformation
     ('par_K_gravel', 'K_GRAVEL', 10.0, 1.0, 200.0, 'log10'),
@@ -940,8 +1082,8 @@ FA_PARS = [  # Ostrich name, key, initial, low, high, transformation
     ('par_K_till', 'K_TILL', 0.5, 0.05, 10.0, 'log10'),
     ('par_perc', 'PERC_SUBSOIL', 0.02, 0.005, 0.10, 'none')]
 FA_MAXITER = 1000
-# the calibration of the tutorial: the two conductivities the heads see, each in its own way (the sensitivity table); the
-# other parameters keep the values of tutorial 2
+# the calibration of the workshop: the two conductivities the heads see, each in its own way (the sensitivity table); the
+# other parameters keep the values of workshop 2
 INIT = {'K_SAND': 2.0, 'K_TILL': 0.5}
 PARS = [
     ('par_K_sand', 'K_SAND', 2.0, 0.5, 50.0, 'log10'),
@@ -1139,9 +1281,10 @@ def ostrich_argv():
 
 def tut6():
     t = 't6'
+    begin_ws(t)
     log('t6: files')
     start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
-    # the "truth": tutorial 2's model, run for 2010-2014
+    # the "truth": workshop 2's model, run for 2010-2014
     truth = fresh(os.path.join(C.work, 't6_truth'))
     write_creek_coupled(truth)
     edit(os.path.join(truth, 'Creek.rvi'), ':Duration           %d' % DUR3, ':Duration           %d' % DUR5)
@@ -1161,7 +1304,7 @@ def tut6():
     for f in ('Ost-RAVEN.sh', 'save_best.sh'):
         os.chmod(os.path.join(start, f), 0o755)
     G.text('t6_obs_head.txt', '$ head -n 7 model/CreekObs.rvt\n' + ''.join(open(os.path.join(start, 'model', 'CreekObs.rvt')).readlines()[:7]))
-    G.text('t6_rvt.diff', udiff(RVT + ':RedirectToFile CreekGW.rvt\n', open(os.path.join(start, 'model', 'Creek.rvt')).read(), 'Creek.rvt (tutorial 2)', 'model/Creek.rvt', 1))
+    G.text('t6_rvt.diff', udiff(RVT + ':RedirectToFile CreekGW.rvt\n', open(os.path.join(start, 'model', 'Creek.rvt')).read(), 'Creek.rvt (workshop 2)', 'model/Creek.rvt', 1))
     G.text('t6_tpl.diff', udiff(open(os.path.join(start, 'model', 'Creek.rvp')).read(), tpl, 'model/Creek.rvp', 'Creek.rvp.tpl', 0))
     G.val('t6:maxiter', '%d' % MAXITER)
     G.val('t6:headw', '%g' % HEAD_W)
@@ -1171,8 +1314,8 @@ def tut6():
     G.val('t6:noiseh', '%d' % round(100 * NOISE_H))
 
     # step 1: the initial parameter set, run by hand
-    w = copytree(start, os.path.join(C.work, 't6'))
-    uw = U_WORK + '/t6'
+    w = copytree(start, runws(t, 'work'))
+    uw = u_ws() + '/work'
     ex, dt, _ = raven(os.path.join(w, 'model'), 'output', 't6_run_init.txt', ucwd=uw + '/model')
     G.val('t6:runsec', '%d' % max(1, round(dt)), volatile=True)
     G.text('t6_diag_init.txt', '$ cat output/Diagnostics.csv\n' + open(os.path.join(w, 'model', 'output', 'Diagnostics.csv')).read())
@@ -1244,7 +1387,7 @@ def tut6():
     # attempt (four parameters, FA_MAXITER runs; section "A first attempt") is always the committed one.
     RECORD = ('OstOutput0.txt', 'OstModel0.txt', 'best/Creek.rvp', 'best/Diagnostics.csv')
     FA_RECORD = ('first_attempt/OstOutput0.txt', 'first_attempt/OstModel0.txt')
-    committed = os.path.join(FILES, TDIR[t], 'finished')
+    committed = os.path.join(WSROOT, WS[t], 'model', 'finished')
     saved = {}
     for f in FA_RECORD:
         pth = os.path.join(committed, f)
@@ -1264,9 +1407,8 @@ def tut6():
             if not os.path.exists(pth):
                 raise RuntimeError('t6: no committed record of the calibration (%s): run with --ostrich, without --quick' % pth)
             saved[f] = open(pth).read()
-        m = re.search(r'\\defval\{t6:ddsmin\}\{(\d+)\}', open(os.path.join(GEN, 'values.tex')).read()) \
-            if os.path.exists(os.path.join(GEN, 'values.tex')) else None
-        G.val('t6:ddsmin', m.group(1) if m else '?', volatile=True)
+        m = committed_values('t6:ddsmin').get('t6:ddsmin')
+        G.val('t6:ddsmin', m[0] if m else '?', volatile=True)
     if os.path.exists(fin):
         shutil.rmtree(fin)
     copytree(start, fin)
@@ -1289,7 +1431,7 @@ def tut6():
         G.val('t6:fa:best' + p[1], sig(fbest[p[0]]))
         G.val('t6:fa:err' + p[1], fmt(100.0 * (fbest[p[0]] / TRUE[p[1]] - 1.0), 0, sign=True))
     fo = ostin(FA_PARS, FA_MAXITER, FA_DDS_R, FA_WEIGHTS)
-    G.text('t6_fa_params.txt', '$ grep -A%d BeginParams first_attempt/ostIn.txt\n' % (len(FA_PARS) + 2) +
+    G.text('t6_fa_params.txt', '$ grep -A%d BeginParams $WS/model/finished/first_attempt/ostIn.txt\n' % (len(FA_PARS) + 2) +
            fo[fo.index('BeginParams'):fo.index('EndParams') + len('EndParams')])
     hdr, data, best, ostout = read_ostrich(fin)
     G.val('t6:ostver', re.search(r'OSTRICH version ([0-9.]+)', ostout).group(1))
@@ -1342,7 +1484,7 @@ def tut6():
     rvi = open(os.path.join(vfin, 'Creek.rvi')).read()
     rvi2 = rvi.replace(':Duration           %d' % DUR3, ':Duration           %d' % DUR5).replace(':EvaluationMetrics', EVAL + ':EvaluationMetrics')
     wfile(os.path.join(vfin, 'Creek.rvi'), rvi2)
-    G.text('t6_valid_rvi.diff', udiff(rvi, rvi2, 'model/Creek.rvi', 'validation/Creek.rvi', 1))
+    G.text('t6_valid_rvi.diff', udiff(rvi, rvi2, 'Creek.rvi', 'Creek.rvi', 1))
     v = copytree(vfin, os.path.join(C.work, 't6_validation'))
     raven(v, 'output', 't6_run_valid.txt', ucwd=uw + '/validation')
     G.text('t6_diag_valid.txt', '$ cat output/Diagnostics.csv\n' + open(os.path.join(v, 'output', 'Diagnostics.csv')).read())
@@ -1403,7 +1545,7 @@ def tut6():
 
 
 # ======================================================================================================================
-# tutorial 3: the soil-zone coupling
+# workshop 3: the soil-zone coupling
 # ======================================================================================================================
 SOIL_OLD = """  :Parameters, POROSITY, FIELD_CAPACITY, SAT_WILT, HBV_BETA, MAX_PERC_RATE, PERC_COEFF, BASEFLOW_COEFF
   :Units,      none,     none,           none,     none,     mm/d,          1/d,        1/d
@@ -1434,7 +1576,7 @@ T3_RUNS = [('out_conceptual', 'CONCEPTUAL'), ('out_physical', 'PHYSICAL'), ('out
 
 
 def t3_metrics(out):
-    sys.path.insert(0, SCRIPTS)
+    sys.path.insert(0, runws('t3', 'scripts'))
     import compare_runs
     return compare_runs.metrics(out, [6, 7])
 
@@ -1451,10 +1593,10 @@ def lag_days(b):
 
 def tut3():
     t = 't3'
+    begin_ws(t)
     start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
-    for d in (start, fin):
-        if os.path.exists(d):
-            shutil.rmtree(d)
+    if os.path.exists(tutfiles(t)):
+        shutil.rmtree(tutfiles(t))
     write_creek_coupled(start)
     write_creek_coupled(fin)
     rvp0 = open(os.path.join(start, 'Creek.rvp')).read()
@@ -1473,6 +1615,11 @@ def tut3():
     rvg3 = rvg2 + CL
     wfile(os.path.join(fin, 'Creek.rvp'), rvp2)
     wfile(os.path.join(fin, 'Creek.rvg'), rvg3)
+    # the states after the steps that run PHYSICAL (step 6) and RICHARDS (step 10) of the text
+    for name, rvp, rvg in (('step_06', rvp1, rvg1), ('step_10', rvp2, rvg2)):
+        copytree(start, tutfiles(t, name))
+        wfile(tutfiles(t, name, 'Creek.rvp'), rvp)
+        wfile(tutfiles(t, name, 'Creek.rvg'), rvg)
     G.text('t3_soil.diff', udiff(rvp0, rvp1, 'Creek.rvp', 'Creek.rvp', 0))
     G.text('t3_physical.diff', udiff(rvg0, rvg1, 'Creek.rvg', 'Creek.rvg', 0))
     G.text('t3_aquifer.diff', udiff(rvp1, rvp2, 'Creek.rvp', 'Creek.rvp', 0))
@@ -1480,10 +1627,10 @@ def tut3():
     G.text('t3_kinematic.diff', udiff(rvg2, rvg_k, 'Creek.rvg', 'Creek.rvg', 0))
     G.text('t3_lag.diff', udiff(rvg_k, rvg_l, 'Creek.rvg', 'Creek.rvg', 0))
     G.text('t3_classes.diff', udiff(rvg_l, rvg3, 'Creek.rvg', 'Creek.rvg', 0))
-    w = copytree(start, os.path.join(C.work, 't3'))
-    uw = U_WORK + '/t3'
+    w = copytree(start, runws(t, 'work'))
+    uw = u_ws() + '/work'
     secs = {}
-    # the runs, in the order of the tutorial
+    # the runs, in the order of the text
     for out, rvp, rvg, name in (('out_conceptual', rvp0, rvg0, 't3_run_conceptual.txt'), ('out_physical', rvp1, rvg1, 't3_run_physical.txt'),
                                 ('out_richards', rvp2, rvg2, 't3_run_richards.txt'), ('out_kinematic', rvp2, rvg_k, None),
                                 ('out_lag', rvp2, rvg_l, None), ('out_classes', rvp2, rvg3, None)):
@@ -1507,16 +1654,16 @@ def tut3():
     G.val('t3:sylinks', m.group(1) if m else '?')
     G.val('t3:syratio', fmt(float(m.group(2)), 2) if m else '?')
     s = summary_text(os.path.join(w, 'out_physical'))
-    G.text('t3_summary.txt', '$ grep -A6 "soil zone  " out_physical/GWModelSummary.txt\n' +
+    G.text('t3_summary.txt', '$ grep -A6 "soil zone *:" out_physical/GWModelSummary.txt\n' +
            excerpt(s, [r'^\s+soil zone\s+:', r'^\s+soil-zone thickness', r'^\s+soil-zone links', r'^\s+interface iteration', r'^\s+soil-zone columns']))
     s2 = summary_text(os.path.join(w, 'out_richards'))
     G.text('t3_summary_rich.txt', '$ grep -i "unsaturated" out_richards/GWModelSummary.txt\n' +
            excerpt(s2, [r'(?i)unsaturated'], drop=r'computed in'))
     G.text('t3_soilex_head.txt', '$ head -n 3 out_physical/GWSoilExchange.csv | cut -d, -f1-9\n' +
            '\n'.join(','.join(l.rstrip('\n').split(',')[:9]) for l in open(os.path.join(w, 'out_physical', 'GWSoilExchange.csv')).readlines()[:3]))
-    # the comparison, with the tutorial's script
-    disp = 'python3 $TUT/scripts/compare_runs.py ' + ' '.join(o for o, _ in T3_RUNS) + ' --hrus 7 6'
-    run([sys.executable, os.path.join(SCRIPTS, 'compare_runs.py')] + [o for o, _ in T3_RUNS] + ['--hrus', '7', '6',
+    # the comparison, with the workshop's script
+    disp = 'python3 $WS/scripts/compare_runs.py ' + ' '.join(o for o, _ in T3_RUNS) + ' --hrus 7 6'
+    run([sys.executable, runws(t, 'scripts', 'compare_runs.py')] + [o for o, _ in T3_RUNS] + ['--hrus', '7', '6',
         '--png', 'compare_runs.png'], w, disp, 't3_compare.txt', ucwd=uw)
     shutil.copy(os.path.join(w, 'compare_runs.png'), figpath('t3_compare.png'))
     M = {o: t3_metrics(os.path.join(w, o)) for o, _ in T3_RUNS}
@@ -1546,22 +1693,14 @@ def tut3():
     G.val('t3:F6mean', fmt(s6['saturated fraction [-]'].mean(), 2)); G.val('t3:F6max', fmt(s6['saturated fraction [-]'].max(), 2))
     G.val('t3:F6min', fmt(s6['saturated fraction [-]'].min(), 2))
     # the package's plotting tool
-    tool = os.path.join(C.tools, 'plot_soilzone.py')
+    tool = runws(t, 'scripts', 'plot_soilzone.py')
     run([sys.executable, tool, 'out_physical', '6', '1', '--png', 'soilzone.png'], w,
-        'python3 $TOOLS/plot_soilzone.py out_physical 6 1 --png soilzone.png', 't3_plot_soilzone.txt', ucwd=uw)
+        'python3 $WS/scripts/plot_soilzone.py out_physical 6 1 --png soilzone.png', 't3_plot_soilzone.txt', ucwd=uw)
     shutil.copy(os.path.join(w, 'soilzone.png'), figpath('t3_soilzone.png'))
-    # the unsaturated columns: what goes in and what reaches the water table
-    plt = plt_()
-    fig, ax = plt.subplots(2, 1, figsize=(8.6, 5.4), sharex=True)
-    for o, lab, c in (('out_richards', 'RICHARDS', '#1f4e79'), ('out_kinematic', 'KINEMATIC', '#2e8b57'), ('out_lag', 'LAG', '#d08a2b')):
-        b = budget(os.path.join(w, o))
-        if o == 'out_richards':
-            ax[0].plot(b['date'], b['unsaturated zone inflow [m3]'].rolling(30, min_periods=1).mean() / 1000.0, color='0.5', lw=1.0, label='into the columns')
-        ax[0].plot(b['date'], b['unsaturated zone to aquifer [m3]'].rolling(30, min_periods=1).mean() / 1000.0, color=c, lw=1.0, label='to the water table, ' + lab)
-        ax[1].plot(b['date'], b['unsaturated zone storage [m3]'] / 1e6, color=c, lw=1.2, label=lab)
-    ax[0].set_ylabel('1000 m$^3$/d'); ax[0].set_title('unsaturated columns: inflow and outflow to the aquifer, 30-day means'); ax[0].legend(fontsize=7)
-    ax[1].set_ylabel('million m$^3$'); ax[1].set_title('water stored in the unsaturated columns'); ax[1].legend(fontsize=7)
-    fig.tight_layout(); fig.savefig(figpath('t3_vadose.png'), dpi=150); plt.close(fig)
+    # the unsaturated columns: what goes in and what reaches the water table (the workshop's script)
+    run([sys.executable, runws(t, 'scripts', 'plot_vadose.py'), 'out_richards', 'out_kinematic', 'out_lag'], w,
+        'python3 $WS/scripts/plot_vadose.py out_richards out_kinematic out_lag', 't3_plot_vadose.txt', ucwd=uw)
+    shutil.copy(os.path.join(w, 'vadose.png'), figpath('t3_vadose.png'))
     for o, _ in T3_RUNS:
         if o != 'out_physical':
             shutil.rmtree(os.path.join(w, o, 'mf6'), ignore_errors=True)
@@ -1569,7 +1708,7 @@ def tut3():
 
 
 # ======================================================================================================================
-# tutorial 4: coupling an existing MODFLOW 6 model
+# workshop 4: coupling an existing MODFLOW 6 model
 # ======================================================================================================================
 RVG_EXT = """# Creek.rvg - Raven coupled to an existing MODFLOW 6 model of Tutorial Creek
 :InputCRS          EPSG:32611                  # hrus.geojson is in UTM zone 11N
@@ -1613,10 +1752,10 @@ RVP_EXT_ET = """
 
 def tut4():
     t = 't4'
+    begin_ws(t)
     start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
-    for d in (start, fin):
-        if os.path.exists(d):
-            shutil.rmtree(d)
+    if os.path.exists(tutfiles(t)):
+        shutil.rmtree(tutfiles(t))
     os.makedirs(start)
     write_geometry(start)
     for f in ('rivers.geojson', 'outlet.geojson', 'pond.geojson'):
@@ -1639,8 +1778,8 @@ def tut4():
     # stage A: couple
     A = {'Creek.rvh': rvh_text(AQ_OF, group=True), 'Creek.rvi': rvi_coupled(), 'Creek.rvp': rvp_text(gw=False) + RVP_EXT,
          'Creek.rvg': RVG_EXT}
-    w = copytree(start, os.path.join(C.work, 't4'))
-    uw = U_WORK + '/t4'
+    w = copytree(start, runws(t, 'work'))
+    uw = u_ws() + '/work'
     for f, txt in A.items():
         if f != 'Creek.rvg':
             G.text('t4_a_%s.diff' % f.split('.')[1], udiff(open(os.path.join(start, f)).read(), txt, f + ' (start)', f, 1))
@@ -1708,6 +1847,11 @@ def tut4():
     copytree(start, fin)
     for f, txt in (('Creek.rvh', rvhC), ('Creek.rvi', rviC), ('Creek.rvp', rvpB), ('Creek.rvg', rvgC)):
         wfile(os.path.join(fin, f), txt)
+    # the states of the steps that run the coupled model (step 7 of the text) and add water-table ET (step 10)
+    for name, files in (('step_07', A), ('step_10', dict(A, **{'Creek.rvp': rvpB}))):
+        copytree(start, tutfiles(t, name))
+        for f, txt in files.items():
+            wfile(tutfiles(t, name, f), txt)
     plot_gw(t, out, uw, 't4_plot.txt', 'existing model')
     for d in ('out_coupled', 'out_et'):
         shutil.rmtree(os.path.join(w, d, 'mf6'), ignore_errors=True)
@@ -1715,7 +1859,7 @@ def tut4():
 
 
 # ======================================================================================================================
-# tutorial 5: restarts, ensembles and particle tracking
+# workshop 5: restarts, ensembles and particle tracking
 # ======================================================================================================================
 RVE = """# Creek.rve - a Monte Carlo ensemble: PERC_COEFF of SUBSOIL (how fast the subsoil feeds the aquifer) drawn per member
 :OutputDirectoryFormat ./out_ens/ens_*/
@@ -1729,16 +1873,16 @@ NENS = 5
 
 def tut5():
     t = 't5'
+    begin_ws(t)
     start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
-    for d in (start, fin):
-        if os.path.exists(d):
-            shutil.rmtree(d)
+    if os.path.exists(tutfiles(t)):
+        shutil.rmtree(tutfiles(t))
     write_creek_coupled(start)
-    w = copytree(start, os.path.join(C.work, 't5'))
-    p2 = os.path.join(C.work, 't5_part2')
+    w = copytree(start, runws(t, 'work'))
+    p2 = runws(t, 'work_part2')
     if os.path.exists(p2):
         shutil.rmtree(p2)
-    uw, up2 = U_WORK + '/t5', U_WORK + '/t5_part2'
+    uw, up2 = u_ws() + '/work', u_ws() + '/work_part2'
     # A. a continuous run, and the same run in two parts
     raven(w, 'out', 't5_run_full.txt', ucwd=uw)
     rvi0 = open(os.path.join(w, 'Creek.rvi')).read()
@@ -1767,13 +1911,14 @@ def tut5():
                        keep=lambda o: keep_raven(o).replace('...\n', '...\n' + '\n'.join(l for l in o.split('\n') if 'hotstart' in l.lower()) + '\n', 1))
     err = open(os.path.join(p2, 'out', 'Raven_errors.txt')).read()
     G.text('t5_part2_advisory.txt', '$ grep hotstart out/Raven_errors.txt\n' + ''.join(l for l in err.splitlines(True) if 'hotstart' in l))
-    run([sys.executable, os.path.join(SCRIPTS, 'compare_runs.py'), '--diff', os.path.join(w, 'out'), os.path.join(p2, 'out')], p2,
-        'python3 $TUT/scripts/compare_runs.py --diff ../t5/out out', 't5_diff.txt', ucwd=up2)
+    run([sys.executable, runws(t, 'scripts', 'compare_runs.py'), '--diff', os.path.join(w, 'out'), os.path.join(p2, 'out')], p2,
+        'python3 $WS/scripts/compare_runs.py --diff ../work/out out', 't5_diff.txt', ucwd=up2)
     o = G.texts['t5_diff.txt']
     G.val('t5:maxdiff', re.search(r'largest difference of all: (\S+)', o).group(1))
     wfile(os.path.join(w, 'Creek.rvi'), rvi0)
     # B. an ensemble
-    rviE = rvi0.replace(':EvaluationMetrics', ':EnsembleMode       ENSEMBLE_MONTECARLO %d\n:RandomSeed         7\n\n:EvaluationMetrics' % NENS)
+    G.text('t5_undo.diff', udiff(rvi1, rvi0, 'Creek.rvi', 'Creek.rvi', 0))
+    rviE = rvi0.replace(':EvaluationMetrics', ':EnsembleMode       ENSEMBLE_MONTECARLO %d\n:RandomSeed         7\n:EvaluationMetrics' % NENS)
     G.text('t5_ens.diff', udiff(rvi0, rviE, 'Creek.rvi', 'Creek.rvi', 0))
     wfile(os.path.join(w, 'Creek.rvi'), rviE)
     wfile(os.path.join(w, 'Creek.rve'), RVE)
@@ -1782,21 +1927,14 @@ def tut5():
     G.val('t5:nens', '%d' % NENS)
     G.text('t5_ls_ens.txt', '$ ls out_ens\n' + '  '.join(sorted(os.listdir(os.path.join(w, 'out_ens')))) +
            '\n$ ls out_ens/ens_1\n' + '  '.join(sorted(os.listdir(os.path.join(w, 'out_ens', 'ens_1')))))
-    plt = plt_()
-    fig, ax = plt.subplots(2, 1, figsize=(8.6, 5.0), sharex=True)
-    import pandas as pd
+    run([sys.executable, runws(t, 'scripts', 'plot_ensemble.py'), 'out_ens', '--ref', 'out', '--well', '103'], w,
+        'python3 $WS/scripts/plot_ensemble.py out_ens --ref out --well 103', 't5_plot_ensemble.txt', ucwd=uw)
+    shutil.copy(os.path.join(w, 'ensemble.png'), figpath('t5_ensemble.png'))
     ens = []
     for k in range(1, NENS + 1):
         e = os.path.join(w, 'out_ens', 'ens_%d' % k)
         g = gwheads(e); b = budget(e)
-        ax[0].plot(pd.to_datetime(g['date']), g['OW_SLOPE (103) [m]'], lw=1.0, label='member %d' % k)
-        ax[1].plot(b['date'], b['MF6 recharge [m3/d]'].rolling(30, min_periods=1).mean() / 1000.0, lw=1.0)
         ens.append((g['OW_SLOPE (103) [m]'].iloc[-1], b['MF6 recharge [m3/d]'].mean()))
-    gref = gwheads(os.path.join(w, 'out'))
-    ax[0].plot(pd.to_datetime(gref['date']), gref['OW_SLOPE (103) [m]'], 'k--', lw=1.0, label='single run (0.04)')
-    ax[0].set_ylabel('head [m]'); ax[0].set_title('OW_SLOPE (103): head in each member'); ax[0].legend(fontsize=7, ncol=3)
-    ax[1].set_ylabel('1000 m$^3$/d'); ax[1].set_title('recharge reaching MODFLOW, 30-day means')
-    fig.tight_layout(); fig.savefig(figpath('t5_ensemble.png'), dpi=150); plt.close(fig)
     hs = [e[0] for e in ens]; rs = [e[1] for e in ens]
     G.val('t5:enshmin', fmt(min(hs), 2)); G.val('t5:enshmax', fmt(max(hs), 2))
     G.val('t5:ensrmin', fmt(min(rs), 0)); G.val('t5:ensrmax', fmt(max(rs), 0))
@@ -1816,8 +1954,8 @@ def tut5():
     raven(w, 'out_prt', 't5_run_prt.txt', ucwd=uw)
     mf = os.path.join(w, 'out_prt', 'mf6')
     G.val('t5:cbcmb', fmt(os.path.getsize(os.path.join(mf, 'gwf.cbc')) / 1e6, 0))
-    o, dt = run([sys.executable, os.path.join(C.tools, 'make_prt.py'), 'out_prt', '--backward', '--run', C.mf6lib], w,
-                'python3 $TOOLS/make_prt.py out_prt --backward --run $PKG/bin/libmf6.so', 't5_make_prt.txt', ucwd=uw)
+    o, dt = run([sys.executable, runws(t, 'scripts', 'make_prt.py'), 'out_prt', '--backward', '--run', C.mf6run], w,
+                'python3 $WS/scripts/make_prt.py out_prt --backward --run $WS/bin/libmf6.so', 't5_make_prt.txt', ucwd=uw)
     epf = os.path.join(w, 'out_prt', 'prt', 'endpoints.csv')
     ep = csv(epf)
     G.text('t5_endpoints.txt', '$ head -n 4 out_prt/prt/endpoints.csv\n' + ''.join(open(epf).readlines()[:4]))
@@ -1825,13 +1963,13 @@ def tut5():
     dist = np.hypot(ep['x1'] - ep['x0'], ep['y1'] - ep['y0'])
     G.val('t5:distmin', fmt(dist.min(), 0)); G.val('t5:distmax', fmt(dist.max(), 0))
     G.val('t5:ttime', fmt(ep['travel_time_d'].max(), 0))
-    run([sys.executable, os.path.join(SCRIPTS, 'plot_tracks.py'), 'out_prt'], w,
-        'python3 $TUT/scripts/plot_tracks.py out_prt', 't5_plot_tracks.txt', ucwd=uw)
+    run([sys.executable, runws(t, 'scripts', 'plot_tracks.py'), 'out_prt'], w,
+        'python3 $WS/scripts/plot_tracks.py out_prt', 't5_plot_tracks.txt', ucwd=uw)
     shutil.copy(os.path.join(w, 'out_prt', 'prt', 'tracks.png'), figpath('t5_tracks.png'))
-    # the finished state: both folders as the tutorial leaves them
-    copytree(w, os.path.join(fin, 't5'))
-    copytree(p2, os.path.join(fin, 't5_part2'))
-    for d in (os.path.join(fin, 't5'), os.path.join(fin, 't5_part2')):
+    # the finished state: both folders as the workshop leaves them
+    copytree(w, os.path.join(fin, 'work'))
+    copytree(p2, os.path.join(fin, 'work_part2'))
+    for d in (os.path.join(fin, 'work'), os.path.join(fin, 'work_part2')):
         for x in os.listdir(d):
             if x.startswith('out') and os.path.isdir(os.path.join(d, x)):
                 shutil.rmtree(os.path.join(d, x))
@@ -1842,14 +1980,16 @@ def tut5():
 # committed values (for steps skipped with --quick)
 # ======================================================================================================================
 def committed_values(prefix):
-    p = os.path.join(GEN, 'values.tex')
+    """{key: (value, volatile)} of the committed values (tex/generated/values.tex of the workshops) starting with prefix"""
     rx = re.compile(r'\\defval\{([^}]*)\}\{(.*)\}(  % measured on the build machine)?$')
     out = {}
-    if os.path.exists(p):
-        for l in open(p):
-            m = rx.match(l.rstrip('\n'))
-            if m and m.group(1).startswith(prefix):
-                out[m.group(1)] = (m.group(2), bool(m.group(3)))
+    for t in TUTS:
+        p = os.path.join(WSROOT, WS[t], 'tex', 'generated', 'values.tex')
+        if os.path.exists(p):
+            for l in open(p):
+                m = rx.match(l.rstrip('\n'))
+                if m and m.group(1).startswith(prefix):
+                    out[m.group(1)] = (m.group(2), bool(m.group(3)))
     return out
 
 
@@ -1857,7 +1997,7 @@ def keep_committed(prefix, texts=()):
     for k, (v, vol) in committed_values(prefix).items():
         G.val(k, v, volatile=vol)
     for n in texts:
-        p = os.path.join(GEN, n)
+        p = os.path.join(WSROOT, WS[n[:2]], 'tex', 'generated', n)
         if os.path.exists(p):
             G.text(n, open(p).read())
 
@@ -1868,45 +2008,94 @@ def summary_value(s, label):
 
 
 # ======================================================================================================================
-# tutorial 1: getting started (the package and the Liard example)
+# workshop 1: getting started (the installation check and the Liard example)
 # ======================================================================================================================
+LIARD_README_HEAD = '''# Liard River with groundwater: Raven + MODFLOW 6 example (Workshop 1 copy)
+
+This folder is the Liard River example of Workshop 1. Paths below are relative to the workshop folder ($WS); the
+programs are in $WS/bin and the helper scripts in $WS/scripts. The workshop PDF gives every step.
+
+A hypothetical aquifer is added under three nested Central Liard subbasins (52 -> 48 -> 43; 85 HRUs).
+The other 62 subbasins run exactly as in the original Raven model. Adding groundwater took four edits to
+ordinary Raven files plus one new `.rvg` file; this README walks through them so you can repeat them on
+your own model.
+
+## 1. Run it
+```
+cp -r $WS/model/start $WS/work_full      # as in the last steps of the workshop
+cd $WS/work_full
+$RAVEN Liard -o out/                      # 20 years, daily; about 10 minutes on one core
+python3 $WS/scripts/tools_audit.py out    # water-balance and consistency audit
+```
+(`RAVEN=$WS/bin/Raven`, as set in Step 1 of the workshop.)
+Groundwater results: `out/GWBudget.csv`, `GWHRUState.csv`, `GWConnectivity.csv`, `GWModelSummary.txt`,
+and the generated MODFLOW 6 model in `out/mf6/`. Streamflow and diagnostics are in the usual Raven files.
+
+'''
+
+
+def liard_for_workshop(d):
+    """the Liard example as workshop 1 ships it: its README with paths of the workshop (sections 0 and 1 replaced), and
+    the copyright notice its DATA_NOTICE.md points to"""
+    rd = open(os.path.join(d, 'README.md')).read()
+    rest = rd[rd.index('## 2. What was changed'):]
+    rest = rest.replace('run `tools_audit.py`', 'run `$WS/scripts/tools_audit.py`').replace(
+        '## 4. Results you should see (tools_audit.py)', '## 4. Results you should see ($WS/scripts/tools_audit.py, 20-year run)')
+    rest = re.sub(r', then calibrate with Ostrich\s*\n\s*\(see `docs/ostrich_example`\)\.', ', then calibrate with OSTRICH (Workshop 6).', rest)
+    for bad in ('docs/ostrich_example', 'examples/', 'tools/get_mf6', '../'):
+        if bad in rest:
+            raise RuntimeError('workshop 1: the Liard README still names %s' % bad)
+    wfile(os.path.join(d, 'README.md'), LIARD_README_HEAD + rest)
+    dn = open(os.path.join(d, 'DATA_NOTICE.md')).read()
+    if '`../../NOTICE.md`' not in dn:
+        raise RuntimeError('workshop 1: DATA_NOTICE.md no longer points to ../../NOTICE.md')
+    wfile(os.path.join(d, 'DATA_NOTICE.md'), dn.replace('`../../NOTICE.md`', '`NOTICE.md` (in this folder)'))
+    shutil.copy(os.path.join(REPO, 'NOTICE.md'), os.path.join(d, 'NOTICE.md'))
+
+
 def tut1():
     t = 't1'
-    # the release package the tutorials need: built from these commits (or later) of the Raven code and of
-    # RavenHydroFramework-extra; files/README.txt names them too
-    G.val('t1:reqcode', REQUIRES['code']); G.val('t1:reqextra', REQUIRES['extra'])
-    rd = open(os.path.join(FILES, 'README.txt')).read()
-    if REQUIRES['code'] not in rd or REQUIRES['extra'] not in rd:
-        raise RuntimeError('files/README.txt does not name the required commits %s' % REQUIRES)
-    r = subprocess.run(['git', '-C', C.tools, 'merge-base', '--is-ancestor', REQUIRES['extra'], 'HEAD'], capture_output=True)
-    if r.returncode == 1:
-        log('WARNING: the tools folder %s is older than commit %s' % (C.tools, REQUIRES['extra']))
-    if not C.pkgdir:
-        raise RuntimeError('tutorial 1 needs the unpacked release package: give --package')
-    w = fresh(os.path.join(C.work, 't1'))
-    # the package
-    G.text('t1_ls_pkg.txt', '$ ls $PKG\n' + '  '.join(sorted(f for f in os.listdir(C.pkgdir) if f not in ('raven-soil-zone', 'raven-mf6-extra'))) + '\n$ ls $PKG/bin\n' + '  '.join(sorted(os.listdir(os.path.join(C.pkgdir, 'bin')))))
-    # installation check, as the package README says
-    x = os.path.join(w, 'pkgsrc')
-    os.makedirs(x)
-    subprocess.run(['tar', 'xzf', os.path.join(C.pkgdir, 'source', 'raven_code_src.tar.gz'), 'raven-soil-zone/cmake/RavenMF6InstallCheck.py'], cwd=x, check=True)
-    run([sys.executable, os.path.join(x, 'raven-soil-zone', 'cmake', 'RavenMF6InstallCheck.py'), os.path.join(C.pkgdir, 'bin')], C.pkgdir,
-        'python3 raven-soil-zone/cmake/RavenMF6InstallCheck.py bin', 't1_installcheck.txt', ucwd=U_PKG,
-        env=dict(C.env, RAVEN_MF6_LIB=''))
-    tools = sorted(f for f in os.listdir(C.tools) if not f.startswith('.') and f != '__pycache__')
-    G.text('t1_ls_tools.txt', '$ ls $TOOLS\n' + '  '.join(tools))
+    r = begin_ws(t)
+    # the Liard example, copied in from this repository's examples/ (the start state); the finished state is the same
+    # folder with the one-year duration of the first run
+    start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
+    for d in (start, fin):
+        if os.path.exists(d):
+            shutil.rmtree(d)
+    shutil.copytree(os.path.join(REPO, 'examples', 'Liard_groundwater'), start,
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'output', 'out', 'tools_audit.py'))
+    liard_for_workshop(start)
+    # the workshop folder, as the student unpacks it
+    top = sorted(set(os.listdir(wsdir(t))) | {WS[t] + '.pdf', 'README.txt', 'bin', 'model', 'scripts', 'tex'})
+    top = [f for f in top if f in (WS[t] + '.pdf', 'README.txt', 'bin', 'model', 'scripts', 'tex')]
+    G.text('t1_ls_ws.txt', '$ ls\n' + '  '.join(top) + '\n$ ls bin\nREADME.txt  Raven  libmf6.so\n$ ls scripts\n' +
+           '  '.join(sorted(WS_SCRIPTS[t])))
+    # installation check
+    run([sys.executable, os.path.join(r, 'scripts', 'RavenMF6InstallCheck.py'), 'bin'], r,
+        'python3 scripts/RavenMF6InstallCheck.py bin', 't1_installcheck.txt', ucwd=u_ws())
     # the Liard example, one year
-    ex = copytree(C.examples, os.path.join(w, 'examples'))
-    lg = os.path.join(ex, 'Liard_groundwater')
-    uw = U_WORK + '/examples/Liard_groundwater'
+    lg = copytree(start, runws(t, 'work'))
+    uw = u_ws() + '/work'
     rvi = open(os.path.join(lg, 'Liard.rvi')).read()
     nd = int(re.search(r'^:Duration\s+(\d+)', rvi, re.M).group(1))
     G.val('t1:fullDays', '%d' % nd); G.val('t1:fullYears', '%d' % round(nd / 365.25))
-    edit(os.path.join(lg, 'Liard.rvi'), ':Duration           7305 00:00:00', ':Duration           365 00:00:00')
+    sh("sed -i 's/^:Duration *7305 /:Duration           365 /' Liard.rvi", lg, 't1_sed.txt', ucwd=uw)
     G.text('t1_duration.txt', '$ grep :Duration Liard.rvi\n' + [l for l in open(os.path.join(lg, 'Liard.rvi')) if l.startswith(':Duration')][0])
+    os.makedirs(fin)
+    shutil.copy(os.path.join(lg, 'Liard.rvi'), os.path.join(fin, 'Liard.rvi'))
+    wfile(os.path.join(fin, 'README.txt'),
+          'This folder holds only the file that Workshop 1 changes: Liard.rvi, with :Duration 365 (one year) instead of\n'
+          '7305. Every other file of the finished state is the same as in ../start.\n')
     ex1, dt, _ = raven(lg, 'out', 't1_run.txt', ucwd=uw, model='Liard')
     G.val('t1:runsec', '%d' % max(1, round(dt)), volatile=True)
     out = os.path.join(lg, 'out')
+    wl = [l for l in open(os.path.join(out, 'Raven_errors.txt'), errors='ignore') if l.startswith('WARNING')]
+    G.val('t1:nwarn', '%d' % len(wl))
+    G.val('t1:nwarnpoly', '%d' % sum(1 for l in wl if 'polygon area' in l))
+    G.val('t1:nwarnchan', '%d' % sum(1 for l in wl if 'CheckReferenceFlow' in l))
+    G.val('t1:nwarndiag', '%d' % sum(1 for l in wl if 'not calculated' in l))
+    if sum(int(G.values['t1:nwarn' + k]) for k in ('poly', 'chan', 'diag')) != len(wl):
+        raise RuntimeError('workshop 1: warnings of another kind in Raven_errors.txt; the text names three kinds')
     G.text('t1_ls_out.txt', '$ ls out\n' + '  '.join(sorted(os.listdir(out))) + '\n$ ls out/mf6\n' + '  '.join(sorted(os.listdir(os.path.join(out, 'mf6')))))
     s = summary_text(out)
     G.text('t1_summary.txt', '$ grep -v "computed in" out/GWModelSummary.txt | head -n 17\n' + sanitize(excerpt(s, first=17, drop=r'computed in'), lg, uw))
@@ -1937,18 +2126,16 @@ def tut1():
     mb = re.search(r'Raven MB error max \[mm\]\s+([-0-9.eE+]+)', o)
     G.val('t1:auditMB', mb.group(1) if mb else '?')
     plot_gw(t, out, uw, 't1_plot.txt', 'Liard', figs=('gw_budget', 'gw_watertable', 'gw_map'))
-    G.text('t1_restore.txt', '$ sed -i \'s/^:Duration           365 /:Duration           7305 /\' Liard.rvi\n$ grep :Duration Liard.rvi\n'
-           + [l for l in rvi.split('\n') if l.startswith(':Duration')][0])
-    # the full 20-year run (skipped with --quick)
+    # the full 20-year run, in a second copy of the example (skipped with --quick)
     if C.quick:
         keep_committed('t1:full', ('t1_audit_full.txt',))
         return
-    wfile(os.path.join(lg, 'Liard.rvi'), rvi)
-    shutil.rmtree(out)
+    lf = copytree(start, runws(t, 'work_full'))
     log('t1: the 20-year Liard run')
-    ex2, dt2, _ = raven(lg, 'out', None, ucwd=uw, model='Liard')
+    ex2, dt2, _ = raven(lf, 'out', None, ucwd=u_ws() + '/work_full', model='Liard')
+    out = os.path.join(lf, 'out')
     G.val('t1:fullmin', '%d' % max(1, round(dt2 / 60.0)), volatile=True)
-    o2 = audit(t, out, 't1_audit_full.txt', uw)
+    o2 = audit(t, out, 't1_audit_full.txt', u_ws() + '/work_full')
     G.val('t1:fullUnconv', '%d' % float(re.search(r'unconverged steps\s+([-0-9.eE+]+)', o2).group(1)))
     G.val('t1:fullRes', sci(float(re.search(r'MF6 cumulative residual / gross flow\s+([-0-9.eE+]+)', o2).group(1))))
     import pandas as pd
@@ -1960,18 +2147,18 @@ def tut1():
 
 
 # ======================================================================================================================
-# tutorial 2: your own groundwater model (Tutorial Creek)
+# workshop 2: your own groundwater model (Tutorial Creek)
 # ======================================================================================================================
 def tut2():
     t = 't2'
+    begin_ws(t)
     start, fin = tutfiles(t, 'start'), tutfiles(t, 'finished')
-    for d in (start, fin):
-        if os.path.exists(d):
-            shutil.rmtree(d)
+    if os.path.exists(tutfiles(t)):
+        shutil.rmtree(tutfiles(t))
     write_creek_start(start, ascii_too=True)
     write_creek_coupled(fin, ascii_too=True)
-    w = copytree(start, os.path.join(C.work, 't2'))
-    uw = U_WORK + '/t2'
+    w = copytree(start, runws(t, 'work'))
+    uw = u_ws() + '/work'
     G.text('t2_ls_start.txt', '$ ls\n' + '  '.join(sorted(os.listdir(w))))
     # step 0: the model without groundwater
     raven(w, 'out_nogw', 't2_run_nogw.txt', ucwd=uw)
@@ -2051,13 +2238,11 @@ def tut2():
     G.val('t2:deepgw', fmt(dd['out'], 0, sign=True)); G.val('t2:deepnogw', fmt(dd['out_nogw'], 0, sign=True))
     ndays = len(q1) - 1
     G.val('t2:deeprate', fmt(round((dd['out'] - dd['out_nogw']) / 1000.0 * sum(area(r) for *_, r in HRUS) / ndays, -2)))
-    plt = plt_()
-    fig, ax = plt.subplots(figsize=(8.6, 3.0))
-    sel = (q1['date'] >= '2011-01-01') & (q1['date'] < '2012-01-01')
-    ax.plot(q0['date'][sel], q0['q'][sel], color='#d08a2b', lw=0.9, label='Raven alone (step 1)')
-    ax.plot(q1['date'][sel], q1['q'][sel], color='#1f4e79', lw=0.9, label='Raven + MODFLOW 6')
-    ax.set_ylabel('m$^3$/s'); ax.set_title('streamflow at the outlet of subbasin 2 (LOWER), 2011'); ax.legend()
-    fig.tight_layout(); fig.savefig(figpath('t2_hydrograph.png'), dpi=150); plt.close(fig)
+    run([sys.executable, runws(t, 'scripts', 'plot_hydrograph.py'), 'out_nogw', 'out', '--labels', 'Raven alone',
+         'Raven + MODFLOW 6', '--subbasin', 'LOWER', '--year', '2011'], w,
+        'python3 $WS/scripts/plot_hydrograph.py out_nogw out --labels "Raven alone" "Raven + MODFLOW 6" --subbasin LOWER --year 2011',
+        't2_plot_hydrograph.txt', ucwd=uw)
+    shutil.copy(os.path.join(w, 'hydrograph.png'), figpath('t2_hydrograph.png'))
     # variant 1: the ESRI ASCII grids instead of the GeoTIFF files
     rvg = open(os.path.join(w, 'Creek.rvg')).read()
     rvg_a = rvg.replace('dem.tif    ', 'dem.asc    ').replace('bedrock.tif ', 'bedrock.asc ')
@@ -2099,75 +2284,141 @@ def tut2():
 
 
 
-REQUIRES = {'code': 'f8ee662', 'extra': '7be65a6'}   # the commits of the release package the tutorials were made with
 
 
 # ======================================================================================================================
-# PDFs and the zip of the tutorial files
+# PDFs and zips
 # ======================================================================================================================
-DOCS = [('t1', 'Tutorial1_Getting_started'), ('t2', 'Tutorial2_Own_groundwater_model'), ('t3', 'Tutorial3_Soil_zone'),
-        ('t4', 'Tutorial4_Existing_MODFLOW_model'), ('t5', 'Tutorial5_Restarts_ensembles_particles'),
-        ('t6', 'Tutorial6_Calibration_Ostrich')]
-COMBINED = 'Raven_MF6_Tutorials'
+LATEX_BAD = re.compile(r'(Overfull \\[hv]box.*|Underfull \\hbox.*|LaTeX (?:\w+ )?Warning:.*|Package \w+ Warning:.*|pdfTeX warning.*|.*undefined.*|! .*)')
 
 
-def pdflatex(name, texsrc):
-    """compiles tex/<name>.tex (written from texsrc) in a scratch folder; returns the page count"""
-    b = fresh(os.path.join(C.work, 'latex', name))
-    wfile(os.path.join(TEX, name + '.tex'), texsrc)
+def compile_ws(t, root, dest=None):
+    """compiles workshop t of the tree root standalone: copies the workshop folder (without bin/ and its PDF) to a scratch
+    folder and runs 'pdflatex main.tex' twice in its tex/, as a student would. Returns (pages, problems); copies the PDF
+    to dest if given"""
+    b = os.path.join(C.work, 'latex', WS[t])
+    if os.path.exists(b):
+        shutil.rmtree(b)
+    top = os.path.join(root, WS[t])
+
+    def ignore(d, names):           # bin/, the PDF and a student's work folders (only at the top), caches
+        return [n for n in names if n == '__pycache__' or (os.path.samefile(d, top) and (
+            n in ('bin', WS[t] + '.pdf') or n.startswith('work')))]
+    shutil.copytree(top, b, ignore=ignore)
+    env = dict(os.environ, SOURCE_DATE_EPOCH=PDF_EPOCH, FORCE_SOURCE_DATE='1')
     for _ in range(2):
-        r = subprocess.run(['pdflatex', '-interaction=nonstopmode', '-halt-on-error', '-output-directory', b, name + '.tex'],
-                           cwd=TEX, capture_output=True, text=True)
+        r = subprocess.run(['pdflatex', '-interaction=nonstopmode', '-halt-on-error', 'main.tex'], cwd=os.path.join(b, 'tex'),
+                           capture_output=True, text=True, env=env)
         if r.returncode != 0:
             sys.stderr.write(r.stdout[-3000:])
-            raise RuntimeError('pdflatex failed on %s' % name)
-    log_ = open(os.path.join(b, name + '.log'), errors='ignore').read()
-    bad = re.findall(r'(LaTeX Warning: (?:Reference|Citation).*undefined.*)', log_)
-    if bad:
-        raise RuntimeError('%s: %s' % (name, bad[0]))
-    os.makedirs(PDF, exist_ok=True)
-    shutil.copy(os.path.join(b, name + '.pdf'), os.path.join(PDF, name + '.pdf'))
-    return int(re.search(r'Output written on .*?\((\d+)\s+pages?', log_, re.S).group(1))
+            return 0, ['pdflatex failed on %s' % WS[t]]
+    lg = open(os.path.join(b, 'tex', 'main.log'), errors='ignore').read()
+    probs = ['%s: %s' % (WS[t], m.strip()) for m in LATEX_BAD.findall(lg)]
+    pages = int(re.search(r'Output written on .*?\((\d+)\s+pages?', lg, re.S).group(1))
+    if dest:
+        shutil.copy(os.path.join(b, 'tex', 'main.pdf'), dest)
+    shutil.rmtree(b)
+    return pages, probs
 
 
-def build_pdfs():
-    pages = {}
-    for t, name in DOCS:
-        src = ('\\documentclass[11pt,a4paper]{article}\n\\input{preamble}\n\\hypersetup{pdftitle={Raven-MODFLOW 6 tutorial %s: %s}}\n'
-               '\\begin{document}\n\\input{%s_body}\n\\end{document}\n' % (t[1], TITLES[t], t))
-        pages[name] = pdflatex(name, src)
-        log('%s.pdf: %d pages' % (name, pages[name]))
-    src = ('\\documentclass[11pt,a4paper,oneside]{report}\n\\input{preamble}\n\\hypersetup{pdftitle={Raven-MODFLOW 6 tutorials}}\n'
-           '\\begin{document}\n\\input{cover}\n' + ''.join('\\input{%s_body}\n' % t for t, _ in DOCS) + '\\end{document}\n')
-    pages[COMBINED] = pdflatex(COMBINED, src)
-    log('%s.pdf: %d pages' % (COMBINED, pages[COMBINED]))
-    wfile(os.path.join(PDF, 'pages.txt'), ''.join('%s.pdf %d\n' % (k, v) for k, v in pages.items()))
+def build_pdfs(ts):
+    pages, probs = {}, []
+    for t in ts:
+        pages[t], p = compile_ws(t, WSROOT, os.path.join(WSROOT, WS[t], WS[t] + '.pdf'))
+        probs += p
+        log('%s.pdf: %d pages%s' % (WS[t], pages[t], (', %d LaTeX problems' % len(p)) if p else ''))
+    if probs:
+        raise RuntimeError('LaTeX problems:\n' + '\n'.join(probs))
     return pages
 
 
-def build_zip():
-    """Raven_MF6_Tutorial_Files.zip: the tutorial files and the PDFs, as the folder Raven_MF6_Tutorials/ (fixed dates, so
-    that a rebuild with unchanged files gives the same zip)"""
-    if os.path.exists(ZIPFILE):
-        os.remove(ZIPFILE)
-    with zipfile.ZipFile(ZIPFILE, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        items = []
-        for r, ds, fs in os.walk(FILES):
-            ds.sort()
+def sha256(p):
+    h = hashlib.sha256()
+    with open(p, 'rb') as f:
+        for blk in iter(lambda: f.read(1 << 20), b''):
+            h.update(blk)
+    return h.hexdigest()
+
+
+def mf6_version(lib):
+    """the version the MODFLOW 6 library reports (its XMI get_version), or the libmf6_version.txt beside it"""
+    try:
+        L = ctypes.CDLL(os.path.abspath(lib))
+        buf = ctypes.create_string_buffer(256)
+        if L.get_version(buf) == 0 and buf.value:
+            return buf.value.decode().strip()
+    except (OSError, AttributeError):
+        pass
+    p = os.path.join(os.path.dirname(lib), 'libmf6_version.txt')
+    if os.path.exists(p):
+        m = re.search(r'MODFLOW\s+([0-9.]+)', open(p).read())
+        if m:
+            return m.group(1)
+    return 'unknown'
+
+
+def package(out, raven, mf6, ravensrc=None):
+    """the six zips Workshop_N_<Name>.zip in out, each with its workshop folder and bin/ filled"""
+    for p, what in ((raven, 'Raven (--raven)'), (mf6, 'libmf6.so (--mf6)')):
+        if not (p and os.path.isfile(p)):
+            sys.exit('--package needs %s' % what)
+    probe = fresh(os.path.join(out, '.probe'))           # Raven without arguments prints its banner (and writes Raven_errors.txt)
+    ban = subprocess.run([raven], capture_output=True, text=True, cwd=probe).stdout
+    shutil.rmtree(probe)
+    ver = (re.search(r'Version:\s*(\S+)', ban) or re.search(r'(\d+\.\d+)', ban))
+    bd = re.search(r'BuildDate:\s*(.+)', ban)
+    rv = 'Raven %s%s' % (ver.group(1) if ver else '?', (', built %s' % bd.group(1).strip()) if bd else '')
+    if ravensrc and os.path.isdir(os.path.join(ravensrc, '.git')):
+        c = subprocess.run(['git', '-C', ravensrc, 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        if c:
+            rv += ', source commit %s' % c
+    versions = [('Raven', rv), ('', 'sha256 ' + sha256(raven)),
+                ('libmf6.so', 'MODFLOW 6 version %s' % mf6_version(mf6)), ('', 'sha256 ' + sha256(mf6))]
+    readme = bin_readme(versions).encode()
+    lic = os.path.join(ravensrc or '', 'LICENSE')
+    if not (ravensrc and os.path.isfile(lic)):
+        sys.exit('--package needs --raven-src (the Raven checkout): its LICENSE is shipped as bin/LICENSE-Raven.txt')
+    licence = open(lic, 'rb').read()
+    mf6notice = open(os.path.join(HERE, 'NOTICE-MODFLOW6.txt'), 'rb').read()
+    os.makedirs(out, exist_ok=True)
+    sizes = {}
+    for t in TUTS:
+        src = os.path.join(WSROOT, WS[t])
+        if not os.path.exists(os.path.join(src, WS[t] + '.pdf')):
+            sys.exit('%s has no PDF: build it first' % WS[t])
+        zp = os.path.join(out, WS[t] + '.zip')
+        if os.path.exists(zp):
+            os.remove(zp)
+        entries = []                       # (archive name, source path or bytes, mode); directories end with /
+        for r, ds, fs in os.walk(src):
+            ds[:] = sorted(d for d in ds if d not in ('__pycache__',) and not (r == src and d.startswith('work')))
+            rel = os.path.relpath(r, src)
+            arc = WS[t] if rel == '.' else WS[t] + '/' + rel.replace(os.sep, '/')
+            entries.append((arc + '/', None, 0o755))
+            if rel == 'bin':
+                entries += [(arc + '/LICENSE-Raven.txt', licence, 0o644), (arc + '/NOTICE-MODFLOW6.txt', mf6notice, 0o644),
+                            (arc + '/README.txt', readme, 0o644), (arc + '/Raven', raven, 0o755), (arc + '/libmf6.so', mf6, 0o755)]
+                continue
             for f in sorted(fs):
-                if f.endswith('.pyc') or '__pycache__' in r:
+                if f.endswith('.pyc'):
                     continue
-                items.append((os.path.join(r, f), os.path.join('Raven_MF6_Tutorials', os.path.relpath(os.path.join(r, f), FILES))))
-        for f in sorted(os.listdir(PDF)):
-            if f.endswith('.pdf'):
-                items.append((os.path.join(PDF, f), os.path.join('Raven_MF6_Tutorials', 'pdf', f)))
-        for src, arc in items:
-            zi = zipfile.ZipInfo(arc, date_time=(2026, 11, 1, 0, 0, 0))
-            zi.compress_type = zipfile.ZIP_DEFLATED
-            ex = src.endswith(('.sh', '.py'))
-            zi.external_attr = ((0o755 if ex else 0o644) | 0o100000) << 16
-            z.writestr(zi, open(src, 'rb').read())
-    log('%s: %.1f MB' % (os.path.basename(ZIPFILE), os.path.getsize(ZIPFILE) / 1e6))
+                p = os.path.join(r, f)
+                ex = f.endswith(('.sh', '.py')) or os.access(p, os.X_OK) and not f.endswith(('.txt', '.tex', '.pdf', '.png'))
+                entries.append((arc + '/' + f, p, 0o755 if ex else 0o644))
+        with zipfile.ZipFile(zp, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+            for arc, data, mode in entries:
+                zi = zipfile.ZipInfo(arc, date_time=ZIP_DATE)
+                zi.create_system = 3
+                if arc.endswith('/'):
+                    zi.external_attr = ((0o040000 | mode) << 16) | 0x10
+                    z.writestr(zi, b'')
+                    continue
+                zi.compress_type = zipfile.ZIP_DEFLATED
+                zi.external_attr = ((0o100000 | mode) << 16)
+                z.writestr(zi, data if isinstance(data, bytes) else open(data, 'rb').read())
+        sizes[t] = os.path.getsize(zp)
+        log('%s: %.1f MB' % (os.path.basename(zp), sizes[t] / 1e6))
+    return sizes
 
 
 # ======================================================================================================================
@@ -2180,31 +2431,40 @@ def setup(a):
     C.quick, C.check = a.quick, a.check
     C.work = os.path.abspath(a.work)
     os.makedirs(C.work, exist_ok=True)
-    C.pkgdir = os.path.abspath(a.package) if a.package else None
-    C.raven = os.path.abspath(a.raven or os.environ.get('RAVEN_EXE') or (C.pkgdir and os.path.join(C.pkgdir, 'bin', 'Raven')) or '')
-    C.mf6lib = os.path.abspath(a.mf6lib or os.environ.get('RAVEN_MF6_LIB') or (C.pkgdir and os.path.join(C.pkgdir, 'bin', 'libmf6.so')) or '')
-    if not os.path.exists(C.raven):
-        sys.exit('Raven not found: give --raven or --package, or set RAVEN_EXE')
-    if not os.path.exists(C.mf6lib):
-        sys.exit('MODFLOW 6 library not found: give --mf6lib or --package, or set RAVEN_MF6_LIB')
-    C.examples = os.path.join(C.pkgdir, 'examples') if C.pkgdir else os.path.join(REPO, 'examples')
+    raven = os.path.abspath(a.raven or os.environ.get('RAVEN_EXE') or '')
+    mf6lib = os.path.abspath(a.mf6 or os.environ.get('RAVEN_MF6_LIB') or '')
+    if not os.path.isfile(raven):
+        sys.exit('Raven not found: give --raven or set RAVEN_EXE')
+    if not os.path.isfile(mf6lib):
+        sys.exit('MODFLOW 6 library not found: give --mf6 or set RAVEN_MF6_LIB')
+    rs = a.raven_src or os.environ.get('RAVEN_SRC')
+    C.ravensrc = os.path.abspath(rs) if rs else None
+    if C.ravensrc and os.path.basename(C.ravensrc) == 'src' and not os.path.isdir(os.path.join(C.ravensrc, 'cmake')):
+        C.ravensrc = os.path.dirname(C.ravensrc)
+    if C.ravensrc and not os.path.exists(os.path.join(C.ravensrc, 'cmake', 'RavenMF6InstallCheck.py')):
+        log('note: %s has no cmake/RavenMF6InstallCheck.py; the committed copy is used' % C.ravensrc)
+        C.ravensrc = None
     C.tools = os.path.abspath(a.tools) if a.tools else os.path.join(REPO, 'tools')
     C.ostrich = a.ostrich
-    C.files = os.path.join(C.work, 'check', 'files') if C.check else FILES
-    C.gen = os.path.join(C.work, 'check', 'generated') if C.check else GEN
-    C.fig = os.path.join(C.work, 'check', 'figures') if C.check else FIG
+    C.root = os.path.join(C.work, 'check', 'workshops') if C.check else WSROOT
     if C.check:
-        for d in (C.files, C.gen, C.fig):
-            fresh(d)
-        if os.path.exists(SCRIPTS):
-            shutil.copytree(SCRIPTS, os.path.join(C.files, 'scripts'))
+        fresh(C.root)
+        for t in TUTS:                      # the hand-written parts (sources of the texts) as committed
+            for p in ('README.txt', 'tex/main.tex', 'tex/sections'):
+                s = os.path.join(WSROOT, WS[t], p)
+                if os.path.isdir(s):
+                    shutil.copytree(s, os.path.join(C.root, WS[t], p))
+                elif os.path.exists(s):
+                    os.makedirs(os.path.dirname(os.path.join(C.root, WS[t], p)), exist_ok=True)
+                    shutil.copy(s, os.path.join(C.root, WS[t], p))
+    # Raven and the library, side by side, as in a workshop's bin/ (Raven finds the library beside itself)
+    C.binmaster = fresh(os.path.join(C.work, 'bin'))
+    shutil.copy2(raven, os.path.join(C.binmaster, 'Raven'))
+    shutil.copy2(mf6lib, os.path.join(C.binmaster, 'libmf6.so'))
     C.env = dict(os.environ)
-    C.env['RAVEN'] = C.raven
-    C.env['RAVEN_MF6_LIB'] = C.mf6lib
-    C.env['TUT'] = C.files
-    C.env['PKG'] = C.pkgdir or ''
-    C.env['TOOLS'] = C.tools
+    C.env.pop('RAVEN_MF6_LIB', None)
     C.env['MPLBACKEND'] = 'Agg'
+    C.cur = 't1'
 
 
 def compare_trees(a, b, what):
@@ -2246,26 +2506,32 @@ def check_values(gen_now, gen_committed, volatile):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--raven'); ap.add_argument('--mf6lib'); ap.add_argument('--package'); ap.add_argument('--ostrich')
+    ap.add_argument('--raven'); ap.add_argument('--mf6', '--mf6lib', dest='mf6'); ap.add_argument('--ostrich')
+    ap.add_argument('--raven-src', dest='raven_src')
     ap.add_argument('--tools', help='the tools folder of RavenHydroFramework-extra (make_prt.py, plot_soilzone.py); default: ../../tools')
     ap.add_argument('--work', default=os.path.join(HERE, '_work'))
     ap.add_argument('--only', default=','.join(TUTS))
     ap.add_argument('--quick', action='store_true'); ap.add_argument('--check', action='store_true')
     ap.add_argument('--no-pdf', action='store_true')
-    ap.add_argument('--pdf-only', action='store_true', help='only compile the PDFs and write the zip (from the committed includes)')
+    ap.add_argument('--pdf-only', action='store_true', help='only compile the PDFs (from the committed sources)')
+    ap.add_argument('--package', metavar='OUT_DIR', help='write the six workshop zips into OUT_DIR')
     a = ap.parse_args()
+    if a.package:
+        raven = a.raven or os.environ.get('RAVEN_EXE')
+        mf6 = a.mf6 or os.environ.get('RAVEN_MF6_LIB')
+        package(os.path.abspath(a.package), raven and os.path.abspath(raven), mf6 and os.path.abspath(mf6),
+                a.raven_src or os.environ.get('RAVEN_SRC'))
+        return
     setup(a)
     only = [x.strip() for x in a.only.split(',') if x.strip()]
     if a.pdf_only:
-        build_pdfs(); build_zip(); return
+        build_pdfs(only); return
     t0 = time.time()
-    if not C.check and os.path.exists(GEN):
-        # keep the committed values of tutorials not implemented now
-        rx = re.compile(r'\\defval\{([^}]*)\}\{(.*)\}(  % measured on the build machine)?$')
-        for l in open(os.path.join(GEN, 'values.tex')) if os.path.exists(os.path.join(GEN, 'values.tex')) else []:
-            m = rx.match(l.rstrip('\n'))
-            if m and m.group(1).split(':')[0] not in only:
-                G.val(m.group(1), m.group(2), volatile=bool(m.group(3)))
+    if not C.check:
+        # keep the committed values of workshops not rebuilt now (for keep_committed and the volatile run times)
+        for k, (v, vol) in committed_values('').items():
+            if k.split(':')[0] not in only:
+                G.val(k, v, volatile=vol)
     times = {}
     for t in TUTS:
         if t in only:
@@ -2274,31 +2540,53 @@ def main():
             times[t] = time.time() - t1
             log('%s done in %.0f s' % (t, times[t]))
     if C.check:
-        G.write(C.gen)
-        bad = check_values(C.gen, GEN, G.volatile)
-        for n in sorted(G.texts):
-            p = os.path.join(GEN, n)
-            if not os.path.exists(p):
-                bad.append('excerpt %s is new' % n)
-            elif open(p).read() != G.texts[n]:
-                diff = udiff(open(p).read(), G.texts[n], 'committed/' + n, 'now/' + n, 0)
-                bad.append('excerpt %s differs:\n%s' % (n, diff[:1500]))
+        bad = []
         for t in only:
-            bad += compare_trees(os.path.join(C.files, TDIR[t]), os.path.join(FILES, TDIR[t]), 'tutorial files')
-        print('\n'.join(bad) if bad else 'check: every number, excerpt, diff and tutorial file matches')
+            gd = wsdir(t, 'tex', 'generated')
+            G.write(t, gd)
+            cd = os.path.join(WSROOT, WS[t], 'tex', 'generated')
+            bad += ['%s: %s' % (WS[t], x) for x in check_values(gd, cd, G.volatile)]
+            for n in sorted(x for x in G.texts if x.startswith(t + '_')):
+                p = os.path.join(cd, n)
+                if not os.path.exists(p):
+                    bad.append('%s: excerpt %s is new' % (WS[t], n))
+                elif open(p).read() != G.texts[n]:
+                    diff = udiff(open(p).read(), G.texts[n], 'committed/' + n, 'now/' + n, 0)
+                    bad.append('%s: excerpt %s differs:\n%s' % (WS[t], n, diff[:1500]))
+            for n in sorted(os.listdir(cd)):
+                if n != 'values.tex' and n not in G.texts:
+                    bad.append('%s: excerpt %s was not generated' % (WS[t], n))
+            for p in ('model', 'scripts'):
+                bad += compare_trees(wsdir(t, p), os.path.join(WSROOT, WS[t], p), '%s/%s' % (WS[t], p))
+            for p in ('tex/preamble.tex', 'bin/README.txt'):
+                q = os.path.join(WSROOT, WS[t], p)
+                if not (os.path.exists(q) and filecmp.cmp(wsdir(t, p), q, shallow=False)):
+                    bad.append('%s/%s differs from its source' % (WS[t], p))
+            extra = sorted(set(os.listdir(os.path.join(WSROOT, WS[t], 'bin'))) - {'README.txt'})
+            if extra:
+                bad.append('%s/bin holds more than README.txt: %s (the programs are added only to the zips)' % (WS[t], ', '.join(extra)))
+        if not a.no_pdf:
+            for t in only:
+                pages, probs = compile_ws(t, WSROOT)
+                bad += probs
+                log('%s: committed tex/ compiles standalone, %d pages%s' % (WS[t], pages, '' if not probs else ', with problems'))
+        print('\n'.join(bad) if bad else 'check: every number, excerpt, diff, model file and script matches; the texts compile')
         print('check: %d values, %d excerpts, %s; %.0f s' % (len(G.values), len(G.texts), ', '.join(only), time.time() - t0))
         sys.exit(1 if bad else 0)
     for t in TUTS:
         if t in times:
             G.val(t + ':buildmin', '%d' % max(1, round(times[t] / 60.0)), volatile=True)
-    G.write(GEN)
-    if set(only) == set(TUTS):
-        for f in os.listdir(GEN):                 # excerpts of steps that no longer exist
-            if f != 'values.tex' and f not in G.texts:
-                os.remove(os.path.join(GEN, f))
-    if not a.no_pdf and set(only) == set(TUTS):
-        build_pdfs()
-        build_zip()
+    for t in only:
+        gd = os.path.join(WSROOT, WS[t], 'tex', 'generated')
+        if os.path.exists(gd):
+            shutil.rmtree(gd)                   # excerpts of steps that no longer exist go too
+        G.write(t, gd)
+        unused = [n for n in G.texts if n.startswith(t + '_') and not any(
+            n in open(p).read() for p in tex_sources(t) if os.path.exists(p))]
+        if unused:
+            log('note: %s does not use the generated %s' % (WS[t], ', '.join(sorted(unused))))
+    if not a.no_pdf:
+        build_pdfs(only)
     log('done in %.0f s' % (time.time() - t0))
 
 

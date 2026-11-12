@@ -1,0 +1,8 @@
+$ python3 scripts/RavenMF6InstallCheck.py bin
+ok   Raven and the library in /home/user/Workshop_1_Getting_Started/bin
+     runtime libraries beside the library: none
+ok   coupled run finishes  (Successful Simulation)
+ok   GWBudget.csv has the two steps  (2 rows)
+ok   the library beside Raven was used  (MODFLOW 6 library     : /home/user/Workshop_1_Getting_Started/bin/libmf6.so (version 6.8.1))
+ok   the Fortran runtime resolves to /home/user/Workshop_1_Getting_Started/bin  (0 libraries)
+install check: PASS

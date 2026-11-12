@@ -1,0 +1,42 @@
+% 09_validation.tex - validate the best parameter set on 2013-2014
+\section{Validate on 2013--2014}
+A calibrated model must also work on data it has not seen.
+
+\step{Make a validation folder}
+Copy \cmd{model} to a new folder \cmd{validation}, with the best \cmd{Creek.rvp}:
+\begin{shell}
+$ cp -r model validation
+$ cp best/Creek.rvp validation/
+$ cd validation
+\end{shell}
+If you did not run DDS, there is no \cmd{best}. Use the best \cmd{Creek.rvp} of this workshop instead:
+\cmd{cp \$WS/model/finished/best/Creek.rvp validation/} (before \cmd{cd validation}).
+Then change \cmd{Creek.rvi}: run the five years 2010--2014, and let Raven score the calibration years and the validation
+years separately:
+\diff{t6_valid_rvi.diff}
+
+\step{Run the validation}
+\term{t6_run_valid.txt}
+\term{t6_diag_valid.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}, and in \cmd{Diagnostics.csv} one line per series and period
+(\cmd{CALIBRATION} and \cmd{VALIDATION}).
+\why the table compares the calibrated set with the initial and the true parameters. The columns \emph{initial} and
+\emph{true} are the same validation run with the initial and the true \cmd{Creek.rvp}.
+\begin{center}\small
+\begin{tabular}{lrrrrrr}\toprule
+ & \multicolumn{3}{c}{calibration years 2011--2012} & \multicolumn{3}{c}{validation years 2013--2014}\\
+Parameters & initial & calibrated & true & initial & calibrated & true\\\midrule
+KGE of streamflow & \V{t6:kgecalibinit} & \V{t6:kgecalib} & \V{t6:kgecalibtrue} & \V{t6:kgevalidinit} & \V{t6:kgevalid} & \V{t6:kgevalidtrue}\\
+RMSE OW\_NEAR [m] & \V{t6:rmsecalib101init} & \V{t6:rmsecalib101} & \V{t6:rmsecalib101true} & \V{t6:rmsevalid101init} & \V{t6:rmsevalid101} & \V{t6:rmsevalid101true}\\
+RMSE OW\_UPPER [m] & \V{t6:rmsecalib102init} & \V{t6:rmsecalib102} & \V{t6:rmsecalib102true} & \V{t6:rmsevalid102init} & \V{t6:rmsevalid102} & \V{t6:rmsevalid102true}\\
+RMSE OW\_SLOPE [m] & \V{t6:rmsecalib103init} & \V{t6:rmsecalib103} & \V{t6:rmsecalib103true} & \V{t6:rmsevalid103init} & \V{t6:rmsevalid103} & \V{t6:rmsevalid103true}\\
+\cmd{COST} & \V{t6:costcalibinit} & \V{t6:costcalib} & \V{t6:costcalibtrue} & \V{t6:costvalidinit} & \V{t6:costvalid} & \V{t6:costvalidtrue}\\\bottomrule
+\end{tabular}\end{center}
+\begin{tocheck}
+The calibrated set is much better than the first guess everywhere. It is as good as the true parameters in the validation
+years too (KGE \V{t6:kgevalid} against \V{t6:kgevalidtrue}; head errors at the \V{t6:noiseh}-cm noise of the observations
+at all three wells), although its sand conductivity is off. Where the observations cannot see a parameter, its error does
+no harm to what they measure. It does not help predictions that depend on that parameter either.
+\end{tocheck}
+\fig{t6_validation.png}{Observed (grey) and simulated streamflow and heads, with the initial (orange) and the calibrated
+(blue) parameters. Shaded: the warm-up year. Dashed: the start of the validation years.}

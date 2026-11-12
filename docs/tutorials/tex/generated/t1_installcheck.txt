@@ -1,8 +1,0 @@
-$ python3 raven-soil-zone/cmake/RavenMF6InstallCheck.py bin
-ok   Raven and the library in /home/user/Raven_MF6_linux/bin
-     runtime libraries beside the library: none
-ok   coupled run finishes  (Successful Simulation)
-ok   GWBudget.csv has the two steps  (2 rows)
-ok   the library beside Raven was used  (MODFLOW 6 library     : /home/user/Raven_MF6_linux/bin/libmf6.so (version 6.8.1))
-ok   the Fortran runtime resolves to /home/user/Raven_MF6_linux/bin  (0 libraries)
-install check: PASS

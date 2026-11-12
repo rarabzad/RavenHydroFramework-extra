@@ -1,0 +1,25 @@
+% 12_own_model.tex - compare with the finished state; the same steps for your own model
+\section{Finish}
+
+\step{Compare your folder with the finished state}
+\cmd{\$WS/model/finished} holds every file as it is at the end of this workshop (without the three changes of the last
+section). Compare:
+\begin{shell}
+$ diff -rq $WS/model/finished $WS/work
+\end{shell}
+\see only lines \cmd{Only in /home/user/Workshop\_2\_Own\_Groundwater\_Model/work: out} (and \cmd{out\_nogw},
+\cmd{out\_ascii}, \cmd{out\_refined} and the other output folders). A line \cmd{Files \dots differ} names a file that is
+not as in the finished state: \cmd{diff} without \cmd{-rq} shows the lines.
+
+\section{Do the same for your own model}
+\begin{enumerate}
+\item Export the HRU polygons with the HRU numbers of your \cmd{.rvh} (GeoJSON), the river lines with their subbasin, a
+  DEM and a raster of the aquifer base. Use longitude and latitude for all of them, or one projection for all of them
+  (\cmd{:InputCRS}).
+\item Choose aquifer profiles, fill the \cmd{AQUIFER\_PROFILE} column, and define the classes and profiles in the
+  \cmd{.rvp}.
+\item In the coupled HRUs, send the water that your model sends to deep groundwater into \cmd{GROUNDWATER}. Make sure that
+  no process takes water out of \cmd{GROUNDWATER} there.
+\item Write the \cmd{.rvg}. Start with cells of a few hundred metres to a few kilometres, and refine later.
+\item Run, read \cmd{GWModelSummary.txt}, run the audit and plot. Then calibrate (Workshop~6).
+\end{enumerate}

@@ -1,0 +1,16 @@
+% 03_concepts.tex - the two couplings and the unsaturated columns
+\section{Two ways to couple the soil and the aquifer}
+Read this section before you start. It explains what the steps change.
+\begin{description}
+\item[\cmd{CONCEPTUAL} (the default, as in Workshop~2)] The soil and the aquifer meet only in two ways: through recharge
+  (whatever Raven puts into its \cmd{GROUNDWATER} store) and through a seepage drain at the land surface. Where the water
+  table reaches the surface, MODFLOW sends groundwater back to Raven. The water table never enters the soil.
+\item[\cmd{PHYSICAL}] Raven computes the water in the soil layers you list; MODFLOW starts below them. The top of the
+  MODFLOW model is the base of these layers (the land surface minus their thickness). The water table can rise into the soil. There, recharge is rejected (it stays in
+  the soil), saturated soil drains to the aquifer, groundwater rises into the soil, and a full soil zone overflows to the
+  surface. Within each day, Raven and MODFLOW repeat their calculation until the soil and the aquifer agree. On sloping or
+  uneven land, each cell samples the DEM at 5$\times$5 points, so the low points saturate first.
+\end{description}
+Below the soil zone, recharge can cross an unsaturated zone. \cmd{:SoilZoneVadose} adds a column to each cell, between the
+base of the soil zone and a water table deeper than 5~cm. The column delays and spreads the recharge. It solves Richards'
+equation (\cmd{RICHARDS}), a kinematic wave (\cmd{KINEMATIC}) or a cascade of linear stores (\cmd{LAG}).

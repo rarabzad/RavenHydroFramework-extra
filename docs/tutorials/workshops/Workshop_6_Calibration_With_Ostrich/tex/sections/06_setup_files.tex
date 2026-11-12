@@ -1,0 +1,40 @@
+% 06_setup_files.tex - the template, ostIn.txt and the two scripts
+\section{The OSTRICH files}
+
+\step{Read the template}
+\cmd{Creek.rvp.tpl} is \cmd{model/Creek.rvp} with two values replaced by parameter names. Show the difference:
+\diff{t6_tpl.diff}
+\why before each run, OSTRICH writes \cmd{Creek.rvp} from this template, with the names replaced by the values it tries.
+
+\step{Read \texttt{ostIn.txt}}\label{st:ostin}
+\showfile{start/ostIn.txt}
+\why
+\begin{itemize}
+\item \cmd{ProgramType DDS} and \cmd{ObjectiveFunction GCOP}: DDS minimises a general objective function built from the
+  responses.
+\item \cmd{ModelExecutable} and \cmd{PreserveBestModel}: the two scripts of the next step.
+\item \cmd{BeginFilePairs}: OSTRICH writes \cmd{Creek.rvp} from \cmd{Creek.rvp.tpl} before each run.
+\item \cmd{BeginParams}: the initial value, the lower bound and the upper bound of each parameter. The conductivities are
+  searched in \cmd{log10} space (column \cmd{tx\_ost}): a step from 1 to 10~m/d is as large as one from 10 to 100.
+\item \cmd{BeginResponseVars}: where to read each response: the file, the line, the column and the separator. Line~0 is
+  the header line of \cmd{Diagnostics.csv}, so line~1 is the streamflow series. Column~5 is the KGE, column~4 the RMSE.
+  Check them against your own \cmd{Diagnostics.csv} whenever you change the observations or the metrics.
+\item \cmd{BeginTiedRespVars}: the objective \cmd{COST} $= -\mathrm{KGE} + \V{t6:w101}\,\mathrm{RMSE}_{101} +
+  \V{t6:w102}\,\mathrm{RMSE}_{102} + \V{t6:w103}\,\mathrm{RMSE}_{103}$, with the RMSE in metres. Each weight is
+  $1/(2\sigma)$, with $\sigma$ the standard deviation of that well's observed heads in the calibration years. So a head
+  error of half the well's own spread costs as much as a loss of 0.25 of KGE. For the first guess, \cmd{COST} =
+  \V{t6:costInit}.
+\item \cmd{RandomSeed} makes the search repeatable. \cmd{MaxIterations} is the number of model runs.
+  \cmd{UseInitialParamValues} starts from the \cmd{init} column (otherwise from random values).
+\end{itemize}
+
+\step{Read the two scripts}
+OSTRICH runs \cmd{Ost-RAVEN.sh} for every model run:
+\showfile{start/Ost-RAVEN.sh}
+\why \cmd{\$RAVEN} is the variable of Step~\ref{st:unpack}. It must be set in the terminal where OSTRICH runs. The script
+deletes \cmd{Diagnostics.csv} before the run. Then a failed run stops OSTRICH, instead of OSTRICH reading the results of
+the previous run.
+
+After every run that is the best so far, OSTRICH runs \cmd{save\_best.sh}:
+\showfile{start/save_best.sh}
+Both scripts must be executable. They are, in the zip. If not, type \cmd{chmod +x *.sh}.

@@ -1,0 +1,27 @@
+% 08_finish.tex - final checks, plots and notes
+\section{Check and plot the final run}
+
+\step{Check the water balance}
+\term{t4_audit_c.txt}
+\begin{tocheck}
+\begin{itemize}
+\item The reservoir lines: \cmd{delivered / sent} is 1, and no seepage is left undelivered.
+\item The surface-store line and the recharge line are 0.
+\item The cumulative residual is \V{t4:c:auditRes}, and there are \V{t4:c:auditUnconv} unconverged steps.
+\end{itemize}
+\end{tocheck}
+
+\step{Plot the results}
+\term{t4_plot.txt}
+\fig{t4_gw_budget.png}{\cmd{gw\_budget.png}: the budget of the coupled model. The model's own well and boundary
+(\emph{model's own packages}), water-table ET, and the storage release of the drain-down that follows the steady first
+day.}
+\fig[0.72]{t4_gw_map.png}{\cmd{gw\_map.png}: water-table depth below the model top, on the model's own cells (converted
+from feet to metres).}
+
+\section{Notes}
+Raven never changes your model. \cmd{out/mf6/} is a working copy, with the stress periods split into days, the taken-over
+packages commented out and Raven's packages added. \cmd{\$WS/model/finished} holds the files as they are at the end of
+this workshop. The manual of the coupling (chapter ``Coupling an existing MODFLOW~6 model'') describes restarts and later
+start dates, DISV grids, the water mover, steady-state models and the safeguards. It is in the RavenHydroFramework-extra
+repository (see \cmd{bin/README.txt}), with a larger example, \cmd{examples/Liard\_existing\_model}.

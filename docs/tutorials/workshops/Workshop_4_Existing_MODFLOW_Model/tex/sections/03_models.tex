@@ -1,0 +1,27 @@
+% 03_models.tex - the Raven model and the existing MODFLOW 6 model
+\section{The two models}
+
+\step{Copy the start folder and look at the MODFLOW model}
+\begin{shell}
+$ cp -r $WS/model/start $WS/work
+$ cd $WS/work
+\end{shell}
+The folder holds the Raven model of Tutorial Creek without groundwater, the HRU polygons \cmd{hrus.geojson}, and the
+MODFLOW~6 model in the folder \cmd{model}:
+\term{t4_ls_model.txt}
+The name file lists the packages of the model:
+\term{t4_nam.txt}
+\why the model has:
+\begin{itemize}
+\item A regular grid (package \cmd{DIS}) of \V{t4:nrow}~rows and \V{t4:ncol}~columns of \V{t4:cellft}-ft cells
+  (\V{t4:cellm}~m) and two layers, with lengths in feet. Its origin is given in feet, in UTM zone 11N:
+\term{t4_dis_head.txt}
+\item A steady-state period of one day, then monthly periods, \V{t4:nper} in all, from 1 January 2010:
+\term{t4_tdis_head.txt}
+\item Its own recharge (\cmd{RCH\_MODEL}) and ET (\cmd{EVT\_MODEL}), given as arrays.
+\item \V{t4:nriv} river cells (\cmd{RIV\_CREEK}). Their auxiliary variable \cmd{SUBBASIN} (an extra column) names the Raven
+  subbasin of each river reach:
+\term{t4_riv_head.txt}
+\item A pumping well (\cmd{WEL\_PUMP}, monthly rates) and a head boundary at the outlet (\cmd{GHB\_OUTLET}, \V{t4:nghb}
+  cells).
+\end{itemize}

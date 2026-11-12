@@ -1,0 +1,40 @@
+% 07_dds.tex - run DDS and read its results
+\section{Run the calibration}
+
+\step{Run DDS}
+In \cmd{\$WS/work}, with \cmd{RAVEN} and \cmd{OSTRICH} set:
+\begin{shell}
+$ $OSTRICH
+\end{shell}
+\see little output in the terminal. OSTRICH writes \cmd{OstModel0.txt} (one line per run: the objective and the
+parameters, in the order of the runs) and, at the end, \cmd{OstOutput0.txt}. To follow the progress, open a second
+terminal, go to \cmd{\$WS/work} and type \cmd{tail -f OstModel0.txt} (stop it with Ctrl+C). The \V{t6:maxiter} runs take
+about \V{t6:ddsmin}~minutes (about \V{t6:runsec}~seconds each).
+\begin{trouble}
+\begin{itemize}
+\item OSTRICH stops at once with an error about \cmd{Diagnostics.csv}: the first model run failed. Run
+  \cmd{./Ost-RAVEN.sh} by hand and read \cmd{model/output/Raven\_errors.txt}. Most often \cmd{RAVEN} is not set in this
+  terminal.
+\item Every run gives the same objective: the parameter names in the template do not match \cmd{BeginParams}, so
+  \cmd{Creek.rvp} never changes.
+\item A response of \cmd{-1e+99} or \cmd{inf}: a series has no observations in the evaluated period. Check the weights.
+\end{itemize}
+\end{trouble}
+
+\step{Read the results}
+The end of \cmd{OstOutput0.txt}:
+\term{t6_ostout.txt}
+and its run record (each line is a new best):
+\term{t6_runrecord.txt}
+\fig{t6_convergence.png}{DDS: the objective of each run and the best so far (left; grey: the best so far of the first
+attempt), and the parameters of the best run so far divided by their true values (right).\label{fig:t6conv}}
+\begin{tocheck}
+\begin{itemize}
+\item \cmd{OstErrors0.txt} reports \cmd{A total of 0 errors}, and \cmd{OstModel0.txt} has a header line and
+  \V{t6:nevals} lines, one per run.
+\item The objective fell from \V{t6:costInit} to \V{t6:costBest}. DDS had made 95\% of that improvement after
+  \V{t6:itninetyfive} runs, and found its best at run \V{t6:itBest} (Figure~\ref{fig:t6conv}).
+\item The folder \cmd{best} holds \cmd{Creek.rvp}, \cmd{Diagnostics.csv}, \cmd{Hydrographs.csv} and \cmd{GWHeads.csv} of
+  the best run.
+\end{itemize}
+\end{tocheck}

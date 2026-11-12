@@ -1,0 +1,20 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[HRU] Hydrological response unit: a part of a subbasin with one land use, one soil and one elevation band.
+\item[Recharge] The water that leaves the soil downwards towards the groundwater.
+\item[Water table] The top of the saturated ground. Its \emph{depth} is measured from the land surface.
+\item[Soil zone] The soil layers that Raven computes (here the top two). With \cmd{:SoilZone PHYSICAL}, the water table
+  can rise into them.
+\item[Unsaturated zone] The ground between the soil zone and the water table, where the pores hold both air and water.
+  An \emph{unsaturated column} computes the water moving down through it.
+\item[Specific yield] The share of the ground's volume that drains when the water table falls. The \emph{drainable
+  porosity} of a soil is the same quantity for the soil: porosity times (1 $-$ field capacity).
+\end{description}
+
+\paragraph{How to read the commands and file changes.} A line in a grey box that starts with \cmd{\$} is what you type
+(without the \cmd{\$}); the lines under it are what the computer prints, shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. A file change is shown as
+a \emph{diff}: lines starting with \cmd{-} are removed, lines starting with \cmd{+} are added, the other lines help you find
+the place, and \cmd{@@} lines give line numbers. Make each change with a text editor.

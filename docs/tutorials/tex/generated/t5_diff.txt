@@ -1,6 +1,0 @@
-$ python3 $TUT/scripts/compare_runs.py --diff ../t5/out out
-GWBudget.csv       366 common dates,  27 columns: largest difference 0
-GWHeads.csv        367 common dates,   3 columns: largest difference 0
-GWHRUState.csv     366 common dates,  16 columns: largest difference 0
-Hydrographs.csv    366 common dates,   1 columns: largest difference 0
-largest difference of all: 0

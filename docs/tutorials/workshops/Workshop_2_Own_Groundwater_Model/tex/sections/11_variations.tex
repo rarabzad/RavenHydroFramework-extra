@@ -1,0 +1,41 @@
+% 11_variations.tex - ASCII grids, a missing :InputCRS, a refined grid
+\section{Try three changes}
+Make each change, run, and then undo the change before the next one. Each run writes to its own output folder.
+
+\step{Use ESRI ASCII grids instead of GeoTIFF}
+Change the two raster names in \cmd{Creek.rvg}:
+\diff{t2_ascii.diff}
+\begin{shell}
+$ $RAVEN Creek -o out_ascii/
+\end{shell}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+
+\why the two pairs of rasters hold the same values (the GeoTIFF files store them as 32-bit numbers). The heads in
+\cmd{out\_ascii/GWHRUState.csv} differ from those in \cmd{out/} by at most \V{t2:asciidiff}~m. An ESRI ASCII grid has no
+projection of its own: \cmd{:InputCRS} applies to it, and Raven only checks that the grid covers the HRUs. Undo the change
+(\cmd{dem.tif}, \cmd{bedrock.tif}) before the next step.
+
+\step{Leave out \texttt{:InputCRS}}\label{st:nocrs}
+Make the \cmd{:InputCRS} line a comment:
+\diff{t2_nocrs.diff}
+\term{t2_nocrs_err.txt}
+\see Raven stops before it builds anything. Without \cmd{:InputCRS}, the coordinates of the well (and of every input file)
+would be read as longitude and latitude. The message says what to do. (If the wells had been given by latitude and
+longitude, the next message would have named \cmd{hrus.geojson}, whose \cmd{"crs"} member says EPSG:32611.) Undo the change
+before the next step.
+
+\step{Use smaller cells along the creek}
+Add one line after \cmd{:GridCellSize}:
+\diff{t2_refine.diff}
+\begin{shell}
+$ $RAVEN Creek -o out_refined/
+\end{shell}
+\term{t2_refine_summary.txt}
+\why a regular grid is refined in whole rows and columns. The grid now has \V{t2:refnrow}$\times$\V{t2:refncol} cells and
+\V{t2:refactive} active columns (instead of \V{t2:nrow}$\times$\V{t2:ncol} and \V{t2:activecols}), \V{t2:refriv} river
+cells (instead of \V{t2:rivcells}), and a run takes about \V{t2:refsec}~seconds (instead of \V{t2:runsec}).
+The smaller cells along the creek change the discharge to it: \V{t2:reftoriv} instead of
+\V{t2:toriv}~m\textsuperscript{3}/d. The narrower river cells take less of the groundwater, and more of it seeps out into
+the soil next to them (seepage to Raven \V{t2:refseep} instead of \V{t2:seep}~m\textsuperscript{3}/d). The mean
+water-table depth of HRU~6 becomes \V{t2:refwt6}~m. Another option, \cmd{:GridType QUADTREE}, refines the grid locally
+instead of in whole rows and columns. Undo the change at the end.

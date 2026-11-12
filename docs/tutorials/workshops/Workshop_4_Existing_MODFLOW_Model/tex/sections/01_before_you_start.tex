@@ -1,0 +1,19 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[HRU] Hydrological response unit: a part of a subbasin with one land use, one soil and one elevation band.
+\item[Recharge] The water that leaves the soil downwards and reaches the groundwater.
+\item[Package] A part of a MODFLOW~6 model with one job, for example \cmd{RCH} (recharge), \cmd{EVT} (evapotranspiration),
+  \cmd{RIV} (river cells), \cmd{WEL} (wells), \cmd{GHB} (general-head boundary). The \emph{name file} lists the packages.
+\item[Stress period] A time interval of a MODFLOW model in which the inputs stay constant. A \emph{steady-state} period
+  computes the heads that do not change in time.
+\item[Projection] The coordinate system of a map (here UTM zone 11N). An \emph{EPSG code} names it (EPSG:32611).
+\end{description}
+
+\paragraph{How to read the commands and file changes.} A line in a grey box that starts with \cmd{\$} is what you type
+(without the \cmd{\$}); the lines under it are what the computer prints, shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. A file change is shown as
+a \emph{diff}: lines starting with \cmd{-} are removed, lines starting with \cmd{+} are added, the other lines help you find
+the place, and \cmd{@@} lines give line numbers. Make each change with a text editor, or copy the changed file from the
+folder that the step names.

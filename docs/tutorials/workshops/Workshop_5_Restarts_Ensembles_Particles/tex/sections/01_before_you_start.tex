@@ -1,0 +1,19 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[Hotstart] A run that starts from the saved state of an earlier run instead of from the initial conditions.
+  Raven saves the state in \cmd{solution.rvc} at the end of every run.
+\item[Ensemble] A set of runs (\emph{members}) of the same model with different parameter values. In a \emph{Monte Carlo}
+  ensemble the values are drawn at random from given ranges.
+\item[Particle tracking] Following imaginary water particles through the computed groundwater flow. \emph{Backward}
+  tracking runs back in time, from where the water ends up to where it came from. MODFLOW~6 does it with its PRT model
+  (particle-tracking model).
+\item[Head] The water level in the aquifer, in metres.
+\end{description}
+
+\paragraph{How to read the commands and file changes.} A line in a grey box that starts with \cmd{\$} is what you type
+(without the \cmd{\$}); the lines under it are what the computer prints, shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. A file change is shown as
+a \emph{diff}: lines starting with \cmd{-} are removed, lines starting with \cmd{+} are added, the other lines help you find
+the place, and \cmd{@@} lines give line numbers. Make each change with a text editor.

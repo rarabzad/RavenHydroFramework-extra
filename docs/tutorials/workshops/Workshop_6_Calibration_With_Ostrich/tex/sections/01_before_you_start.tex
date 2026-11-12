@@ -1,0 +1,23 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[Calibration] Changing the parameters of a model until its results fit observations. OSTRICH changes the
+  parameters, runs Raven, reads the results and repeats.
+\item[Objective function] The number that the calibration makes as small as possible. Here it combines the fit of the
+  streamflow and of the heads.
+\item[KGE] Kling--Gupta efficiency of the simulated streamflow: 1 is a perfect fit, lower is worse.
+\item[RMSE] Root mean square error: the typical size of the difference between simulated and observed values, here in
+  metres of head.
+\item[DDS] Dynamically Dimensioned Search: a search method that changes many parameters at first and fewer and fewer as
+  the run budget is used up.
+\item[Hydraulic conductivity] $K_h$: how easily water flows through the ground, in m/d. \emph{Specific yield} $S_y$: the
+  share of the volume that drains when the water table falls.
+\item[Validation] Testing the calibrated model on data that the calibration did not use.
+\end{description}
+
+\paragraph{How to read the commands and file changes.} A line in a grey box that starts with \cmd{\$} is what you type
+(without the \cmd{\$}); the lines under it are what the computer prints, shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. A file change is shown as
+a \emph{diff}: lines starting with \cmd{-} are removed, lines starting with \cmd{+} are added, the other lines help you find
+the place, and \cmd{@@} lines give line numbers.

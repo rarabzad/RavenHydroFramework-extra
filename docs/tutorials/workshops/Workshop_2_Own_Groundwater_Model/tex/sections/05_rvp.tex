@@ -1,0 +1,22 @@
+% 05_rvp.tex - aquifer classes, profiles and profile parameters
+\section{Describe the aquifer}
+
+\step{Add three tables to \texttt{Creek.rvp}}
+Add these lines to the end of \cmd{Creek.rvp}:
+\diff{t2_rvp.diff}
+\why
+\begin{itemize}
+\item \cmd{:AquiferClasses} lists the materials. \cmd{K\_HORIZ} and \cmd{K\_VERT} are the horizontal and vertical
+  hydraulic conductivity [m/d] (how easily water flows through the material). \cmd{SPEC\_STORAGE} is the specific storage
+  [1/m] and \cmd{SPEC\_YIELD} the specific yield (the share of the volume that drains when the water table falls).
+  \cmd{POROSITY} is used by the unsaturated columns of Workshop~3 and by particle tracking (Workshop~5).
+\item \cmd{:AquiferProfiles} gives the layers under an HRU, from the top. For each layer: the class, the thickness [m] (or
+  \cmd{TO\_BEDROCK}: down to the bedrock raster) and the layer type. Both profiles have two layers, so layer~1 of the valley
+  joins layer~1 of the slopes where they meet. An \cmd{AQUIFER} layer is \emph{convertible}: it can dry out and wet again.
+  The other types are \cmd{CONFINED\_AQUIFER}, \cmd{AQUITARD} and \cmd{AQUICLUDE}.
+\item \cmd{:AquiferProfileParameters} gives, per profile, the initial depth of the water table [m]
+  (\cmd{INITIAL\_HEAD\_DEPTH}) and the conductance of the \emph{seepage face} (where the water table reaches the land
+  surface and groundwater seeps out) [1/d]. All other parameters (river-bed conductivity, water-table evaporation,
+  recharge delay and others) keep their default values.
+\end{itemize}
+Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvp .}

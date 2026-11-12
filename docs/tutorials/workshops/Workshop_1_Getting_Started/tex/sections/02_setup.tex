@@ -1,0 +1,55 @@
+% 02_setup.tex - unpack the workshop, set the two variables, install the Python packages
+\section{Set up}
+
+\step{Unpack the workshop}\label{st:unpack}
+Copy \cmd{Workshop\_1\_Getting\_Started.zip} into your home folder. On WSL, your Windows files are under \cmd{/mnt/c/}, for
+example:
+\begin{shell}
+$ cp /mnt/c/Users/YOUR_NAME/Downloads/Workshop_1_Getting_Started.zip ~/
+\end{shell}
+Unpack the zip, go into the new folder, and set two variables. \cmd{WS} is the workshop folder and \cmd{RAVEN} is the
+Raven program:
+\begin{shell}
+$ cd ~
+$ unzip -q Workshop_1_Getting_Started.zip
+$ cd Workshop_1_Getting_Started
+$ export WS=$PWD
+$ export RAVEN=$WS/bin/Raven
+\end{shell}
+\see no output. \cmd{unzip -q} and \cmd{export} print nothing when they work. Now list the folder:
+\term{t1_ls_ws.txt}
+\see these names (your terminal may show them in another order or arrangement).
+\cmd{bin} holds Raven and the MODFLOW~6 library, \cmd{model/start} the Liard River example as you get it,
+\cmd{model/finished} the one file that this workshop changes (\cmd{Liard.rvi}; its \cmd{README.txt} explains), \cmd{scripts} the helper programs, and
+\cmd{tex} the source of this document.
+\begin{trouble}
+\begin{itemize}
+\item \cmd{unzip: command not found}: install it with \cmd{sudo apt install unzip} (Ubuntu and WSL).
+\item \cmd{cannot find or open Workshop\_1\_Getting\_Started.zip}: the zip is not in your home folder. Type \cmd{ls \textasciitilde}
+  to see what is there.
+\end{itemize}
+\end{trouble}
+\begin{note}[Every new terminal]
+\cmd{export} is valid only in the terminal where you typed it. In a new terminal, go to the workshop folder and type the
+two \cmd{export} lines again.
+\end{note}
+
+\step{Install the Python packages}\label{st:python}
+The helper scripts need Python~3 with numpy, pandas and matplotlib. A \emph{virtual environment} (a private folder of
+Python packages) avoids conflicts with the packages of your system. On Ubuntu and WSL:
+\begin{shell}
+$ sudo apt update
+$ sudo apt install python3-venv
+$ python3 -m venv ~/raven-venv
+$ source ~/raven-venv/bin/activate
+$ pip install numpy pandas matplotlib
+\end{shell}
+\see \cmd{pip} downloads the packages. It prints a line that starts with \cmd{Successfully installed}. Your prompt now starts with
+\cmd{(raven-venv)}. Test the packages:
+\begin{shell}
+$ python3 -c "import numpy, pandas, matplotlib; print('ok')"
+ok
+\end{shell}
+\begin{note}[Every new terminal]
+Type \cmd{source \textasciitilde/raven-venv/bin/activate} in every new terminal, before you run a Python script.
+\end{note}

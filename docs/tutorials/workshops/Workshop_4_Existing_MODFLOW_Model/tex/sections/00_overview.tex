@@ -1,0 +1,13 @@
+% 00_overview.tex - what the workshop covers, what you need, how to read it
+\begin{goal}
+\textbf{What you do.} A colleague has built a MODFLOW~6 model of Tutorial Creek. It works in feet, on a grid of its own,
+with its own recharge, evapotranspiration (ET), rivers, well and head boundary. You couple the Raven model of Tutorial
+Creek to it without changing it. You link the HRUs to its cells, let Raven take over the recharge and the ET, and send its
+river flows to Raven's river reaches. Then you add ET from the water table, a wetland and a reservoir, and check the
+result.
+
+\textbf{What you need.} A Linux computer (x86\_64) with a terminal, or Windows with WSL. Python~3 with numpy, pandas and
+matplotlib (Step~\ref{st:python}). A text editor, for example \cmd{nano}. Workshop~2 is helpful but not needed.
+
+\textbf{Time.} About 40 minutes.
+\end{goal}

@@ -1,0 +1,68 @@
+% 05_sensitivity.tex - which parameters the observations see; the first attempt
+\section{What the observations can see}\label{sec:ident}
+Before you calibrate, check that the observations depend on the parameters at all. Read this section. The models in it
+were run for you; its one command only shows a file. The table changes one parameter at a time by 10\% and shows how the KGE of the streamflow, the head RMSE of
+each well and the objective function change. The objective function is defined in \cmd{ostIn.txt}
+(Step~\ref{st:ostin}): $-\mathrm{KGE}$ plus, for each well, its head RMSE times a weight $1/(2\sigma)$, where $\sigma$ is the
+standard deviation of that well's observed heads. The weights are \V{t6:w101}, \V{t6:w102} and \V{t6:w103} for OW\_NEAR,
+OW\_UPPER and OW\_SLOPE. With the true parameters the KGE is \V{t6:sens:kge}, the RMSEs are \V{t6:sens:rmse101},
+\V{t6:sens:rmse102} and \V{t6:sens:rmse103}~mm (the noise of the observations), and the objective is \V{t6:sens:base}.
+\begin{center}\small
+\input{generated/t6_sens_table.tex}
+\end{center}
+The true values are: $K_h$ of GRAVEL \V{t6:trueK_GRAVEL}~m/d (valley, layer~1); $S_y$ of GRAVEL \V{t6:trueSY_GRAVEL};
+$K_h$ of SAND \V{t6:trueK_SAND}~m/d (valley, layer~2); $K_h$ of TILL \V{t6:trueK_TILL}~m/d (slopes); \cmd{PERC\_COEFF} of
+SUBSOIL \V{t6:truePERC_SUBSOIL}~1/d. The table shows:
+\begin{itemize}
+\item The valley wells see the gravel. OW\_NEAR and OW\_UPPER respond to its conductivity, more to a higher value than to
+  a lower one, and with their large weights this is most of its change of the objective. Its $S_y$ hardly shows.
+\item Only OW\_SLOPE sees the sand, which carries the groundwater of the slopes down the valley. The RMSE there grows by
+  \V{t6:sens:sandslopemin} to \V{t6:sens:sandslopemax}~cm, about the size of the noise. The small weight of OW\_SLOPE
+  (\V{t6:w103}, set by the large spread of its heads) cuts that to hundredths of the objective. The valley wells hardly see
+  the sand, although OW\_NEAR is screened in the sand 200~m from the pumping well PW\_1: its heads follow the creek and the
+  gravel.
+\item The till matters very much. The water table under the slopes lies at a height set by the ratio of recharge to
+  conductivity. A 10\% change of the till's $K_h$ raises the RMSE at OW\_SLOPE to \V{t6:sens:K_TILL:lo:slope} and
+  \V{t6:sens:K_TILL:hi:slope}~m.
+\item \cmd{PERC\_COEFF} sets how much of the subsoil's drainage becomes recharge; the rest flows to the creek as interflow.
+  So it shows in the streamflow and, through the recharge, at OW\_SLOPE too.
+\end{itemize}
+The objective is not exactly at its minimum at the true values. The observations are noisy, so a nearby parameter set can
+fit them a little better (a negative change in the table). Read the table for the size of the changes on both sides.
+
+\subsection*{A first attempt}
+A first calibration searched four parameters with \V{t6:fa:maxiter} DDS runs: $K_h$ and $S_y$ of the gravel, $K_h$ of the
+till, and \cmd{PERC\_COEFF}. Its files are in \cmd{\$WS/model/finished/first\_attempt}. Its parameters were:
+\term{t6_fa_params.txt}
+\begin{center}\small
+\begin{tabular}{lrrrr}\toprule
+Parameter & initial & true & found & error\\\midrule
+$K_h$ of GRAVEL [m/d] & \V{t6:fa:initK_GRAVEL} & \V{t6:trueK_GRAVEL} & \V{t6:fa:bestK_GRAVEL} & \V{t6:fa:errK_GRAVEL}\%\\
+$S_y$ of GRAVEL & \V{t6:fa:initSY_GRAVEL} & \V{t6:trueSY_GRAVEL} & \V{t6:fa:bestSY_GRAVEL} & \V{t6:fa:errSY_GRAVEL}\%\\
+$K_h$ of TILL [m/d] & \V{t6:fa:initK_TILL} & \V{t6:trueK_TILL} & \V{t6:fa:bestK_TILL} & \V{t6:fa:errK_TILL}\%\\
+\cmd{PERC\_COEFF} of SUBSOIL [1/d] & \V{t6:fa:initPERC_SUBSOIL} & \V{t6:truePERC_SUBSOIL} & \V{t6:fa:bestPERC_SUBSOIL} & \V{t6:fa:errPERC_SUBSOIL}\%\\\bottomrule
+\end{tabular}\end{center}
+Its objective weighted every well alike (\V{t6:headw}~times its head RMSE). It reached \V{t6:fa:cost} at run
+\V{t6:fa:itBest}; with the true parameters it is \V{t6:fa:costtrue}. Two things went wrong, and the table above explains
+both:
+\begin{itemize}
+\item The gravel's parameters ended where the objective is flat. With these observations, no number of runs pins them
+  down.
+\item DDS found a till conductivity that fitted OW\_SLOPE early (it kept the value of run \V{t6:fa:ktfrom} to the end),
+  but together with a wrong \cmd{PERC\_COEFF}: less recharge and a slightly lower conductivity give the same heads on the
+  slope. From there, changing either parameter alone costs much more (see the table) than the streamflow gains. So the
+  search stays in that narrow valley of the objective, even over \V{t6:fa:maxiter} runs.
+\end{itemize}
+Two changes make the calibration well posed:
+\begin{enumerate}
+\item Calibrate what the data can see, and not two parameters that the data see only together. The calibration of this
+  workshop searches the conductivity of the till, which the data see clearly, and that of the sand, which they see weakly,
+  to show what happens to such a parameter. The gravel and \cmd{PERC\_COEFF} keep the values of Workshop~2, as if they were
+  known from elsewhere (a pumping test, or a calibration of the streamflow alone). In this synthetic experiment those are
+  their true values, so the test is whether DDS recovers the two conductivities.
+\item Weight each well by the spread of its own observations. In the calibration years the heads of OW\_SLOPE range over
+  \V{t6:swingm103}~m, those of OW\_NEAR and OW\_UPPER over \V{t6:swing101} and \V{t6:swing102}~cm. Weighted alike, as in the
+  first attempt, OW\_SLOPE dominates the objective so much that DDS keeps any set that fits it. The sand and the till also
+  trade off there: a higher sand conductivity drains the slopes, and a lower till conductivity raises them again. Measured
+  against its own spread, each well and the streamflow get a comparable say.
+\end{enumerate}

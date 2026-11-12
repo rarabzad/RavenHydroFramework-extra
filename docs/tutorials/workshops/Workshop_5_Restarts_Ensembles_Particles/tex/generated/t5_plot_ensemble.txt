@@ -1,0 +1,7 @@
+$ python3 $WS/scripts/plot_ensemble.py out_ens --ref out --well 103
+member 1: mean recharge 58508 m3/d, head at OW_SLOPE (103) on the last day 1007.58 m
+member 2: mean recharge 49417 m3/d, head at OW_SLOPE (103) on the last day 1005.53 m
+member 3: mean recharge 54156 m3/d, head at OW_SLOPE (103) on the last day 1006.61 m
+member 4: mean recharge 49025 m3/d, head at OW_SLOPE (103) on the last day 1005.44 m
+member 5: mean recharge 59100 m3/d, head at OW_SLOPE (103) on the last day 1007.71 m
+wrote ensemble.png

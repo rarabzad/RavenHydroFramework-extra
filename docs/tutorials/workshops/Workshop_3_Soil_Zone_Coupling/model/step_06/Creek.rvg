@@ -1,0 +1,31 @@
+# Creek.rvg - the groundwater model of Tutorial Creek (Raven builds it)
+
+# --- input files and their projection ------------------------------------------
+:InputCRS          EPSG:32611                      # every GeoJSON and raster below is in UTM zone 11N
+:HRUGeometry       hrus.geojson    HRU_ID          # HRU polygons; HRU_ID matches the .rvh
+:RiverGeometry     rivers.geojson  SUBBASIN        # creek lines, each with its Raven subbasin
+:LandSurface       dem.tif                         # land surface (GeoTIFF; ESRI ASCII grids work too)
+:BedrockSurface    bedrock.tif                     # base of the aquifer
+
+# --- grid and start --------------------------------------------------------------
+:GridCellSize      250.0                           # m
+:GWInitialization  STEADY_STATE 1.2                # start from the steady state for 1.2 mm/d of recharge
+
+# --- wells (rates in CreekGW.rvt) and observation wells (by X, Y with :InputCRS) ----
+:Wells
+  :Attributes, NAME, X, Y, SCREEN_TOP, SCREEN_BOT
+  1, PW_1, 505500.0, 5603300.0, 958.0, 945.0
+:EndWells
+:ObservationWells
+  :Attributes, NAME, X, Y, SCREEN_ELEV
+  101, OW_NEAR,  505700.0, 5603300.0, 955.0
+  102, OW_UPPER, 501500.0, 5602700.0, 985.0
+  103, OW_SLOPE, 506500.0, 5604500.0, 995.0
+:EndObservationWells
+
+# --- head boundaries -------------------------------------------------------------
+:GeneralHeadBoundary   OUTLET outlet.geojson HEAD 958.0 CONDUCTANCE 500.0 LAYERS ALL   # underflow leaving the valley
+:SpecifiedHeadBoundary POND   pond.geojson   HEAD 976.5 LAYERS TOP                     # gravel-pit pond; level from CreekGW.rvt
+
+# --- the soil zone and the water table ---------------------------------------------
+:SoilZone          PHYSICAL SOIL[0] SOIL[1]        # Raven owns TOPSOIL and SUBSOIL; MODFLOW starts below them

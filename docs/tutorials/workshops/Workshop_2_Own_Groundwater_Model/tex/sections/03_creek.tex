@@ -1,0 +1,54 @@
+% 03_creek.tex - the start model, Tutorial Creek, run once without groundwater
+\section{Tutorial Creek without groundwater}
+
+\step{Copy the start model into a work folder}
+\begin{shell}
+$ cp -r $WS/model/start $WS/work
+$ cd $WS/work
+\end{shell}
+\term{t2_ls_start.txt}
+\see the files above. The folder is a complete Raven model \emph{without} groundwater, plus the data that a groundwater
+model needs:
+\begin{itemize}
+\item \cmd{Creek.rvi}, \cmd{.rvh}, \cmd{.rvp}, \cmd{.rvc}, \cmd{.rvt} and \cmd{CreekMet.rvt}: the Raven model, with daily
+  weather for 2010--2014. The runs of this workshop cover 2010--2012.
+\item \cmd{hrus.geojson}: the HRU polygons, with the field \cmd{HRU\_ID}. \cmd{rivers.geojson}: the creek, with the field
+  \cmd{SUBBASIN}. Both are in UTM zone 11N (EPSG:32611). GeoJSON is a text format for map features.
+\item \cmd{dem.tif} and \cmd{bedrock.tif}: the land surface and the bedrock surface, as 50-m GeoTIFF rasters in the same
+  projection. \cmd{dem.asc} and \cmd{bedrock.asc} hold the same values as ESRI ASCII grids.
+\item \cmd{outlet.geojson}: a line across the valley at its eastern edge. \cmd{pond.geojson}: a gravel-pit pond.
+\item \cmd{CreekGW.rvt}: the pumping record of the well PW\_1 and the measured level of the pond.
+\end{itemize}
+
+Tutorial Creek (Figure~\ref{fig:t2basin}) covers \V{t2:areaTotal}~km\textsuperscript{2}. The creek runs from west to
+east along a valley floor 1.4~km wide. Forested slopes rise about 150~m to the north and to the south. A bare-rock ridge
+closes the upper subbasin to the north. Subbasin~1 (UPPER) ends in a small lake, CreekLake, which Raven routes as a
+reservoir. Subbasin~2 (LOWER) has a wetland and a streamflow gauge at its outlet. The \V{t2:nhru} HRUs are:
+\begin{center}\small
+\begin{tabular}{rllrl}\toprule
+HRU & subbasin & land & area [km\textsuperscript{2}] & aquifer profile (this workshop)\\\midrule
+1 & UPPER & valley floor & \V{t2:area1} & VALLEY\_FILL\\
+2, 3 & UPPER & north and south slopes & \V{t2:area2}, \V{t2:area3} & SLOPE\_TILL\\
+4 & UPPER & bare-rock ridge & \V{t2:area4} & none\\
+5 & UPPER & CreekLake (reservoir) & \V{t2:area5} & VALLEY\_FILL\\
+6 & LOWER & valley floor & \V{t2:area6} & VALLEY\_FILL\\
+7, 8 & LOWER & north and south slopes & \V{t2:area7}, \V{t2:area8} & SLOPE\_TILL\\
+9 & LOWER & wetland & \V{t2:area9} & VALLEY\_FILL\\\bottomrule
+\end{tabular}\end{center}
+\fig[0.86]{t2_basin.png}{Tutorial Creek: the HRUs (numbers), the creek, the lake (HRU~5) and the wetland (HRU~9), and the
+groundwater features of this workshop: a head boundary where the valley leaves the map, a pond with a known water level,
+a pumping well and three observation wells.\label{fig:t2basin}}
+
+\step{Run the model without groundwater}
+Run the model once as it is, into the output folder \cmd{out\_nogw}. You will compare this run with the coupled run later.
+\term{t2_run_nogw.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The run takes less than a second. The mean flow at the outlet is
+\V{t2:qmeanNoGW}~m\textsuperscript{3}/s.
+
+\why in this model the deep groundwater is a simple store. \cmd{Creek.rvi} sends water from the subsoil
+(\cmd{SUBSOIL}, \cmd{SOIL[1]}) to \cmd{DEEP\_STORE} (\cmd{SOIL[2]}), a linear reservoir that drains to the creek. Read the
+file:
+\needspace{30\baselineskip}
+\showfile{start/Creek.rvi}
+In the next steps you replace \cmd{DEEP\_STORE} by a MODFLOW~6 model under every HRU except the ridge. You make four
+changes to the Raven files and write one new file, \cmd{Creek.rvg}.

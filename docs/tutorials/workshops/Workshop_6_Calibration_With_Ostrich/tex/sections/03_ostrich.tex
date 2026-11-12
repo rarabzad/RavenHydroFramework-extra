@@ -1,0 +1,44 @@
+% 03_ostrich.tex - where to get OSTRICH, the version used, and the loader workaround
+\section{Get OSTRICH}
+
+\step{Download OSTRICH and test it}\label{st:ostrich}
+OSTRICH (by L.~Shawn Matott) is not part of this workshop. Get it from its official sources:
+\begin{itemize}
+\item The University of Waterloo: Linux, macOS and Windows programs, and the Raven--OSTRICH tutorial files with
+  Demo~C1:\newline \url{https://www.civil.uwaterloo.ca/envmodelling/Ostrich.html}
+\item The author's page: the source code, which you can compile with \cmd{make GCC}:\newline
+  \url{https://www.eng.buffalo.edu/~lsmatott/Ostrich/OstrichMain.html}
+\item The documentation of the current versions: \url{https://usbr.github.io/ostrich}
+\end{itemize}
+This workshop was made with \cmd{Ostrich\_v20171219\_GCC\_Linux.exe} from the folder \cmd{Demo\_C1} of the Raven--OSTRICH
+tutorial files. It reports itself as \emph{OSTRICH version \V{t6:ostver}}. Unzip the Raven--OSTRICH tutorial files in a
+folder of their own and go into that folder. Then copy the program into a folder \cmd{\textasciitilde/ostrich}:
+\begin{shell}
+$ mkdir -p ~/ostrich
+$ cp Demo_C1/Ostrich_v20171219_GCC_Linux.exe ~/ostrich/
+$ chmod +x ~/ostrich/Ostrich_v20171219_GCC_Linux.exe
+\end{shell}
+This program was built on a computing cluster. It asks for a program loader (the part of Linux that starts programs) that
+other Linux systems do not have. Start it through your system's loader instead. Put the whole command in the variable
+\cmd{OSTRICH}, and test it in the folder \cmd{\textasciitilde/ostrich}, which has no OSTRICH input file:
+\begin{shell}
+$ export OSTRICH="/lib64/ld-linux-x86-64.so.2 $HOME/ostrich/Ostrich_v20171219_GCC_Linux.exe"
+$ cd ~/ostrich
+$ $OSTRICH
+Starting up MPI required 0.000002 seconds
+InitDataLine() : Couldn't open file |ostIn.txt|
+Ostrich Error Report for Processor 0
+A total of 1 errors and/or warnings were reported
+FILE I/O ERROR             : GetInFileName()(): couldn't open |ostIn.txt|
+...
+\end{shell}
+\see these lines (the time on the first line differs). OSTRICH started and complained only that \cmd{ostIn.txt} is missing.
+That is correct here.
+\begin{trouble}
+\begin{itemize}
+\item \cmd{cannot execute: required file not found}, although the file is there: you started the program directly. Use the
+  \cmd{export OSTRICH=...} line above, which starts it through the loader. This is how it ran for this workshop.
+\item \cmd{/lib64/ld-linux-x86-64.so.2: No such file or directory}: your Linux keeps the loader elsewhere. Find it with
+  \cmd{ls /lib*/ld-linux*} and use that path. Or compile OSTRICH from its source code.
+\end{itemize}
+\end{trouble}
