@@ -76,7 +76,7 @@ equilibrium together, and the cascade itself never takes a node below equilibriu
 \paragraph{Steady start.} With \cmd{:SoilZoneVadoseInitialFlux} $q$ the cascade starts at its steady state for the flux
 it receives, $(1-F)\,q$ (Section~\ref{sec:szvadose}; here written $q$),
 $S_i=\min(q\,k_i,\,S_{\max,i})$ (a full node passes everything it receives), which delivers $q$ from the first step (unit
-test U: to round-off).
+test LU: to round-off).
 
 \paragraph{Behaviour to expect.} With three depth classes (\cmd{:SoilZoneVadoseClasses 3}) the water table can be lower
 during rain than with one class: the upper classes' columns are long (5 to 13~m in the rough-terrain case RT20) and hold
@@ -100,7 +100,7 @@ column grid (exact cascade; time in units of the mean travel time $t_mL$). Right
 column, with \cmd{RICHARDS}, and with \cmd{LAG} 2, 4 and the derived travel time.}\label{fig:vzlagcascade}
 \end{figure}
 
-\paragraph{Cost and limits.} A column step costs 1 to 3~$\mu$s for 16 nodes (unit test U: 1.7 to 2~$\mu$s), against
+\paragraph{Cost and limits.} A column step costs 1 to 3~$\mu$s for 16 nodes (unit test LU: 1.7 to 2~$\mu$s), against
 12 to 15~$\mu$s for \cmd{RICHARDS}; in a coupled run the water-table following, which remaps the nodes every step (as for
 \cmd{RICHARDS}), and the interface iteration cost as much again (test S: 400 columns over a year add 1.4~s to a 1.7~s
 run, \cmd{RICHARDS} 2.3~s). The spreading narrows only as $1/\sqrt{N-7}$ with more nodes (each costs time). The cascade

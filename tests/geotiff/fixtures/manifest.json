@@ -2906,5 +2906,53 @@
 "kind": "stop",
 "twin": null,
 "expect": "pixels, more than the 50 million"
+},
+{
+"file": "stop_pm_paris_userdef.tif",
+"kind": "stop",
+"twin": null,
+"expect": "its prime meridian lies at longitude 2.33722917 from Greenwich (GeogPrimeMeridianLongGeoKey)"
+},
+{
+"file": "stop_pm_bern_noauth.tif",
+"kind": "stop",
+"twin": null,
+"expect": "its prime meridian lies at longitude 7.43958333333 from Greenwich"
+},
+{
+"file": "stop_datum_bern_key.tif",
+"kind": "stop",
+"twin": null,
+"expect": "its geodetic datum EPSG:6801 (GeogGeodeticDatumGeoKey) counts longitudes from the prime meridian of Bern"
+},
+{
+"file": "stop_proj_2227_nounits.tif",
+"kind": "stop",
+"twin": null,
+"expect": "it is in EPSG:2227, a projection whose coordinates are in US survey foot"
+},
+{
+"file": "scaled_int16_dm.tif",
+"kind": "scaled",
+"twin": "twin_scaled_int16.asc",
+"expect": "ok"
+},
+{
+"file": "stop_unit_ft_meta.tif",
+"kind": "stop",
+"twin": null,
+"expect": "elevations are in ft (the band unit, UNITTYPE in GDAL_METADATA)"
+},
+{
+"file": "unit_height_meta.tif",
+"kind": "unitnote",
+"twin": "twin_float32.asc",
+"expect": "has the band unit 'height' (UNITTYPE in GDAL_METADATA), which Raven does not know; its elevations are read as metres"
+},
+{
+"file": "scale_norole_int16.tif",
+"kind": "scaled",
+"twin": "twin_int16.asc",
+"expect": "ok"
 }
 ]

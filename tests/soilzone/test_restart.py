@@ -103,7 +103,7 @@ def ext_restart(N=10, N1=5):
     if not (sec and lag):
         return False
     # (time [d] counts from each run's start; the restart's first step books the hotstart's columns brought to Raven's
-    # state, written to 15 digits, as layer redistribution: a round-off volume, checked below 1e-3 m3)
+    # state, written to 17 significant digits, as layer redistribution: a round-off volume, checked below 1e-3 m3)
     SKIP = ('time [d]', 'soil-zone layer redistribution [m3]')
     red = float(pd.read_csv(os.path.join(sec, 'out', 'GWBudget.csv'))['soil-zone layer redistribution [m3]'].abs().max())
     good = red < 1e-3

@@ -1,8 +1,8 @@
 """Runs the whole verification suite and writes one report.
 
-    python3 run_all.py            # everything, full mode (needs the MODFLOW 6 library; about 1.5 hours on two cores)
+    python3 run_all.py            # everything, full mode (needs the MODFLOW 6 library; about 2.5 hours on two cores)
     python3 run_all.py --nolib    # only the checks that do not need the MODFLOW 6 library (a few minutes)
-    python3 run_all.py --quick    # everything in quick mode (about 35 minutes on two cores): fewer randomized set-ups,
+    python3 run_all.py --quick    # everything in quick mode (about 50 minutes on two cores): fewer randomized set-ups,
                                   # and RAVEN_TEST_QUICK=1 for every script, which shortens the scripts that have a
                                   # quick mode (see "Mode" below)
     python3 run_all.py --only thiem,edge    # selected steps (names as in the report)
@@ -21,10 +21,13 @@ runs fewer randomized set-ups (fuzz_grids 8 instead of 72, fuzz_lakes 4 instead 
 rough-terrain suite 40 seeds instead of 400, LP1 30 days instead of 365), and the scripts with a quick mode run shorter
 cases: every soil-zone script (soilzone/; spike_xmi, test_hillslope, test_surface_stores and test_plot_tool run the same
 case in both modes), behaviour_check, budget_file, combinations, crs_inputs, geotiff_check (fewer damaged files), input_checks, mf6version_check and
-existing/ext_exchanges, ext_inputs and restart_ext (its sub-daily case). The other scripts (edge, liard_grids,
+existing/ext_exchanges, ext_inputs and restart_ext (its sub-daily case), and tutorials_check (the step tutorials:
+it rebuilds the tutorials with docs/tutorials/build_tutorials.py --check and compares every number, excerpt and file they
+quote; quick mode keeps the committed values of the 20-year Liard run and of the calibration). The other scripts (edge, liard_grids,
 mf6files_check, mf6lib_check, restart_test, lake_test, dry_start, thiem, existing/guards and roundtrip, the USGS examples,
 the C++ unit tests, cmake_checks, budget_xcheck) run their usual cases in both modes. Measured on two cores: quick
-about 35 minutes, full about 1.5 hours (up to an hour and 2.5 hours on a busy machine, the latter with the USGS steps). The full mode runs the
+about 50 minutes (the tutorials step about 5 of them), full about 2.5 hours (the tutorials step about an hour more than in
+quick mode; up to 3.5 hours on a busy machine with the USGS steps). The full mode runs the
 rough-terrain suite as the manual reports it (regression cases + 400 seeds x NONE, RICHARDS, KINEMATIC and LAG, 1,620
 runs) and again with three depth classes (--vzclasses 3).
 

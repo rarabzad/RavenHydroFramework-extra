@@ -24,7 +24,7 @@ The coupling's source code is part of Raven itself (RavenHydroFramework). This r
 | `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`), with specified heads too |
 | `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles on the branches of the public repositories, `mf6-coupling` and `main`; a shallow Raven clone is completed from the upstream Raven repository first; `COMMITS.txt`) and runs the clone commands of the package README's "Restore the git history" section as written, checking that each bundle clones with its whole history, branch, tip and commit count as the README states |
 | `tools/make_handover.py` | writes the kit for publishing the two repositories (bundles, source archives, `HANDOVER.md` with the steps to push them to GitHub and check them) and verifies it |
-| `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run, including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
+| `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run from its first step (the recharge delay store at the start from `GWModelSummary.txt`), including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
 ## Quick start
 
@@ -77,14 +77,16 @@ step: `examples/README.md`.
 ```
 cd tests
 python3 run_all.py --nolib     # checks that need no MODFLOW library (a few minutes)
-python3 run_all.py --quick     # everything in quick mode (about 35 minutes on two cores, up to an hour on a busy machine)
-python3 run_all.py             # everything in full mode (about 1.5 hours, up to 2.5 hours on a busy machine)
+python3 run_all.py --quick     # everything in quick mode (about 50 minutes on two cores, up to 75 minutes on a busy machine)
+python3 run_all.py             # everything in full mode (about 2.5 hours, up to 3.5 hours on a busy machine)
 ```
 
 `--quick` runs fewer randomized set-ups and sets `RAVEN_TEST_QUICK=1` for every script. The soil-zone scripts and
-`behaviour_check`, `budget_file`, `combinations`, `crs_inputs`, `input_checks`, `mf6version_check`, `ext_exchanges`,
-`ext_inputs` and `restart_ext` then run shorter cases; the other scripts (among them the long `edge`, `liard_grids` and
-the existing-model guards) run their usual cases in both modes. `tests/README.md` lists them.
+`behaviour_check`, `budget_file`, `combinations`, `crs_inputs`, `geotiff_check`, `input_checks`, `mf6version_check`,
+`ext_exchanges`, `ext_inputs`, `restart_ext` and `tutorials_check` then run shorter cases; the other scripts (among them
+the long `edge`, `liard_grids` and the existing-model guards) run their usual cases in both modes. `tests/README.md` lists
+them. The step `tutorials` (`tutorials_check.py`) rebuilds the tutorials and compares every number they quote; in quick
+mode it keeps the 20-year Liard run and the calibration of their committed values.
 
 The tests find Raven in `../RavenHydroFramework`; otherwise set `RAVEN_SRC` (see `tests/README.md`). The C++ unit tests
 compile Raven's sources from `RAVEN_SRC`, so it must point at the Raven source even when `RAVEN_EXE` names a built Raven.

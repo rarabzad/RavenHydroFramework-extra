@@ -20,7 +20,13 @@ TC5 testconfig.rvc_same, the comparison of solution.rvc with a reference build's
    value that differs when both files hold the block are not; 481.457924970300 (12 decimals) and 481.4579249703005 (17
    digits), two roundings of one value 5.1e-13 apart, are; a block only one file holds is left out, and so is the method
    named on a :GWVadoseColumns line when only one file names it (two different methods are not the same).
-Without the MODFLOW 6 library TC1 and TC2 print SKIP.
+TC6 tools_audit checks the recharge identity on step 1: with 500 m3/d added to step 1's "recharge onto CHD cells" of the
+   two-step run of TC1 (a copy of its output) the identity is off by more than 1e-6; with a recharge delay store
+   (RECHARGE_DELAY 3 d, 3 steps) the store at the start is read from GWModelSummary.txt, the identity holds below 1e-8
+   with step 1 checked, and the same step-1 change is found there too.
+TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the public branch's commits the kit does not hold
+   only when the public check found them (their IDs and subjects), and says nothing about them otherwise.
+Without the MODFLOW 6 library TC1, TC2 and TC6 print SKIP.
 """
 import os, sys, re, shutil, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,6 +61,33 @@ def t1_t2():
             and abs(A['MF6 cumulative residual / gross flow']) < 1e-8
         report('TC1 tools_audit on a run of %d step(s)' % n, good, err or 'step %s d, recharge identity %.1e, residual %.1e' % (
             A.get('time step [d]'), A['recharge: (Raven - MF6 - dStore - toCHD)/Raven'], A['MF6 cumulative residual / gross flow']))
+    # TC6: the recharge identity includes step 1
+    def mutate(out_dir, name):
+        m = os.path.join(W, name); shutil.rmtree(m, ignore_errors=True); shutil.copytree(out_dir, m, ignore=shutil.ignore_patterns('mf6'))
+        p = os.path.join(m, 'GWBudget.csv'); L = open(p).read().split('\n'); h = [c.strip() for c in L[0].split(',')]
+        i = h.index('recharge onto CHD cells [m3/d]'); v = L[1].split(','); v[i] = repr(float(v[i]) + 500.0); L[1] = ','.join(v)
+        open(p, 'w').write('\n'.join(L)); return m
+    key = 'recharge: (Raven - MF6 - dStore - toCHD)/Raven'
+    m = mutate(os.path.join(W, 't1_2', 'out'), 't6_mut')
+    A = tc.audit.audit(m); shutil.rmtree(m, ignore_errors=True)
+    report('TC6 tools_audit: 500 m3/d more onto CHD cells on step 1 is found', abs(A[key]) > 1e-6 and not any('step 1 not checked' in k for k in A), 'recharge identity %.1e' % A[key])
+    d = os.path.join(W, 't6_delay'); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=4, slope=0.01, days=3, physical=False, chd=94.0)
+    p = os.path.join(d, 'm.rvp'); s = open(p).read()
+    s = re.sub(r'(:AquiferProfileParameters\n  :Attributes, [^\n]*)\n  :Units, ([^\n]*)\n  AQ, ([^\n]*)\n', r'\1, RECHARGE_DELAY\n  :Units, \2, d\n  AQ, \3, 3.0\n', s)
+    open(p, 'w').write(s)
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV)
+    if 'Successful Simulation' not in r.stdout + r.stderr or 'RECHARGE_DELAY' not in s:
+        report('TC6 tools_audit with a recharge delay store', False, 'the run FAILED')
+    else:
+        A = tc.audit.audit(os.path.join(d, 'out')); st = pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv'))
+        st.columns = [c.strip() for c in st.columns]
+        used = (st['recharge delay storage [m3]'] != 0).any()
+        report('TC6 tools_audit with a recharge delay store: step 1 checked, identity exact', used and not any('step 1 not checked' in k for k in A) and abs(A[key]) < 1e-8,
+               'store used %s, recharge identity %.1e' % (used, A[key]))
+        m = mutate(os.path.join(d, 'out'), 't6_delay_mut'); shutil.copy(os.path.join(d, 'out', 'GWModelSummary.txt'), m)
+        A = tc.audit.audit(m); shutil.rmtree(m, ignore_errors=True)
+        report('TC6 tools_audit with a recharge delay store: the step-1 change is found', abs(A[key]) > 1e-6, 'recharge identity %.1e' % A[key])
     # TC2: whole-number heads (and the other list packages) in feet and seconds
     d = os.path.join(W, 't1_2'); m = os.path.join(d, 'out', 'mf6')
     if not os.path.exists(os.path.join(m, 'gwf.chd')):
@@ -154,12 +187,23 @@ def t3_t5():
         report('TC5 rvc_same, %s' % name, tc.rvc_same(p, q) == want)
 
 
+def t7():
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'tools'))
+    import make_handover as mh
+    one = mh.found_note([('e03243d5' + '0' * 32, 'Upload the coupling')])
+    many = mh.found_note([('%040x' % i, 'commit %d' % i) for i in range(5)])
+    report('TC7 make_handover: no public commits found, nothing said about them', mh.found_note([]) == '')
+    report('TC7 make_handover: the found commit is named by its ID and subject', '`e03243d5` "Upload the coupling"' in one and '1 commit,' in one, one)
+    report('TC7 make_handover: five found commits, three named and the count', '5 commits' in many and 'and 2 more' in many, many[:120])
+
+
 def main():
     if tc.MF6LIB and os.path.exists(tc.MF6LIB) and os.path.exists(tc.RAVEN):
         t1_t2()
     else:
-        tc.skip('TC1 and TC2 (runs)', 'RAVEN_MF6_LIB not set')
+        tc.skip('TC1, TC2 and TC6 (runs)', 'RAVEN_MF6_LIB not set')
     t3_t5()
+    t7()
     print('tool checks: %s' % ('ALL PASSED' if fails == 0 else '%d FAILED' % fails))
     return fails == 0
 

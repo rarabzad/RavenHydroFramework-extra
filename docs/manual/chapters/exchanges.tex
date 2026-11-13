@@ -1180,7 +1180,8 @@ A specified-head boundary holds the head of its cells at $h_c$; MODFLOW calculat
 
 \subsection{Where boundaries go}
 Boundaries are drawn in a GeoJSON file: polygons select the cells whose centre lies inside (tested with the even--odd
-ray-crossing rule, so holes work), lines select the cells they cross. With \cmd{LAYERS ALL} the boundary is placed in
+ray-crossing rule within each polygon, so holes work; a centre inside any of the file's polygons is inside, so
+overlapping features, or overlapping parts of a MultiPolygon, add up and never cancel), lines select the cells they cross. With \cmd{LAYERS ALL} the boundary is placed in
 every active layer whose bottom lies below its highest head; with \cmd{LAYERS TOP}, in the highest such layer (the top
 active cell when the head lies above it). The highest head is \cmd{HEAD} or, with a \cmd{:BoundaryHead} series, the
 highest value of the series (the whole series, not only the run's days, so a restarted run gets the same cells), and

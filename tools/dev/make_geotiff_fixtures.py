@@ -32,7 +32,16 @@ Fixtures (37 x 29 pixels of 1/1024 degree around the synthetic test models of te
              linear units in feet, angles in grads), a vertical system in US survey feet (EPSG:4269+6360), prime
              meridians other than Greenwich (EPSG:4801, the prime-meridian key), a code in degrees-minutes-seconds,
              blocks covering more than 200 million pixels,
-             truncated and corrupt files, a raster above the pixel limit
+             truncated and corrupt files, a raster above the pixel limit; user-defined longitude/latitude on the Paris
+             meridian and EPSG:4801 without its code, as GDAL writes them (the prime meridian's longitude in
+             GeoDoubleParams), a user-defined system on the Bern datum (GeogGeodeticDatumGeoKey 6801 alone), a
+             projected code in US survey feet without ProjLinearUnitsGeoKey (EPSG:2227), a band unit of feet in
+             GDAL_METADATA
+  scaled_*   GDAL's band scale and offset (GDAL_METADATA, decimetres stored as 16-bit integers, NODATA -9999): the twin
+             holds the scaled values (NODATA where the raster has it)
+  unit_*     a band unit Raven does not know (GDAL_METADATA UNITTYPE "height"): read as metres, with a warning
+  scale_norole_* band metadata items named SCALE, OFFSET and UNITTYPE (ft) without GDAL's role attribute: GDAL takes them
+             as ordinary metadata, so the twin holds the stored values
 Each fixture that Raven reads has an ESRI ASCII twin holding the same values (written as the shortest decimal that reads
 back as the same double), so the twin must give identical cell elevations and byte-identical outputs.
 hru_utm11.geojson: the HRUs of the test model (make_case(nhru=2, hru_w=400, width=400, cell=100)) in EPSG:32611.
@@ -399,6 +408,44 @@ for tag in (256, 257):
     else: b[tg.valueoffset:tg.valueoffset + 4] = struct.pack('<I', 100000)
 t.close()
 open(os.path.join(OUT, small), 'wb').write(b); stop(small, 'pixels, more than the 50 million')
+
+# ---- prime meridians given only by their longitude (GDAL's user-defined geographic systems), datums, projected feet
+stop(gdal_write('stop_pm_paris_userdef.tif', DATA['float32'], 5, 3, crs='+proj=longlat +ellps=clrk80ign +pm=paris +no_defs'),
+     'its prime meridian lies at longitude 2.33722917 from Greenwich (GeogPrimeMeridianLongGeoKey)')
+import re as _re
+stop(gdal_write('stop_pm_bern_noauth.tif', DATA['float32'], 5, 3,
+                crs=_re.sub(r',AUTHORITY\["EPSG","\d+"\]', '', pyproj.CRS.from_epsg(4801).to_wkt(version='WKT1_GDAL'))),
+     'its prime meridian lies at longitude 7.43958333333 from Greenwich')
+stop(tf_write('stop_datum_bern_key.tif', DATA['float32'], 8, keys=geokeys(code=32767, extra=[(2050, 6801)])),
+     'its geodetic datum EPSG:6801 (GeogGeodeticDatumGeoKey) counts longitudes from the prime meridian of Bern')
+stop(tf_write('stop_proj_2227_nounits.tif', U, 5, keys=geokeys(model=1, code=2227), scale=(UCS, UCS, 0.0), tie=(0, 0, 0, UXLL, UYTOP, 0)),
+     'it is in EPSG:2227, a projection whose coordinates are in US survey foot')
+
+
+# ---- GDAL's band scale, offset and unit (GDAL_METADATA)
+def gdal_meta(name, a, scale=None, offset=None, unit=None, nodata=None):
+    with rasterio.open(os.path.join(OUT, name), 'w', driver='GTiff', width=a.shape[1], height=a.shape[0], count=1, dtype=a.dtype,
+                       transform=from_origin(XLL, YTOP, CS, CS), crs=CRS.from_epsg(4326), compress='deflate', nodata=nodata) as d:
+        d.write(a, 1)
+        if scale is not None: d.scales = (scale,)
+        if offset is not None: d.offsets = (offset,)
+        if unit is not None: d.units = (unit,)
+    with rasterio.open(os.path.join(OUT, name)) as d:   # (GDAL reads back what was written)
+        assert (scale is None or d.scales == (scale,)) and (offset is None or d.offsets == (offset,)) and (unit is None or d.units == (unit,)), name
+    return name
+dm = (np.round(Z * 10.0) - 500).astype('int16'); dm[0:2, 0:4] = -9999   # decimetres less 50 m, NODATA in a corner away from the model
+sc = dm.astype('float64') * 0.1 + 50.0; sc[dm == -9999] = -9999.0
+add(gdal_meta('scaled_int16_dm.tif', dm, 0.1, 50.0, 'm', nodata=-9999), 'scaled', write_asc('twin_scaled_int16.asc', sc))
+stop(gdal_meta('stop_unit_ft_meta.tif', DATA['int16'], unit='ft'), 'elevations are in ft (the band unit, UNITTYPE in GDAL_METADATA)')
+add(gdal_meta('unit_height_meta.tif', DATA['float32'], unit='height'), 'unitnote', TWIN['float32'],
+    expect="has the band unit 'height' (UNITTYPE in GDAL_METADATA), which Raven does not know; its elevations are read as metres")
+# band metadata items named SCALE, OFFSET and UNITTYPE without GDAL's role: ordinary metadata, the values stay as stored
+p = gdal_meta('scale_norole_int16.tif', DATA['int16'])
+with rasterio.open(os.path.join(OUT, p), 'r+') as d:
+    d.update_tags(1, SCALE='0.5', OFFSET='7', UNITTYPE='ft')
+with rasterio.open(os.path.join(OUT, p)) as d:
+    assert d.scales == (1.0,) and d.offsets == (0.0,) and d.units in ((None,), ('',)), (d.scales, d.offsets, d.units)
+add(p, 'scaled', TWIN['int16'])
 
 json.dump(manifest, open(os.path.join(OUT, 'manifest.json'), 'w'), indent=0)
 tot = sum(os.path.getsize(os.path.join(OUT, f)) for f in os.listdir(OUT))
