@@ -1,12 +1,12 @@
 $ python3 $WS/scripts/plot_gw.py out --title "Tutorial Creek"
 1096 days, 2010-01-02 to 2013-01-01
 mean groundwater budget [m3/d]:
-  recharge from Raven                     55201
-  seepage to Raven                        35823
-  aquifer to rivers                        8622
-  rivers to aquifer                         231
-  storage release                          1585
-  largest |MF6 balance error| [%]      1.15e-06
+  recharge from Raven                     54881
+  seepage to Raven                        35589
+  aquifer to rivers                        8589
+  rivers to aquifer                         233
+  storage release                          1594
+  largest |MF6 balance error| [%]      1.68e-07
   unconverged steps                           0
-mean water-table depth [m]: HRU 1 1.13, HRU 2 21.66, HRU 3 22.56, HRU 5 0.78, HRU 6 1.18, HRU 7 21.52, HRU 8 22.34, HRU 9 0.80
+mean water-table depth [m]: HRU 1 1.13, HRU 2 21.66, HRU 3 22.56, HRU 5 0.79, HRU 6 1.18, HRU 7 21.53, HRU 8 22.34, HRU 9 0.80
 wrote gw_budget.png, gw_map.png, gw_obswells.png, gw_watertable.png

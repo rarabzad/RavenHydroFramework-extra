@@ -8,7 +8,7 @@ Number of Parameters   : 2
 Seed for Random Nums.  : 20101
 ...
 Optimal Parameter Set
-Objective Function : -5.598694E-01
+Objective Function : -5.574696E-01
 par_K_sand         : 6.514966E+00
 par_K_till         : 2.010471E+00
 ...

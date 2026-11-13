@@ -8,13 +8,16 @@
 \begin{center}\small
 \begin{tabular}{lr@{\qquad}lr}\toprule
 into the aquifer & & out of the aquifer &\\\midrule
-recharge from Raven & \V{t2:rech} & seepage to Raven & \V{t2:seep}\\
+recharge received by MODFLOW & \V{t2:rech} & seepage to Raven & \V{t2:seep}\\
 river leakage & \V{t2:fromriv} & discharge to the creek & \V{t2:toriv}\\
 storage release & \V{t2:stor} & GHB OUTLET & \V{t2:ghb}\\
  & & well PW\_1 & \V{t2:wel}\\
  & & pond (CHD) & \V{t2:chd}\\\bottomrule
 \end{tabular}\end{center}
-The recharge is \V{t2:rechmm}~mm/year over the coupled HRUs. \V{t2:seeppct}\% of it seeps out again, mostly at the foot of
+MODFLOW ignores recharge on a cell with a specified head. So the recharge that falls on the pond cells,
+\V{t2:rechchd}~m\textsuperscript{3}/d on average, goes straight to the pond: it is the column \cmd{recharge onto CHD
+cells} of \cmd{GWBudget.csv}. Raven sends \V{t2:ravenrech}~m\textsuperscript{3}/d; MODFLOW receives the rest. The
+recharge is \V{t2:rechmm}~mm/year over the coupled HRUs. \V{t2:seeppct}\% of it seeps out again, mostly at the foot of
 the slopes and on the valley floor. MODFLOW converged on every day (\V{t2:unconv} unconverged steps, at most
 \V{t2:maxouter} outer iterations). Its largest daily balance error is \V{t2:balerr}~\% of the flow.
 
@@ -23,7 +26,8 @@ The audit script works for any coupled run:
 \term{t2_audit.txt}
 \begin{tocheck}
 \begin{itemize}
-\item The recharge line is 0 and the cumulative MODFLOW residual is \V{t2:auditRes} of the gross flow.
+\item The recharge line is \V{t2:auditRech}, a round-off value: all the recharge reached MODFLOW or, on the pond
+  cells, the specified head (\cmd{toCHD}). The cumulative MODFLOW residual is \V{t2:auditRes} of the gross flow.
 \item There are no unconverged steps, and \cmd{ERROR lines} is 0.
 \item The well delivered what was asked: \cmd{wells delivered / specified} is 1.
 \item Raven's own balance error (\cmd{Raven MB error max}) is \V{t2:auditMB}~mm.

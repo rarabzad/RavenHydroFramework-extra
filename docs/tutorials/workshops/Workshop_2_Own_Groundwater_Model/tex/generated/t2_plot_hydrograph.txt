@@ -1,4 +1,4 @@
 $ python3 $WS/scripts/plot_hydrograph.py out_nogw out --labels "Raven alone" "Raven + MODFLOW 6" --subbasin LOWER --year 2011
 Raven alone              mean flow LOWER 1.03 m3/s
-Raven + MODFLOW 6        mean flow LOWER 0.79 m3/s
+Raven + MODFLOW 6        mean flow LOWER 0.78 m3/s
 wrote hydrograph.png

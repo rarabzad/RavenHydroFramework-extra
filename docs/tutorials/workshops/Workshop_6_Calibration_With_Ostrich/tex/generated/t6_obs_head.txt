@@ -3,6 +3,6 @@ $ head -n 7 model/CreekObs.rvt
 # (synthetic: made with the true parameters of Tutorial Creek, with noise added)
 :ObservationData HYDROGRAPH 2 m3/s
   2010-01-01 00:00:00 1.0 1826
-  1.7109
-  3.4193
-  4.1574
+  1.7108
+  3.4189
+  4.1568

@@ -19,8 +19,9 @@
 \item \cmd{BeginResponseVars}: where to read each response: the file, the line, the column and the separator. Line~0 is
   the header line of \cmd{Diagnostics.csv}, so line~1 is the streamflow series. Column~5 is the KGE, column~4 the RMSE.
   Check them against your own \cmd{Diagnostics.csv} whenever you change the observations or the metrics.
-\item \cmd{BeginTiedRespVars}: the objective \cmd{COST} $= -\mathrm{KGE} + \V{t6:w101}\,\mathrm{RMSE}_{101} +
-  \V{t6:w102}\,\mathrm{RMSE}_{102} + \V{t6:w103}\,\mathrm{RMSE}_{103}$, with the RMSE in metres. Each weight is
+\item \cmd{BeginTiedRespVars}: the objective function, with the RMSE in metres:
+  \[\mathrm{COST} = -\mathrm{KGE} + \V{t6:w101}\,\mathrm{RMSE}_{101} + \V{t6:w102}\,\mathrm{RMSE}_{102} +
+  \V{t6:w103}\,\mathrm{RMSE}_{103}\] Each weight is
   $1/(2\sigma)$, with $\sigma$ the standard deviation of that well's observed heads in the calibration years. So a head
   error of half the well's own spread costs as much as a loss of 0.25 of KGE. For the first guess, \cmd{COST} =
   \V{t6:costInit}.

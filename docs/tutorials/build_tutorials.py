@@ -1009,6 +1009,7 @@ def audit_values(t, o):
         return float(m.group(1)) if m else float('nan')
     G.val(t + ':auditUnconv', '%d' % num(r'unconverged steps\s*[:=]?\s*([-0-9.eE+]+)'))
     G.val(t + ':auditRes', sci(num(r'MF6 cumulative residual / gross flow\s*[:=]?\s*([-0-9.eE+]+)')))
+    G.val(t + ':auditRech', sci(num(r'recharge: \(Raven - MF6 - dStore - toCHD\)/Raven\s*([-0-9.eE+]+)')))
 
 
 def hrustate(out):
@@ -1973,6 +1974,8 @@ def tut5():
         for x in os.listdir(d):
             if x.startswith('out') and os.path.isdir(os.path.join(d, x)):
                 shutil.rmtree(os.path.join(d, x))
+            elif x.endswith('.png'):                  # pictures of the steps are outputs, not part of the model
+                os.remove(os.path.join(d, x))
     shutil.rmtree(os.path.join(w, 'out_prt'))
 
 
@@ -2203,6 +2206,8 @@ def tut2():
                          ('chd', 'CHD [m3/d]', -1), ('wel', 'wells actual [m3/d]', -1)):
         G.val('t2:' + key, fmt(sg * b[col].mean(), 0))
     G.val('t2:rechmm', fmt(b['MF6 recharge [m3/d]'].mean() / A * 1000 * 365.25, 0))
+    G.val('t2:ravenrech', fmt(b['Raven recharge [m3/d]'].mean(), 0))
+    G.val('t2:rechchd', fmt(b['recharge onto CHD cells [m3/d]'].mean(), 0))
     G.val('t2:seeppct', fmt(100 * b['seepage to Raven [m3/d]'].mean() / b['MF6 recharge [m3/d]'].mean(), 0))
     G.val('t2:balerr', sci(b['MF6 balance error [%]'].abs().max(), 1))
     G.val('t2:maxouter', '%d' % b['outer iterations'].max())

@@ -27,7 +27,7 @@ EndResponseVars
 # objective to minimise: -KGE of the streamflow + weight x (head RMSE [m]) at each observation well,
 # with weight = 1 / (2 x standard deviation of the well's observed heads)
 BeginTiedRespVars
-  COST 4 KGE_Q RMSE_101 RMSE_102 RMSE_103 wsum -1.0 4 9.5 0.42
+  COST 4 KGE_Q RMSE_101 RMSE_102 RMSE_103 wsum -1.0 4.1 9.5 0.42
 EndTiedRespVars
 
 BeginGCOP

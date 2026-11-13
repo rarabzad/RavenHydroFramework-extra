@@ -9,7 +9,9 @@ whose interface did not converge marked). When the model has soil-zone columns o
 specified heads, their exchange (the columns "soil zone to specified heads" and "specified heads to soil zone") is drawn
 as lines of its own beside the exchange with the aquifer, and counts in the choice of HRUs. Use it to inspect the dynamics of a case: the
 soil level should follow the water table once connected, the exchange should change sign only at physical turning
-points, and rejection should start when the water table reaches the base.
+points, and rejection should start when the water table reaches the lowest soil-zone base of the HRU's DEM points, which
+can lie below the drawn base (the cell mean). The soil water level of a column without free water is that lowest base, so
+it can lie below the dashed line.
 """
 import os, sys
 import pandas as pd
