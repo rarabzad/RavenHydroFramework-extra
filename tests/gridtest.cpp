@@ -60,5 +60,13 @@ int main(){
   check("cache round trip (quadtree)",ok&&d==0,d);
   stringstream s2; R.Write(s2); CGWGrid R2; ok=R2.Read(s2); d=0; for(int i=0;i<R.ncpl;i++) d+=fabs(R2.bx0[i]-R.bx0[i])+fabs(R2.by1[i]-R.by1[i]);
   check("cache round trip (regular uniform, bit-exact)",ok&&d==0&&R2.uniform,d);
+  // the stop for a grid above the cell limit names what decides the grid's size (the cell size cannot shrink an imported
+  // grid, an existing model or a mesh whose refinement makes the seeds)
+  { struct {int w; const char *want,*not_;} M[]={{CGWGrid::LIMIT_CELLSIZE,"increase :GridCellSize",""},{CGWGrid::LIMIT_REFINEMENT,"larger refinement sizes",":GridCellSize"},
+      {CGWGrid::LIMIT_MESH,"increase :GridCellSize",""},{CGWGrid::LIMIT_MESH_REFINED,":GridRefinement sizes give an HRU mesh of 6000000 seeds",":GridCellSize"},
+      {CGWGrid::LIMIT_IMPORTED,"the imported grid cells.geojson has 6000000 cells per layer, more than the 5000000",":GridCellSize"},
+      {CGWGrid::LIMIT_EXISTING,"the existing model has 6000000 cells per layer, more than the 5000000",":GridCellSize"}};
+    int bad=0; for (auto &m:M){string t=CGWGrid::CellLimitMessage(m.w,6e6,5e6,"cells.geojson"); if ((t.find(m.want)==string::npos) || (*m.not_ && (t.find(m.not_)!=string::npos))){bad++; printf("    %s\n",t.c_str());}}
+    check("grid-size stop names the cause (cell size, refinement, imported grid, existing model)",bad==0,bad); }
   printf("%s: %d failures\n",fails?"FAILED":"ALL PASSED",fails); return fails;
 }

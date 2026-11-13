@@ -51,6 +51,12 @@ I17 EnKF members with their own :ExtraRVTFilename (ENKF_OPEN_FORECAST, 3 members
    specified head that the base .rvt leaves fixed: each member's model is built with its own series (cells released on
    days 3-6, no recharge booked onto them), so every member's GWBudget.csv equals the single run with the series in its
    .rvt (1e-12 relative).
+   I17c: a 2-member ENKF_SPINUP (4 HRUs, CONCEPTUAL, SOIL[0] assimilated, one streamflow observation), then
+   ENKF_CLOSED_LOOP and ENKF_FORECAST from its solution_EnKF.rvc files: each member's solution_EnKF.rvc holds the
+   groundwater blocks of its solution.rvc (the state at the end of the member's run) and the states that are not
+   assimilated with the same 17 digits; the closed loop and the forecast print no "MODFLOW never receives this water"
+   warning, and each member's heads on day 1 equal those of a single run restarted from the member's solution.rvc with the
+   EnKF's states (1e-9 m), so the aquifer continues from the end of the spin-up.
 I18 damaged soil-zone hotstart values: a :GWSoilZoneColumns row with nan, one with negative water (-50 mm), and a
    :GWHeads value nan each stop the run with a message naming the block ("is not a finite number", "is negative");
    the undamaged file runs.
@@ -435,6 +441,50 @@ def main():
     print('  I17b: :BoundaryHead series only in the members\' extra .rvt: members against the single run %.1e (recharge onto CHD cells on days 3-6, cells not held: %s m3/d) -> %s'
           % (dev, ', '.join('%g' % x for x in onto) or 'a run FAILED', 'ok' if g3 else 'FAIL'))
     res.append(('I17b EnKF members build with their own boundary series', g3))
+    # I17c: EnKF spin-up, then closed loop and forecast from the members' solution_EnKF.rvc
+    KW = dict(nhru=4, rain=13.7, perc=7.3, days=6, physical=False, slope=0.01, init_depth=3.0)
+    d = case('I17c_enkf', **KW)
+    edit(os.path.join(d, 'm.rvi'), ':StartDate', ':EnsembleMode ENSEMBLE_ENKF 2\n:StartDate')
+    RVE = (':EnKFMode %s\n:AssimilatedState SOIL[0] All\n:AssimilateStreamflow 1\n:ObservationErrorModel STREAMFLOW DIST_NORMAL 1 0.07 MULTIPLICATIVE\n'
+           ':ForcingPerturbation TEMP_AVE DIST_NORMAL 0 0.000001 ADDITIVE\n:OutputDirectoryFormat ./out/ens_*/\n')
+    open(os.path.join(d, 'm.rve'), 'w').write(RVE % 'ENKF_SPINUP')
+    open(os.path.join(d, 'm.rvh'), 'a').write('\n:HRUGroup All\n  1\n:EndHRUGroup\n')
+    open(os.path.join(d, 'm.rvt'), 'a').write('\n:ObservationData HYDROGRAPH 1 m3/s\n  2000-01-01 00:00:00 1.0 8\n' + '  0.01\n' * 8 + ':EndObservationData\n')
+    for e in (1, 2):
+        os.makedirs(os.path.join(d, 'out', 'ens_%d' % e), exist_ok=True); shutil.copy(os.path.join(d, 'm.rvc'), os.path.join(d, 'out', 'ens_%d' % e, 'solution.rvc'))
+    ok, _ = run_err(d)
+    gwb = lambda t: re.findall(r'^:GW\w+.*?^:EndGW\w+\n', t, re.M | re.S)
+    tab = lambda t: re.search(r':HRUStateVariableTable.*?:EndHRUStateVariableTable\n', t, re.S).group(0)
+    col = lambda t, c: [l.split(',')[c] for l in tab(t).split('\n')[3:-2]]
+    g1, g2, dev, lost = ok, ok, 0.0, False
+    for e in (1, 2):
+        o = os.path.join(d, 'out', 'ens_%d' % e)
+        if not ok: break
+        s, k = (open(os.path.join(o, f)).read() for f in ('solution.rvc', 'solution_EnKF.rvc'))
+        g1 = g1 and len(gwb(s)) > 0 and gwb(k) == gwb(s)                    # the groundwater blocks of the member's run end
+        g2 = g2 and all(col(k, c) == col(s, c) for c in (7, 8))             # SOIL[1] and GROUNDWATER (not assimilated) at full precision
+        shutil.copy(os.path.join(o, 'solution.rvc'), os.path.join(o, 'spin.rvc')); shutil.copy(os.path.join(o, 'solution_EnKF.rvc'), os.path.join(o, 'spin_EnKF.rvc'))
+    for mode in ('ENKF_CLOSED_LOOP', 'ENKF_FORECAST'):
+        if not ok: break
+        for e in (1, 2):
+            o = os.path.join(d, 'out', 'ens_%d' % e); shutil.copy(os.path.join(o, 'spin_EnKF.rvc'), os.path.join(o, 'solution_EnKF.rvc'))
+        open(os.path.join(d, 'm.rve'), 'w').write(RVE % mode)
+        okm, txt = run_err(d)
+        lost = lost or (not okm) or 'MODFLOW never receives' in txt
+        for e in ((1, 2) if okm else ()):
+            o = os.path.join(d, 'out', 'ens_%d' % e)
+            # the same model as a single run from the member's spin-up solution.rvc with the EnKF's updated states
+            ds = case('I17c_single_%d' % e, **KW); sol = open(os.path.join(o, 'spin.rvc')).read()
+            open(os.path.join(ds, 'm.rvc'), 'w').write(sol.replace(tab(sol), tab(open(os.path.join(o, 'spin_EnKF.rvc')).read())))
+            oks, _ = run_err(ds)
+            A = pd.read_csv(os.path.join(o, 'GWHRUState.csv')); B = pd.read_csv(os.path.join(ds, 'out', 'GWHRUState.csv')) if oks else None
+            hc = [c for c in A.columns if c.startswith('head_')]
+            dev = max(dev, float((A[hc].iloc[0] - B[hc].iloc[0]).abs().max()) if oks else float('inf'))
+    g3 = g1 and g2 and (not lost) and dev <= 1e-9
+    print('  I17c: EnKF spin-up: solution_EnKF.rvc holds the members\' groundwater blocks %s, states at full precision %s; closed loop and forecast: '
+          '"never receives" warning or failed run %s, day-1 heads against a restart from the member\'s state %.2g m -> %s'
+          % (g1, g2, lost, dev, 'ok' if g3 else 'FAIL'))
+    res.append(('I17c EnKF closed loop continues the spin-up\'s groundwater', g3))
 
     # I18: damaged soil-zone hotstart values
     d0 = case('I18_base', days=2); ok0, _ = sz_check.run(d0)

@@ -25,7 +25,14 @@ runs geomtest, then compares:
     surplus value (TMERC ... WGS84 junk, EPSG:32610 junk), too few values and a code with letters (EPSG:32610x) are
     refused, each naming the parameter or the value; conic parameters that define no cone (ALBERS and LCC with standard
     parallels symmetric about the equator, 30 -30 or 0 0, and LCC with a parallel at a pole) are refused, naming the
-    standard parallels.
+    standard parallels;
+  - GeoJSON coordinates: a coordinate that is a string, null, true or a number too large for a double is refused,
+    naming the file, the feature (with its ID), the ring and the vertex; NaN, Infinity, hexadecimal (0x10) and a leading
+    zero (-0122.9) are not JSON numbers (invalid JSON, naming the line and column of the token); -1.229E2 is read; a feature without "properties" is refused when
+    an ID field is needed and read when none is (polygons and lines);
+  - conic projections against PROJ (forward within 1 mm, inverse round trip within 1e-9 degrees): LCC and ALBERS with
+    their origin at either pole, also at the pole opposite the cone (LCC 50 60 -90, LCC -50 -60 90: PROJ takes the
+    pole as the cone's apex), and ordinary origins.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -118,6 +125,42 @@ CRS_CASES = [  # (name, file, :InputCRS or NONE, accepted, part of the message, 
 with open('crs_cases.txt', 'w') as f:
     for n, k, spec, _, _, _ in CRS_CASES:
         f.write('%s test_crs_%s.geojson %s\n' % (n, k, spec))
+# GeoJSON coordinates that are not JSON numbers, and features without "properties"
+def gj(name, coords, props=True, kind='Polygon'):
+    """a one-feature file whose coordinates are written as given (raw JSON text)"""
+    f = '{"type": "Feature", %s"geometry": {"type": "%s", "coordinates": %s}}' % ('"properties": {"ID": 7}, ' if props else '', kind, coords)
+    open('test_json_%s.geojson' % name, 'w').write('{"type": "FeatureCollection", "features": [%s]}' % f)
+SQ = '[[[-123.0, 49.0], [%s, 49.0], [-122.9, 49.1], [-123.0, 49.1], [-123.0, 49.0]]]'
+for n, v in (('str', '"-122.9"'), ('null', 'null'), ('bool', 'true'), ('nan', 'NaN'), ('inf', 'Infinity'), ('hex', '0x10'), ('big', '1e999'),
+             ('lead0', '-0122.9'), ('ok', '-1.229E2')):
+    gj(n, SQ % v)
+gj('noprops', SQ % '-122.9', props=False)
+gj('line_null', '[[-123.0, 49.0], [-122.9, null], [-122.8, 49.2]]', kind='LineString')
+gj('line_noprops', '[[-123.0, 49.0], [-122.9, 49.1]]', props=False, kind='LineString')
+JSON_CASES = [  # (name, file, reader, ID field, accepted, part of the message)
+    ('json_str', 'str', 'poly', 'ID', 0, 'feature 1 (ID 7), ring 1 (outline), vertex 2: its x (longitude) is the string "-122.9", not a number'),
+    ('json_null', 'null', 'poly', 'ID', 0, 'vertex 2: its x (longitude) is null, not a number'),
+    ('json_bool', 'bool', 'poly', 'ID', 0, 'vertex 2: its x (longitude) is true, not a number'),
+    ('json_nan', 'nan', 'poly', 'ID', 0, "invalid JSON in test_json_nan.geojson at line 1, column "), ('json_inf', 'inf', 'poly', 'ID', 0, "invalid JSON in test_json_inf.geojson at line 1, column "),
+    ('json_hex', 'hex', 'poly', 'ID', 0, "invalid JSON in test_json_hex.geojson at line 1, column "), ('json_lead0', 'lead0', 'poly', 'ID', 0, "invalid JSON in test_json_lead0.geojson at line 1, column "),
+    ('json_big', 'big', 'poly', 'ID', 0, 'vertex 2: its x (longitude) is a number too large'),
+    ('json_ok', 'ok', 'poly', 'ID', 1, ''),
+    ('json_noprops_id', 'noprops', 'poly', 'ID', 0, 'feature 1 in test_json_noprops.geojson has no "properties" member, so no ID field \'ID\''),
+    ('json_noprops', 'noprops', 'poly', '-', 1, ''),
+    ('json_line_null', 'line_null', 'line', '-', 0, 'feature 1, vertex 2: its y (latitude) is null, not a number'),
+    ('json_line_noprops_id', 'line_noprops', 'line', 'ID', 0, 'has no "properties" member'),
+    ('json_line_noprops', 'line_noprops', 'line', '-', 1, '')]
+with open('json_cases.txt', 'w') as f:
+    for n, k, kind, idf, _, _ in JSON_CASES:
+        f.write('%s test_json_%s.geojson %s %s\n' % (n, k, kind, idf))
+# conic projections against PROJ, including an origin at the pole opposite the cone (PROJ takes either pole as the apex)
+CONIC_CASES = [('LCC 50 60 -90 -96 0 0', -96.0, 55.0), ('LCC 50 60 -90 -96 0 0', -90.0, 49.0), ('LCC -50 -60 90 -96 0 0', -96.0, -55.0),
+               ('LCC -50 -60 90 -96 0 0', -100.0, -61.0), ('LCC 50 60 90 -96 0 0', -96.0, 55.0), ('LCC -50 -60 -90 -96 0 0', -96.0, -55.0),
+               ('LCC 49 77 49 -95 0 0', -110.0, 60.0), ('ALBERS 50 60 -90 -96 0 0', -96.0, 55.0), ('ALBERS -50 -60 90 -96 0 0', -96.0, -55.0),
+               ('ALBERS 50 70 40 -96 1000 2000', -120.0, 61.0)]
+with open('conic_cases.txt', 'w') as f:
+    for spec, lon, lat in CONIC_CASES:
+        f.write('%s|%r %r\n' % (spec, lon, lat))
 
 exe = os.path.join(here, 'geomtest')
 if not os.path.exists(exe):
@@ -188,6 +231,19 @@ expect = {'raster_nocrs': (0, ':InputCRS'), 'poly_crs': (1, ''), 'line_crs': (1,
 for k, (ok, msg) in expect.items():
     got = st.get(k, (-1, 'missing'))
     report(':InputCRS file check %-14s %s' % (k, 'accepted' if ok else 'refused (%s)' % msg), got[0] == ok and msg in got[1], got[0])
+js = {l.split()[0]: (int(l.split()[1]), ' '.join(l.split()[2:])) for l in open('json_status.txt')}
+for n, k, kind, idf, ok, msg in JSON_CASES:
+    got = js.get(n, (-1, 'missing'))
+    good = got[0] == ok and msg in got[1]
+    report('GeoJSON %-22s %s' % (n[5:], 'accepted' if ok else 'refused (%s)' % msg[-46:]), good, got[0])
+    if not good:
+        print('      message: %s' % got[1][:300])
+cn = np.atleast_2d(np.loadtxt('conic.txt'))
+for (spec, lon, lat), r in zip(CONIC_CASES, cn):
+    w = spec.split(); p = dict(zip(('lat_1', 'lat_2', 'lat_0', 'lon_0', 'x_0', 'y_0'), map(float, w[1:7])))
+    x, y = pyproj.Proj(proj={'LCC': 'lcc', 'ALBERS': 'aea'}[w[0]], ellps='WGS84', **p)(lon, lat)
+    e = float(np.hypot(r[1] - x, r[2] - y)) if r[0] == 1 else 1e9; rt = max(abs(r[3] - lon), abs(r[4] - lat))
+    report('projection: %-26s at %g, %g against PROJ (m)' % (spec, lon, lat), r[0] == 1 and e < 1e-3 and rt < 1e-9, e)
 for n, k, spec, ok, msg, nomsg in CRS_CASES:
     got = st.get(n, (-1, 'missing'))
     good = got[0] == ok and msg in got[1] and not (nomsg and nomsg in got[1])
@@ -197,8 +253,8 @@ for n, k, spec, ok, msg, nomsg in CRS_CASES:
         print('      message: %s' % got[1][:300])
 
 for f in ('clip.txt', 'proj.txt', 'raster.txt', 'raster_margin.txt', 'test.asc', 'test_utm.asc', 'raster_utm.txt', 'crs_status.txt', 'poly_utm.txt', 'line_utm.txt',
-          'test_utm_poly.geojson', 'test_utm_bare.geojson', 'test_ll_crs84.geojson', 'test_utm_line.geojson', 'crs_cases.txt') + tuple(
-          'test_crs_%s.geojson' % k for k in CRS_FILES):
+          'test_utm_poly.geojson', 'test_utm_bare.geojson', 'test_ll_crs84.geojson', 'test_utm_line.geojson', 'crs_cases.txt', 'conic_cases.txt', 'conic.txt', 'json_cases.txt', 'json_status.txt') + tuple(
+          'test_crs_%s.geojson' % k for k in CRS_FILES) + tuple('test_json_%s.geojson' % k for k in sorted(set(c[1] for c in JSON_CASES))):
     if os.path.exists(f):   # another run in the same checkout may have removed it already
         os.remove(f)
 print('ALL PASSED' if fails == 0 else '%d FAILED' % fails)

@@ -55,8 +55,11 @@ at 0 (its own first step) as the continuous run's stays at its first step's valu
 \cmd{:TimeStep} routes the reach from its outflow before the take at the take's own rate (take over its step); its first
 step's trapezoid then books the take's rate over the new step, and the rest of the half (negative when the step grows)
 is carried as river loss, so Raven still gives up the whole take and the channel storage follows the routing without
-it (test WB13; for a take from the inflow this holds when the last steps' takes were equal, since Raven averages a
-longer step's inflow history from the shorter steps' inflows). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
+it (test WB13). Where Raven averages a longer step's inflow history from the shorter steps' inflows (for example
+\cmd{ROUTE\_DIFFUSIVE\_WAVE}), the start of the first step's inflow is lowered by the average of the last takes' rates;
+\cmd{solution.rvc} therefore also holds the takes from each reach's inflow over the steps of Raven's inflow history
+(\cmd{:GWRiverInflowTakes}), which the restart averages as Raven averages the inflows, and the first step books that
+average (test WB14). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
 exchange applied to Raven}), as MODFLOW receives it.
 
 \subsection{The whole system}
@@ -196,7 +199,8 @@ including the \cmd{.rvc}, have been read.
 \subsection{Restarting a run (hotstart)}\label{sec:hotstart}
 At the end of a run Raven writes \cmd{solution.rvc}. Besides Raven's own states it contains \cmd{:GWHeads} (the head in
 every cell), \cmd{:GWRechargeStore} (recharge delay stores, if used), \cmd{:GWRiverLossCarry} (river loss carried, if any),
-\cmd{:GWRiverTake} (the river loss taken from reach inflows and outflows in the last step, if any), \cmd{:GWStartHeads}
+\cmd{:GWRiverTake} (the river loss taken from reach inflows and outflows in the last step, if any),
+\cmd{:GWRiverInflowTakes} (the takes from each reach's inflow over the steps of Raven's inflow history, if any), \cmd{:GWStartHeads}
 (after a step that did not converge: the heads of the last converged step, which the far-head test of
 Section~\ref{sec:farheads} compares with) and \cmd{:GWReservoirSeepage} (reservoir seepage in
 transit, if used), and with \cmd{:SoilZone PHYSICAL} \cmd{:GWSoilZoneColumns} (the water of every soil-zone column), \cmd{:GWSoilZoneLag}
@@ -263,7 +267,10 @@ start is decided for each member separately
 \cmd{:WellFlowRate} and \cmd{:BoundaryHead} series: in a coupled run the file is read before the member's groundwater
 model is built, so the member's boundaries are placed, and their cells held or switched, with its own series; they
 replace, for that member and the later ones, the series of the same well or boundary read before, and a series naming no
-well or boundary stops the run.
+well or boundary stops the run. EnKF's spin-up and closed loop write each member's \cmd{solution\_EnKF.rvc} after the
+member's groundwater model is closed: it holds the member's groundwater blocks as its \cmd{solution.rvc} has them (the
+state at the end of the member's run) and every state with 17 significant digits, so closed-loop and forecast members
+continue the aquifer, the river take and the stores in transit from where the member's run ended (test I17c).
 
 \subsection{Safeguards}\label{sec:guard}
 \begin{itemize}

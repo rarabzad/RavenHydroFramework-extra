@@ -145,6 +145,11 @@ projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}), each with a property
 \end{lstlisting}
 \end{minipage}\par\smallskip
 Only HRUs with an \cmd{AQUIFER\_PROFILE} need polygons; others may be present and are ignored.
+Every GeoJSON file Raven reads (HRUs, grids, boundaries, refinement features) is read as strict JSON: a coordinate must be a
+JSON number: a string such as \cmd{"-124.91"}, \cmd{null} or \cmd{true} stops the run, naming the file, the feature, the
+ring and the vertex, and \cmd{NaN}, \cmd{Infinity} and hexadecimal numbers are not JSON (the file is refused as invalid
+JSON, naming the line and column of the token). A feature without a \cmd{"properties"} member stops the run where an ID field is read (a boundary or refinement
+file needs none).
 \subsection{Raster maps}\label{sec:rasters}
 \cmd{:LandSurface} and \cmd{:BedrockSurface} take an ESRI ASCII grid or a GeoTIFF file (Section~\ref{sec:geotiff}), in
 longitude/latitude or in the projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}). An ESRI ASCII grid, for example:
@@ -164,7 +169,8 @@ $5\times5$ such samples. Points more than half a raster cell beyond the map's ed
 \cmd{NODATA\_value} line takes $-9999$ as no-data. The header keys may come in any order and case; \cmd{xllcenter} and
 \cmd{yllcenter} give the centre of the lower-left cell instead of its corner; rectangular cells are given, as GDAL writes
 them, by \cmd{dx} and \cmd{dy} instead of \cmd{cellsize}; \cmd{NODATA\_value nan} marks no-data cells written as
-\cmd{nan}; a UTF-8 byte-order mark before the header and a DOS end-of-file mark (Ctrl-Z) after the values are ignored. The grid must hold exactly \cmd{ncols}$\times$\cmd{nrows} values: an unknown header key, a header value or a
+\cmd{nan}; a UTF-8 byte-order mark before the header and a DOS end-of-file mark (Ctrl-Z) after the values are ignored. The grid must hold exactly \cmd{ncols}$\times$\cmd{nrows} values: an unknown header key, a key given twice or both
+\cmd{xllcorner} and \cmd{xllcenter} (or both \cmd{y} keys), a header value or a
 cell value that is not a number, fewer values or more values (a wrong \cmd{ncols} would otherwise wrap the rows) stop
 the run with a message naming the problem.
 
@@ -188,7 +194,11 @@ in other units, a prime meridian (by code, by its longitude or by the datum), a 
 band unit in feet (or another length unit) that say otherwise stop the run; a vertical system or band unit Raven does not
 know gives a warning (read as metres); the band unit's words are matched whole, so \cmd{m (Admiralty datum)} and
 \cmd{metres above Hydrographic Datum} are metres, and so is \cmd{in metres} (\cmd{in} is inches only when no metre word
-follows), while \cmd{feet above sea level} is not\\
+follows), while \cmd{feet above sea level} is not; feet fused with a qualifier, as GDAL and PROJ write US survey feet
+(\cmd{ftUS}, \cmd{usft}, \cmd{us-ft}, \cmd{USfeet}, \cmd{Foot\_US}), stop as feet; PROJ's short ids \cmd{ch}, \cmd{mi},
+\cmd{fath}, \cmd{link} and \cmd{in} (also \cmd{us-in}, \cmd{us-ch}) stop only as the first word and without a metre word, so
+\cmd{Elevation in m (CH1903+)} is metres; a unit without letters (\cmd{'}, \cmd{?}), a metre word glued to a digit or a
+non-ASCII letter (\cmd{$\mu$m}) or after a number (\cmd{0.1 m}, a scaled unit) is a unit Raven does not know\\
 scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
 \cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
 applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and
@@ -404,7 +414,9 @@ them connected directly.
 \end{lstlisting}
 Sizes must be smaller than \cmd{:GridCellSize}. Refinement applies to regular (variable spacing), quadtree and HRU-mesh
 grids; an imported grid is used as it is. A grid is limited to 5 million cells per layer: a cell size or refinement that
-gives more stops the run before the grid is built, naming the command and the number of cells. For a regular grid the
+gives more stops the run before the grid is built, naming the command and the number of cells. An imported grid
+(\cmd{:GridType FILE}) with more cells stops naming the file, and an HRU mesh whose refinement makes more seeds stops
+naming \cmd{:GridRefinement}; the cell size cannot help there. For a regular grid the
 count is exact: the refined columns and rows are counted with the 2:1 smoothing that adds cells around each refined
 strip, as the build makes them (test N24). For a quadtree it is estimated level by level from the squares the refinement features touch, each square
 counted once however many features touch it (overlapping or adjacent features add no more), plus about a fifth for the

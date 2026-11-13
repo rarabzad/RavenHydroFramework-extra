@@ -269,6 +269,8 @@ recharge the model was calibrated with, needs attention.
 \section{Limits}\label{sec:extlimits}
 \begin{itemize}
 \item DISU models are not supported (DIS and DISV are).
+\item Raven couples models of up to 5 million cells per layer, the limit of the grids it builds (Section~\ref{sec:gridtypes});
+a model with more stops the run (``the existing model has \dots\ cells per layer, more than the 5000000 Raven couples'').
 \item The stream package keeps the model's own stage and conductance: there is no conductance (supply) limit as for generated
 river cells, so a losing reach can take more than the channel holds; the part the channel cannot supply is carried to the
 next step (exactly accounted).

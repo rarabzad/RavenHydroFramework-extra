@@ -445,7 +445,9 @@ reservoir states and the groundwater blocks; a run without groundwater writes Ra
 `:GWHeads nlay nrow ncol` (the head of every cell), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
 seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), `:GWRiverTake` (the river loss taken from
 reach inflows and outflows in the last step, which Raven's channel storage and balance book half in the next step, with
-the time step of the takes: a restart with another `:TimeStep` still gives up exactly the take),
+the time step of the takes: a restart with another `:TimeStep` still gives up exactly the take), `:GWRiverInflowTakes`
+(the takes from each reach's inflow over the steps of Raven's inflow history, which a restart with a longer `:TimeStep`
+averages as Raven averages the inflows),
 `:GWStartHeads` (after an unconverged step: the heads of the last converged step, for the far-head test), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
 (unsaturated columns; the column lines name the method that wrote them; a column whose top, node count, classes or
@@ -502,7 +504,9 @@ Raven's Monte Carlo, DDS and EnKF modes re-initialize the model for every member
 rebuilt and MODFLOW 6 restarted each time, with its files in each member's output folder. Every member starts from the
 first run's routing memory (also the local outflow, irrigation and diversion memory), so member 1 equals the single run.
 An EnKF member's `:ExtraRVTFilename` is read before its groundwater model is built, so `:BoundaryHead` series given there
-place and switch that member's boundaries.
+place and switch that member's boundaries. EnKF's `solution_EnKF.rvc` (spin-up and closed loop) holds each member's
+groundwater blocks as its `solution.rvc` has them at the end of the member's run, and every state with 17 significant
+digits, so closed-loop and forecast members continue the aquifer from there.
 
 ## 8. Troubleshooting
 

@@ -17,7 +17,13 @@ Reader checks (unit driver):
     stored); a band unit in feet stops, an unknown band unit gives a warning; the unit's words are matched whole: "m
     (Admiralty datum)", "metres above Hydrographic Datum", "elevation in metres", "in metres", "in m" and "in meters above
     sea level" are metres, "hydraulic head" is an unknown unit (a warning), "feet above sea level", "US survey foot",
-    "kilometres" and "in" (inches) stop;
+    "kilometres" and "in" (inches) stop; so do the US-foot spellings of GDAL and PROJ, also fused ("ftUS", "usft",
+    "us-ft", "USfeet", "foot_us", "Foot_US", "foot_survey_us", "NAVD88 ftUS", "sft", "ind-ft") and "fathom"; a unit
+    without letters ("'", "?") and "\u00b5m" (micrometres: m glued to a non-ASCII letter) give the unknown-unit warning;
+    "metre" and "m above NAVD88" are metres; PROJ's short ids (ch, mi, fath, link, in, also after us/ind: "us-in",
+    "us-ch") stop only as the first word and without a metre word, so "Elevation in m (CH1903+)", "elevation [m] CH",
+    "H\u00f6he in m \u00fc. M. (CH)", "Elevation (m) see link" and "height in metres, mi" are metres and "hauteur \u00e0
+    mi-mar\u00e9e" an unknown unit; a number before the metre word ("0.1 m") gives the unknown-unit warning;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -31,8 +37,8 @@ Reader checks (unit driver):
     by their longitude (GDAL's user-defined systems) or by the datum, a projected code in feet without its units key, a
     decoding area above the bound), also a file over the size limit (a sparse file made here and removed);
   - ESRI ASCII grids: GDAL's dx and dy header (rectangular pixels) gives the GeoTIFF's samples, NODATA_value nan the
-    -9999 twin's, and so do a Ctrl-Z after the values, a UTF-8 byte-order mark and xllcenter with yllcorner; more values than ncols*nrows, an unknown header key and a value that is not a number are refused,
-    naming the problem;
+    -9999 twin's, and so do a Ctrl-Z after the values, a UTF-8 byte-order mark and xllcenter with yllcorner; more values than ncols*nrows, an unknown header key, a value that is not a number, a key given
+    twice (cellsize 1, then cellsize 2) and both xllcenter and xllcorner are refused, naming the problem;
   - CRS rules: a geographic code is refused with :InputCRS, a projected one without it; another built-in projection
     than :InputCRS is refused, the same one given by its parameters accepted; a code that is not built in is accepted
     under :InputCRS given by parameters (with a note) and refused under another EPSG code; a user-defined CRS and none at
@@ -272,7 +278,18 @@ def with_unit(text, name):
 for text, want, part in (('m (Admiralty datum)', 'OK', ''), ('metres above Hydrographic Datum', 'OK', ''), ('elevation in metres', 'OK', ''),
                          ('in metres', 'OK', ''), ('in m', 'OK', ''), ('in meters above sea level', 'OK', ''),
                          ('hydraulic head', 'OK', "has the band unit 'hydraulic head'"), ('feet above sea level', 'ERROR', 'elevations are in feet above sea level'),
-                         ('US survey foot', 'ERROR', 'elevations are in US survey foot'), ('kilometres', 'ERROR', 'elevations are in kilometres'), ('in', 'ERROR', 'elevations are in in')):
+                         ('US survey foot', 'ERROR', 'elevations are in US survey foot'), ('kilometres', 'ERROR', 'elevations are in kilometres'), ('in', 'ERROR', 'elevations are in in'),
+                         ('ftUS', 'ERROR', 'elevations are in ftUS'), ('usft', 'ERROR', 'elevations are in usft'), ('us-ft', 'ERROR', 'elevations are in us-ft'),
+                         ('USfeet', 'ERROR', 'elevations are in USfeet'), ('foot_us', 'ERROR', 'elevations are in foot_us'), ('Foot_US', 'ERROR', 'elevations are in Foot_US'),
+                         ('foot_survey_us', 'ERROR', 'elevations are in foot_survey_us'), ('NAVD88 ftUS', 'ERROR', 'elevations are in NAVD88 ftUS'),
+                         ('sft', 'ERROR', 'elevations are in sft'), ('ind-ft', 'ERROR', 'elevations are in ind-ft'), ('fathom', 'ERROR', 'elevations are in fathom'),
+                         ("'", 'OK', "has the band unit '''"), ('?', 'OK', "has the band unit '?'"), ('\u00b5m', 'OK', "has the band unit '\u00b5m'"),
+                         ('metre', 'OK', ''), ('m above NAVD88', 'OK', ''),
+                         ('Elevation in m (CH1903+)', 'OK', ''), ('elevation [m] CH', 'OK', ''), ('H\u00f6he in m \u00fc. M. (CH)', 'OK', ''),
+                         ('Elevation (m) see link', 'OK', ''), ('height in metres, mi', 'OK', ''),
+                         ('hauteur \u00e0 mi-mar\u00e9e', 'OK', "has the band unit 'hauteur"), ('0.1 m', 'OK', "has the band unit '0.1 m'"),
+                         ('us-in', 'ERROR', 'elevations are in us-in'), ('us-ch', 'ERROR', 'elevations are in us-ch'), ('mi', 'ERROR', 'elevations are in mi'),
+                         ('link', 'ERROR', 'elevations are in link')):
     o = unit('raster', with_unit(text, 'unit_%s.tif' % re.sub(r'\W', '_', text)), 'NONE').strip()
     good = o.startswith(want) and part in o and (part != '' or o == 'OK')
     report('band unit "%s": %s' % (text, {'OK': 'read as metres' if not part else 'read as metres, with a note', 'ERROR': 'stops'}[want]), good, o[:160])
@@ -309,7 +326,10 @@ BAD_ASC = [('surplus.asc', hd, rows + [rows[0][:1]], 'has more values than ncols
            ('badkey.asc', [('cellsizee', hd[4][1]) if kv[0].lower() == 'cellsize' else kv for kv in hd], rows, "unknown header key 'cellsizee'"),
            ('badval.asc', hd, [rows[0][:2] + ['1O'] + rows[0][3:]] + rows[1:], "the value '1O' (row 1, column 3) is not a number"),
            ('badhead.asc', [('xllcorner', '-12O.5') if kv[0].lower() == 'xllcorner' else kv for kv in hd], rows, "header key xllcorner ('-12O.5') is not a number"),
-           ('onlydx.asc', [('dx', hd[4][1]) if kv[0].lower() == 'cellsize' else kv for kv in hd], rows, 'needs a positive cellsize, or positive dx and dy')]
+           ('onlydx.asc', [('dx', hd[4][1]) if kv[0].lower() == 'cellsize' else kv for kv in hd], rows, 'needs a positive cellsize, or positive dx and dy'),
+           ('dupcs.asc', hd[:5] + [('cellsize', repr(2 * float(hd[4][1])))] + hd[5:], rows, 'the header gives the key cellsize twice'),
+           ('both.asc', hd[:2] + [('xllcenter', repr(float(hd[2][1]) + 0.5 * float(hd[4][1]))), hd[2]] + hd[3:], rows,   # (hd: ncols, nrows, xllcorner, ...)
+            'the header gives xllcorner and xllcenter (a corner and a centre of the same axis)')]
 # a DOS end-of-file mark (Ctrl-Z) after the values, a UTF-8 byte-order mark, and a centre on one axis and a corner on the
 # other: read, and sampled as the twin
 x0 = float([kv for kv in hd if kv[0].lower() == 'xllcorner'][0][1]); cs0 = float([kv for kv in hd if kv[0].lower() == 'cellsize'][0][1])

@@ -68,5 +68,24 @@ int main(){
     }
   }
   fclose(st);
+  //GeoJSON coordinates and members (json_cases.txt, written by geomtest_check.py: name, file, poly or line, ID field or -)
+  { std::ifstream C("json_cases.txt"); std::string line; FILE *g=fopen("json_status.txt","w");
+    while (std::getline(C,line)){
+      std::istringstream is(line); std::string name,file,kind,idf; is>>name>>file>>kind>>idf; if (idf=="-"){idf="";}
+      bool ok; err="";
+      if (kind=="poly"){std::map<long long,std::vector<gw_ring> > sh; ok=GWGeom::ReadGeoJSONPolygons(file,idf,sh,err);}
+      else {std::vector<gw_ring> L; std::vector<long long> id; ok=GWGeom::ReadGeoJSONLines(file,idf,L,id,err);}
+      fprintf(g,"%s %d %s\n",name.c_str(),ok?1:0,ok?"":err.c_str());
+    }
+    fclose(g); }
+  //conic projections (conic_cases.txt, written by geomtest_check.py: the parameters, then lon lat): forward and inverse
+  { std::ifstream C("conic_cases.txt"); std::string line; FILE *g=fopen("conic.txt","w");
+    while (std::getline(C,line)){
+      const size_t b=line.find('|'); if (b==std::string::npos){continue;}
+      std::istringstream is(line.substr(b+1)); double lon=0,lat=0; is>>lon>>lat;
+      CGWCRS K; if (!K.Parse(line.substr(0,b),err)){fprintf(g,"0 0 0 0 0\n"); continue;}
+      double x,y,lo,la; K.Forward(lon,lat,x,y); K.Inverse(x,y,lo,la); fprintf(g,"1 %.6f %.6f %.12f %.12f\n",x,y,lo,la);
+    }
+    fclose(g); }
   printf("done\n"); return 0;
 }
