@@ -30,6 +30,9 @@ Grid size (one limit, 5 million cells per layer, checked before the grid is buil
   N17 an HRU mesh (:GridType HRU_MESH, 4 HRUs of 5 x 5 km, :GridCellSize 500) with a short :GridRefinement LINES line of
       0.1 m (100 m meant) stops before the mesh is built: "... too slow to build" (the HRU boundaries take seeds at the
       finest line size); N18 the same with 2 m is built within the time limit (about 65,000 cells per layer).
+  N24 a regular grid (400 x 300 km, :GridCellSize 2000) refined around 60 short lines (:GridRefinement LINES 100): the
+      estimate counts the cells the 2:1 smoothing adds (2,918 columns by 2,161 rows, 6.3 million cells per layer, against
+      4.8 million without it), so it stops before the grid is built, advising larger refinement sizes, QUADTREE or HRU_MESH.
   Each case runs under a 3 GB address-space limit and a 120 s time limit, so a build that tries to allocate the grid
   fails the check instead of exhausting the machine; a stop must not be a crash ("terminate called", bad_alloc).
 Boundary polygons (the 4-HRU strip of sz_models with :SpecifiedHeadBoundary EDGE, 100 m cells):
@@ -198,6 +201,24 @@ line = (re.findall(r'.*too slow to build.*', out) or [''])[0].strip()
 report('N17 HRU mesh, :GridRefinement LINES 0.1 stops before the mesh is built', (not ok) and bool(line), (line or out.strip().split('\n')[-1])[:170])
 ok, n, out = mesh_case('n18', '2')
 report('N18 HRU mesh, :GridRefinement LINES 2 is built within 120 s', ok and n > 10000, '%d cells per layer %s' % (n, '' if ok else out.strip().split('\n')[-1][:120]))
+
+# regular grid refined around 60 short lines: the size counted with the 2:1 smoothing, before the grid is built
+d = os.path.join(W, 'n24'); shutil.rmtree(d, ignore_errors=True)
+sz_models.make_case(d, nhru=4, hru_w=100000.0, width=300000.0, cell=2000.0, physical=False, days=1, rain=1.0)
+json.dump({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": i + 1}, "geometry": {"type": "LineString", "coordinates": [
+    list(sz_models.ll(-195000 + i * 6500, -143000 + (i * 7919) % 280000)), list(sz_models.ll(-193500 + i * 6500, -141800 + (i * 7919) % 280000))]}} for i in range(60)]},
+    open(os.path.join(d, 'lines.geojson'), 'w'))
+open(os.path.join(d, 'm.rvg'), 'a').write('\n:GridRefinement LINES lines.geojson 100\n')
+try:
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=120, preexec_fn=limits); out = r.stdout + r.stderr
+except subprocess.TimeoutExpired:
+    out = '(not finished after 120 s)'
+e = os.path.join(d, 'out', 'Raven_errors.txt'); out += open(e, errors='replace').read() if os.path.exists(e) else ''
+shutil.rmtree(d, ignore_errors=True)
+m = re.search(r'the :GridRefinement sizes give a regular grid of about (\S+) cells per layer \((\d+) columns by (\d+) rows\)[^\n]*QUADTREE or HRU_MESH', out)
+crash = re.findall(r'terminate called|bad_alloc|Segmentation|not enough memory', out)
+report('N24 regular grid, 60 lines refined to 100 m: stops before the build, smoothing counted', m is not None and int(m.group(2)) * int(m.group(3)) > 5e6 and not crash,
+       ('%s x %s cells' % (m.group(2), m.group(3))) if m else (re.findall(r'ERROR.*', out) or [out.strip().split('\n')[-1]])[0][:170])
 
 
 # ---- boundary polygons: overlapping features add up

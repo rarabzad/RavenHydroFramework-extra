@@ -1,4 +1,4 @@
-""":SoilZoneVadoseInitialFlux and the columns' initial state (VI1-VI12).
+""":SoilZoneVadoseInitialFlux and the columns' initial state (VI1-VI13).
 
 VI1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
@@ -48,6 +48,11 @@ VI12 an existing model's own specified heads (stress periods 3-5, the cells of H
     K = 3): a run restarted on day 4 rebuilds those columns at rest and the first step ends them again; such columns hold
     no water and are not counted: the run total 'columns over specified heads' of the first part (days 1-3) plus that of
     the restarted part equals the continuous run's, columns and volume (1e-6).
+VI13 a restart on the day before a :BoundaryHead series holds a generated model's cells again (the column case with CHD, SWX
+    and ET; the EDGE series below the aquifer on days 1-3, so columns form on its cells, and near the ground from day 4;
+    :SoilZoneVadoseInitialFlux 30; LAG with K = 1, and KINEMATIC with K = 3 and LAGGED timing): the run restarted from day 3's
+    solution.rvc builds those columns from its lines and ends them in its first step, their water to the specified heads,
+    as the continuous run does: GWBudget.csv from day 4 equals the continuous run's (1e-9), and no hotstart line is unused.
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -347,9 +352,43 @@ def i12():
     print('  continuous %s; first part %s + restarted part %s -> %s' % (nf, na, nb, 'ok' if g else 'FAIL'))
     return g
 
+def i13():
+    print('VI13 a restart on the day before a :BoundaryHead series holds a generated model\'s cells again')
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    ok = True
+    for m, K, extra in (('LAG', 1, ''), ('KINEMATIC', 3, ':SoilZoneExchangeTiming LAGGED\n')):
+        s = dict(sz='PHYS', vz=m, K=K, x={'chd', 'swx', 'et'}, st={'bho'}, dt=1.0)
+        def mk(tag, dur, start):
+            d = os.path.join(W, 'i13_%s%d%s' % (m, K, tag)); shutil.rmtree(d, ignore_errors=True); sz_models.make_case(d, **C.cfg_of(s)); C.options(d, s)
+            p = os.path.join(d, 'm.rvt'); t = open(p).read()   # (the EDGE series below the aquifer on days 1-3, then near the ground)
+            mm = re.search(r':BoundaryHead EDGE m\n  \S+ \S+ 1.0 (\d+)\n((?:  \S+\n)+):EndBoundaryHead', t)
+            v = [float(x) for x in mm.group(2).split()]
+            open(p, 'w').write(t.replace(mm.group(2), ''.join('  %.3f\n' % x for x in [min(v)] * 3 + [max(v)] * (len(v) - 3))))
+            open(os.path.join(d, 'm.rvg'), 'a').write(':SoilZoneVadoseInitialFlux 30\n' + extra)
+            p = os.path.join(d, 'm.rvi'); x = re.sub(r':Duration \d+', ':Duration %d' % dur, open(p).read())
+            if start: x = x.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+            open(p, 'w').write(x)
+            return d
+        f, a = mk('_full', C.DAYS, None), mk('_first', 3, None)
+        b = mk('_second', C.DAYS - 3, '2000-01-04')
+        if not ('Successful Simulation' in C.run(f) and 'Successful Simulation' in C.run(a)): print('  %s: runs FAILED' % m); return False
+        shutil.copy(os.path.join(a, 'out', 'solution.rvc'), os.path.join(b, 'm.rvc'))
+        if 'Successful Simulation' not in C.run(b): print('  %s: restart FAILED' % m); return False
+        A, B = budget(f).iloc[3:].reset_index(drop=True), budget(b)
+        cols = [c for c in A.columns if pd.api.types.is_numeric_dtype(A[c]) and not c.startswith('time')]
+        dev = max(float(tc.max_diff(A[c], B[c], max(float(A[c].abs().max()), 1.0))) for c in cols)
+        c4 = 'recharge onto CHD cells [m3/d]'
+        g = len(A) == len(B) and dev <= 1e-9 and unused(b) is None and float(A[c4].iloc[0]) > 0.0
+        ok &= g
+        print('  %s, K = %d: day 4 recharge onto CHD cells %.4f (continuous) / %.4f m3/d (restart); GWBudget.csv from day 4 %.1e; unused lines %s -> %s'
+              % (m, K, A[c4].iloc[0], B[c4].iloc[0], dev, unused(b), 'ok' if g else 'FAIL'))
+    return ok
+
 def main():
     tc.need_mf6()
-    res = {'VI1': i1(), 'VI2': i2(), 'VI4': i4(), 'VI5': i5(), 'VI6': i6(), 'VI7': i7(), 'VI8': i8(), 'VI9': i9(), 'VI10': i10(), 'VI11': i11(), 'VI12': i12()}
+    res = {'VI1': i1(), 'VI2': i2(), 'VI4': i4(), 'VI5': i5(), 'VI6': i6(), 'VI7': i7(), 'VI8': i8(), 'VI9': i9(), 'VI10': i10(), 'VI11': i11(), 'VI12': i12(),
+           'VI13': i13()}
     print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
     good = all(res.values())
     print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')

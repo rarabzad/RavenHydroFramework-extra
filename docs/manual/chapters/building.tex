@@ -160,7 +160,7 @@ NODATA_value -9999
 \end{lstlisting}
 \end{minipage}\par\smallskip
 Values are interpolated bilinearly between raster cell centres, ignoring no-data cells; each model cell takes the mean of
-$5\times5$ such samples. Points more than one raster cell outside the map count as no-data. A grid without a
+$5\times5$ such samples. Points more than half a raster cell beyond the map's edge (one cell beyond the outermost cell centres) count as no-data. A grid without a
 \cmd{NODATA\_value} line takes $-9999$ as no-data. The header keys may come in any order and case; \cmd{xllcenter} and
 \cmd{yllcenter} give the centre of the lower-left cell instead of its corner; rectangular cells are given, as GDAL writes
 them, by \cmd{dx} and \cmd{dy} instead of \cmd{cellsize}; \cmd{NODATA\_value nan} marks no-data cells written as
@@ -186,7 +186,9 @@ file & classic TIFF and BigTIFF, little- and big-endian; the first image of the 
 units & coordinates in metres (projections) or degrees from Greenwich, elevations in metres: units keys, a projected code
 in other units, a prime meridian (by code, by its longitude or by the datum), a vertical coordinate system in feet or a
 band unit in feet (or another length unit) that say otherwise stop the run; a vertical system or band unit Raven does not
-know gives a warning (read as metres)\\
+know gives a warning (read as metres); the band unit's words are matched whole, so \cmd{m (Admiralty datum)} and
+\cmd{metres above Hydrographic Datum} are metres, and so is \cmd{in metres} (\cmd{in} is inches only when no metre word
+follows), while \cmd{feet above sea level} is not\\
 scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
 \cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
 applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and
@@ -259,7 +261,8 @@ The grammar is that of \cmd{:MF6CRS} (Section~\ref{sec:mf6crs}): the EPSG codes 
 ellipsoid. The parameters are read strictly: each must be a plain number (\cmd{-ll7}, \cmd{O.9996} or \cmd{500km} stop
 the run, naming the parameter), \cmd{TMERC} takes exactly five of them and \cmd{ALBERS} and \cmd{LCC} six, then at most
 the ellipsoid, and an EPSG code takes nothing after it; latitudes must lie within $\pm90^\circ$ and $k_0$ must be
-positive. The projection applies to every geometry and raster input file: \cmd{:HRUGeometry}, \cmd{:RiverGeometry},
+positive. \cmd{ALBERS} and \cmd{LCC} need a cone: standard parallels symmetric about the equator (\cmd{30 -30}, or
+\cmd{0 0}) and, for \cmd{LCC}, a standard parallel at a pole stop the run, naming the parallels. The projection applies to every geometry and raster input file: \cmd{:HRUGeometry}, \cmd{:RiverGeometry},
 \cmd{:GridFile}, the files of \cmd{:GridRefinement LINES} and \cmd{POLYGONS}, the boundary files of
 \cmd{:GeneralHeadBoundary} and \cmd{:SpecifiedHeadBoundary}, \cmd{:LandSurface} and \cmd{:BedrockSurface} (also for the
 soil zone's DEM samples), and for an existing model \cmd{:MF6GridFile}. Each vertex is converted to longitude/latitude as
@@ -402,7 +405,8 @@ them connected directly.
 Sizes must be smaller than \cmd{:GridCellSize}. Refinement applies to regular (variable spacing), quadtree and HRU-mesh
 grids; an imported grid is used as it is. A grid is limited to 5 million cells per layer: a cell size or refinement that
 gives more stops the run before the grid is built, naming the command and the number of cells. For a regular grid the
-count is exact. For a quadtree it is estimated level by level from the squares the refinement features touch, each square
+count is exact: the refined columns and rows are counted with the 2:1 smoothing that adds cells around each refined
+strip, as the build makes them (test N24). For a quadtree it is estimated level by level from the squares the refinement features touch, each square
 counted once however many features touch it (overlapping or adjacent features add no more), plus about a fifth for the
 2:1 balance: 6\% below the cells built on the Liard example's grids, and between a third below and a fifth above on small
 test grids of lines and polygons. So the estimate stops the run only beyond 1.5 times the limit; a grid nearer the limit

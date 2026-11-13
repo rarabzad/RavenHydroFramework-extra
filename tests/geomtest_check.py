@@ -8,7 +8,8 @@ geomtest writes clipping areas, projected points and raster samples; this script
 runs geomtest, then compares:
   - clipping: area of 400 random (often concave) polygons inside random squares, against shapely;
   - projection: Lambert azimuthal equal-area (sphere R=6371007.181 m) against PROJ, and the inverse round trip;
-  - raster: bilinear sampling of an ESRI ASCII grid holding a plane, which bilinear sampling must reproduce exactly;
+  - raster: bilinear sampling of an ESRI ASCII grid holding a plane, which bilinear sampling must reproduce exactly; a
+    point 0.4 cell beyond the grid's edge has a value and one 0.6 cell beyond has none (the margin is half a cell);
   - :InputCRS: a raster in UTM zone 10 (EPSG:32610) holding a plane in metres, sampled at lon/lat points, against the
     plane at the PROJ position; GeoJSON polygons and lines in UTM read back in lon/lat against the originals (outer
     rings counterclockwise); the file's "crs" member: a projected file without :InputCRS, a different projection, a
@@ -22,7 +23,9 @@ runs geomtest, then compares:
     feet (EPSG:2227); a file that starts with a UTF-8 byte-order mark is read;
   - :InputCRS parameters are read strictly: a letter in a number (TMERC lon0 -ll7, k0 O.9996), a unit (FE 500km), a
     surplus value (TMERC ... WGS84 junk, EPSG:32610 junk), too few values and a code with letters (EPSG:32610x) are
-    refused, each naming the parameter or the value.
+    refused, each naming the parameter or the value; conic parameters that define no cone (ALBERS and LCC with standard
+    parallels symmetric about the equator, 30 -30 or 0 0, and LCC with a parallel at a pole) are refused, naming the
+    standard parallels.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -106,7 +109,12 @@ CRS_CASES = [  # (name, file, :InputCRS or NONE, accepted, part of the message, 
     ('spec_too_few', 'utm_ver', 'LCC 49 77 49 -95 0', 0, 'LCC takes lat1 lat2 lat0 lon0 FE FN', ''),
     ('spec_ellipsoid', 'utm_ver', 'TMERC 0 -123 0.9996 500000 0 NAD27', 0, "ellipsoid must be WGS84 or GRS80, not 'NAD27'", ''),
     ('spec_epsg_letters', 'utm_ver', 'EPSG:32610x', 0, "'EPSG:32610x' is not EPSG: followed by a whole-number code", ''),
-    ('spec_epsg_surplus', 'utm_ver', 'EPSG:32610 junk', 0, "surplus value 'junk' after EPSG:32610", '')]
+    ('spec_epsg_surplus', 'utm_ver', 'EPSG:32610 junk', 0, "surplus value 'junk' after EPSG:32610", ''),
+    ('spec_albers_symmetric', 'utm_ver', 'ALBERS 30 -30 0 -96 0 0', 0, 'ALBERS (standard parallels lat1 30, lat2 -30): the standard parallels lie symmetric about the equator', ''),
+    ('spec_albers_equator', 'utm_ver', 'ALBERS 0 0 0 -96 0 0', 0, 'lie symmetric about the equator', ''),
+    ('spec_lcc_symmetric', 'utm_ver', 'LCC 30 -30 0 -96 0 0', 0, 'LCC (standard parallels lat1 30, lat2 -30): the standard parallels lie symmetric about the equator', ''),
+    ('spec_lcc_equator', 'utm_ver', 'LCC 0 0 0 -96 0 0', 0, 'lie symmetric about the equator', ''),
+    ('spec_lcc_pole', 'utm_ver', 'LCC 90 90 49 -95 0 0', 0, 'a standard parallel at a pole defines no Lambert conformal cone', '')]
 with open('crs_cases.txt', 'w') as f:
     for n, k, spec, _, _, _ in CRS_CASES:
         f.write('%s test_crs_%s.geojson %s\n' % (n, k, spec))
@@ -152,6 +160,10 @@ ok = r[:, 2] == 1
 e = np.max(np.abs(r[inside & ok, 3] - (3 * r[inside & ok, 0] + 2 * r[inside & ok, 1] + 1))) if np.any(inside & ok) else 1e9
 report('raster: bilinear sampling of a plane (worst error)', e < 1e-6 and np.all(ok[inside]), e)
 
+# the no-data margin: a point 0.4 cell beyond the raster's edge has a value (the outermost cells' values), 0.6 cell beyond none
+r = np.loadtxt('raster_margin.txt')
+report('raster: half a cell beyond the edge has a value, more has none', r[0, 2] == 1 and r[1, 2] == 0, r[0, 3])
+
 # :InputCRS: projected raster against the plane at PROJ's position
 r = np.loadtxt('raster_utm.txt')
 x, y = utm.transform(r[:, 0], r[:, 1])
@@ -184,7 +196,7 @@ for n, k, spec, ok, msg, nomsg in CRS_CASES:
     if not good:
         print('      message: %s' % got[1][:300])
 
-for f in ('clip.txt', 'proj.txt', 'raster.txt', 'test.asc', 'test_utm.asc', 'raster_utm.txt', 'crs_status.txt', 'poly_utm.txt', 'line_utm.txt',
+for f in ('clip.txt', 'proj.txt', 'raster.txt', 'raster_margin.txt', 'test.asc', 'test_utm.asc', 'raster_utm.txt', 'crs_status.txt', 'poly_utm.txt', 'line_utm.txt',
           'test_utm_poly.geojson', 'test_utm_bare.geojson', 'test_ll_crs84.geojson', 'test_utm_line.geojson', 'crs_cases.txt') + tuple(
           'test_crs_%s.geojson' % k for k in CRS_FILES):
     if os.path.exists(f):   # another run in the same checkout may have removed it already

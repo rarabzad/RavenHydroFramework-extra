@@ -444,7 +444,8 @@ In a coupled run Raven's `solution.rvc` holds every value with 17 significant di
 reservoir states and the groundwater blocks; a run without groundwater writes Raven's usual 5 decimals, and reservoir stages and flows with 12 digits, with or without groundwater). It also contains
 `:GWHeads nlay nrow ncol` (the head of every cell), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
 seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), `:GWRiverTake` (the river loss taken from
-reach inflows and outflows in the last step, which Raven's channel storage and balance book half in the next step),
+reach inflows and outflows in the last step, which Raven's channel storage and balance book half in the next step, with
+the time step of the takes: a restart with another `:TimeStep` still gives up exactly the take),
 `:GWStartHeads` (after an unconverged step: the heads of the last converged step, for the far-head test), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
 (unsaturated columns; the column lines name the method that wrote them; a column whose top, node count, classes or
@@ -498,7 +499,10 @@ Calibrate hydraulic conductivity in log space.
 ## 7. Ensembles
 
 Raven's Monte Carlo, DDS and EnKF modes re-initialize the model for every member; the groundwater model is
-rebuilt and MODFLOW 6 restarted each time, with its files in each member's output folder.
+rebuilt and MODFLOW 6 restarted each time, with its files in each member's output folder. Every member starts from the
+first run's routing memory (also the local outflow, irrigation and diversion memory), so member 1 equals the single run.
+An EnKF member's `:ExtraRVTFilename` is read before its groundwater model is built, so `:BoundaryHead` series given there
+place and switch that member's boundaries.
 
 ## 8. Troubleshooting
 

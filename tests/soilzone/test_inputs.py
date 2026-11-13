@@ -46,7 +46,11 @@ I16 an age-tracer run started from the solution.rvc of a spin-up run without the
    :AgeTracerDatum.
 I17 EnKF members with their own :ExtraRVTFilename (ENKF_OPEN_FORECAST, 3 members, one well): each member's well rate is
    its own file's (-100, -200, -300 m3/d in GWBudget.csv "wells specified"), with no "has no :WellFlowRate" warning for
-   the later members; an extra .rvt naming no well stops the member that reads it.
+   the later members; an extra .rvt naming no well stops the member that reads it. I17b: a :BoundaryHead series given only
+   in the members' extra .rvt files (2 members, the same series: 99 m on days 1-2, then 70 m, below the aquifer) for a
+   specified head that the base .rvt leaves fixed: each member's model is built with its own series (cells released on
+   days 3-6, no recharge booked onto them), so every member's GWBudget.csv equals the single run with the series in its
+   .rvt (1e-12 relative).
 I18 damaged soil-zone hotstart values: a :GWSoilZoneColumns row with nan, one with negative water (-50 mm), and a
    :GWHeads value nan each stop the run with a message naming the block ("is not a finite number", "is negative");
    the undamaged file runs.
@@ -82,6 +86,9 @@ I22 strict numbers in the .rvc: ":InitialGWHeads ELEVATION 98,5" (a decimal comm
    naming the command; ":InitialGWHeads FROM_PROFILE 0" stops ("FROM_PROFILE takes no value"); ":InitialGWHeads ELEVATION
    98.5", "98.5# note" and "98.5 # note" (a trailing comment) run and start at 98.5 m; a :GWHeads value "98.5x" stops ("is
    not a finite number").
+I23 two specified-head boundaries that select the same cells (:SpecifiedHeadBoundary EDGE and EDGE2 on the same file, HEAD
+   99 and 99.5) stop before MODFLOW starts, with a message naming both boundaries and the cell; two general-head boundaries
+   on the same cells (legal in MODFLOW) run.
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -403,6 +410,31 @@ def main():
     print('  I17: members\' "wells specified" %s (want -100, -200, -300), %d "no :WellFlowRate" warnings; orphan series in member 2 stops: %s -> %s'
           % (rates, nw, g2, 'ok' if (g1 and g2) else 'FAIL'))
     res.append(('I17 EnKF members use their own extra .rvt series', g1 and g2))
+    # I17b: a :BoundaryHead series in the members' extra .rvt for a specified head the base .rvt leaves fixed
+    BH = ':BoundaryHead EDGE\n  2000-01-01 00:00:00 1.0 6\n  99\n  99\n  70\n  70\n  70\n  70\n:EndBoundaryHead\n'
+    ds = case('I17b_single', nhru=4, rain=20.0, perc=10.0, days=6, chd=96.0, physical=False, slope=0.01, init_depth=3.0)
+    open(os.path.join(ds, 'm.rvt'), 'a').write('\n' + BH)
+    oks, _ = run_err(ds)
+    d = case('I17b_enkf', nhru=4, rain=20.0, perc=10.0, days=6, chd=96.0, physical=False, slope=0.01, init_depth=3.0)
+    edit(os.path.join(d, 'm.rvi'), ':StartDate', ':EnsembleMode ENSEMBLE_ENKF 2\n:StartDate')
+    open(os.path.join(d, 'm.rve'), 'w').write(':EnKFMode ENKF_OPEN_FORECAST\n:AssimilatedState SOIL[0] All\n:ForcingPerturbation TEMP_AVE DIST_NORMAL 0 0.000001 ADDITIVE\n'
+                                              ':ExtraRVTFilename extra_*.rvt\n:OutputDirectoryFormat ./out/ens_*/\n')
+    open(os.path.join(d, 'm.rvh'), 'a').write('\n:HRUGroup All\n  1\n:EndHRUGroup\n')
+    for e in (1, 2):
+        os.makedirs(os.path.join(d, 'out', 'ens_%d' % e), exist_ok=True); shutil.copy(os.path.join(d, 'm.rvc'), os.path.join(d, 'out', 'ens_%d' % e, 'solution.rvc'))
+        open(os.path.join(d, 'extra_%d.rvt' % e), 'w').write(BH)
+    ok, _ = run_err(d)
+    dev, onto = float('inf'), []
+    if ok and oks:
+        A = pd.read_csv(os.path.join(ds, 'out', 'GWBudget.csv')); dev = 0.0
+        for e in (1, 2):
+            B = pd.read_csv(os.path.join(d, 'out', 'ens_%d' % e, 'GWBudget.csv'))
+            onto.append(float(B[[c for c in B.columns if 'onto CHD' in c][0]].iloc[2:].abs().max()))
+            dev = max([dev] + [float(sz_check.tc.max_diff(A[c], B[c], max(float(A[c].abs().max()), 1e-9))) for c in A.columns if pd.api.types.is_numeric_dtype(A[c])])
+    g3 = ok and oks and dev <= 1e-12
+    print('  I17b: :BoundaryHead series only in the members\' extra .rvt: members against the single run %.1e (recharge onto CHD cells on days 3-6, cells not held: %s m3/d) -> %s'
+          % (dev, ', '.join('%g' % x for x in onto) or 'a run FAILED', 'ok' if g3 else 'FAIL'))
+    res.append(('I17b EnKF members build with their own boundary series', g3))
 
     # I18: damaged soil-zone hotstart values
     d0 = case('I18_base', days=2); ok0, _ = sz_check.run(d0)
@@ -603,6 +635,20 @@ def main():
         print('  I22 :GWHeads value %s: %s -> %s' % (w[i0], 'stops with the message' if g else ('runs' if ok else 'stops without the message'), 'ok' if g else 'FAIL'))
     good &= g
     res.append(('I22 strict numbers in the .rvc', good))
+    # I23: two specified-head boundaries on the same cells
+    d = case('I23_chd', nhru=2, days=3, chd=99.0, extra_rvg=':SpecifiedHeadBoundary EDGE2 edge.geojson HEAD 99.5\n')
+    ok, txt = run_err(d)
+    g1 = (not ok) and ':SpecifiedHeadBoundary EDGE2 and :SpecifiedHeadBoundary EDGE both select the cell in layer' in txt and 'MODFLOW 6 stopped' not in txt
+    d = case('I23_ghb', nhru=2, days=3, chd=99.0)
+    t = open(os.path.join(d, 'm.rvg')).read(); m = re.search(r':SpecifiedHeadBoundary EDGE (\S+) HEAD 99[^\n]*\n', t)
+    open(os.path.join(d, 'm.rvg'), 'w').write(t.replace(m.group(0), ':GeneralHeadBoundary EDGE %s HEAD 99 CONDUCTANCE 10\n:GeneralHeadBoundary EDGE2 %s HEAD 99.5 CONDUCTANCE 10\n'
+                                                       % (m.group(1), m.group(1))) if m else t)
+    ok2, txt2 = run_err(d)
+    g2 = m is not None and ok2
+    msg = [l.strip() for l in txt.split('\n') if 'both select' in l or 'MODFLOW 6 stopped' in l]
+    print('  I23: two CHD boundaries on the same cells: %s; two GHB boundaries on the same cells: %s -> %s'
+          % ('stops: ' + msg[0][:160] if (msg and not ok) else ('runs' if ok else 'stops without the message'), 'run' if ok2 else 'FAIL', 'ok' if (g1 and g2) else 'FAIL'))
+    res.append(('I23 two specified-head boundaries on one cell', g1 and g2))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

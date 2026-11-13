@@ -14,7 +14,10 @@ Reader checks (unit driver):
     8 bit) give no data at the masked pixels; tiles of 2048 x 2048 on a small raster; the EPSG code and its kind as written;
   - GDAL's band scale and offset (GDAL_METADATA) are applied (16-bit decimetres against a twin of the scaled values,
     NODATA pixels no data); items named SCALE, OFFSET and UNITTYPE without GDAL's role are ordinary metadata (values as
-    stored); a band unit in feet stops, an unknown band unit gives a warning;
+    stored); a band unit in feet stops, an unknown band unit gives a warning; the unit's words are matched whole: "m
+    (Admiralty datum)", "metres above Hydrographic Datum", "elevation in metres", "in metres", "in m" and "in meters above
+    sea level" are metres, "hydraulic head" is an unknown unit (a warning), "feet above sea level", "US survey foot",
+    "kilometres" and "in" (inches) stop;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -254,6 +257,25 @@ for m in M:
         report('warning: %s "%s"' % (m['file'], m['expect'][:60]), o.startswith('OK') and m['expect'] in o, o[:200])
 o = unit('raster', fx('matrix_int16_c8_p2_le_strip_classic.tif') if os.path.exists(fx('matrix_int16_c8_p2_le_strip_classic.tif')) else fx('twin_int16.asc'), 'NONE').strip()
 report('no NODATA tag and no such values: no warning', o == 'OK', o[:120])
+
+# ---- band units (UNITTYPE): matched as whole words
+def with_unit(text, name):
+    """unit_height_meta.tif with another UNITTYPE text (the GDAL_METADATA string rewritten at the end of the file)"""
+    import struct
+    b = bytearray(open(fx('unit_height_meta.tif'), 'rb').read()); off = struct.unpack('<I', b[4:8])[0]; n = struct.unpack('<H', b[off:off + 2])[0]
+    for i in range(n):
+        e = off + 2 + 12 * i; t, ty, c, v = struct.unpack('<HHII', b[e:e + 12])
+        if t == 42112:
+            meta = (bytes(b[v:v + c]).rstrip(b'\0').decode().replace('>height<', '>%s<' % text)).encode() + b'\0'
+            b[e:e + 12] = struct.pack('<HHII', t, ty, len(meta), len(b)); b += meta
+    p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
+for text, want, part in (('m (Admiralty datum)', 'OK', ''), ('metres above Hydrographic Datum', 'OK', ''), ('elevation in metres', 'OK', ''),
+                         ('in metres', 'OK', ''), ('in m', 'OK', ''), ('in meters above sea level', 'OK', ''),
+                         ('hydraulic head', 'OK', "has the band unit 'hydraulic head'"), ('feet above sea level', 'ERROR', 'elevations are in feet above sea level'),
+                         ('US survey foot', 'ERROR', 'elevations are in US survey foot'), ('kilometres', 'ERROR', 'elevations are in kilometres'), ('in', 'ERROR', 'elevations are in in')):
+    o = unit('raster', with_unit(text, 'unit_%s.tif' % re.sub(r'\W', '_', text)), 'NONE').strip()
+    good = o.startswith(want) and part in o and (part != '' or o == 'OK')
+    report('band unit "%s": %s' % (text, {'OK': 'read as metres' if not part else 'read as metres, with a note', 'ERROR': 'stops'}[want]), good, o[:160])
 
 # ---- ESRI ASCII grids (CGWRaster): GDAL's rectangular-pixel header, NaN NODATA, and malformed grids
 def asc_write(name, header, rows):

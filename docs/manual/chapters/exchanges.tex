@@ -670,7 +670,10 @@ by step. Unsaturated columns (Section~\ref{sec:szvadose}) exist on such a cell w
 link's cell is a specified head its unsaturated columns end, their water above their reference profiles going to the
 specified head (\emph{recharge onto CHD cells}, and \emph{unsaturated zone to aquifer}; the columns that held water and
 their water are a run total of \cmd{GWModelSummary.txt}), and a column forms again, at rest, when the cell is no longer
-one. A generated model knows the cells held at the start, so no column is built on them; an existing model's specified
+one. A generated model knows the cells held at the start, so no column is built on them, except the columns a hotstart
+file holds for such a cell (its series released the cell in the last step of the run that wrote the file): they are
+built from their lines and end in the first step, their water going to the specified head, as in the continuous run
+(test VI13); an existing model's specified
 heads are known only once MODFLOW has read the first step's period, so its columns on such cells are built and end in the
 first step. The
 rest column of an HRU covers only the part outside the grid, where there is no aquifer to exchange with.
@@ -861,7 +864,9 @@ the reach's state as set: the take is not added back to it, Raven's books start 
 the outflow routed from it, and Raven warns (test WB11). Raven's channel storage and outflow integrate the flows over
 the step (the mean of the values at the start and at the end); a take from the inflow or the outflow therefore leaves
 Raven half in the step and half in the next, and Raven's balance books it so (Section~\ref{sec:accraven}); the half of
-the last step's take still to be booked at the end of a run is a run total (\emph{river take in transit}). A loss that the outflow cannot supply either --- a reach whose
+the last step's take still to be booked at the end of a run is a run total (\emph{river take in transit}, given when it
+exceeds $10^{-6}$~m$^3$: a reach that has stopped flowing gives round-off takes, which \cmd{solution.rvc} still holds for
+an exact restart). A loss that the outflow cannot supply either --- a reach whose
 flow stops within the day, after the start-of-day flow allowed the loss --- is \emph{carried} to the next day and taken
 from the river first thing then, so no water is created; Raven warns (the first ten such steps) and the loss still
 carried at the end of a run is a run total of \cmd{GWModelSummary.txt} (\emph{river loss carried}):
@@ -1187,7 +1192,11 @@ active cell when the head lies above it). The highest head is \cmd{HEAD} or, wit
 highest value of the series (the whole series, not only the run's days, so a restarted run gets the same cells), and
 \cmd{HEAD} as well where the series has blank values (\cmd{HEAD} applies there). With a series, \cmd{LAYERS TOP} also places
 the layers below, down to the first one whose bottom lies below the series' lowest head; layers only \cmd{HEAD} would
-reach are not placed when the series has no blank value.
+reach are not placed when the series has no blank value. MODFLOW holds a cell at one specified head only: two
+\cmd{:SpecifiedHeadBoundary} commands whose files select the same cell (a coastline and a lake that share a cell, a line
+and a polygon that meet) stop the run with a message naming both boundaries, the layer and the cell's position, so
+the cell can be removed from one of the files. General-head boundaries may share cells, with each other and with a
+specified head.
 
 On each step, a placed cell whose bottom lies at or above the step's head is switched off: a general-head cell gets
 conductance 0, and a specified-head cell is left out of MODFLOW's list for the step (it is an ordinary active cell then).

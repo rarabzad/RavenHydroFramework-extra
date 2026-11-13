@@ -168,7 +168,11 @@ file's water);
 the specified heads in step 1);
 \item VI12: columns over an existing model's own specified heads (\cmd{KINEMATIC}, $K=3$, periods 3--5): a restart on day 4
 rebuilds them at rest and ends them again, but only columns that held water are counted, so the two parts' run totals
-add up to the continuous run's (18 columns, 225.75~m$^3$).
+add up to the continuous run's (18 columns, 225.75~m$^3$);
+\item VI13: a generated model's \cmd{:BoundaryHead} series below the aquifer on days 1--3 (columns form on its cells) and
+near the ground from day 4, restarted from day 3's \cmd{solution.rvc} (\cmd{LAG}, $K=1$; \cmd{KINEMATIC}, $K=3$,
+\cmd{LAGGED}): the restart builds those columns from the file and ends them in its first step, so \cmd{GWBudget.csv} from
+day 4 equals the continuous run's (deviation 0; day 4's recharge onto the specified heads 51.79 and 94.32~m$^3$/d).
 \end{itemize}
 
 \subsection{Input handling}\label{sec:vszinputs}
@@ -194,6 +198,7 @@ I14 & age tracer (no groundwater): 20 days against 7 + 7 + 6 days chained throug
 I15 & age-tracer chains across year boundaries: 1999-12-25 (7 + 7 + 6 days), 1998-12-20 (400 + 380 days; quick mode 12 + 400 + 8) & every part runs; ages within the limit of I14, largest difference $10^{-4}$~d; \cmd{:AgeTracerDatum} 1999-12-25 and 1998-12-20\\
 I16 & age tracer started from the \cmd{solution.rvc} of a 30-day spin-up without it & ages 0 at the start, 1~d after the first day; no \cmd{:AgeTracerDatum}\\
 I17 & EnKF, 3 members, one well, \cmd{:ExtraRVTFilename} with $-100$, $-200$, $-300$~m$^3$/d & each member pumps its own rate; a series naming no well stops the run\\
+I17b & EnKF, 2 members whose \cmd{:ExtraRVTFilename} gives a \cmd{:BoundaryHead} series (99~m, then 70~m below the aquifer) to a specified head the base \cmd{.rvt} leaves fixed & each member's model is built with its series: the cells are released on days 3--6, nothing is booked onto them, and both members' \cmd{GWBudget.csv} equal the single run with the series in its \cmd{.rvt}\\
 I18 & \cmd{:GWSoilZoneColumns} with \cmd{nan} or $-50$~mm, \cmd{:GWHeads} with \cmd{nan} & each stops with a message naming the block; the undamaged file runs\\
 I19 & \cmd{:Transport Nitrate} (\cmd{CONCEPTUAL}, \cmd{PHYSICAL}) and \cmd{:Transport AGE} with \cmd{:GroundwaterModel MODFLOW6}; the same model without groundwater & the coupled runs stop naming the constituent; the run without groundwater completes\\
 I20 & a specified head with \cmd{HEAD} 0 (below every cell) and a \cmd{:BoundaryHead} series of 99.5~m; the same without the series & placed by the series: 2 cells, flow 1\,390~m$^3$; without it no cell and a warning naming the boundary, its head and the highest cell bottom\\
@@ -201,7 +206,8 @@ I21 & head boundary \cmd{EDGE} (\cmd{HEAD} 90) with a series of 99~m on day 1, t
 I21 (d) & a column with no cell held: 8 HRUs, the last wholly on \cmd{EDGE} (\cmd{LAYERS ALL}), rain 20~mm/d, a series of 99~m on days 1--2 and 70~m (below the aquifer) on days 3--6; \cmd{CONCEPTUAL} and \cmd{PHYSICAL} & days 3--6: CHD flow 0 and nothing booked onto specified-head cells; MODFLOW's recharge equals Raven's (\cmd{CONCEPTUAL}); the column's soil-zone link exchanges 425 to 42~m$^3$/d with the aquifer (\cmd{PHYSICAL}); every identity holds\\
 I21 (e) & \cmd{LAYERS TOP}, \cmd{HEAD} 90 and a series of 99~m on every day, CHD and GHB & the cells of layer 1 only (2), none switched off\\
 I21 (f) & a steady-state first period at 90~m (series 90, 99, 99, 90, 90, 99~m) & the run total counts the steady period's 2 cells: 8 cell-steps against 6 without it\\
-I22 & \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5}, \cmd{0x62}, \cmd{98.5}, \cmd{98.5\# note} and \cmd{98.5 \# note}; \cmd{:InitialGWHeads FROM\_PROFILE 0}; a \cmd{:GWHeads} value \cmd{98.1x} & the first three stop naming the command and the token (surplus value '5'; not a number), the next three start at 98.5~m; \cmd{FROM\_PROFILE 0} stops (takes no value); the damaged value stops naming the block\\\bottomrule
+I22 & \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5}, \cmd{0x62}, \cmd{98.5}, \cmd{98.5\# note} and \cmd{98.5 \# note}; \cmd{:InitialGWHeads FROM\_PROFILE 0}; a \cmd{:GWHeads} value \cmd{98.1x} & the first three stop naming the command and the token (surplus value '5'; not a number), the next three start at 98.5~m; \cmd{FROM\_PROFILE 0} stops (takes no value); the damaged value stops naming the block\\
+I23 & two \cmd{:SpecifiedHeadBoundary} commands on the same file (\cmd{HEAD} 99 and 99.5); two \cmd{:GeneralHeadBoundary} commands on it & the first stops before MODFLOW starts, naming both boundaries and the cell; the second runs\\\bottomrule
 \end{longtable}
 
 \subsection{Robustness}\label{sec:vszrobust}

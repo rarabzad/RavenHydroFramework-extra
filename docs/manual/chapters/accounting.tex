@@ -50,8 +50,13 @@ at the end of the step, give it up.
 With these, Raven's own balance closes as without groundwater. In the Liard example its MB error is 0.431~mm on every
 step of 20 years: the value of base Raven's first step for this model, the same without groundwater
 (Section~\ref{ch:limits}); in Example B the same. The half of the last step's take that Raven books in the next step is
-written to \cmd{solution.rvc} (\cmd{:GWRiverTake}), so a restarted run's MB error stays at 0 (its own first step) as
-the continuous run's stays at its first step's value. \cmd{GWBudget.csv} books the whole take in its step (\emph{river
+written to \cmd{solution.rvc} (\cmd{:GWRiverTake}, with the time step of the takes), so a restarted run's MB error stays
+at 0 (its own first step) as the continuous run's stays at its first step's value. A restart with another
+\cmd{:TimeStep} routes the reach from its outflow before the take at the take's own rate (take over its step); its first
+step's trapezoid then books the take's rate over the new step, and the rest of the half (negative when the step grows)
+is carried as river loss, so Raven still gives up the whole take and the channel storage follows the routing without
+it (test WB13; for a take from the inflow this holds when the last steps' takes were equal, since Raven averages a
+longer step's inflow history from the shorter steps' inflows). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
 exchange applied to Raven}), as MODFLOW receives it.
 
 \subsection{The whole system}
@@ -248,13 +253,17 @@ number in any groundwater block, and negative water in \cmd{:GWSoilZoneColumns},
 Raven's ensemble modes (Monte Carlo, DDS, EnKF) run the model several times in one program run. For every member the
 groundwater model is rebuilt from scratch, MODFLOW is restarted, and its files go to that member's output folder.
 Each member starts with a fresh water balance and, unless its own \cmd{.rvc} says
-otherwise, from the routing memory and reservoir states of the first run (stage, outflow, loss terms). These defaults are
+otherwise, from the routing memory and reservoir states of the first run (the inflow and lateral-inflow histories, the
+local outflow, the irrigation and diversion memory with each demand's delivered and returned flow; stage, outflow, loss
+terms), so member 1 equals the single run. These defaults are
 restored before the member's \cmd{.rvc} is read, so member-specific initial conditions (as used by EnKF forecasting) still
 apply; groundwater hotstart values are likewise cleared, so each member uses only its own \cmd{.rvc}, and the steady-state
 start is decided for each member separately
 (Section~\ref{sec:coreflix}). An EnKF member's own time series file (\cmd{:ExtraRVTFilename}) may give
-\cmd{:WellFlowRate} and \cmd{:BoundaryHead} series: they replace, for that member and the later ones, the series of the
-same well or boundary read before, and a series naming no well or boundary stops the run.
+\cmd{:WellFlowRate} and \cmd{:BoundaryHead} series: in a coupled run the file is read before the member's groundwater
+model is built, so the member's boundaries are placed, and their cells held or switched, with its own series; they
+replace, for that member and the later ones, the series of the same well or boundary read before, and a series naming no
+well or boundary stops the run.
 
 \subsection{Safeguards}\label{sec:guard}
 \begin{itemize}

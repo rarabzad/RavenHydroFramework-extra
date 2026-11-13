@@ -24,9 +24,12 @@ TC6 tools_audit checks the recharge identity on step 1: with 500 m3/d added to s
    two-step run of TC1 (a copy of its output) the identity is off by more than 1e-6; with a recharge delay store
    (RECHARGE_DELAY 3 d, 3 steps) the store at the start is read from GWModelSummary.txt, the identity holds below 1e-8
    with step 1 checked, and the same step-1 change is found there too.
+TC8 tools_audit on a run without aquifer flow (TC1's two-step output with every flow 0 except a round-off storage term of
+   3e-9 m3/d): MODFLOW's cumulative residual over the gross flow is below 1e-8 (the gross flow is floored at 1 m3/d, as
+   the tool's other ratios are), not 1.
 TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the public branch's commits the kit does not hold
    only when the public check found them (their IDs and subjects), and says nothing about them otherwise.
-Without the MODFLOW 6 library TC1, TC2 and TC6 print SKIP.
+Without the MODFLOW 6 library TC1, TC2, TC6 and TC8 print SKIP.
 """
 import os, sys, re, shutil, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -88,6 +91,20 @@ def t1_t2():
         m = mutate(os.path.join(d, 'out'), 't6_delay_mut'); shutil.copy(os.path.join(d, 'out', 'GWModelSummary.txt'), m)
         A = tc.audit.audit(m); shutil.rmtree(m, ignore_errors=True)
         report('TC6 tools_audit with a recharge delay store: the step-1 change is found', abs(A[key]) > 1e-6, 'recharge identity %.1e' % A[key])
+    # TC8: a run without aquifer flow: the residual ratio is not a 100 % failure
+    m = os.path.join(W, 't8_noflow'); shutil.rmtree(m, ignore_errors=True)
+    if not os.path.exists(os.path.join(W, 't1_2', 'out', 'GWBudget.csv')):
+        report('TC8 tools_audit on a run whose only aquifer flow is round-off storage', False, 'no two-step run (TC1)'); return
+    shutil.copytree(os.path.join(W, 't1_2', 'out'), m, ignore=shutil.ignore_patterns('mf6'))
+    b = pd.read_csv(os.path.join(m, 'GWBudget.csv'))
+    for c in b.columns:
+        if c.endswith('[m3/d]') or c.endswith('[m3]'):
+            b[c] = 0.0
+    b['storage release [m3/d]'] = [3.07e-9, 3.29e-9][:len(b)]
+    b.to_csv(os.path.join(m, 'GWBudget.csv'), index=False)
+    A = tc.audit.audit(m); shutil.rmtree(m, ignore_errors=True)
+    rk = 'MF6 cumulative residual / gross flow'
+    report('TC8 tools_audit on a run whose only aquifer flow is round-off storage', abs(A[rk]) < 1e-8, 'residual %.1e' % A[rk])
     # TC2: whole-number heads (and the other list packages) in feet and seconds
     d = os.path.join(W, 't1_2'); m = os.path.join(d, 'out', 'mf6')
     if not os.path.exists(os.path.join(m, 'gwf.chd')):

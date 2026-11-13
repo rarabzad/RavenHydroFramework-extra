@@ -29,6 +29,10 @@ int main(){
   f=fopen("raster.txt","w");
   for (int t=0;t<200;t++){double lon=-2+4.0*(rand()%10000)/10000.0, lat=10+3.0*(rand()%10000)/10000.0,v=-1; bool ok=R.Sample(lon,lat,v); fprintf(f,"%.8f %.8f %d %.10f\n",lon,lat,ok?1:0,v);}
   fclose(f);
+  //the no-data margin: points up to half a cell beyond the raster's edge (0.4 and 0.6 of a 0.5-degree cell west of it)
+  f=fopen("raster_margin.txt","w");
+  for (int t=0;t<2;t++){double lon=-3.0-((t==0)?0.4:0.6)*0.5,lat=11.25,v=-1; bool ok=R.Sample(lon,lat,v); fprintf(f,"%.8f %.8f %d %.10f\n",lon,lat,ok?1:0,v);}
+  fclose(f);
   // :InputCRS: a raster and GeoJSON files in UTM zone 10 (EPSG:32610), written by geomtest_check.py
   CGWCRS U,U9; if (!U.Parse("EPSG:32610",err) || !U9.Parse("EPSG:32609",err)){printf("CRS parse failed: %s\n",err.c_str()); return 1;}
   CGWRaster RU; RU.SetCRS(&U); if (!RU.Read("test_utm.asc",err)){printf("projected raster read failed: %s\n",err.c_str()); return 1;}

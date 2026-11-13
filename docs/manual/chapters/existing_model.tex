@@ -89,7 +89,9 @@ Any other projection of these three kinds is given by its parameters:
 :MF6CRS ALBERS lat1 lat2 lat0 lon0 FE FN {WGS84|GRS80}
 :MF6CRS LCC    lat1 lat2 lat0 lon0 FE FN {WGS84|GRS80}
 \end{lstlisting}
-The built-in formulas (Karney's series for Transverse Mercator, Snyder's for the conics) agree with the PROJ library to a few
+The parameters are read as for \cmd{:InputCRS} (Section~\ref{sec:inputcrs}); conic parameters that define no cone
+(standard parallels symmetric about the equator, an \cmd{LCC} parallel at a pole) stop the run. The built-in formulas
+(Karney's series for Transverse Mercator, Snyder's for the conics) agree with the PROJ library to a few
 micrometres (Section~\ref{sec:vexisting}). The small datum difference between NAD83 and WGS84 (about a metre) is ignored.
 
 \paragraph{\cmd{:MF6GridFile}.} A GeoJSON file of the top-layer cells in longitude/latitude (or in the projection of
