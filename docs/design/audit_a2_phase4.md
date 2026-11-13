@@ -1,5 +1,9 @@
 # Audit A2, phase 4: physics, restarts and books (agent p4)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Issue list: spec/audit_A2/AUDIT_A2_issues_and_phases.md; findings F_CB, F_VZ, F_IB, F_SZ, F_MT (repro cases reused from
 audit2/{CB,VZ,IB,SZ}). Code on rb-p4 (from a2133bf), tests and documents on rb-p4-tests (from 6b886d4). Builds compared:
 the current build (wt/p3/pkg/Raven_MF6_linux/bin/Raven, "before") and Raven_p4.exe ("after"), both `make -O2`, MODFLOW

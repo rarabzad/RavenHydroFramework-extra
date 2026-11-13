@@ -30,7 +30,9 @@ Arabzadeh. Licensed under the Artistic License 2.0: full text in LICENSE-Raven.t
 the Raven source code). This Raven is a modified version of Raven: its source code, with the changes documented, is
 in the RavenHydroFramework repository (https://github.com/rarabzad/RavenHydroFramework, branch mf6-coupling) and its
 documentation in RavenHydroFramework-extra (https://github.com/rarabzad/RavenHydroFramework-extra). It was compiled
-with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig/clang, libc++ linked statically).
+with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig 0.17.1, clang with libc++ linked
+statically); that script with zig 0.17.1 gives this executable again from the Raven source commit that the versions
+name.
 
 MODFLOW 6: software of the U.S. Geological Survey, in the public domain (licence "Public Domain, CC0-1.0"); see
 NOTICE-MODFLOW6.txt. libmf6.so is the unchanged library of the official release.

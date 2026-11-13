@@ -61,18 +61,18 @@ WEL (\cmd{RES\_RAVEN}) & \cmd{Q}, \cmd{HCOF}, \cmd{RHS} & reservoir seepage\\\bo
 For MODFLOW versions before 6.5 the values are written to the columns of \cmd{BOUND} instead.
 
 \section{Changes to existing Raven files}\label{sec:coreflix}
-The changes are against Raven~4.15 (v593). They form five independent groups, each offered as a pull request; the pull
-requests merge cleanly in any order:
+The changes are against Raven~4.15 (v593), and the branch \cmd{mf6-coupling} holds all of them. They fall into five
+groups by what they change; the first is the coupling itself, the other four change Raven's behaviour also in runs
+without groundwater:
 \begin{enumerate}
-\item \textbf{Groundwater coupling} (branch \cmd{mf6-groundwater}): the new source files and the changes below that
-      concern groundwater.
-\item \textbf{Ensemble reset} (\cmd{fix-ensemble-reset}): every ensemble member starts from the routing memory and
+\item \textbf{Groundwater coupling}: the new source files and the changes below that concern groundwater.
+\item \textbf{Ensemble reset}: every ensemble member starts from the routing memory and
       reservoir states of the first run (\cmd{RestoreInitialDynamicState}) instead of inheriting the previous member's.
-\item \textbf{Reservoir balance} (\cmd{fix-reservoir-balance}): a drying reservoir books only the water available;
+\item \textbf{Reservoir balance}: a drying reservoir books only the water available;
       reservoir stages and flows written to \cmd{solution.rvc} with 12 digits; reservoirs with absolute stages start at
       their crest when no initial condition is given; the reservoir constraint is initialised; a reservoir whose
       \cmd{:HRUID} lies in another subbasin stops with a message instead of crashing.
-\item \textbf{Observation constituent} (\cmd{fix-observation-constituent}): \cmd{:ObservationData} and
+\item \textbf{Observation constituent}: \cmd{:ObservationData} and
       \cmd{:ObservationWeights} for \cmd{STREAM\_CONCENTRATION} read the constituent name before the line is re-read.
 \item \textbf{Age-tracer hotstart}: the \cmd{:StartTime} offset of a hotstart reaches
       the age tracers. The masses keep the datum of the run that wrote the file, and the age clock and the entry time of
@@ -84,7 +84,7 @@ requests merge cleanly in any order:
       initial water has age 0). Runs without an age tracer, and cold starts, are unchanged.
 \end{enumerate}
 \begin{longtable}{P{0.32\linewidth}P{0.628\linewidth}}
-\caption{Changes to existing Raven files (pull request in brackets).}\label{tab:corechanges}\\
+\caption{Changes to existing Raven files (group in brackets).}\label{tab:corechanges}\\
 \toprule\hdr
 File & Change\\\midrule\endfirsthead
 \caption[]{Changes to existing Raven files (continued).}\\
@@ -100,7 +100,7 @@ File & Change\\\midrule\endhead
 \cmd{ParseHRUFile.cpp}, \cmd{HydroUnits.h} & \cmd{AQUIFER\_PROFILE} stored on each HRU (1)\\
 \cmd{ProcessGroup.h}, \cmd{SoilWaterMovers.h} & accessors the coupling reads (\cmd{GetSubProcess}, \cmd{GetPercolationType}) (1)\\
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate} (m$^3$/d, m$^3$/s or L/s), \cmd{:BoundaryHead} (m); other units stop (1); constituent name captured before parsing (4)\\
-\cmd{ParseInitial\allowbreak ConditionFile.cpp} & \cmd{:InitialGWHeads} and the groundwater hotstart blocks (\cmd{:GWHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWVadoseColumnTops}, \cmd{:GWSoilZoneLag}), each value checked (not a number as a whole token, not finite, or a negative water amount, stops: a damaged file; \cmd{:InitialGWHeads} read strictly, as the \cmd{.rvg}'s numbers), ignored with a warning in a run without \cmd{:GroundwaterModel}; the capacity check of the initial soil water skipped for the seepage target and the \cmd{:SurfaceWaterExchange} stores of a coupled model (they can hold more than their capacity, as in a continuous run) (1); ensemble members restored (2); default reservoir stage (3); \cmd{:AgeTracerDatum} read, age-tracer masses detected in the state table, and the offset passed to the age tracers before their initial conditions are set (5)\\
+\cmd{ParseInitial\allowbreak ConditionFile.cpp} & \cmd{:InitialGWHeads} and the groundwater hotstart blocks (\cmd{:GWHeads}, \cmd{:GWStartHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWRiverTake}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWVadoseColumnTops}, \cmd{:GWSoilZoneLag}), each value checked (not a number as a whole token, not finite, or a negative water amount, stops: a damaged file; \cmd{:InitialGWHeads} read strictly, as the \cmd{.rvg}'s numbers), ignored with a warning in a run without \cmd{:GroundwaterModel}; the capacity check of the initial soil water skipped for the seepage target and the \cmd{:SurfaceWaterExchange} stores of a coupled model (they can hold more than their capacity, as in a continuous run) (1); ensemble members restored (2); default reservoir stage (3); \cmd{:AgeTracerDatum} read, age-tracer masses detected in the state table, and the offset passed to the age tracers before their initial conditions are set (5)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor, routing-memory get/set (\cmd{GetRoutingMemory}, \cmd{SetRoutingMemory}) (2)\\
 \cmd{EnKF.cpp/.h} & in a coupled run an EnKF member's \cmd{:ExtraRVTFilename} is read before its groundwater model is built (\cmd{ReadExtraRVT}) (2)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision (12 decimals, or the stream's 17 significant digits in a coupled run), constraint initialised (3)\\
@@ -115,7 +115,7 @@ The coupling is split as the Raven team asked: Raven's own repository holds only
 lives in a separate repository.
 \begin{itemize}
 \item \textbf{RavenHydroFramework} (\cmd{src/}): the coupling's source files and the small changes to existing Raven files
-      (Section~\ref{sec:coreflix}). Until the pull requests are merged, the branch \cmd{mf6-coupling} of
+      (Section~\ref{sec:coreflix}). The branch \cmd{mf6-coupling} of
       \url{https://github.com/rarabzad/RavenHydroFramework} holds them all.
 \item \textbf{RavenHydroFramework-extra}: this manual, the user guide, the Liard examples, the tests
       (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}, at\\ \url{https://github.com/rarabzad/RavenHydroFramework-extra}
@@ -129,7 +129,9 @@ git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 Without network access, the release package's \cmd{source/} folder holds both repositories with their whole history as
 git bundles (\cmd{tools/package\_sources.py}); the two \cmd{git clone} commands of its README (section ``Restore the git
 history'') make the same two checkouts. \cmd{tools/make\_handover.py} writes the kit from which the two repositories are
-published, with the steps to push and check them (\cmd{HANDOVER.md}).
+published, with the steps to push and check them (\cmd{HANDOVER.md}). \cmd{tools/check\_manual\_pdf.py} builds this manual
+from \cmd{docs/manual} in a scratch folder and checks that \cmd{docs/manual/main.pdf} is that build (the same text and
+pages; \cmd{--write} replaces a PDF that is not); \cmd{package\_sources.py} runs it on the revision it packages.
 
 \section{Building}\label{sec:building}
 Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}; with a

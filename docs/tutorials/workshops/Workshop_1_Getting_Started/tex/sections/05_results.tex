@@ -81,11 +81,11 @@ storage takes up the difference.}\label{fig:t1budget}\end{figure}
 \cmd{out/mf6/gwf.hds}, on the cells of \cmd{out/mf6/grid\_cells.geojson}. The command \cmd{:HeadSaveFrequency} in
 \cmd{Liard.rvg} sets how often MODFLOW saves the heads.}\label{fig:t1map}\end{figure}
 \begin{trouble}
-\cmd{ModuleNotFoundError: No module named 'pandas'} (or numpy, matplotlib): the virtual environment is not active in this
+\cmd{ModuleNotFoundError: No module named \textquotesingle{}pandas\textquotesingle} (or numpy, matplotlib): the virtual environment is not active in this
 terminal. Type \cmd{source \textasciitilde/raven-venv/bin/activate} (Step~\ref{st:python}).
 \end{trouble}
 \begin{note}[Reading MODFLOW's files yourself]
 \cmd{out/mf6/gwf.hds} is a standard MODFLOW~6 head file and \cmd{gwf.dis.grb} its grid file. With FloPy,
-\cmd{flopy.utils.HeadFile('out/mf6/gwf.hds').get\_data()} returns the last head field. \cmd{grid\_cells.geojson} holds
+\cmd{flopy.utils.HeadFile(\textquotesingle out/mf6/gwf.hds\textquotesingle).get\_data()} returns the last head field. \cmd{grid\_cells.geojson} holds
 all cells in longitude and latitude, with their number and an \cmd{active} flag. It opens in any GIS program.
 \end{note}

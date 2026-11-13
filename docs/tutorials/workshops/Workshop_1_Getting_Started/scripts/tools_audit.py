@@ -70,7 +70,7 @@ def audit(run,dt=1.0):
         gross=gross+b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']
         ws=b['surface-store gains withheld [m3]'] if 'surface-store gains withheld [m3]' in b else 0.0   #:SoilZone PHYSICAL guard
         R['surface-store: applied - (discharge-leakage) (rel)']=(b['surface-store exchange applied to Raven [m3]']-(b['aquifer discharge to surface stores [m3/d]']-b['surface-store leakage to aquifer [m3/d]'])*dt+ws).abs().sum()/max((b['surface-store leakage to aquifer [m3/d]']+b['aquifer discharge to surface stores [m3/d]']).sum()*dt,1)
-    R['MF6 cumulative residual / gross flow']=flows.sum()/gross.sum()
+    R['MF6 cumulative residual / gross flow']=flows.sum()/max(gross.sum(),1)   #(m3/d summed over the steps; a run without aquifer flow has only round-off)
     if 'reservoir seepage awaiting delivery [m3]' in b and b['reservoir seepage sent [m3/d]'].abs().sum()>0:
         #reservoir seepage reaches MODFLOW one step later: sent(t)*dt = awaiting(t-1); MODFLOW takes what is sent unless the cell is dry
         import numpy as _np

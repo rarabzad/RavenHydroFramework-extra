@@ -1,5 +1,9 @@
 # Rebuild note: soil zone v3 shared hooks (agent v3h)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Replay of the original v3 hooks commit debb63a (turn 276), from the verbatim edit scripts in
 spec/conv_220_330.md section 34, applied with tools/ed.py (CRLF-preserving) to rb-v3h (soil zone v2 merged).
 

@@ -132,8 +132,9 @@ reach stops flowing), and its outflow is 300.9~m$^3$ lower than without the rive
 run total. WB10 repeats the losing reach with every channel routing method (Muskingum and Muskingum-Cunge over 300~km,
 storage coefficient, \cmd{ROUTE\_HYDROLOGIC}, diffusive wave and plug flow over 30~km), fed by an inflow that stops after
 5 days: the volume leaving the watershed is lower than without the river by the loss taken (6\,539.9 against
-6\,539.8~m$^3$ for Muskingum, within the file's digits) and the channel storage ends the same (within 0.01~m$^3$), also
-with an irrigation demand on the reach. WB11: a \cmd{ROUTE\_EXTERNAL} reach whose outflow a live file sets to
+6\,539.8~m$^3$ for Muskingum, within the file's digits) and the channel storage ends the same (the test allows
+$10^{-5}$ of the loss taken, 0.065~m$^3$ for Muskingum; the run ends 0.007~m$^3$ apart), also with an irrigation demand on
+the reach. WB11: a \cmd{ROUTE\_EXTERNAL} reach whose outflow a live file sets to
 0.02~m$^3$/s every step delivers that outflow less the step's take (220.4~m$^3$/d), and its channel storage ends as without
 the river. WB12: 2-member ensembles with \cmd{ROUTE\_HYDROLOGIC}, \cmd{ROUTE\_STORAGECOEFF} and \cmd{ROUTE\_TVD}, with and
 without groundwater: every member's hydrographs (and \cmd{GWBudget.csv}) equal the single run's exactly; without

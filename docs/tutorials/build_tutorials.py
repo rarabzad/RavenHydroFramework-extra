@@ -874,6 +874,7 @@ def script_source(name):
     return os.path.join(SCRIPTS, name)
 
 
+BIN_FILES = ('LICENSE-Raven.txt', 'NOTICE-MODFLOW6.txt', 'README.txt', 'Raven', 'libmf6.so')   # bin/ of every zip
 BIN_README_T = """bin/ - the programs of this workshop
 ====================================
 
@@ -903,13 +904,18 @@ Arabzadeh. Licensed under the Artistic License 2.0: full text in LICENSE-Raven.t
 the Raven source code). This Raven is a modified version of Raven: its source code, with the changes documented, is
 in the RavenHydroFramework repository (https://github.com/rarabzad/RavenHydroFramework, branch mf6-coupling) and its
 documentation in RavenHydroFramework-extra (https://github.com/rarabzad/RavenHydroFramework-extra). It was compiled
-with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig/clang, libc++ linked statically).
+with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig %s, clang with libc++ linked
+statically); that script with zig %s gives this executable again from the Raven source commit that the versions
+name.
 
 MODFLOW 6: software of the U.S. Geological Survey, in the public domain (licence "Public Domain, CC0-1.0"); see
 NOTICE-MODFLOW6.txt. libmf6.so is the unchanged library of the official release.
 
 Raven and MODFLOW are the names of their projects; they are used here to describe the programs only.
 """
+
+
+ZIG_VERSION = re.search(r'^ZIG_VERSION=(\S+)$', open(os.path.join(HERE, 'build_release_raven.sh')).read(), re.M).group(1)
 
 
 def bin_readme(versions=None):
@@ -919,7 +925,19 @@ def bin_readme(versions=None):
              'workshop zips are made (build_tutorials.py --package), and this file then lists the versions.\n')
     else:
         v = '\nVersions in this zip:\n' + ''.join('  %-10s %s\n' % (k, x) for k, x in versions) + ''
-    return BIN_README_T % v
+    return BIN_README_T % (v, ZIG_VERSION, ZIG_VERSION)
+
+
+def readme_minutes(t, pattern, key):
+    """the hand-written README.txt of workshop t gives a run time that the PDF gives as the generated value key: they
+    must agree (within 30 %, at least 5 minutes: both are rounded and the build machine's speed varies)"""
+    rd = open(os.path.join(WSROOT, WS[t], 'README.txt')).read()     # (hand-written: the committed file in both modes)
+    m = re.search(pattern, rd)
+    v = G.values.get(key)
+    if not m:
+        raise RuntimeError('%s: README.txt does not give the time "%s"' % (t, pattern))
+    if v and re.match(r'^\d+$', v) and abs(int(m.group(1)) - int(v)) > max(5, 0.3 * int(v)):
+        raise RuntimeError('%s: README.txt says %s minutes, the PDF %s (%s): make them agree' % (t, m.group(1), v, key))
 
 
 def install_ws_files(t):
@@ -1410,6 +1428,7 @@ def tut6():
             saved[f] = open(pth).read()
         m = committed_values('t6:ddsmin').get('t6:ddsmin')
         G.val('t6:ddsmin', m[0] if m else '?', volatile=True)
+    readme_minutes(t, r'plus about (\d+) minutes of computing', 't6:ddsmin')
     if os.path.exists(fin):
         shutil.rmtree(fin)
     copytree(start, fin)
@@ -2037,6 +2056,32 @@ and the generated MODFLOW 6 model in `out/mf6/`. Streamflow and diagnostics are 
 '''
 
 
+WS1_NOTICE = """# Copyright and licensing (Workshop 1)
+
+This folder holds the Liard River example of the Raven-MODFLOW 6 groundwater coupling, as Workshop 1 ships it.
+Copyright (c) 2026 Rezgar Arabzadeh. All rights not granted by the licenses below are reserved.
+Paths are given from the workshop folder (Workshop_1_Getting_Started/).
+
+| Part | Copyright | License |
+|---|---|---|
+| Raven with the coupling (`bin/Raven`) | the Raven Development Team; the coupling and the changes to Raven by Rezgar Arabzadeh | Artistic License 2.0 (`bin/LICENSE-Raven.txt`) |
+| MODFLOW 6 library (`bin/libmf6.so`, the unchanged library of the official release) | U.S. Geological Survey | public domain; licence and disclaimer in `bin/NOTICE-MODFLOW6.txt` |
+| Scripts (`scripts/`; `RavenMF6InstallCheck.py` is part of RavenHydroFramework) | Rezgar Arabzadeh | Artistic License 2.0 (`bin/LICENSE-Raven.txt`) |
+| Workshop text (the PDF and `tex/`) and the README files | Rezgar Arabzadeh | Creative Commons Attribution 4.0 International (https://creativecommons.org/licenses/by/4.0/) |
+| Liard River model inputs (`model/start/`, `model/finished/`) | their original authors | not relicensed; see `model/start/DATA_NOTICE.md` |
+
+## Differences from the Standard Version of Raven
+As the Artistic License 2.0 asks for modified versions, the differences of `bin/Raven` from Raven 4.15 (v593) are
+documented file by file in the manual of the coupling (chapter "Developer guide and limitations", "Changes to existing
+Raven files", in https://github.com/rarabzad/RavenHydroFramework-extra) and in full in the branch `mf6-coupling` of
+https://github.com/rarabzad/RavenHydroFramework. The modifications are offered to the Raven Development Team for
+inclusion in Raven under the Artistic License 2.0.
+
+## Third-party names
+Raven and MODFLOW are the names of their respective projects; their use here describes compatibility only.
+"""
+
+
 def liard_for_workshop(d):
     """the Liard example as workshop 1 ships it: its README with paths of the workshop (sections 0 and 1 replaced), and
     the copyright notice its DATA_NOTICE.md points to"""
@@ -2045,7 +2090,8 @@ def liard_for_workshop(d):
     rest = rest.replace('run `tools_audit.py`', 'run `$WS/scripts/tools_audit.py`').replace(
         '## 4. Results you should see (tools_audit.py)', '## 4. Results you should see ($WS/scripts/tools_audit.py, 20-year run)')
     rest = re.sub(r', then calibrate with Ostrich\s*\n\s*\(see `docs/ostrich_example`\)\.', ', then calibrate with OSTRICH (Workshop 6).', rest)
-    for bad in ('docs/ostrich_example', 'examples/', 'tools/get_mf6', '../'):
+    rest = rest.replace('`output/mf6/`', '`out/mf6/`')          # the workshop's output folder is out/
+    for bad in ('docs/ostrich_example', 'examples/', 'tools/get_mf6', '../', 'output/'):
         if bad in rest:
             raise RuntimeError('workshop 1: the Liard README still names %s' % bad)
     wfile(os.path.join(d, 'README.md'), LIARD_README_HEAD + rest)
@@ -2053,7 +2099,7 @@ def liard_for_workshop(d):
     if '`../../NOTICE.md`' not in dn:
         raise RuntimeError('workshop 1: DATA_NOTICE.md no longer points to ../../NOTICE.md')
     wfile(os.path.join(d, 'DATA_NOTICE.md'), dn.replace('`../../NOTICE.md`', '`NOTICE.md` (in this folder)'))
-    shutil.copy(os.path.join(REPO, 'NOTICE.md'), os.path.join(d, 'NOTICE.md'))
+    wfile(os.path.join(d, 'NOTICE.md'), WS1_NOTICE)
 
 
 def tut1():
@@ -2071,7 +2117,7 @@ def tut1():
     # the workshop folder, as the student unpacks it
     top = sorted(set(os.listdir(wsdir(t))) | {WS[t] + '.pdf', 'README.txt', 'bin', 'model', 'scripts', 'tex'})
     top = [f for f in top if f in (WS[t] + '.pdf', 'README.txt', 'bin', 'model', 'scripts', 'tex')]
-    G.text('t1_ls_ws.txt', '$ ls\n' + '  '.join(top) + '\n$ ls bin\nREADME.txt  Raven  libmf6.so\n$ ls scripts\n' +
+    G.text('t1_ls_ws.txt', '$ ls\n' + '  '.join(top) + '\n$ ls bin\n' + '  '.join(sorted(BIN_FILES)) + '\n$ ls scripts\n' +
            '  '.join(sorted(WS_SCRIPTS[t])))
     # installation check
     run([sys.executable, os.path.join(r, 'scripts', 'RavenMF6InstallCheck.py'), 'bin'], r,
@@ -2138,6 +2184,7 @@ def tut1():
     ex2, dt2, _ = raven(lf, 'out', None, ucwd=u_ws() + '/work_full', model='Liard')
     out = os.path.join(lf, 'out')
     G.val('t1:fullmin', '%d' % max(1, round(dt2 / 60.0)), volatile=True)
+    readme_minutes(t, r'plus about (\d+) minutes for the optional 20-year run', 't1:fullmin')
     o2 = audit(t, out, 't1_audit_full.txt', u_ws() + '/work_full')
     G.val('t1:fullUnconv', '%d' % float(re.search(r'unconverged steps\s+([-0-9.eE+]+)', o2).group(1)))
     G.val('t1:fullRes', sci(float(re.search(r'MF6 cumulative residual / gross flow\s+([-0-9.eE+]+)', o2).group(1))))
@@ -2242,7 +2289,13 @@ def tut2():
         dd[o] = float(ws[c].iloc[-1] - ws[c].iloc[0])
     G.val('t2:deepgw', fmt(dd['out'], 0, sign=True)); G.val('t2:deepnogw', fmt(dd['out_nogw'], 0, sign=True))
     ndays = len(q1) - 1
-    G.val('t2:deeprate', fmt(round((dd['out'] - dd['out_nogw']) / 1000.0 * sum(area(r) for *_, r in HRUS) / ndays, -2)))
+    deeprate = (dd['out'] - dd['out_nogw']) / 1000.0 * sum(area(r) for *_, r in HRUS) / ndays
+    G.val('t2:deeprate', fmt(round(deeprate, -2)))
+    qdrop = (q0['q'].iloc[1:].mean() - q1['q'].iloc[1:].mean()) * 86400.0
+    sinks = -b['GHB [m3/d]'].mean() - b['wells actual [m3/d]'].mean() + deeprate
+    if not (sinks > qdrop and b['storage release [m3/d]'].mean() > 0):   # the text of Step 16 says so
+        raise RuntimeError('workshop 2: GHB, well and DEEP_STORE (%.0f m3/d) do not exceed the drop of the streamflow '
+                           '(%.0f m3/d) with a storage release' % (sinks, qdrop))
     run([sys.executable, runws(t, 'scripts', 'plot_hydrograph.py'), 'out_nogw', 'out', '--labels', 'Raven alone',
          'Raven + MODFLOW 6', '--subbasin', 'LOWER', '--year', '2011'], w,
         'python3 $WS/scripts/plot_hydrograph.py out_nogw out --labels "Raven alone" "Raven + MODFLOW 6" --subbasin LOWER --year 2011',
@@ -2401,8 +2454,10 @@ def package(out, raven, mf6, ravensrc=None):
             arc = WS[t] if rel == '.' else WS[t] + '/' + rel.replace(os.sep, '/')
             entries.append((arc + '/', None, 0o755))
             if rel == 'bin':
-                entries += [(arc + '/LICENSE-Raven.txt', licence, 0o644), (arc + '/NOTICE-MODFLOW6.txt', mf6notice, 0o644),
-                            (arc + '/README.txt', readme, 0o644), (arc + '/Raven', raven, 0o755), (arc + '/libmf6.so', mf6, 0o755)]
+                binf = {'LICENSE-Raven.txt': (licence, 0o644), 'NOTICE-MODFLOW6.txt': (mf6notice, 0o644),
+                        'README.txt': (readme, 0o644), 'Raven': (raven, 0o755), 'libmf6.so': (mf6, 0o755)}
+                assert sorted(binf) == sorted(BIN_FILES)
+                entries += [(arc + '/' + f, binf[f][0], binf[f][1]) for f in sorted(binf)]
                 continue
             for f in sorted(fs):
                 if f.endswith('.pyc'):
@@ -2575,7 +2630,8 @@ def main():
                 pages, probs = compile_ws(t, WSROOT)
                 bad += probs
                 log('%s: committed tex/ compiles standalone, %d pages%s' % (WS[t], pages, '' if not probs else ', with problems'))
-        print('\n'.join(bad) if bad else 'check: every number, excerpt, diff, model file and script matches; the texts compile')
+        print('\n'.join(bad) if bad else 'check: every number, excerpt, diff, model file and script matches; %s' % (
+            'the texts compile' if not a.no_pdf else 'the texts were not compiled (--no-pdf)'))
         print('check: %d values, %d excerpts, %s; %.0f s' % (len(G.values), len(G.texts), ', '.join(only), time.time() - t0))
         sys.exit(1 if bad else 0)
     for t in TUTS:

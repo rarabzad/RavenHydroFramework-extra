@@ -1,5 +1,9 @@
 # Audit A3, phase 10: documentation and package
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Phase 10 of the round-3 audit (issue list: `spec/audit_A3/AUDIT_A3_issues_and_phases.md`) covers VZ3-3, CB3-3, MT3-4 to
 MT3-8, IB3-1, IB3-8, the remaining history wording, Phase 9's hand-over (the example's commented boundary heads), the
 manual PDF and the Linux package. Code unchanged (rb-p10 = d986fb0, the Phase 9 code). Changes in extra (rb-p10-tests),

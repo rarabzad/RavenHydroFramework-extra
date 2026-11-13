@@ -34,6 +34,9 @@ WB8  a headwater reach (one subbasin, no inflow) with a 10-day in-catchment unit
      MODFLOW's river leakage, and the outflow is lower than in the same model without the river by the loss applied
      (summed over the run, within 1 %); |MB error| <= 1e-6 mm; a run restarted on day 6 (a day whose loss came from the
      outflow) has the continuous run's hydrographs and channel storage (1e-9 relative).
+WB9  the same reach with :CatchmentRoute ROUTE_DUMP: the reach stops flowing on day 4, whose loss it can no longer
+     supply; that loss is carried and reported: a warning in Raven_errors.txt and the run total 'river loss carried' in
+     GWModelSummary.txt, equal to the last value of 'river loss carried to next step' in GWBudget.csv (1e-6 relative).
 WB10 every channel routing method (MUSKINGUM and MUSKINGUM_CUNGE over a 300 km reach; STORAGECOEFF, ROUTE_HYDROLOGIC,
      DIFFUSIVE_WAVE and PLUG_FLOW over 30 km): SB2 losing (bed conductivity 200 m/d), fed only by a 0.05 m3/s inflow on
      days 1-5 (no rain, so no lateral flow), then 35 dry days of recession, so the loss is taken from the inflow and then
@@ -42,7 +45,8 @@ WB10 every channel routing method (MUSKINGUM and MUSKINGUM_CUNGE over a 300 km r
      the take, the water still in transit at the end of the 300 km reaches: the methods that keep the outflow as their state route the channel's own water as without the take).
      Also with an irrigation demand of 0.003 m3/s on SB2, the run without the river given the irrigation the river run
      delivered, so both withdraw the same (Raven's own irrigation withdrawal lowers its routing state with these methods;
-     the take adds nothing to that).
+     the take adds nothing to that). WB10 also checks the run total 'river take in transit': given (half of :GWRiverTake)
+     when above 1e-6 m3, not given for the round-off takes of a reach that has stopped flowing.
 WB11 a reach whose outflow is set from outside the routing: both subbasins ROUTE_EXTERNAL, a live file (:ReadLiveFile)
      setting SB1's outflow to 0 and SB2's to 0.02 m3/s every step, no rain and no inflow, so SB2's loss is taken from the
      outflow the live file set: the outflow delivered at the end of each step is that outflow less the step's take
@@ -50,11 +54,6 @@ WB11 a reach whose outflow is set from outside the routing: both subbasins ROUTE
      ends as in the run without the river (1e-6 of the takes; added back to the set outflow, the last take would hide the
      take from the flows and lower the channel storage by it every step), and Raven warns that the outflow was set from
      outside the routing.
-WB9  the same reach with :CatchmentRoute ROUTE_DUMP: the reach stops flowing on day 4, whose loss it can no longer
-     supply; that loss is carried and reported: a warning in Raven_errors.txt and the run total 'river loss carried' in
-     GWModelSummary.txt, equal to the last value of 'river loss carried to next step' in GWBudget.csv (1e-6 relative).
-WB10 also checks the run total 'river take in transit': given (half of :GWRiverTake) when above 1e-6 m3, not given for the
-     round-off takes of a reach that has stopped flowing.
 WB12 ensemble members start from the first run's routing memory: the two-subbasin losing reach (30 km, bed conductivity
      200 m/d, ROUTE_DUMP) with ROUTE_HYDROLOGIC, ROUTE_STORAGECOEFF and ROUTE_TVD, which read the local outflow, with and
      without groundwater; each member of a 2-member Monte Carlo ensemble equals the single run (Hydrographs.csv, and

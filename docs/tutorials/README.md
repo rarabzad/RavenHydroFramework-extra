@@ -17,7 +17,7 @@ Each folder holds `README.txt`, the PDF, `tex/` (`main.tex`, `preamble.tex`, `se
 workshop uses) and `bin/`. A student needs only the workshop's zip and a Linux shell (on Windows: WSL). The texts tell
 Windows users to use WSL; the programs in `bin/` are Linux (x86_64) builds.
 
-There is no combined PDF and no combined zip of all workshops any more: each workshop is its own PDF and its own zip.
+Each workshop is its own PDF and its own zip; there is no combined PDF or zip.
 
 ## What is committed and what is generated
 
@@ -61,4 +61,6 @@ python3 build_tutorials.py --package OUT_DIR --raven RAVEN_EXE --mf6 libmf6.so -
 writes `OUT_DIR/Workshop_N_<Name>.zip`, each holding its folder with `bin/Raven`, `bin/libmf6.so` and a `bin/README.txt`
 that lists their versions and SHA-256 sums and the licences (Raven: Artistic License 2.0; MODFLOW 6: U.S. Geological
 Survey, public domain). The zips have fixed timestamps. Run `--check` with the same Raven first: the numbers in the texts
-belong to that build.
+belong to that build. The Raven of the zips is built with `build_release_raven.sh RAVEN_CHECKOUT BUILD_DIR RAVEN_EXE
+[COMMIT]` (a Linux executable for glibc 2.28 or newer, with zig 0.17.1, pinned in the script: the same commit gives the
+same executable again).

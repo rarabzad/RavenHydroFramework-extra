@@ -50,7 +50,7 @@ Optional features (steady-state start, wetland exchange, wells, monitoring wells
 are listed in the file, commented out, ready to switch on.
 
 No MODFLOW file is written by hand: Raven builds the grid (3 layers x 85 x 54 cells at 2 km, 3,252 active
-columns, 178 river cells), writes `output/mf6/`, and runs MODFLOW 6 alongside Raven every day.
+columns, 178 river cells), writes `out/mf6/`, and runs MODFLOW 6 alongside Raven every day.
 
 ## 3. About the input data in this example
 The Liard package has no HRU polygons, DEM or bedrock data, so stand-ins were generated for testing:

@@ -1,5 +1,9 @@
 # Audit A2, phase 5: tests, build and inputs (agent p5)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Issue list: spec/audit_A2/AUDIT_A2_issues_and_phases.md; findings F_MT (MT-1, MT-3), F_CB (CB5, CB6), F_IB (IB2, IB3,
 IB5, IB6). Code on rb-p5 (from 18c8bb6), tests and documents on rb-p5-tests (from 96a3756); changes left uncommitted,
 diffs in wt/p5/patches/. Builds compared: Raven_p4.exe ("before", the phase-4 build) and Raven_p5.exe ("after"), both

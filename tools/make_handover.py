@@ -20,8 +20,11 @@ Writes into --out (a new or empty folder):
   KIT.txt, SHA256SUMS.txt                      commit, tree and commit count of each bundle; checksums of every file
 
 The -extra repository is published with its whole history, docs/design (the developer records) included: every earlier
-commit holds them, so leaving them out of the tip would not take them out of the public repository, and rewriting the
-history would give commits that no longer match this repository's. The release package's source archive (written by
+commit holds them, so leaving them out of the tip would not take them out of the public repository. Give the
+repositories exactly as they are to be published: when their commit messages are edited before publishing, edit them in
+new clones (each commit keeping its tree, author and dates) and give those clones here, with the branch names; the
+bundles then carry those commits. The commit IDs that docs/design cites are those of the development repositories, as
+each record that cites one says. The release package's source archive (written by
 package_sources.py) leaves docs/design out.
 
 A shallow code repository is completed from the upstream Raven repository first (package_sources.publish_repo:

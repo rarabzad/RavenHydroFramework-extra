@@ -34,9 +34,11 @@
 % the contents, on the first page of every workshop (no paragraph spacing between its lines)
 \newcommand{\wstoc}{{\small\setlength{\parskip}{0pt}\tableofcontents}}
 
-% ---- headings: sections group the steps; each step is a numbered subsection "Step N: ..." (numbered through the workshop)
-\titleformat{\section}{\needspace{8\baselineskip}\raggedright\normalfont\sffamily\Large\bfseries\color{brand}}{\thesection}{0.7em}{}
-\titleformat{\subsection}{\needspace{6\baselineskip}\raggedright\normalfont\sffamily\large\bfseries\color{brand!80!black}}{}{0pt}{}
+% ---- headings: sections group the steps; each step is a numbered subsection "Step N: ..." (numbered through the workshop).
+% A heading starts a new page unless its first lines fit below it: a step heading with about ten lines, a section heading
+% with its first step heading and those lines
+\titleformat{\section}{\needspace{16\baselineskip}\raggedright\normalfont\sffamily\Large\bfseries\color{brand}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\needspace{10\baselineskip}\raggedright\normalfont\sffamily\large\bfseries\color{brand!80!black}}{}{0pt}{}
 \titlespacing*{\section}{0pt}{14pt plus 4pt minus 2pt}{5pt}
 \titlespacing*{\subsection}{0pt}{10pt plus 3pt minus 2pt}{3pt}
 \newcounter{step}
@@ -67,8 +69,9 @@
 \lstdefinestyle{base}{basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,breaklines=true,
   breakatwhitespace=false,postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},upquote=true,showstringspaces=false,
   aboveskip=4pt,belowskip=4pt,xleftmargin=6pt,xrightmargin=6pt,framexleftmargin=4pt,framexrightmargin=4pt}
-% terminal: commands (lines starting with "$ ") in bold blue, their output plain
-\lstdefinestyle{term}{style=base,basicstyle=\ttfamily\scriptsize,backgroundcolor=\color{termbg},frame=l,framerule=2pt,rulecolor=\color{brand},
+% terminal: commands (lines starting with "$ ") in bold blue, their output plain; a long line breaks only at a space, so
+% a command copied from the PDF never has a break inside an option or a file name
+\lstdefinestyle{term}{style=base,breakatwhitespace=true,basicstyle=\ttfamily\scriptsize,backgroundcolor=\color{termbg},frame=l,framerule=2pt,rulecolor=\color{brand},
   morecomment=[f][\bfseries\color{brand}][0]{\$}}
 % a file shown in full (no line numbers: text copied from the PDF must be the file itself)
 \lstdefinestyle{file}{style=base,basicstyle=\ttfamily\scriptsize,frame=single,framerule=0.3pt,rulecolor=\color{gray!60},backgroundcolor=\color{white},

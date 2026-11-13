@@ -1,5 +1,9 @@
 # Audit A2, phase 6: documentation as a first release, MT-4..MT-8, package (agent p6)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Items: DOC1 (the user's request), MT-4, MT-5, MT-6, MT-7, MT-8 (spec/audit_A2/AUDIT_A2_issues_and_phases.md, F_MT.md).
 Code unchanged (rb-p6 = cf3e946, the merged soil-zone code). Changes in extra (rb-p6-tests), left uncommitted as asked
 (renames staged with git mv; this note added with git add -N).

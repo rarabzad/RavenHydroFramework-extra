@@ -4,7 +4,7 @@ README says.
 
     python3 package_sources.py <package folder> <code repo> <code revision> <extra repo> <extra revision>
                                [--code-branch mf6-coupling] [--extra-branch main]
-                               [--readme <package folder>/README.md] [--update-readme]
+                               [--readme <package folder>/README.md] [--update-readme] [--no-manual-check]
 
 <code revision> and <extra revision> are branches or commits of the two repositories (worktrees work too).
 
@@ -32,7 +32,9 @@ clone both bundles, and each clone must be complete (not shallow, git fsck --ful
 the recorded tip and the same number of commits as the full history. The clones are the checkouts the public repositories
 give (RavenHydroFramework on mf6-coupling, RavenHydroFramework-extra on main), for use offline. Every "<n> commits ... (to <tip>)" statement of the
 section must match the bundles. With --update-readme the section is first replaced by RESTORE_HISTORY.md's text.
-Exit code 0 when the check passes.
+Manual check (unless --no-manual-check): docs/manual/main.pdf of the extra revision must be the build of its chapters
+(tools/check_manual_pdf.py), and <package folder>/Raven_MF6_Manual.pdf, when present, must be that PDF.
+Exit code 0 when the checks pass.
 """
 import os, sys, re, subprocess, shutil, tempfile, argparse
 
@@ -42,6 +44,7 @@ SECTION = '## Restore the git history'
 BUNDLES = {'code': 'raven_code_history.bundle', 'extra': 'raven_extra_history.bundle'}
 CLONES = {'code': 'RavenHydroFramework', 'extra': 'RavenHydroFramework-extra'}   # the folder names of the public clones
 PUBLIC = {'code': 'https://github.com/rarabzad/RavenHydroFramework', 'extra': 'https://github.com/rarabzad/RavenHydroFramework-extra'}
+MANUAL_COPY = 'Raven_MF6_Manual.pdf'   # the package's copy of docs/manual/main.pdf (checked when present)
 EXCLUDE_EXTRA = ['docs/design']      # developer records: in the repository and its history, not in the source archive
 
 
@@ -164,6 +167,7 @@ def main():
     ap.add_argument('--extra-branch', default='main', help='branch of the extra bundle (default main)')
     ap.add_argument('--readme', default=None, help='the package README to check (default <pkg>/README.md)')
     ap.add_argument('--update-readme', action='store_true', help='replace its restore section by RESTORE_HISTORY.md first')
+    ap.add_argument('--no-manual-check', action='store_true', help='skip the manual PDF check (needs LaTeX and pdftotext)')
     a = ap.parse_args()
     br = {'code': a.code_branch, 'extra': a.extra_branch}
     src = os.path.join(a.pkg, 'source')
@@ -191,8 +195,26 @@ def main():
             f.write('raven_extra_docs_tests.tar.gz and %s: commit %s, branch %s in the bundle, %d commits '
                     '(the archive without %s)\n' % (BUNDLES['extra'], rec['extra'][0], br['extra'], rec['extra'][1],
                                                     ', '.join(EXCLUDE_EXTRA)))
-        # the package README
         fails = []
+        # the manual: the PDF of the extra revision must be the build of its chapters, and the package's copy that PDF
+        if a.no_manual_check:
+            print('manual check: SKIPPED (--no-manual-check)')
+        else:
+            r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'check_manual_pdf.py'),
+                                '--repo', pubs['extra'], '--rev', rec['extra'][0]], capture_output=True, text=True)
+            print(r.stdout.strip().split('\n')[-1] if r.stdout.strip() else r.stderr.strip())
+            if r.returncode != 0:
+                fails.append('docs/manual/main.pdf of the extra revision is not the build of its chapters '
+                             '(tools/check_manual_pdf.py --write rebuilds it)')
+            pkg_pdf = os.path.join(a.pkg, MANUAL_COPY)
+            if os.path.exists(pkg_pdf):
+                pdf = subprocess.run(['git', 'show', '%s:docs/manual/main.pdf' % rec['extra'][0]], cwd=pubs['extra'],
+                                     capture_output=True).stdout
+                if open(pkg_pdf, 'rb').read() != pdf:
+                    fails.append('%s is not docs/manual/main.pdf of the extra revision' % MANUAL_COPY)
+                else:
+                    print('%s: the manual of the extra revision' % MANUAL_COPY)
+        # the package README
         text = open(readme).read() if os.path.exists(readme) else None
         if text is None:
             fails.append('no package README %s' % readme)
@@ -226,7 +248,7 @@ def main():
         print(open(os.path.join(src, 'COMMITS.txt')).read())
         for f in fails:
             print('FAIL: ' + f)
-        print('restore check (README %s): %s' % (readme, 'PASS' if not fails else 'FAIL'))
+        print('package check (manual PDF, README %s restore section): %s' % (readme, 'PASS' if not fails else 'FAIL'))
         return 1 if fails else 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

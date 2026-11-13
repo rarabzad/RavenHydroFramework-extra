@@ -21,11 +21,12 @@
 \end{tocheck}
 \begin{trouble}
 \begin{itemize}
-\item \emph{``\dots must be named in :RavenTakesOver or :KeepPackages''}: name every recharge, ET and UZF package.
-\item \emph{``a stream cell whose subbasin does not exist''}: the \cmd{SUBBASIN} values must be subbasin numbers of the
-  \cmd{.rvh}.
-\item \emph{``each stress period must contain a whole number of Raven time steps''} or \emph{``\dots longer than the
-  model''}: check \cmd{:MF6StartDate}, and \cmd{:StartDate} and \cmd{:Duration} in the \cmd{.rvi}.
+\item \emph{``\dots would add recharge or evapotranspiration beside Raven's''}: name every recharge, ET and UZF package
+  in \cmd{:RavenTakesOver} or \cmd{:KeepPackages}.
+\item \emph{``stream package entry with subbasin ID \dots{} - no such subbasin''}: the \cmd{SUBBASIN} values must be
+  subbasin numbers of the \cmd{.rvh}.
+\item \emph{``\dots is not a whole number of Raven time steps''} or \emph{``the MODFLOW 6 model ends before Raven's
+  run''}: check \cmd{:MF6StartDate}, and \cmd{:StartDate} and \cmd{:Duration} in the \cmd{.rvi}.
 \item Commands for a grid that Raven builds (\cmd{:GridCellSize}, \cmd{:LandSurface}, \cmd{:Wells} and others) stop the
   run here: the model has its own grid and wells.
 \end{itemize}

@@ -19,7 +19,7 @@ folder at the start and at the end) and \cmd{tex}.
 \begin{itemize}
 \item \cmd{unzip: command not found}: install it with \cmd{sudo apt install unzip}.
 \item \cmd{Permission denied} when you run Raven later: type \cmd{chmod +x \$WS/bin/Raven}.
-\item A message with \cmd{version \textasciigrave GLIBC\_2.34' not found} (for example after \cmd{cannot load MODFLOW 6
+\item A message with \cmd{version \textasciigrave GLIBC\_2.34\textquotesingle{} not found} (for example after \cmd{cannot load MODFLOW 6
   library}): your Linux is too old. The programs need glibc 2.34 or newer (Ubuntu 22.04 or newer, Debian 12 or newer); \cmd{ldd
   --version} shows yours. On Windows, install a newer Ubuntu in WSL with \cmd{wsl --install -d Ubuntu-24.04}.
 \end{itemize}
