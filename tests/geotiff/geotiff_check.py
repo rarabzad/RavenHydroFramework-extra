@@ -12,6 +12,9 @@ Reader checks (unit driver):
     it), and the encoding read as written (compression, predictor, byte order, strips or tiles, classic or BigTIFF);
     PixelIsPoint files give the same corner as PixelIsArea ones; internal masks (GDAL 1 bit, tifffile 1 bit in tiles and
     8 bit) give no data at the masked pixels; tiles of 2048 x 2048 on a small raster; the EPSG code and its kind as written;
+  - GDAL's band scale and offset (GDAL_METADATA) are applied (16-bit decimetres against a twin of the scaled values,
+    NODATA pixels no data); items named SCALE, OFFSET and UNITTYPE without GDAL's role are ordinary metadata (values as
+    stored); a band unit in feet stops, an unknown band unit gives a warning;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -21,8 +24,12 @@ Reader checks (unit driver):
   - the same rasters through CGWRaster (Raven's sampling): 4,000 points inside, on the edges and outside give the same
     values and the same misses for the GeoTIFF and its twin;
   - every file Raven must refuse is refused with a message naming the file and the reason (also FillOrder 2 and units
-    other than metres and degrees, vertical systems in feet, prime meridians other than Greenwich, a decoding area
-    above the bound), also a file over the size limit (a sparse file made here and removed);
+    other than metres and degrees, vertical systems in feet, prime meridians other than Greenwich, also when given only
+    by their longitude (GDAL's user-defined systems) or by the datum, a projected code in feet without its units key, a
+    decoding area above the bound), also a file over the size limit (a sparse file made here and removed);
+  - ESRI ASCII grids: GDAL's dx and dy header (rectangular pixels) gives the GeoTIFF's samples, NODATA_value nan the
+    -9999 twin's, and so do a Ctrl-Z after the values, a UTF-8 byte-order mark and xllcenter with yllcorner; more values than ncols*nrows, an unknown header key and a value that is not a number are refused,
+    naming the problem;
   - CRS rules: a geographic code is refused with :InputCRS, a projected one without it; another built-in projection
     than :InputCRS is refused, the same one given by its parameters accepted; a code that is not built in is accepted
     under :InputCRS given by parameters (with a note) and refused under another EPSG code; a user-defined CRS and none at
@@ -242,11 +249,61 @@ for f, crs, want, part in CRS_CASES:
 
 # ---- no GDAL_NODATA: values that usually mark missing data are reported, and read as values
 for m in M:
-    if m['kind'] in ('fill', 'vertnote', 'chain'):
+    if m['kind'] in ('fill', 'vertnote', 'chain', 'unitnote'):
         o = unit('raster', fx(m['file']), 'NONE').strip()
         report('warning: %s "%s"' % (m['file'], m['expect'][:60]), o.startswith('OK') and m['expect'] in o, o[:200])
 o = unit('raster', fx('matrix_int16_c8_p2_le_strip_classic.tif') if os.path.exists(fx('matrix_int16_c8_p2_le_strip_classic.tif')) else fx('twin_int16.asc'), 'NONE').strip()
 report('no NODATA tag and no such values: no warning', o == 'OK', o[:120])
+
+# ---- ESRI ASCII grids (CGWRaster): GDAL's rectangular-pixel header, NaN NODATA, and malformed grids
+def asc_write(name, header, rows):
+    p = os.path.join(W, name)
+    with open(p, 'w') as f:
+        f.write(''.join('%s %s\n' % kv for kv in header) + ''.join(' '.join(r) + '\n' for r in rows))
+    return p
+for m in M:
+    if m['kind'] != 'nonsquare':
+        continue
+    L = open(fx(m['values'])).read().split('\n'); rows = [l.split() for l in L[6:] if l.strip()]
+    hd = [('ncols', len(rows[0])), ('nrows', len(rows)), ('xllcorner', repr(m['xll'])), ('yllcorner', repr(m['yll'])), ('dx', repr(m['dx'])), ('dy', repr(m['dy'])),
+          ('NODATA_value', -9999)]
+    a = asc_write('dxdy.asc', hd, rows)
+    o = unit('samplecmp', fx(m['file']), a, 'NONE')
+    g = re.search(r'SAMPLES (\d+) points, (\d+) with values, (\d+) differ', o)
+    report('ESRI ASCII: dx %g/1024, dy %g/1024 header (GDAL) samples as %s' % (m['dx'] * 1024, m['dy'] * 1024, m['file']), bool(g) and g.group(3) == '0' and int(g.group(2)) > 1000, o.strip()[:150])
+    xc = [('xllcenter', repr(m['xll'] + 0.5 * m['dx'])), ('yllcenter', repr(m['yll'] + 0.5 * m['dy']))]
+    a = asc_write('dxdy_center.asc', hd[:2] + xc + hd[4:], rows)
+    o = unit('samplecmp', fx(m['file']), a, 'NONE'); g = re.search(r'(\d+) differ', o)
+    report('ESRI ASCII: dx, dy with xllcenter, yllcenter (half a pixel each way)', bool(g) and g.group(1) == '0', o.strip()[:150])
+    break
+tw = [m['twin'] for m in M if m['twin'] and m['kind'] == 'nodata' and '-9999' in open(fx(m['twin'])).read().split('\n', 6)[6]][0]
+L = open(fx(tw)).read().split('\n'); hd = [tuple(l.split()) for l in L[:6]]; rows = [l.split() for l in L[6:] if l.strip()]
+a = asc_write('nan.asc', [kv if kv[0].lower() != 'nodata_value' else ('NODATA_value', 'nan') for kv in hd], [['nan' if v == '-9999' else v for v in r] for r in rows])
+o = unit('samplecmp', a, fx(tw), 'NONE'); g = re.search(r'(\d+) with values, (\d+) differ', o)
+report('ESRI ASCII: NODATA_value nan (NaN pixels) samples as the -9999 twin %s' % tw, bool(g) and g.group(2) == '0' and int(g.group(1)) > 1000, o.strip()[:150])
+BAD_ASC = [('surplus.asc', hd, rows + [rows[0][:1]], 'has more values than ncols*nrows'),
+           ('wrap.asc', [('ncols', int(hd[0][1]) - 1)] + hd[1:], rows, 'has more values than ncols*nrows'),
+           ('fewer.asc', hd, rows[:-1], 'fewer than ncols*nrows'),
+           ('badkey.asc', [('cellsizee', hd[4][1]) if kv[0].lower() == 'cellsize' else kv for kv in hd], rows, "unknown header key 'cellsizee'"),
+           ('badval.asc', hd, [rows[0][:2] + ['1O'] + rows[0][3:]] + rows[1:], "the value '1O' (row 1, column 3) is not a number"),
+           ('badhead.asc', [('xllcorner', '-12O.5') if kv[0].lower() == 'xllcorner' else kv for kv in hd], rows, "header key xllcorner ('-12O.5') is not a number"),
+           ('onlydx.asc', [('dx', hd[4][1]) if kv[0].lower() == 'cellsize' else kv for kv in hd], rows, 'needs a positive cellsize, or positive dx and dy')]
+# a DOS end-of-file mark (Ctrl-Z) after the values, a UTF-8 byte-order mark, and a centre on one axis and a corner on the
+# other: read, and sampled as the twin
+x0 = float([kv for kv in hd if kv[0].lower() == 'xllcorner'][0][1]); cs0 = float([kv for kv in hd if kv[0].lower() == 'cellsize'][0][1])
+OK_ASC = [('ctrlz.asc', hd, rows, lambda b: b + b'\x1a'), ('bom.asc', hd, rows, lambda b: b'\xef\xbb\xbf' + b),
+          ('mixed.asc', [('xllcenter', repr(x0 + 0.5 * cs0)) if kv[0].lower() == 'xllcorner' else kv for kv in hd], rows, lambda b: b)]
+for name, h, r, f in OK_ASC:
+    a = asc_write(name, h, r); b = open(a, 'rb').read(); open(a, 'wb').write(f(b))
+    o = unit('samplecmp', a, fx(tw), 'NONE'); g = re.search(r'(\d+) with values, (\d+) differ', o)
+    report('ESRI ASCII read: %-14s (%s) samples as the twin' % (name, {'ctrlz.asc': 'Ctrl-Z at the end', 'bom.asc': 'UTF-8 byte-order mark',
+           'mixed.asc': 'xllcenter with yllcorner'}[name]), bool(g) and g.group(2) == '0' and int(g.group(1)) > 1000, o.strip()[:150])
+for name, h, r, want in BAD_ASC:
+    o = unit('raster', asc_write(name, h, r), 'NONE').strip()
+    report('ESRI ASCII refused: %-14s "%s"' % (name, want[:52]), o.startswith('ERROR') and want in o and name in o, o[:160])
+for f in ('dxdy.asc', 'dxdy_center.asc', 'nan.asc') + tuple(b[0] for b in BAD_ASC) + tuple(b[0] for b in OK_ASC):
+    if os.path.exists(os.path.join(W, f)):
+        os.remove(os.path.join(W, f))
 
 # ---- EPSG longitude/latitude rule
 o = unit('epsg', '4647', '4326', '4269', '4617', '6318', '4979', '4978', '32610', '4839', '4087')
@@ -350,7 +407,7 @@ else:
     # every fixture with a twin as the DEM
     n_ok, bad, nrun = 0, [], 0
     for m in M:
-        if m['kind'] not in ('matrix', 'nodata', 'point', 'mask', 'bigtile') or not m['twin']:
+        if m['kind'] not in ('matrix', 'nodata', 'point', 'mask', 'bigtile', 'scaled') or not m['twin']:
             continue
         ok, diffs, d = compare(m['file'], m['file'], m['twin'])
         nrun += 1
@@ -358,7 +415,7 @@ else:
             n_ok += 1; shutil.rmtree(d)
         else:
             bad.append('%s: %s' % (m['file'], ', '.join(diffs)[:200]))
-    report('Raven: %d GeoTIFFs as :LandSurface (all encodings, NODATA, masks, PixelIsPoint, large tiles) = twins' % nrun, n_ok == nrun, '%d of %d byte-identical' % (n_ok, nrun))
+    report('Raven: %d GeoTIFFs as :LandSurface (all encodings, NODATA, masks, PixelIsPoint, large tiles, scale and offset) = twins' % nrun, n_ok == nrun, '%d of %d byte-identical' % (n_ok, nrun))
     for b in bad[:10]:
         print('      ' + b)
     # as the bedrock (the land from the HRU ELEVATION above the rasters' values)
@@ -395,7 +452,7 @@ else:
             shutil.rmtree(d)
     # no NODATA tag, -9999 and float32-lowest pixels (away from the model): the same run as the twin, with a warning
     for m in M:
-        if m['kind'] in ('fill', 'vertnote', 'chain'):
+        if m['kind'] in ('fill', 'vertnote', 'chain', 'unitnote'):
             ok, diffs, d = compare(m['kind'], m['file'], m['twin'], skip=('Raven_errors.txt',), want_warn=m['expect'])
             report('Raven: %s = twin, and warns' % m['file'], ok, ', '.join(diffs))
             if ok:

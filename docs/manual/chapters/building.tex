@@ -161,7 +161,12 @@ NODATA_value -9999
 \end{minipage}\par\smallskip
 Values are interpolated bilinearly between raster cell centres, ignoring no-data cells; each model cell takes the mean of
 $5\times5$ such samples. Points more than one raster cell outside the map count as no-data. A grid without a
-\cmd{NODATA\_value} line takes $-9999$ as no-data.
+\cmd{NODATA\_value} line takes $-9999$ as no-data. The header keys may come in any order and case; \cmd{xllcenter} and
+\cmd{yllcenter} give the centre of the lower-left cell instead of its corner; rectangular cells are given, as GDAL writes
+them, by \cmd{dx} and \cmd{dy} instead of \cmd{cellsize}; \cmd{NODATA\_value nan} marks no-data cells written as
+\cmd{nan}; a UTF-8 byte-order mark before the header and a DOS end-of-file mark (Ctrl-Z) after the values are ignored. The grid must hold exactly \cmd{ncols}$\times$\cmd{nrows} values: an unknown header key, a header value or a
+cell value that is not a number, fewer values or more values (a wrong \cmd{ncols} would otherwise wrap the rows) stop
+the run with a message naming the problem.
 
 A raster that gives no value for any active column (all 25 samples of every column no-data or off the map) stops the run:
 it is a map of another area, has a wrong corner, or is in another projection than \cmd{:InputCRS}. The message gives the
@@ -178,9 +183,14 @@ a GeoTIFF and an ESRI ASCII grid with the same values give the same model.
 \begin{tabular}{P{0.25\linewidth}P{0.68\linewidth}}
 \toprule\hdr Item & Supported\\\midrule
 file & classic TIFF and BigTIFF, little- and big-endian; the first image of the file (overviews are ignored); at most 1~GB\\
-units & coordinates in metres (projections) or degrees from Greenwich, elevations in metres: units keys, a prime meridian
-or a vertical coordinate system in feet that say otherwise stop the run; a vertical system of unknown unit gives a warning
-(read as metres)\\
+units & coordinates in metres (projections) or degrees from Greenwich, elevations in metres: units keys, a projected code
+in other units, a prime meridian (by code, by its longitude or by the datum), a vertical coordinate system in feet or a
+band unit in feet (or another length unit) that say otherwise stop the run; a vertical system or band unit Raven does not
+know gives a warning (read as metres)\\
+scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
+\cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
+applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and
+values beyond the range of a double, are no-data; a \cmd{GDAL\_METADATA} tag over 16~MB stops the run\\
 layout & strips or tiles\\
 compression & none, LZW, DEFLATE (codes 8 and 32946) and PackBits\\
 predictor & none, horizontal differencing (2) and floating-point (3), with LZW and DEFLATE\\
@@ -202,7 +212,12 @@ The run stops with a message naming the file and the reason for: other compressi
 a rotated, sheared or south-up raster, control points without a pixel size, no georeferencing, geocentric coordinates,
 bits stored in reverse order (\cmd{FillOrder} 2), projected coordinates or elevations in other units than metres
 (\cmd{ProjLinearUnitsGeoKey}, \cmd{GeogLinearUnitsGeoKey}, \cmd{VerticalUnitsGeoKey}) or longitude/latitude in other units
-than degrees, a geographic code or key with a prime meridian other than Greenwich (for example EPSG:4801, Bern), a
+than degrees, a geographic code or key with a prime meridian other than Greenwich (for example EPSG:4801, Bern), also
+when the prime meridian is given only by its longitude (\cmd{GeogPrimeMeridianLongGeoKey}, as GDAL writes a user-defined
+longitude/latitude system such as \cmd{+pm=paris}) or by the datum (\cmd{GeogGeodeticDatumGeoKey}, for example 6801), a
+projected code whose coordinates are in feet or other units when the file has no \cmd{ProjLinearUnitsGeoKey} (for example
+EPSG:2227, California zone 3 in US survey feet), a band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}) in feet or another
+length unit than metres, a band \cmd{SCALE} of 0, a
 vertical coordinate system in feet (for example EPSG:4269+6360, NAVD88 in US survey feet), an internal mask Raven cannot
 read, a truncated or corrupt file or a decompression error, and a file over 1~GB, 50 million pixels, or strips or tiles
 covering more than 200 million pixels. Raven is stricter than GDAL in a few rare cases: a negative pixel height
@@ -241,7 +256,10 @@ projection once in the \cmd{.rvg} file:
 \end{lstlisting}
 The grammar is that of \cmd{:MF6CRS} (Section~\ref{sec:mf6crs}): the EPSG codes 326xx and 327xx (UTM, WGS84), 269xx (UTM, NAD83),
 3005, 5070, 3978, 3347 and ESRI:102001, or \cmd{TMERC}, \cmd{ALBERS} and \cmd{LCC} by their parameters, on the WGS84 or GRS80
-ellipsoid. The projection applies to every geometry and raster input file: \cmd{:HRUGeometry}, \cmd{:RiverGeometry},
+ellipsoid. The parameters are read strictly: each must be a plain number (\cmd{-ll7}, \cmd{O.9996} or \cmd{500km} stop
+the run, naming the parameter), \cmd{TMERC} takes exactly five of them and \cmd{ALBERS} and \cmd{LCC} six, then at most
+the ellipsoid, and an EPSG code takes nothing after it; latitudes must lie within $\pm90^\circ$ and $k_0$ must be
+positive. The projection applies to every geometry and raster input file: \cmd{:HRUGeometry}, \cmd{:RiverGeometry},
 \cmd{:GridFile}, the files of \cmd{:GridRefinement LINES} and \cmd{POLYGONS}, the boundary files of
 \cmd{:GeneralHeadBoundary} and \cmd{:SpecifiedHeadBoundary}, \cmd{:LandSurface} and \cmd{:BedrockSurface} (also for the
 soil zone's DEM samples), and for an existing model \cmd{:MF6GridFile}. Each vertex is converted to longitude/latitude as
@@ -262,7 +280,8 @@ NAD83(CSRS), 4258 ETRS89, 6318 NAD83(2011), 8255 NAD83(CSRS)v7, 7844 GDA2020), a
 between 4000 and 4999 are not all geographic (4647, ETRS89 / UTM zone 32N, is a projection, as are 4087 and 4839). The
 table also holds 69 geographic codes whose coordinates are not degrees from Greenwich (27 with another prime meridian,
 such as 4801 Bern or 4807 NTF (Paris), and others in grads or degrees-minutes-seconds); a file in one of them is refused,
-asking for a reprojection to EPSG:4326. Any
+asking for a reprojection to EPSG:4326. A projected code whose coordinates are not metres (for example 2227, in US survey
+feet; a table of 1\,016 codes) is refused too. A file that starts with a UTF-8 byte-order mark is read as any other. Any
 other code cannot be classified: the file's coordinates decide, and without \cmd{:InputCRS} coordinates outside the
 longitude/latitude range stop the run with a request for the projection's parameters (\cmd{TMERC}, \cmd{ALBERS} or
 \cmd{LCC}); GeoTIFF rasters carry their code in their keys (Section~\ref{sec:geotiff});
@@ -387,8 +406,12 @@ count is exact. For a quadtree it is estimated level by level from the squares t
 counted once however many features touch it (overlapping or adjacent features add no more), plus about a fifth for the
 2:1 balance: 6\% below the cells built on the Liard example's grids, and between a third below and a fifth above on small
 test grids of lines and polygons. So the estimate stops the run only beyond 1.5 times the limit; a grid nearer the limit
-is built, and the build stops once it passes the limit. A grid within the limit that still needs more memory than the
-computer has stops with a message naming the command and the estimated size.
+is built, and the build stops once it passes the limit. An HRU mesh is estimated before its seeds are placed (pairs along
+the HRU boundaries, which take seeds at the smallest \cmd{LINES} or \cmd{RIVERS} size, seeds along the lines, around the
+points and over the polygons, and the interior lattice); it stops beyond 1.5 times the limit, or when the boundary seeds
+are so close for the cell size that building the cells would take more than a few minutes (seeds every 0.1~m along
+65~km of HRU boundaries with 500~m cells, a size meant in kilometres). A grid within the limit that still needs more
+memory than the computer has stops with a message naming the command and the estimated size.
 
 \cmd{LAKES} needs no extra file: the outline of the lake HRU of every Raven reservoir (\cmd{:Reservoir \dots\ :HRUID}) is taken
 from \cmd{:HRUGeometry}. Fine cells around a lake place its seepage (\cmd{:ReservoirExchange}) and the exchange along its shore

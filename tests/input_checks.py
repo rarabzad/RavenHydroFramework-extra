@@ -27,8 +27,17 @@ Grid size (one limit, 5 million cells per layer, checked before the grid is buil
   N15 200 copies of one line (:GridRefinement LINES 0.1 on the 4-HRU strip of sz_models) and N16 20 adjacent squares of 30 m
       (POLYGONS 0.5) are built (N15: about 47,000 cells per layer, as one line): the estimate counts each square once,
       however many features touch it.
+  N17 an HRU mesh (:GridType HRU_MESH, 4 HRUs of 5 x 5 km, :GridCellSize 500) with a short :GridRefinement LINES line of
+      0.1 m (100 m meant) stops before the mesh is built: "... too slow to build" (the HRU boundaries take seeds at the
+      finest line size); N18 the same with 2 m is built within the time limit (about 65,000 cells per layer).
   Each case runs under a 3 GB address-space limit and a 120 s time limit, so a build that tries to allocate the grid
   fails the check instead of exhausting the machine; a stop must not be a crash ("terminate called", bad_alloc).
+Boundary polygons (the 4-HRU strip of sz_models with :SpecifiedHeadBoundary EDGE, 100 m cells):
+  N19 polygon A over the last two cell columns, then A with a polygon B over the last column, then A twice: every file
+      selects A's four cells (overlapping features and parts of a MultiPolygon add up; they do not cancel).
+Numbers of the .rvp aquifer tables (each stops, naming the table, the row and the token):
+  N20 :AquiferClasses K_HORIZ "1O" (letter O), N21 SPEC_YIELD "O.2", N22 an :AquiferProfiles thickness "3m", N23 an
+      :AquiferProfileParameters value "2.O".
 Units of the series (the subbasin-52 grid model with its 5,000 m3/d pumping well, testconfig.grid_base):
   U1 the rates given as m3/s (-0.0578704) and U2 as L/s (-57.8704): GWBudget.csv "wells specified" is -5,000 m3/d, as with
      m3/d (U0);
@@ -166,6 +175,68 @@ sq = lambda x0, s, i: {"type": "Feature", "properties": {"ID": i + 1}, "geometry
       ((x0, -s / 2), (x0 + s, -s / 2), (x0 + s, s / 2), (x0, s / 2), (x0, -s / 2))]]}}
 ok, n, msg = strip_qt('n16', [sq(-350.0 + 30.0 * i, 30.0, i) for i in range(20)], 'POLYGONS', 0.5)
 report('N16 20 adjacent squares, :GridRefinement POLYGONS 0.5, are built', ok and n > 0, '%d cells per layer %s' % (n, msg[:150]))
+
+# HRU mesh with a refinement size meant in other units (the 4 HRUs of 5 x 5 km, 500 m cells, one short line)
+def mesh_case(name, size):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=4, hru_w=5000.0, width=5000.0, cell=500.0, physical=False, days=1)
+    xs = -10000.0
+    json.dump({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "LineString", "coordinates":
+               [list(sz_models.ll(xs + 100, 0)), list(sz_models.ll(xs + 600, 50))]}}]}, open(os.path.join(d, 'line.geojson'), 'w'))
+    open(os.path.join(d, 'm.rvg'), 'a').write('\n:GridType HRU_MESH\n:GridRefinement LINES line.geojson %s\n' % size)
+    try:
+        r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=120, preexec_fn=limits)
+        out = r.stdout + r.stderr
+    except subprocess.TimeoutExpired:
+        out = '(not finished after 120 s)'
+    e = os.path.join(d, 'out', 'Raven_errors.txt'); out += open(e, errors='replace').read() if os.path.exists(e) else ''
+    s = os.path.join(d, 'out', 'GWModelSummary.txt'); g = re.findall(r'HRU mesh, 1 layers x (\d+) cells', open(s).read()) if os.path.exists(s) else []
+    shutil.rmtree(d, ignore_errors=True)
+    return ('Successful Simulation' in out), (int(g[0]) if g else 0), out
+ok, n, out = mesh_case('n17', '0.1')
+line = (re.findall(r'.*too slow to build.*', out) or [''])[0].strip()
+report('N17 HRU mesh, :GridRefinement LINES 0.1 stops before the mesh is built', (not ok) and bool(line), (line or out.strip().split('\n')[-1])[:170])
+ok, n, out = mesh_case('n18', '2')
+report('N18 HRU mesh, :GridRefinement LINES 2 is built within 120 s', ok and n > 10000, '%d cells per layer %s' % (n, '' if ok else out.strip().split('\n')[-1][:120]))
+
+
+# ---- boundary polygons: overlapping features add up
+def chd_cells(name, feats, multi=False):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=4, days=1, physical=False, chd=95.0)
+    rings = lambda r: [[list(sz_models.ll(*p)) for p in r]]
+    fs = ([{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "MultiPolygon", "coordinates": [rings(r) for r in feats]}}] if multi else
+          [{"type": "Feature", "properties": {"ID": i + 1}, "geometry": {"type": "Polygon", "coordinates": rings(r)}} for i, r in enumerate(feats)])
+    json.dump({"type": "FeatureCollection", "features": fs}, open(os.path.join(d, 'edge.geojson'), 'w'))
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=600)
+    p = os.path.join(d, 'out', 'mf6', 'gwf.chd')
+    cells = sorted(' '.join(l.split()[:3]) for l in open(p).read().split('BEGIN PERIOD')[1].split('END PERIOD')[0].split('\n')[1:] if l.strip()) if os.path.exists(p) else []
+    shutil.rmtree(d, ignore_errors=True)
+    return ('Successful Simulation' in r.stdout + r.stderr), cells
+A = [(225.0, -300.0), (600.0, -300.0), (600.0, 300.0), (225.0, 300.0), (225.0, -300.0)]   # the last two cell columns
+B = [(325.0, -300.0), (600.0, -300.0), (600.0, 300.0), (325.0, 300.0), (325.0, -300.0)]   # the last one
+res = {k: chd_cells('n19_' + k, f, k == 'multi') for k, f in (('a', [A]), ('ab', [A, B]), ('aa', [A, A]), ('multi', [A, B]))}
+ref = res['a'][1]
+report('N19 overlapping boundary polygons (A+B, A twice, MultiPolygon A+B) select the cells of A', all(v[0] for v in res.values()) and len(ref) >= 4 and
+       all(v[1] == ref for v in res.values()), '; '.join('%s: %d cells' % (k, len(v[1])) for k, v in res.items()))
+
+
+# ---- numbers of the .rvp aquifer tables
+def rvp_case(name, old, new, want):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=2, days=1, physical=False, top=3.0)
+    edit(d, 'm.rvp', old, new, regex=True)
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=600)
+    e = os.path.join(d, 'out', 'Raven_errors.txt'); out = r.stdout + r.stderr + (open(e, errors='replace').read() if os.path.exists(e) else '')
+    line = (re.findall(r'.*' + re.escape(want) + r'.*', out) or [''])[0].strip()
+    shutil.rmtree(d, ignore_errors=True)
+    return ('Successful Simulation' not in out) and bool(line), (line or out.strip().split('\n')[-1])[:170]
+for name, old, new, want in (('N20 :AquiferClasses K_HORIZ 1O stops', r'(\n  SAND, )\S+?,', r'\g<1>1O,', "row SAND: K_HORIZ '1O' is not a number"),
+                             ('N21 :AquiferClasses SPEC_YIELD O.2 stops', r'(\n  SAND, [^,]+, [^,]+, [^,]+, )[^,]+,', r'\g<1>O.2,', "row SAND: SPEC_YIELD 'O.2' is not a number"),
+                             ('N22 :AquiferProfiles thickness 3m stops', r'AQ, 2, SAND, 3, AQUIFER', 'AQ, 2, SAND, 3m, AQUIFER', "the thickness of layer 1 (or TO_BEDROCK) '3m' is not a number"),
+                             ('N23 :AquiferProfileParameters value 2.O stops', r'(:Units, m, m, 1/d, m\n  AQ, )[^,]+,', r'\g<1>2.O,', "row AQ: INITIAL_HEAD_DEPTH '2.O' is not a number")):
+    ok, msg = rvp_case(name.split()[0].lower(), old, new, want)
+    report(name, ok, msg)
 
 # ---- units of :WellFlowRate and :BoundaryHead ----
 B = tc.grid_base()

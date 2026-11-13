@@ -35,7 +35,13 @@ Checks (the exit code is 0 only when all pass):
     stand-ins for the two GitHub repositories (git's url.insteadOf; the code stand-in at an ancestor of the kit's tip,
     the -extra one empty): 0-checksums; 2-extra (the -extra branch at the kit's commit); 1B-bundle and 1B-archive (the
     published tree is the kit's; the stand-in is reset after each); 1A-check and 1A-push (a fast-forward to the kit's
-    commit); 4-show; 3-verify (PASS); 2-extra-files on an empty stand-in (the kit's tree). Nothing is pushed to GitHub;
+    commit); 4-show; 3-verify (PASS); 2-extra-files on an empty stand-in (the kit's tree); 1B-archive and 2-extra-files
+    again with core.autocrlf=true (Git for Windows' default: the kit's tree); step 4 with a public commit the kit does
+    not hold: one that applies (4-keep and 4-keep-push publish it on top of the kit, with the backup branch) and one
+    that conflicts (4-keep stops; 4-keep-push and 4-merge then stop and push nothing, 4-keep-push also after
+    git cherry-pick --abort, and 4-merge run again inside its unfinished merge); two kept commits whose first conflict
+    is finished with git commit (4-keep-push stops while the cherry-pick sequence holds the second). Nothing is pushed
+    to GitHub;
   - unless --no-public-check: the public branch mf6-coupling is read (git ls-remote; nothing is pushed) and, when it can
     be fetched, whether it is an ancestor of the bundle's tip (a plain fast-forward) is written into HANDOVER.md.
 """
@@ -165,13 +171,90 @@ def run_blocks(text, out, rec, pubs, tmp):
     shutil.rmtree(extra_gh); bare(extra_gh, 'refs/heads/' + xb)
     rc, o = blk('2-extra-files'); tr = head(extra_gh, 'refs/heads/' + xb, 'tree')
     step('2-extra-files', rc == 0 and tr == rec['extra']['tree'], ('-extra %s has tree %s' % (xb, tr[:12])) if rc == 0 else o[-300:])
+    # the archive blocks with Git for Windows' default core.autocrlf=true: the files are added as unpacked, same tree
+    cfg2 = os.path.join(tmp, 'gitconfig_crlf')
+    with open(cfg2, 'w') as f:
+        f.write(open(cfg).read() + '[core]\n\tautocrlf = true\n')
+    env_crlf = dict(env, GIT_CONFIG_GLOBAL=cfg2)
+    def blk_env(tag, e):
+        r = subprocess.run(['bash', '-c', B[tag]], cwd=work, capture_output=True, text=True, env=e, timeout=1800)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    g(['update-ref', 'refs/heads/' + cb, base], code_gh)
+    rc, o = blk_env('1B-archive', env_crlf); tr = head(code_gh, 'refs/heads/' + cb, 'tree')
+    step('1B-archive', rc == 0 and tr == rec['code']['tree'], ('core.autocrlf=true: %s has tree %s' % (cb, tr[:12])) if rc == 0 else 'core.autocrlf=true: ' + o[-300:])
+    shutil.rmtree(os.path.join(work, NAME['code'] + '-1B'), ignore_errors=True)
+    shutil.rmtree(extra_gh); bare(extra_gh, 'refs/heads/' + xb); shutil.rmtree(os.path.join(work, NAME['extra'] + '-files'), ignore_errors=True)
+    rc, o = blk_env('2-extra-files', env_crlf); tr = head(extra_gh, 'refs/heads/' + xb, 'tree')
+    step('2-extra-files', rc == 0 and tr == rec['extra']['tree'], ('core.autocrlf=true: -extra %s has tree %s' % (xb, tr[:12])) if rc == 0 else 'core.autocrlf=true: ' + o[-300:])
+    # step 4: GitHub's branch holds a commit the kit does not (made on the stand-in's base): one that applies on the kit
+    # (kept: 4-keep, 4-keep-push publish it on top of the kit, with a backup), and one that conflicts (4-keep stops in an
+    # unfinished cherry-pick; 4-keep-push and 4-merge then stop and push nothing, also after git cherry-pick --abort)
+    mk = os.path.join(tmp, 'mk')
+    g(['clone', '-q', '--no-checkout', code_gh, mk], tmp); g(['checkout', '-q', '--detach', base], mk)
+    open(os.path.join(mk, 'KEPT_NOTE.txt'), 'w').write('a commit made on the public branch only\n')
+    g(['add', 'KEPT_NOTE.txt'], mk); g(['-c', 'user.name=check', '-c', 'user.email=check@example.invalid', 'commit', '-q', '-m', 'kept'], mk)
+    keep = g(['rev-parse', 'HEAD'], mk)[1]
+    changed = [f for f in g(['diff', '--name-only', '--diff-filter=M', base, rec['code']['tip']], pubs['code'])[1].split('\n') if f.strip()]
+    g(['checkout', '-q', '--detach', base], mk)
+    open(os.path.join(mk, changed[0]), 'w').write('a conflicting change\n')
+    g(['add', changed[0]], mk); g(['-c', 'user.name=check', '-c', 'user.email=check@example.invalid', 'commit', '-q', '-m', 'conflicting'], mk)
+    conf = g(['rev-parse', 'HEAD'], mk)[1]
+    g(['push', '-q', code_gh, keep + ':refs/heads/keep-src', conf + ':refs/heads/conf-src'], mk)
+    def reset_public(c):
+        g(['update-ref', 'refs/heads/' + cb, c], code_gh); g(['update-ref', '-d', 'refs/heads/' + cb + '-before-release'], code_gh)
+        shutil.rmtree(os.path.join(work, NAME['code']), ignore_errors=True)
+    reset_public(keep)
+    rc1, o1 = blk('4-keep'); rc2, o2 = blk('4-keep-push')
+    now, bak = head(code_gh, 'refs/heads/' + cb), head(code_gh, 'refs/heads/' + cb + '-before-release')
+    okk = (rc1 == 0 and rc2 == 0 and g(['merge-base', '--is-ancestor', rec['code']['tip'], now], code_gh)[0] == 0 and bak == keep and
+           g(['cat-file', '-e', now + ':KEPT_NOTE.txt'], code_gh)[0] == 0)
+    step('4-keep-push', okk, 'kept commit published on top of the kit, backup at it' if okk else (o1 + '\n' + o2)[-300:])
+    reset_public(conf)
+    rc1, o1 = blk('4-keep'); rc2, o2 = blk('4-keep-push')
+    now, bak = head(code_gh, 'refs/heads/' + cb), g(['rev-parse', '-q', '--verify', 'refs/heads/' + cb + '-before-release'], code_gh)[0]
+    step('4-keep-push', rc1 != 0 and rc2 != 0 and 'STOP' in o2 and now == conf and bak != 0,
+         'after a conflicting 4-keep: stops, nothing pushed' if rc2 != 0 and now == conf else 'pushed after a conflicting 4-keep: ' + o2[-300:])
+    rc3, o3 = blk('4-merge'); now = head(code_gh, 'refs/heads/' + cb)
+    step('4-merge', rc3 != 0 and 'STOP' in o3 and now == conf, 'in an unfinished cherry-pick: stops' if rc3 != 0 and now == conf else o3[-300:])
+    g(['cherry-pick', '--abort'], os.path.join(work, NAME['code']))
+    rc2, o2 = blk('4-keep-push'); now = head(code_gh, 'refs/heads/' + cb)
+    step('4-keep-push', rc2 != 0 and 'holds nothing beyond the kit' in o2 and now == conf,
+         'after git cherry-pick --abort: stops, nothing pushed' if rc2 != 0 and now == conf else o2[-300:])
+    # 4-merge rerun inside its own unfinished merge (the conflicting commit): a STOP line, nothing pushed
+    rc3, o3 = blk('4-merge'); rc4, o4 = blk('4-merge'); now = head(code_gh, 'refs/heads/' + cb)
+    step('4-merge', rc3 != 0 and rc4 != 0 and 'STOP: the merge is not finished' in o4 and now == conf,
+         'run again in its unfinished merge: stops, nothing pushed' if rc4 != 0 and now == conf else o4[-300:])
+    # two kept commits, the first conflicting, its conflict finished with git commit (not --continue): the sequence still
+    # holds the second, so 4-keep-push stops and pushes nothing
+    g(['checkout', '-q', '--detach', conf], mk)
+    open(os.path.join(mk, 'KEPT_NOTE2.txt'), 'w').write('a second commit made on the public branch only\n')
+    g(['add', 'KEPT_NOTE2.txt'], mk); g(['-c', 'user.name=check', '-c', 'user.email=check@example.invalid', 'commit', '-q', '-m', 'kept second'], mk)
+    two = g(['rev-parse', 'HEAD'], mk)[1]
+    g(['push', '-q', code_gh, two + ':refs/heads/two-src'], mk)
+    reset_public(two)
+    rc1, o1 = blk('4-keep'); cl = os.path.join(work, NAME['code'])
+    g(['checkout', '--theirs', '--', changed[0]], cl); g(['add', changed[0]], cl)
+    g(['-c', 'user.name=check', '-c', 'user.email=check@example.invalid', 'commit', '-q', '--no-edit'], cl)
+    rc2, o2 = blk('4-keep-push'); now = head(code_gh, 'refs/heads/' + cb)
+    step('4-keep-push', rc1 != 0 and rc2 != 0 and 'cherry-pick sequence is not finished' in o2 and now == two,
+         'two kept commits, the first finished with git commit: stops, nothing pushed' if rc2 != 0 and now == two else 'pushed: ' + (o1 + o2)[-300:])
     print('\n'.join(steps), flush=True)
     return bad
 
 
+def found_note(found):
+    """the words HANDOVER.md's 1A-replace paragraph adds about the public branch's commits the kit does not hold: only
+    the commits the public check found (ID and subject), nothing when it found none or could not read the branch"""
+    if not found:
+        return ''
+    shown = ', '.join('`%s` "%s"' % (s[:8], subj) for s, subj in found[:3]) + (' and %d more' % (len(found) - 3) if len(found) > 3 else '')
+    return ' (when the kit was made: %d commit%s, %s; block 1A-check lists them again)' % (len(found), '' if len(found) == 1 else 's', shown)
+
+
 def public_state(pub_code, rec, tmp):
-    """what the public repositories hold now (read only): text lines for KIT.txt and HANDOVER.md"""
-    lines = []
+    """what the public repositories hold now (read only): text lines for KIT.txt and HANDOVER.md, and the public branch's
+    commits the kit does not hold (ID, subject; empty unless the branch was fetched and is not an ancestor of the kit)"""
+    lines, found = [], []
     br = rec['code']['branch']
     rc, out = run(['git', 'ls-remote', PUBLIC['code'], 'refs/heads/' + br], tmp, timeout=120)
     sha = out.split()[0] if (rc == 0 and out.strip()) else ''
@@ -186,6 +269,8 @@ def public_state(pub_code, rec, tmp):
         else:
             anc = run(['git', 'merge-base', '--is-ancestor', sha, rec['code']['tip']], pub_code)[0] == 0
             extra = run(['git', 'rev-list', '--count', '%s..%s' % (rec['code']['tip'], sha)], pub_code)[1]
+            if not anc:
+                found = [tuple(l.split(' ', 1)) for l in run(['git', 'log', '--format=%H %s', '%s..%s' % (rec['code']['tip'], sha)], pub_code)[1].split('\n') if l.strip()]
             lines.append('%s branch %s: at %s, %s' % (PUBLIC['code'], br, sha,
                          'an ancestor of the bundle\'s tip: publishing it is a fast-forward (block 1A-push)' if anc else
                          'not an ancestor of the bundle\'s tip: it holds %s commit(s) the bundle does not (block 1A-replace, or step 4)' % extra))
@@ -196,7 +281,7 @@ def public_state(pub_code, rec, tmp):
         lines.append('%s: exists and is empty: fill it in step 2' % PUBLIC['extra'])
     else:
         lines.append('%s: exists and holds %s: see step 2 (it must be empty before the first push)' % (PUBLIC['extra'], ', '.join(l.split()[1] for l in out.split('\n'))))
-    return lines
+    return lines, found
 
 
 HANDOVER = r"""# Publishing the Raven + MODFLOW 6 coupling
@@ -282,8 +367,7 @@ fast-forward:
 )
 ```
 
-When GitHub's branch holds commits the kit does not and you do not need them on `{cb}` (when the kit was made: the
-commit listed above, an earlier single-commit upload of the coupling that the kit's history replaces), keep a copy of
+When GitHub's branch holds commits the kit does not and you do not need them on `{cb}`{found}, keep a copy of
 the branch as `{cb}-before-release` and replace it. The copy is made only when it does not exist yet, and the block
 stops if an existing copy does not hold GitHub's branch. `--force-with-lease` makes the push fail, rather than discard
 anything, if someone pushes to the branch after the block has read it:
@@ -334,8 +418,9 @@ in `RavenHydroFramework-1B/` (it stops if that folder exists), commits, and push
 )
 ```
 
-From the archive, without git bundles (on Windows the executable bits of scripts can differ, and with them the tree:
-the block then stops; use the bundle form there):
+From the archive, without git bundles. The files are added exactly as unpacked (`core.autocrlf` off, so Git for
+Windows does not change their line endings); on Windows the executable bits of scripts can still differ, and with them
+the tree: the block then stops and pushes nothing; use the bundle form (1B-bundle) there:
 
 ```
 # [1B-archive] run in: the working folder (the one that holds handover/)
@@ -346,7 +431,7 @@ the block then stops; use the bundle form there):
   cd RavenHydroFramework-1B
   git rm -r -q --ignore-unmatch .
   tar -xzf ../handover/{ctar} --strip-components=1
-  git add -A -f
+  git -c core.autocrlf=false -c core.safecrlf=false add -A -f
   git commit -q -m "Raven + MODFLOW 6 coupling: release {date}"
   TREE=$(git rev-parse "HEAD^{{tree}}")
   test "$TREE" = {ctree} || {{ echo "STOP: the commit's tree is $TREE, not {ctree}; nothing pushed"; exit 1; }}
@@ -379,7 +464,8 @@ https://github.com/new, owner `rarabzad`, name `RavenHydroFramework-extra`, Publ
 The first branch pushed becomes the default branch (`{xb}`); check it under Settings > General > Default branch. If
 the repository was created with a README it is not empty, and the push is refused: delete and re-create it empty.
 
-To publish it by its files instead (one commit, without the history):
+To publish it by its files instead (one commit, without the history; as in 1B-archive, on Windows the executable bits
+of scripts can differ: the block then stops and pushes nothing; use 2-extra there):
 
 ```
 # [2-extra-files] run in: the working folder (the one that holds handover/)
@@ -391,7 +477,7 @@ To publish it by its files instead (one commit, without the history):
   git init -q
   git symbolic-ref HEAD refs/heads/{xb}
   tar -xzf ../handover/{xtar} --strip-components=1
-  git add -A -f
+  git -c core.autocrlf=false -c core.safecrlf=false add -A -f
   git commit -q -m "Raven + MODFLOW 6 coupling: documentation, examples, tests and tools, release {date}"
   TREE=$(git rev-parse "HEAD^{{tree}}")
   test "$TREE" = {xtree} || {{ echo "STOP: the commit's tree is $TREE, not {xtree}; nothing pushed"; exit 1; }}
@@ -442,8 +528,10 @@ the kit. The last line is `verify: PASS` or `verify: FAIL`:
 
 Then build Raven with the MODFLOW 6 library inside the clone (where the tests look for it), install it, run the install
 check (it runs the installed Raven on a tiny coupled model and checks that it uses the library and Fortran runtime
-beside it; it prints `install check: PASS`), and run the tests that need no MODFLOW library (a few minutes). On Windows
-write `python` for `python3`:
+beside it; it prints `install check: PASS`), and run the tests that need no MODFLOW library (a few minutes). The build
+needs CMake and a C++ compiler; the tests need g++ (they compile Raven's unit tests) and the Python packages numpy,
+pandas, shapely, pyproj and flopy (`python3 -m pip install numpy pandas shapely pyproj flopy`). On Windows write
+`python` for `python3`:
 
 ```
 # [3-build] run in: the working folder (the one that holds handover/)
@@ -487,7 +575,9 @@ Then choose:
 - **They hold work to keep**: put them on top of the kit's branch in a local branch `release` (block 4-keep), check the
   result (build, `run_all.py --quick`), and publish it (block 4-keep-push). If a commit does not apply cleanly, git stops
   and names the files: resolve them inside `RavenHydroFramework/`, run `git cherry-pick --continue` there until it
-  ends, then go on with 4-keep-push.
+  ends, then go on with 4-keep-push. 4-keep-push stops, and pushes nothing, while a cherry-pick is unfinished or when
+  `release` holds no commit beyond the kit (for example after `git cherry-pick --skip` or `--abort`), and while the
+  cherry-pick sequence has commits left (finish a conflict with `git cherry-pick --continue`, not with `git commit`).
 
   ```
   # [4-keep] run in: the working folder (the one that holds handover/)
@@ -516,8 +606,12 @@ Then choose:
   ( set -eu
     test -d RavenHydroFramework/.git || {{ echo "STOP: run this in the folder that holds RavenHydroFramework/ (block 4-keep)"; exit 1; }}
     cd RavenHydroFramework
+    ! git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null || {{ echo "STOP: a cherry-pick is not finished: resolve it and run git cherry-pick --continue, or start again (see above); nothing pushed"; exit 1; }}
+    test ! -e "$(git rev-parse --git-path sequencer)" || {{ echo "STOP: a cherry-pick sequence is not finished (git cherry-pick --continue, or --abort); nothing pushed"; exit 1; }}
+    test -z "$(git status --porcelain --untracked-files=no)" || {{ echo "STOP: the clone has uncommitted changes; nothing pushed"; exit 1; }}
     git rev-parse -q --verify refs/heads/release >/dev/null || {{ echo "STOP: no branch release: run block 4-keep first"; exit 1; }}
     git merge-base --is-ancestor {ct} release || {{ echo "STOP: release does not hold the kit's {ct}"; exit 1; }}
+    test -n "$(git rev-list {ct}..release)" || {{ echo "STOP: release holds nothing beyond the kit (the kept commits are missing); nothing pushed"; exit 1; }}
     git fetch -q --prune origin
     if ! CUR=$(git rev-parse -q --verify refs/remotes/origin/{cb}); then
       git push origin "refs/heads/release:refs/heads/{cb}"; exit 0
@@ -548,6 +642,9 @@ Then choose:
     git fetch -q --prune origin
     OLD=$(git rev-parse -q --verify refs/remotes/origin/{cb}-before-release || git rev-parse -q --verify refs/remotes/origin/{cb}) \
       || {{ echo "STOP: GitHub has neither {cb}-before-release nor {cb}"; exit 1; }}
+    ! git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null || {{ echo "STOP: a cherry-pick (block 4-keep) is not finished: finish it or run git cherry-pick --abort first"; exit 1; }}
+    test ! -e "$(git rev-parse --git-path sequencer)" || {{ echo "STOP: a cherry-pick sequence (block 4-keep) is not finished: git cherry-pick --continue, or --abort first"; exit 1; }}
+    ! git rev-parse -q --verify MERGE_HEAD >/dev/null || {{ echo "STOP: the merge is not finished: resolve the files inside RavenHydroFramework/, run git commit there, then run this block again"; exit 1; }}
     if ! git rev-parse -q --verify refs/heads/release-merge >/dev/null; then
       git checkout -q -b release-merge handover/{cb}
       git merge --no-edit "$OLD"
@@ -602,12 +699,12 @@ def main():
                               ('archive', check_archive(os.path.join(out, files[k]['tar']), k))):
                 print('  %-5s %-7s %s' % (k, kind, 'ok' if not bad else 'FAIL: ' + '; '.join(bad)), flush=True)
                 fails += bad
-        public = ['(not checked: --no-public-check)'] if a.no_public_check else public_state(pubs['code'], rec, tmp)
+        public, found = (['(not checked: --no-public-check)'], []) if a.no_public_check else public_state(pubs['code'], rec, tmp)
         c, x = rec['code'], rec['extra']
         text = HANDOVER.format(cu=PUBLIC['code'], xu=PUBLIC['extra'], cb=br['code'], xb=br['extra'], ct=c['tip'], xt=x['tip'],
                                cn=c['n'], xn=x['n'], ctree=c['tree'], xtree=x['tree'], cbundle=files['code']['bundle'],
                                xbundle=files['extra']['bundle'], ctar=files['code']['tar'], xtar=files['extra']['tar'],
-                               date=max(c['date'], x['date']), public='\n'.join('- ' + l for l in public))
+                               date=max(c['date'], x['date']), public='\n'.join('- ' + l for l in public), found=found_note(found))
         open(os.path.join(out, 'HANDOVER.md'), 'w').write(text)
         with open(os.path.join(out, 'KIT.txt'), 'w') as f:
             for k in ('code', 'extra'):

@@ -103,6 +103,8 @@ results = []        # (check, label, ok)
 def report(check, label, ok, detail=''):
     results.append((check, label, ok))
     print('%-3s %-78s %s %s' % (check, label, 'ok' if ok else ('SKIP' if ok is None else 'FAIL'), detail), flush=True)
+    if ok is None:   # (the form run_all.py counts, as testconfig.skip writes it: the step then reads "PASS (k skipped)")
+        print('SKIP cmake check %s, %s: %s' % (check, label.strip(), detail.strip() or 'not made'), flush=True)
 
 
 def flat(s):

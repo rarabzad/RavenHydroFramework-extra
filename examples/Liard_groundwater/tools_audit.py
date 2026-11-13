@@ -19,10 +19,19 @@ def audit(run,dt=1.0):
     rej=rejv.sum()
     uzs=(b['unsaturated zone inflow [m3]']-b['unsaturated zone to aquifer [m3]']) if 'unsaturated zone inflow [m3]' in b else 0*b['MF6 recharge [m3/d]']   #(:SoilZoneVadose: recharge crosses the unsaturated columns)
     uz=uzs.sum()
-    if 'recharge delay storage [m3]' in b:
-        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]+uzs.iloc[0]
-    lost=b['recharge not applied by MODFLOW [m3/d]'].sum()*dt if 'recharge not applied by MODFLOW [m3/d]' in b else 0.0   #existing model without NEWTON
-    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej-uz-lost)/max(abs(rr),1)   #(step 1 unchecked with a delay store: s0 is back-computed)
+    lostv=b['recharge not applied by MODFLOW [m3/d]']*dt if 'recharge not applied by MODFLOW [m3/d]' in b else 0*b['MF6 recharge [m3/d]']   #existing model without NEWTON
+    lost=lostv.sum()
+    #the recharge delay store at the start: from GWModelSummary.txt (written when a profile has RECHARGE_DELAY or the
+    #hotstart holds a store), 0 when the run has no store; only for a run without that line is it back-computed from step
+    #1's own identity, and step 1 is then not checked
+    sm=o+'GWModelSummary.txt'; m0=re.search(r'^\s*recharge delay storage\s*:\s*(\S+) m3 at the start',open(sm).read(),re.M) if os.path.exists(sm) else None
+    s0checked=True
+    if m0: s0=float(m0.group(1))
+    elif 'recharge delay storage [m3]' in b and (b['recharge delay storage [m3]']!=0).any():
+        s0=b['recharge delay storage [m3]'].iloc[0]-(b['Raven recharge [m3/d]'].iloc[0]-b['MF6 recharge [m3/d]'].iloc[0]-chdv.iloc[0])*dt+rejv.iloc[0]+uzs.iloc[0]+lostv.iloc[0]
+        s0checked=False
+    R['recharge: (Raven - MF6 - dStore - toCHD)/Raven']=(rr-mr-(st-s0)-chdv.sum()*dt-rej-uz-lost)/max(abs(rr),1)
+    if not s0checked: R['recharge: step 1 not checked (start of the delay store back-computed)']=True
     R['recharge delay store at end [m3]']=st
     flows=b['MF6 recharge [m3/d]']+b['storage release [m3/d]']-b['seepage to Raven [m3/d]']+b['river leakage to aquifer [m3/d]']\
           -b['aquifer discharge to rivers [m3/d]']-b['water-table ET [m3/d]']+b['wells actual [m3/d]']+b['GHB [m3/d]']+b['CHD [m3/d]']

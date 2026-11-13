@@ -18,7 +18,11 @@ runs geomtest, then compares:
     as longitude/latitude (and refused with :InputCRS), a versioned URN of a projection is read by its code, and
     projections that are not built in (EPSG:3157, and EPSG:4647, a projected code among the geographic ones of the
     4000s) ask for their parameters (not for :InputCRS), which are then accepted; geographic codes that are not degrees
-    from Greenwich (EPSG:4801 Bern, 4035 in degrees-minutes-seconds) are refused.
+    from Greenwich (EPSG:4801 Bern, 4035 in degrees-minutes-seconds) are refused, and so is a projection in US survey
+    feet (EPSG:2227); a file that starts with a UTF-8 byte-order mark is read;
+  - :InputCRS parameters are read strictly: a letter in a number (TMERC lon0 -ll7, k0 O.9996), a unit (FE 500km), a
+    surplus value (TMERC ... WGS84 junk, EPSG:32610 junk), too few values and a code with letters (EPSG:32610x) are
+    refused, each naming the parameter or the value.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -74,9 +78,11 @@ CRS_FILES = {'ll_6318': (pl, 'urn:ogc:def:crs:EPSG::6318'), 'll_4979': (pl, 'urn
              'll_crs83': (pl, 'urn:ogc:def:crs:OGC:1.3:CRS83'), 'utm_ver': (pu, 'urn:ogc:def:crs:EPSG:9.8.15:32610'),
              'utm_3157': (pu, 'urn:ogc:def:crs:EPSG::3157'), 'll_4326': (pl, 'EPSG:4326'), 'll_4269': (pl, 'urn:ogc:def:crs:EPSG::4269'),
              'll_4617': (pl, 'urn:ogc:def:crs:EPSG::4617'), 'xy_4647': (pu, 'urn:ogc:def:crs:EPSG::4647'),
-             'll_4801': (pl, 'urn:ogc:def:crs:EPSG::4801'), 'll_4035': (pl, 'EPSG:4035')}
+             'll_4801': (pl, 'urn:ogc:def:crs:EPSG::4801'), 'll_4035': (pl, 'EPSG:4035'), 'xy_2227': (pu, 'urn:ogc:def:crs:EPSG::2227'),
+             'll_bom': (pl, 'EPSG:4326')}
 for k, (g, c) in CRS_FILES.items():
     json.dump(fc(g, c), open('test_crs_%s.geojson' % k, 'w'))
+b = open('test_crs_ll_bom.geojson', 'rb').read(); open('test_crs_ll_bom.geojson', 'wb').write(b'\xef\xbb\xbf' + b)   # (a UTF-8 byte-order mark)
 TM10 = 'TMERC 0 -123 0.9996 500000 0 GRS80'
 CRS_CASES = [  # (name, file, :InputCRS or NONE, accepted, part of the message, text the message must not hold)
     ('crs_6318', 'll_6318', 'NONE', 1, '', ''), ('crs_4979', 'll_4979', 'NONE', 1, '', ''), ('crs_4267', 'll_4267', 'NONE', 1, '', ''),
@@ -91,7 +97,16 @@ CRS_CASES = [  # (name, file, :InputCRS or NONE, accepted, part of the message, 
     ('crs_4979_inputcrs', 'll_4979', TM10, 0, 'is in longitude/latitude', ''),
     ('crs_4647_none', 'xy_4647', 'NONE', 0, 'TMERC, ALBERS or LCC', 'is in longitude/latitude'),
     ('crs_4647_tmerc', 'xy_4647', TM10, 1, '', ''),
-    ('crs_4801_bern', 'll_4801', 'NONE', 0, 'prime meridian of Bern', ''), ('crs_4035_dms', 'll_4035', 'NONE', 0, 'angles are in degree minute second', '')]
+    ('crs_4801_bern', 'll_4801', 'NONE', 0, 'prime meridian of Bern', ''), ('crs_4035_dms', 'll_4035', 'NONE', 0, 'angles are in degree minute second', ''),
+    ('crs_2227_feet', 'xy_2227', TM10, 0, 'whose coordinates are in US survey foot', ''), ('crs_bom', 'll_bom', 'NONE', 1, '', ''),
+    ('spec_lon_letters', 'utm_ver', 'TMERC 0 -ll7 0.9996 500000 0', 0, "TMERC parameter lon0: '-ll7' is not a number", ''),
+    ('spec_k0_letter', 'utm_ver', 'TMERC 0 -123 O.9996 500000 0', 0, "parameter k0: 'O.9996' is not a number", ''),
+    ('spec_fe_unit', 'utm_ver', 'TMERC 0 -123 0.9996 500km 0', 0, "parameter FE: '500km' is not a number", ''),
+    ('spec_surplus', 'utm_ver', 'TMERC 0 -123 0.9996 500000 0 WGS84 junk', 0, 'TMERC takes lat0 lon0 k0 FE FN and an optional ellipsoid', ''),
+    ('spec_too_few', 'utm_ver', 'LCC 49 77 49 -95 0', 0, 'LCC takes lat1 lat2 lat0 lon0 FE FN', ''),
+    ('spec_ellipsoid', 'utm_ver', 'TMERC 0 -123 0.9996 500000 0 NAD27', 0, "ellipsoid must be WGS84 or GRS80, not 'NAD27'", ''),
+    ('spec_epsg_letters', 'utm_ver', 'EPSG:32610x', 0, "'EPSG:32610x' is not EPSG: followed by a whole-number code", ''),
+    ('spec_epsg_surplus', 'utm_ver', 'EPSG:32610 junk', 0, "surplus value 'junk' after EPSG:32610", '')]
 with open('crs_cases.txt', 'w') as f:
     for n, k, spec, _, _, _ in CRS_CASES:
         f.write('%s test_crs_%s.geojson %s\n' % (n, k, spec))
@@ -164,7 +179,8 @@ for k, (ok, msg) in expect.items():
 for n, k, spec, ok, msg, nomsg in CRS_CASES:
     got = st.get(n, (-1, 'missing'))
     good = got[0] == ok and msg in got[1] and not (nomsg and nomsg in got[1])
-    report('"crs" %-22s %-11s %s' % (CRS_FILES[k][1][-22:], spec[:11], 'accepted' if ok else 'refused (%s)' % msg), good, got[0])
+    report('%s %-22s %-11s %s' % ('spec' if n.startswith('spec') else '"crs"', (spec if n.startswith('spec') else CRS_FILES[k][1])[-22:], '' if n.startswith('spec') else spec[:11],
+                                  'accepted' if ok else 'refused (%s)' % msg[:40]), good, got[0])
     if not good:
         print('      message: %s' % got[1][:300])
 

@@ -64,7 +64,10 @@ Age tracer started from a hotstart file & the ages continue from the run that wr
 The tool \cmd{tools\_audit.py}, shipped with the example, checks any output folder for:
 \begin{enumerate}
 \item \textbf{recharge:} $\left(\sum V^{\mathrm{Raven}}-\sum V^{\mathrm{MF6}}-\Delta V^{\mathrm{dl}}-\sum V^{\mathrm{CHD}}\right)/\sum V^{\mathrm{Raven}}$,
-with the soil-zone terms of Section~\ref{sec:accsz} when \cmd{:SoilZone PHYSICAL} is used;
+with the soil-zone terms of Section~\ref{sec:accsz} when \cmd{:SoilZone PHYSICAL} is used, from the first step on
+($\Delta V^{\mathrm{dl}}$ from the recharge delay store at the start, which \cmd{GWModelSummary.txt} gives when a profile
+has \cmd{RECHARGE\_DELAY} or the hotstart holds a store, and 0 otherwise; only for an output folder without that line
+and a store in use is the start back-computed, and step~1 is then reported as not checked);
 \item \textbf{MODFLOW's balance:} cumulative imbalance relative to the gross flow, and the worst single step;
 \item \textbf{convergence:} steps that failed to converge;
 \item \textbf{seepage, rivers and surface stores:} the volume applied to Raven against MODFLOW's flow, including carried river losses;
@@ -136,16 +139,18 @@ GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre
 \cmd{:InputCRS}: UTM GeoJSON polygons and lines read back in lon/lat & pyproj (PROJ) & $1.1\times10^{-11}$ degrees\\
 \cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\
 \cmd{"crs"} members: EPSG:4326, 4269, 4617, 6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 and 4647 (projections, not built in) & EPSG registry (pyproj) & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 and 4647 ask for their parameters, which are then accepted\\
-GeoTIFF reader: 225 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
-GeoTIFF reader: 29 unsupported or damaged files, an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
+\cmd{"crs"} EPSG:2227 (US survey feet); a file with a UTF-8 byte-order mark; \cmd{:InputCRS} with letters or units in a parameter (\cmd{-ll7}, \cmd{O.9996}, \cmd{500km}), surplus or missing values, an unknown ellipsoid, \cmd{EPSG:32610x} & -- & 2227 refused; the file read; each specification refused, naming the parameter or value (\cmd{geomtest\_check.py})\\
+GeoTIFF reader: 228 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes; GDAL's band scale and offset, and role-less items of those names) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
+ESRI ASCII grids: GDAL's \cmd{dx}/\cmd{dy} header (with corner or centre), \cmd{NODATA\_value nan}; more values than \cmd{ncols}$\times$\cmd{nrows}, a wrapped grid, fewer values, an unknown key, a value or header value that is not a number & the GeoTIFF with the same pixels; the $-9999$ twin & the same samples bit for bit; each malformed grid refused with its reason\\
+GeoTIFF reader: 34 unsupported or damaged files (also a prime meridian given only by its longitude or by the datum, a projected code in feet without its units key, a band unit in feet), an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
 \end{tabularx}
 \end{table}
 
-\paragraph{GeoTIFF rasters.} \cmd{tests/geotiff/geotiff\_check.py} reads 225 GeoTIFF files written by GDAL and tifffile
+\paragraph{GeoTIFF rasters.} \cmd{tests/geotiff/geotiff\_check.py} reads 228 GeoTIFF files written by GDAL and tifffile
 (every supported compression, predictor, sample type and byte order, in strips and tiles, classic and BigTIFF, with
 NODATA values, internal masks, \cmd{PixelIsPoint} and several EPSG codes) and compares each with an ESRI ASCII twin holding the same
 values: the corner, cell size and every value agree exactly, and Raven's sampling of the two at 4\,000 points agrees bit for
-bit; rasters with rectangular pixels agree with an independent bilinear sampler. Each of 184 of these files used as \cmd{:LandSurface} of a small model, and 43 as \cmd{:BedrockSurface}, gives outputs
+bit; rasters with rectangular pixels agree with an independent bilinear sampler. Each of 186 of these files used as \cmd{:LandSurface} of a small model, and 43 as \cmd{:BedrockSurface}, gives outputs
 byte-identical to its twin (the model files hold the sampled cell elevations); so do projected rasters under
 \cmd{:InputCRS}. Unsupported, damaged and oversized files, a code that disagrees with \cmd{:InputCRS}, and a DEM or bedrock
 raster that covers no active column stop the run with their reason; a raster covering part of the columns gives a warning
@@ -249,6 +254,9 @@ Monitoring well outside the model; unknown \cmd{.rvg} command & runs with a warn
 Malformed numbers in the \cmd{.rvg} (\cmd{:GridCellSize 2,000.0}, \cmd{2km}, \cmd{HEAD H1146}, \cmd{1146.85m}, \cmd{50.5} iterations, a \cmd{:Wells} value); a cell size giving more than $5\times10^6$ cells per layer (\cmd{:GridCellSize 50} and \cmd{60} on Liard), a refinement size giving more on a regular grid or, by its estimate, on a quadtree grid (\cmd{:GridRefinement RIVERS 0.1}) & stops before the grid is built; names the command and the value or the estimated cells per layer (\cmd{tests/input\_checks.py})\\
 A quadtree grid within the limit that needs more memory than there is (\cmd{RIVERS 0.5} on Liard, about $4.6\times10^6$ cells per layer, under a 3~GB limit) & stops naming \cmd{:GridRefinement} and the estimated cells per layer (no crash)\\
 Overlapping and adjacent refinement features: 200 copies of one line (\cmd{LINES 0.1}) and 20 adjacent squares (\cmd{POLYGONS 0.5}) on a 4-HRU strip & built (the estimate counts each square once)\\
+An HRU mesh of 4 HRUs of 5~$\times$~5~km with 500~m cells and one short refinement line of 0.1~m (N17) and of 2~m (N18) & N17 stops before the mesh is built (``too slow to build''); N18 is built within 120~s (65\,484 cells per layer)\\
+Boundary polygons that overlap: two features, the same feature twice, a MultiPolygon of two overlapping parts (N19) & each selects the cells of the union (as the larger polygon alone)\\
+Malformed numbers in the \cmd{.rvp} aquifer tables: \cmd{K\_HORIZ 1O}, \cmd{SPEC\_YIELD O.2}, a thickness \cmd{3m}, a profile parameter \cmd{2.O} (N20--N23) & stops; names the table, the row and the token\\
 Malformed numbers in the \cmd{.rvc}: \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5} or \cmd{0x62}, \cmd{:InitialGWHeads FROM\_PROFILE 0}, a \cmd{:GWHeads} value \cmd{98.5x} & stops; names the command and the token (\cmd{test\_inputs.py} I22)\\
 \cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
 A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule
@@ -476,7 +484,7 @@ water-table ET draws on a PET the soil cannot meet from a water table within the
 columns (\cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG}, one and three depth classes) run under negative recharge, a water table
 rising through them (the columns vanish) and dry top cells. A boundary group switches cells off and on with
 \cmd{:BoundaryHead} series (also every cell of a column, which is then an ordinary column) and switches an existing
-model's own specified heads on under a lake. Every case runs with the model Raven builds and as an existing model (with
+model's own specified heads on under a lake. Every case except the \cmd{:BoundaryHead} series cases of the boundary group (6 in quick mode, 8 in full mode; generated model only) runs with the model Raven builds and as an existing model (with
 \cmd{NEWTON}, without it for \cmd{CONCEPTUAL}, and converted to feet and seconds, the model's own river, well and boundaries
 included). On every run: MODFLOW's balance, the recharge, soil-zone and unsaturated-column identities, Raven's balance, the
 river, surface-store and reservoir books, the seepage returned, the run totals against their columns, and no HDRY or NaN in
@@ -503,10 +511,11 @@ need no MODFLOW library. \cmd{-{}-quick} runs fewer randomized set-ups (the grid
 72 and 24, the existing-model harness 6 instead of 20, the rough-terrain suite 40 seeds instead of 400, the Liard soil-zone
 run LP1 30 days instead of 365) and sets \cmd{RAVEN\_TEST\_QUICK=1} for every script: the scripts that have a quick mode
 (every soil-zone script, the behaviour, budget-file, option-combination, projected-input, GeoTIFF, input and version-guard checks,
-and the existing-model exchange, input-form and restart tests) run shorter cases, each described in its header; the
-others run their usual cases (\cmd{tests/README.md} lists both groups). On two cores the quick mode takes about 35
-minutes and the full mode about 1.5 hours (on a busy machine up to an hour and 2.5 hours, the latter with the USGS example
-steps). A check a script cannot make (for example a byte-identity check
+and the existing-model exchange, input-form and restart tests, and the tutorials check, which rebuilds the tutorials and
+compares every number they quote, keeping in quick mode the committed values of the 20-year Liard run and of the
+calibration) run shorter cases, each described in its header; the others run their usual cases (\cmd{tests/README.md} lists both groups). On two cores the quick mode takes about 50
+minutes and the full mode about 2.5 hours, the tutorials check about 5 minutes and an hour of them (on a busy machine up
+to 75 minutes and 3.5 hours, the latter with the USGS example steps). A check a script cannot make (for example a byte-identity check
 without a reference build, \cmd{RAVEN\_EXE\_REF}) is reported as skipped: the step reads ``PASS (k skipped)'' and the report
 lists the skipped checks. The two USGS example steps run only when \cmd{RAVEN\_USGS\_EXAMPLES} points at the MODFLOW~6 examples.
 A step passes when its script exits without error and its own criterion holds; the scripts with several runs (restart,

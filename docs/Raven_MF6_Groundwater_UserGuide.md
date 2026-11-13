@@ -177,7 +177,8 @@ order where profiles meet.
 | `:GeneralHeadBoundary name file HEAD h CONDUCTANCE c {LAYERS ALL\|TOP}` | none | head-dependent boundary; c per cell [m2/d] |
 | `:SpecifiedHeadBoundary name file HEAD h {LAYERS ALL\|TOP}` | none | fixed-head boundary |
 
-Boundary files are GeoJSON: polygons select cells whose centre lies inside; lines select cells they cross.
+Boundary files are GeoJSON: polygons select cells whose centre lies inside (holes excluded; overlapping features or parts
+of a MultiPolygon add up, they never cancel); lines select cells they cross.
 A boundary is placed only in layers whose bottom lies below its head. Recharge falling on specified-head
 cells is spread over the HRU's other cells.
 
@@ -206,18 +207,26 @@ the HRUs' LATITUDE/LONGITUDE, not near them in the projection). The `"crs"` memb
 (also a versioned URN such as `urn:ogc:def:crs:EPSG:6.6:4326`); geographic codes mean lon/lat: the geographic 2D and 3D
 systems of the EPSG registry, a table compiled into Raven (e.g. 4326, 4979, 4269, 4617, NAD83(2011) 6318; not every code
 of the 4000s: 4647, ETRS89 / UTM 32N, is a projection; geographic codes that are not degrees from Greenwich, such as 4801
-Bern, are refused); a projection that is not built in is accepted, and its
-coordinates decide. Outputs stay in lon/lat.
+Bern, are refused, and so are projected codes in feet or other units, such as 2227); a projection that is not built in is
+accepted, and its coordinates decide. A file with a UTF-8 byte-order mark is read. `:InputCRS` and `:MF6CRS` parameters
+are read strictly: plain numbers only (`O.9996` or `500km` stop the run), exactly five (TMERC) or six (ALBERS, LCC) of
+them and at most an ellipsoid, nothing after an EPSG code. Outputs stay in lon/lat.
 
 **Rasters.** `:LandSurface` and `:BedrockSurface` read ESRI ASCII grids, and GeoTIFF files when the name ends in `.tif`,
-`.tiff` or `.gtiff` (any case), with Raven's own reader (no GDAL needed); both are sampled the same way. GeoTIFF support: classic and
+`.tiff` or `.gtiff` (any case), with Raven's own reader (no GDAL needed); both are sampled the same way. An ESRI ASCII grid
+may give `xllcenter`/`yllcenter`, rectangular cells by `dx` and `dy` (as GDAL writes them) and `NODATA_value nan`; it must
+hold exactly ncols x nrows numbers (an unknown header key, a value that is not a number, or too few or too many values
+stop the run). GeoTIFF support: classic and
 BigTIFF, either byte order, strips or tiles; no compression, LZW, DEFLATE or PackBits, with predictor 1, 2 or 3; one band
 of 8-64 bit integers or 32/64-bit floats; north-up georeferencing (`ModelPixelScale` + `ModelTiepoint`, or a
 `ModelTransformation` without rotation); `PixelIsPoint` (the tie point is a pixel centre, so the corner is half a pixel up
 and left, as GDAL reads it); `GDAL_NODATA` and a GDAL internal mask as no-data (NaN is always no-data). Without either,
-every value is an elevation, as GDAL reads it; Raven warns when such a file holds -9999 or a type's extreme value. Other compressions (JPEG, ZSTD, LERC, ...),
+every value is an elevation, as GDAL reads it; Raven warns when such a file holds -9999 or a type's extreme value. GDAL's band
+scale and offset (`GDAL_METADATA`) are applied, as GDAL's `-unscale` and GIS programs show the values. Other compressions (JPEG, ZSTD, LERC, ...),
 several bands, palette or colour images, other bit depths, FillOrder 2, units other than metres or degrees (units keys),
-a prime meridian other than Greenwich, a vertical coordinate system in feet,
+a projected code in feet without its units key (e.g. EPSG:2227), a prime meridian other than Greenwich (also given only by
+its longitude, as GDAL writes a user-defined system such as `+pm=paris`, or by the datum), a vertical coordinate system
+in feet, a band unit in feet or another length unit than metres (an unknown band unit gives a warning),
 rotated or south-up rasters, files without georeferencing,
 corrupt or truncated files and files over 1 GB or 50 million pixels stop the run with the reason; convert with
 `gdal_translate -b 1 -co COMPRESS=DEFLATE`. The GeoTIFF's EPSG code is checked: a geographic code needs no `:InputCRS`, a
@@ -512,6 +521,10 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | "GeoTIFF file ...: the linear units of its projection ... are foot" / "its angular units ..." / "its elevations are in ..." (also a vertical system such as EPSG:6360) | Raven reads metres and degrees: reproject (`gdalwarp -t_srs`) or convert the elevations to metres |
 | "... is in EPSG:n, whose longitudes count from the prime meridian of ..." / "whose angles are in ..." / "its prime meridian ... is not Greenwich" | reproject the GeoTIFF or GeoJSON file to EPSG:4326 |
 | "GeoTIFF file ...: its n tiles of ... pixels cover more than 200 million pixels" | export the file again |
+| "GeoTIFF file ...: its prime meridian lies at longitude ... from Greenwich" / "its geodetic datum EPSG:n ... counts longitudes from the prime meridian of ..." | reproject the raster to EPSG:4326 |
+| "... is in EPSG:n, a projection whose coordinates are in ..." | reproject the GeoTIFF or GeoJSON file to a projection in metres |
+| "GeoTIFF file ...: its elevations are in ... (the band unit, UNITTYPE in GDAL_METADATA)" / "its band SCALE ... is 0" / warning "... has the band unit '...', which Raven does not know" | convert the values to metres and set the unit (`gdal_edit.py -units m`); save unscaled elevations (`gdal_translate -unscale`) |
+| "raster ...: unknown header key" / "... is not a number" / "has ... values, fewer than ncols*nrows" / "has more values than ncols*nrows" (ESRI ASCII) | correct the grid's header or values |
 | warning "raster ... has a vertical coordinate system (...) whose unit Raven does not know" | check that the elevations are in metres |
 | warning "raster ...: its chain of image directories is damaged after the raster ..." | the raster is read without its internal mask; export the file again if it has one |
 | "GeoTIFF file ...: the file has an internal mask ... that Raven cannot read" | save it with a no-data value: `gdalwarp -dstnodata -9999 in.tif out.tif` |
@@ -525,6 +538,9 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
 | ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid (or a quadtree grid) of about ..." | more than 5 million cells per layer, before the grid is built (a quadtree's size is estimated from the squares the refinement features touch, and refused before the build only beyond 1.5 times the limit; the build stops at the limit: "... of more than 5e+06 cells per layer (the build stopped there)"): give the sizes in metres as plain numbers; refine locally with QUADTREE or HRU_MESH, or limit the levels with `:QuadtreeMaxLevel` |
 | "not enough memory to build the groundwater model (about ... cells per layer, from ...)" / "... to couple the existing model" | the grid is within the limit but the computer's memory is not enough for it (or for the model's files): larger `:GridCellSize` or `:GridRefinement` sizes; for an existing model, more memory |
 | ":WellFlowRate ...: units ... are not supported" / ":BoundaryHead ...: units ..." | well rates in m3/d, m3/s or L/s; heads in m |
+| ":AquiferClasses / :AquiferProfiles / :AquiferProfileParameters, row ...: ... '...' is not a number" | give plain numbers in the `.rvp` tables (10, not 1O; 3, not 3m) |
+| ":InputCRS - TMERC parameter ...: '...' is not a number" / "TMERC takes ... and an optional ellipsoid" / "surplus value ... after EPSG:n" | give the projection's parameters as plain numbers, exactly as many as it takes |
+| "the :GridRefinement sizes (smallest ... m) give an HRU mesh of about ... cells per layer (estimated) ... too slow to build" | an HRU mesh's boundaries take seeds at the smallest LINES/RIVERS size: give the sizes in metres (500, not 0.5); for very fine features use QUADTREE |
 | "... a name Raven reserves for the packages it adds" | an existing model's package is named like one of Raven's (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN, RES_RAVEN, SZ*_RAVEN): rename it, or remove the line if Raven wrote it |
 | warning "layer ... starts dry" | the initial heads leave a whole layer dry (INITIAL_HEAD_DEPTH deeper than the layers above); start from `:GWInitialization STEADY_STATE`, a smaller INITIAL_HEAD_DEPTH or `:InitialGWHeads` |
 | warning "soil-zone base of the HRU lies ... from the model top" | cells shared with lakes or with HRUs of a different soil-zone thickness; between the two levels soil and aquifer both store water (or neither does) |
