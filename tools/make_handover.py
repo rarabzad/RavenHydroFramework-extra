@@ -42,7 +42,8 @@ Checks (the exit code is 0 only when all pass):
     again with core.autocrlf=true (Git for Windows' default: the kit's tree); step 4 with a public commit the kit does
     not hold: one that applies (4-keep and 4-keep-push publish it on top of the kit, with the backup branch) and one
     that conflicts (4-keep stops; 4-keep-push and 4-merge then stop and push nothing, 4-keep-push also after
-    git cherry-pick --abort, and 4-merge run again inside its unfinished merge); two kept commits whose first conflict
+    git cherry-pick --abort; 4-keep run again stops, and the commands it prints delete branch release, after which it
+    starts again; 4-merge run again inside its unfinished merge); two kept commits whose first conflict
     is finished with git commit (4-keep-push stops while the cherry-pick sequence holds the second). Nothing is pushed
     to GitHub;
   - unless --no-public-check: the public branch mf6-coupling is read (git ls-remote; nothing is pushed) and, when it can
@@ -223,6 +224,19 @@ def run_blocks(text, out, rec, pubs, tmp):
     rc2, o2 = blk('4-keep-push'); now = head(code_gh, 'refs/heads/' + cb)
     step('4-keep-push', rc2 != 0 and 'holds nothing beyond the kit' in o2 and now == conf,
          'after git cherry-pick --abort: stops, nothing pushed' if rc2 != 0 and now == conf else o2[-300:])
+    # 4-keep run again on its own branch release: it stops and names the commands that delete release; they work as
+    # printed (release is the checked-out branch), and 4-keep then starts again (here: the same conflict, aborted)
+    rc1, o1 = blk('4-keep')
+    cmd = [l.strip() for l in o1.split('\n') if 'branch -D release' in l]
+    r5 = subprocess.run(['bash', '-c', cmd[0]], cwd=work, capture_output=True, text=True, env=env) if cmd else None
+    rc5 = r5.returncode if r5 else 1
+    rc6, o6 = blk('4-keep'); cl = os.path.join(work, NAME['code'])
+    again = g(['rev-parse', '-q', '--verify', 'CHERRY_PICK_HEAD'], cl)[0] == 0
+    step('4-keep', rc1 != 0 and 'branch release exists' in o1 and rc5 == 0 and rc6 != 0 and again and
+         head(code_gh, 'refs/heads/' + cb) == conf,
+         'run again: stops; the printed commands delete release; then it starts again' if rc5 == 0 and again else
+         'run again: ' + (o1 + '\n' + o6)[-300:])
+    g(['cherry-pick', '--abort'], cl)
     # 4-merge rerun inside its own unfinished merge (the conflicting commit): a STOP line, nothing pushed
     rc3, o3 = blk('4-merge'); rc4, o4 = blk('4-merge'); now = head(code_gh, 'refs/heads/' + cb)
     step('4-merge', rc3 != 0 and rc4 != 0 and 'STOP: the merge is not finished' in o4 and now == conf,
@@ -595,8 +609,10 @@ Then choose:
     PICK=$(git rev-list --reverse --no-merges "handover/{cb}..$OLD")
     test -n "$PICK" || {{ echo "nothing to keep: $OLD holds no commit the kit does not"; exit 0; }}
     if git rev-parse -q --verify refs/heads/release >/dev/null; then
-      echo "STOP: branch release exists (an earlier 4-keep): publish it with block 4-keep-push, or delete it with"
-      echo "      git -C RavenHydroFramework branch -D release   and run this block again"; exit 1
+      echo "STOP: branch release exists (an earlier 4-keep): publish it with block 4-keep-push, or start again: end an"
+      echo "      unfinished cherry-pick with git -C RavenHydroFramework cherry-pick --abort, then delete the branch with"
+      echo "      git -C RavenHydroFramework checkout -q --detach && git -C RavenHydroFramework branch -D release"
+      echo "      and run this block again"; exit 1
     fi
     git checkout -q -b release handover/{cb}
     git cherry-pick $PICK

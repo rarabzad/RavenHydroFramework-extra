@@ -102,7 +102,7 @@ File & Change\\\midrule\endhead
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate} (m$^3$/d, m$^3$/s or L/s), \cmd{:BoundaryHead} (m); other units stop (1); constituent name captured before parsing (4)\\
 \cmd{ParseInitial\allowbreak ConditionFile.cpp} & \cmd{:InitialGWHeads} and the groundwater hotstart blocks (\cmd{:GWHeads}, \cmd{:GWStartHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWRiverTake}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWVadoseColumnTops}, \cmd{:GWSoilZoneLag}), each value checked (not a number as a whole token, not finite, or a negative water amount, stops: a damaged file; \cmd{:InitialGWHeads} read strictly, as the \cmd{.rvg}'s numbers), ignored with a warning in a run without \cmd{:GroundwaterModel}; the capacity check of the initial soil water skipped for the seepage target and the \cmd{:SurfaceWaterExchange} stores of a coupled model (they can hold more than their capacity, as in a continuous run) (1); ensemble members restored (2); default reservoir stage (3); \cmd{:AgeTracerDatum} read, age-tracer masses detected in the state table, and the offset passed to the age tracers before their initial conditions are set (5)\\
 \cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor, routing-memory get/set (\cmd{GetRoutingMemory}, \cmd{SetRoutingMemory}) (2)\\
-\cmd{EnKF.cpp/.h} & in a coupled run an EnKF member's \cmd{:ExtraRVTFilename} is read before its groundwater model is built (\cmd{ReadExtraRVT}) (2)\\
+\cmd{EnKF.cpp/.h} & in a coupled run an EnKF member's \cmd{:ExtraRVTFilename} is read before its groundwater model is built (\cmd{ReadExtraRVT}) (1)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision (12 decimals, or the stream's 17 significant digits in a coupled run), constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\
 \cmd{CMakeLists.txt}, \cmd{src/Makefile}, \cmd{src/Raven.vcxproj(.filters)} & new files; link \cmd{-ldl} (CMake: \cmd{CMAKE\_DL\_LIBS}); CMake: Release by default for single-configuration generators, option \cmd{RAVEN\_MF6} with \cmd{cmake/RavenMF6*.cmake} (the MODFLOW~6 library: build, download or given path; install with its runtime) (1)\\
@@ -368,9 +368,10 @@ Raven~4.15 without groundwater and in a coupled run alike (Section~\ref{sec:accr
 its water as an output (base Raven books it only for model types other than a surface-water model), so a model that sends
 water to \cmd{GROUNDWATER} shows a balance error that falls by the store's content every step: $-7.48$~mm after the first
 year of the Liard example without groundwater. The flows are not affected.
-\item In ensemble mode, \cmd{WatershedStorage.csv} shows channel and rivulet storages that differ from a single run, also
-without groundwater; the hydrographs, reservoir stages and groundwater outputs of each member equal the single run's
-(Section~\ref{sec:behaviour}).
+\item In ensemble mode, every member's \cmd{WatershedStorage.csv} and \cmd{solution.rvc} show a larger rivulet storage
+(and so a larger total storage) than a single run, by a constant, also without groundwater and in base Raven: Raven adds
+the rivulet storage again at every initialization. The hydrographs, channel storage, reservoir stages, balance error and
+groundwater outputs of each member equal the single run's (Section~\ref{sec:behaviour}).
 \item valgrind reports uninitialised reads in base Raven when it reads the \cmd{.rvp} file: in \cmd{RVPParameterWarning}
 (called from \cmd{ParseClassPropertiesFile}; three contexts) and in \cmd{CVegetationClass::RecalculateRootParams} (two
 contexts; 23 errors in the short run of test I10). The coupling's own code and the hotstart code show none

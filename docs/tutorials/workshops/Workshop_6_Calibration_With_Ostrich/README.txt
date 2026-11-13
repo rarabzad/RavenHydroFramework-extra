@@ -35,7 +35,7 @@ What you need
 
 Time needed
 -----------
-About 30 minutes of work, plus about 25 minutes of computing for the calibration.
+About 30 minutes of work, plus about 28 minutes of computing for the calibration.
 
 How to start
 ------------

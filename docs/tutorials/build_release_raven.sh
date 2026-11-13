@@ -12,13 +12,16 @@
 #   COMMIT          the commit to build (default HEAD); it is exported with git archive, so the checkout is not touched
 #
 # Needs git, make, strip, objdump (binutils), Python 3 and the zig compiler ZIG_VERSION below (C++ through clang and
-# libc++, any glibc as target). The zips are built with that version: the same commit then gives the same executable,
-# byte for byte. A zig of that version on the PATH is used; otherwise the script installs the Python package
-# ziglang==ZIG_VERSION into BUILD_DIR/zig (pip, no root). The compiler flags are the script's own: -O2 -std=c++11 -fPIC
-# -Wno-deprecated and -ldl, plus -Wno-date-time (zig rejects __DATE__ by default; the build date in Raven's banner then
-# comes from __DATE__ as usual). They are not those of the repository's builds (CMake Release uses -O3 -DNDEBUG; the
-# Makefile sets no optimisation). At the end it prints the highest GLIBC symbol version the executable needs; the
-# script fails if it is above 2.28.
+# libc++, any glibc as target). The zips are built with that version. A zig of that version on the PATH is used;
+# otherwise the script installs the Python package ziglang==ZIG_VERSION into BUILD_DIR/zig (pip, no root). The compiler
+# flags are the script's own: -O2 -std=c++11 -fPIC -Wno-deprecated and -ldl, plus -Wno-date-time (zig rejects __DATE__
+# by default). They are not those of the repository's builds (CMake Release uses -O3 -DNDEBUG; the Makefile sets no
+# optimisation). The build date in Raven's banner (__DATE__) is the commit's date: the script sets SOURCE_DATE_EPOCH to
+# the commit's committer time (git log -1 --format=%ct COMMIT), which clang uses for __DATE__ and __TIME__. So the same
+# commit gives the same executable, byte for byte, on any day. zig keeps compiled objects in its cache without regard to
+# SOURCE_DATE_EPOCH, so the script also passes the date as a macro (-DRAVEN_SOURCE_DATE_EPOCH=...; Raven does not use
+# it): an object compiled with another date is then not taken from the cache. At the end it prints the highest GLIBC
+# symbol version the executable needs; the script fails if it is above 2.28.
 set -euo pipefail
 SRC=$(cd "$1" && pwd); B=$2; OUT=$(realpath -m "$3"); COMMIT=${4:-HEAD}
 TARGET_GLIBC=2.28
@@ -44,10 +47,13 @@ for f in "$B"/export/src/*; do [ -f "$f" ] || continue; t="$B/src/$(basename "$f
 for f in "$B"/src/*.cpp "$B"/src/*.h; do [ -e "$B/export/src/$(basename "$f")" ] || rm -f "$f" "${f%.cpp}.o"; done
 rm -rf "$B/export"
 REV=$(git -C "$SRC" rev-parse --short "$COMMIT")
-echo "building Raven $REV for x86_64-linux-gnu.$TARGET_GLIBC"
+# the build date of the banner: the commit's date, so that a rebuild on another day gives the same bytes
+SOURCE_DATE_EPOCH=$(git -C "$SRC" log -1 --format=%ct "$COMMIT"); export SOURCE_DATE_EPOCH
+rm -f "$B/src/RavenMain.o"       # (the one object that holds __DATE__: compiled again with this date)
+echo "building Raven $REV for x86_64-linux-gnu.$TARGET_GLIBC (build date $(date -u -d "@$SOURCE_DATE_EPOCH" '+%b %e %Y'), the commit's date)"
 cd "$B/src"
 make -j"$(nproc)" CXX="$ZIG c++ -target x86_64-linux-gnu.$TARGET_GLIBC" \
-     CXXFLAGS="-Wno-deprecated -Wno-date-time -std=c++11 -fPIC -O2" LDLIBS="-ldl" > make.log 2>&1 \
+     CXXFLAGS="-Wno-deprecated -Wno-date-time -std=c++11 -fPIC -O2 -DRAVEN_SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" LDLIBS="-ldl" > make.log 2>&1 \
   || { grep -m20 -B2 -A5 "error" make.log; exit 1; }
 cp Raven.exe "$OUT"
 strip "$OUT"                     # zig keeps the symbol tables; the release does not need them

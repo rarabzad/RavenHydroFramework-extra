@@ -15,8 +15,8 @@ about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run exactly as th
 
 \subsection{Step 0: prepare}
 \begin{enumerate}
-\item Get Raven with the coupling (RavenHydroFramework; until the pull request is merged, the \cmd{mf6-coupling} branch
-of \url{https://github.com/rarabzad/RavenHydroFramework}) and, beside it, RavenHydroFramework-extra (branch \cmd{main} of
+\item Get Raven with the coupling (RavenHydroFramework; the coupling is offered to the Raven team for inclusion, and
+until it is part of Raven, the \cmd{mf6-coupling} branch of \url{https://github.com/rarabzad/RavenHydroFramework}) and, beside it, RavenHydroFramework-extra (branch \cmd{main} of
 \url{https://github.com/rarabzad/RavenHydroFramework-extra}; Section~\ref{sec:building}). Build Raven with CMake: \cmd{cmake -S . -B build}, \cmd{cmake --build build
 --config Release} (an optimised \cmd{Release} build by default). With a Fortran compiler, meson~$\geq$~1.7, ninja and git,
 and the MODFLOW~6 repository reachable, this also builds the MODFLOW~6 library from source; otherwise (also offline) it

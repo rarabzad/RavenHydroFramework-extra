@@ -40,8 +40,9 @@ storage itself is reported by the files in section 5.
   `--raven PATH` when the Raven checkout is not beside this repository). The script downloads the release zip from
   https://github.com/MODFLOW-ORG/modflow6/releases and keeps only the library. MODFLOW 6.8 is released for Linux
   x86_64, Windows 64-bit and Apple Silicon Macs; Intel Macs need an earlier release.
-- Raven with the coupling: the RavenHydroFramework source (the coupling is a pull request to it; until it is merged, use
-  the `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework), cloned beside this repository
+- Raven with the coupling: the RavenHydroFramework source (the coupling is offered to the Raven team for inclusion;
+  until it is part of Raven, use the `mf6-coupling` branch of https://github.com/rarabzad/RavenHydroFramework), cloned
+  beside this repository
   (https://github.com/rarabzad/RavenHydroFramework-extra, branch `main`):
 
       git clone -b mf6-coupling https://github.com/rarabzad/RavenHydroFramework.git
@@ -500,7 +501,11 @@ Calibrate hydraulic conductivity in log space.
 
 Raven's Monte Carlo, DDS and EnKF modes re-initialize the model for every member; the groundwater model is
 rebuilt and MODFLOW 6 restarted each time, with its files in each member's output folder. Every member starts from the
-first run's routing memory (also the local outflow, irrigation and diversion memory), so member 1 equals the single run.
+first run's routing memory (also the local outflow, irrigation and diversion memory), so member 1's hydrographs, flows,
+groundwater books and Raven's balance error equal the single run's. The rivulet storage that `WatershedStorage.csv` and
+`solution.rvc` report is base Raven's: Raven adds it again at every initialization of a member, so members report more
+rivulet storage than the single run (a constant offset, also without groundwater and in base Raven; the balance error
+is not affected; see the known issues in section 9).
 An EnKF member's `:ExtraRVTFilename` is read before its groundwater model is built, so `:BoundaryHead` series given there
 place and switch that member's boundaries.
 
@@ -599,7 +604,10 @@ place and switch that member's boundaries.
   Raven's `MB Error` of the first step is not zero in some models and stays at that value (0.431 mm in the Liard example,
   0.216 mm with half-day steps, also in base Raven 4.15); without `:GroundwaterModel`, Raven empties the `GROUNDWATER`
   store every step without booking it as an output, so `MB Error` falls by the store's content each step (-7.48 mm after
-  the first year of the Liard example without groundwater; the flows are not affected);
+  the first year of the Liard example without groundwater; the flows are not affected); in ensemble mode every member's
+  `WatershedStorage.csv` and `solution.rvc` show a larger rivulet storage (and total) than a single run, by a constant,
+  because Raven adds the rivulet storage again at every initialization (the flows, channel storage and balance error
+  equal the single run's);
   after a hotstart of a model whose reservoir spills, Raven's `MB Error` (`WatershedStorage.csv`) is offset by a
   constant, half the water that crossed the reservoir in the step before the restart (its outflow, and reservoir seepage
   returned to the subbasin or a gain MODFLOW did not supply on its way into the reservoir), because Raven's initial storage
