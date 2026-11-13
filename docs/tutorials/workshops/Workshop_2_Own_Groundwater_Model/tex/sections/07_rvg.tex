@@ -1,0 +1,48 @@
+% 07_rvg.tex - the groundwater file Creek.rvg
+\section{Write the groundwater file}
+
+\step{Create \texttt{Creek.rvg}}\label{st:rvg}
+Create a new file \cmd{Creek.rvg} with a text editor (\cmd{nano Creek.rvg}) and type this content. Text after \cmd{\#} is
+a comment; Raven ignores it.
+\showfile{finished/Creek.rvg}
+Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvg .} The rest of this step explains the file, part by
+part.
+
+\paragraph{Input files and their projection.}
+\cmd{:InputCRS EPSG:32611} says that \emph{every} GeoJSON file and raster named in the \cmd{.rvg} is in UTM zone 11N.
+Without this line, Raven expects longitude and latitude (EPSG:4326). Raven checks the projection. A GeoJSON file whose
+\cmd{"crs"} member names another projection, a GeoTIFF with a different EPSG code, or coordinates that look like longitude
+and latitude stop the run with the reason. The output files (\cmd{grid\_cells.geojson}, the coordinates of the \cmd{.rvh})
+stay in longitude and latitude.
+
+\cmd{:HRUGeometry} reads the HRU polygons and the name of the field that holds the HRU number. \cmd{:RiverGeometry} reads
+the creek lines and the field that holds their subbasin. (Without a field, each piece of river goes to the subbasin of the
+HRU that covers most of its cell.) \cmd{:LandSurface} and \cmd{:BedrockSurface} read the rasters. Each cell takes the mean
+of the raster over its area. Raven reads GeoTIFF files itself (one band; uncompressed, LZW, DEFLATE or PackBits; north-up)
+and ESRI ASCII grids. No GIS software is needed.
+
+\paragraph{Grid and start.}
+\cmd{:GridCellSize 250} lays a regular grid of 250-m cells over the coupled HRUs. A column of cells is active where coupled
+HRUs cover at least a quarter of it (\cmd{:MinCellCoverage}, default 0.25). \cmd{:GWInitialization STEADY\_STATE 1.2}
+starts the run from the \emph{steady state} (the heads that do not change in time) of a uniform recharge of 1.2~mm/d,
+instead of the profiles' \cmd{INITIAL\_HEAD\_DEPTH}. Then the first months are not spent filling or draining the aquifer.
+
+\paragraph{Wells and observation wells.}
+With \cmd{:InputCRS}, wells are placed by \cmd{X} and \cmd{Y} in the projection (without it, by \cmd{LATITUDE} and
+\cmd{LONGITUDE}). PW\_1 is screened between 958 and 945~m, in the sand of layer~2. Its pumping rate comes from a
+\cmd{:WellFlowRate} series in the \cmd{.rvt} file (a negative rate is pumping). If its cell runs dry, MODFLOW reduces the
+rate; the column \cmd{wells actual} of \cmd{GWBudget.csv} shows the rate it delivered. Each observation well gives the
+elevation of its screen. Raven writes the head there every day to \cmd{GWHeads.csv}. Observed heads
+(\cmd{:ObservationData GW\_HEAD}, used in Workshop~6) are compared with these heads in \cmd{Diagnostics.csv}.
+
+\paragraph{Head boundaries, with and without a series.}
+\begin{itemize}
+\item \cmd{:GeneralHeadBoundary OUTLET outlet.geojson HEAD 958.0 CONDUCTANCE 500.0 LAYERS ALL}: groundwater leaves the
+  valley through its eastern edge towards a head of 958~m. The line selects the cells it crosses. The conductance is per
+  cell [m\textsuperscript{2}/d]. Without a \cmd{:BoundaryHead} series, the head stays at 958~m.
+\item \cmd{:SpecifiedHeadBoundary POND pond.geojson HEAD 976.5 LAYERS TOP}: the cells whose centre lies in the pond polygon
+  are held at the pond level. \cmd{CreekGW.rvt} has a \cmd{:BoundaryHead POND} series (the measured level, from
+  \V{t2:pondmin} to \V{t2:pondmax}~m over the year). It replaces \cmd{HEAD} day by day.
+\end{itemize}
+A boundary is placed only in layers whose bottom lies below its head (for a series: below its highest value). On a day when
+the head lies below the bottom of a placed cell, that cell is switched off. \cmd{GWModelSummary.txt} counts these days.

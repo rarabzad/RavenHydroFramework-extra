@@ -1,0 +1,47 @@
+% 05_particles.tex - save MODFLOW's flows and track particles backwards from the well
+\section{Track particles from the pumping well}
+MODFLOW~6's particle tracking (PRT) runs after the coupled run, on the flows that MODFLOW saved.
+
+\step{Save MODFLOW's flows every day and run}
+Still in \cmd{\$WS/work} (with the ensemble lines removed), run one year and ask Raven to save MODFLOW's flows every day.
+Change \cmd{Creek.rvi} and \cmd{Creek.rvg}:
+\diff{t5_prt_rvi.diff}
+\diff{t5_prt.diff}
+\term{t5_run_prt.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+\why \cmd{out\_prt/mf6/gwf.cbc} (the \emph{budget file}) now holds the flows of every package, the specific discharge and
+the saturation of every day (\V{t5:cbcmb}~MB for this year). \cmd{gwf.porosity} holds the porosity of every cell
+(\cmd{POROSITY} of the aquifer classes).
+
+\step{Track particles backwards}
+\cmd{make\_prt.py} writes a PRT simulation for these flows and runs it with the library. By default it releases
+\V{t5:npart} particles around each well of \cmd{:Wells}. \cmd{--backward} tracks them backwards in time, to where the
+pumped water came from:
+\term{t5_make_prt.txt}
+\term[basicstyle=\ttfamily\tiny]{t5_endpoints.txt}
+\why each line is a particle: when it was released (in days of the tracking), its release point and its end point, the
+time it was tracked (here the whole year: no particle left the model), the PRT status code of its last record and, in
+words, why its track ended. The points are in metres, in the frame of the grid file \cmd{gwf.dis.grb} (PRT's own
+coordinates shifted by its \cmd{XORIGIN} and \cmd{YORIGIN}).
+\begin{trouble}
+\begin{itemize}
+\item \emph{``No module named flopy''}: type \cmd{pip install flopy} with the virtual environment active.
+\item \cmd{make\_prt.py} stops with a message when the flows were not saved every day: add \cmd{:HeadSaveFrequency 1} and
+  \cmd{:WriteGWBudgetFile} to the \cmd{.rvg}.
+\item PRT needs a regular or a quadtree grid (MODFLOW's DIS or DISV). HRU meshes and imported grids use DISU, which PRT
+  cannot track.
+\end{itemize}
+\end{trouble}
+
+\step{Plot the tracks}
+The script \cmd{plot\_tracks.py} draws the tracks, in the same frame, with the travel times of \cmd{endpoints.csv}:
+\term{t5_plot_tracks.txt}
+\fig[0.62]{t5_tracks.png}{\cmd{out\_prt/prt/tracks.png}: backward tracks from the \V{t5:npart} release points around PW\_1
+over one year. The water pumped at the end of 2010 was \V{t5:distmin} to \V{t5:distmax}~m away at the start of the
+year.}
+\begin{note}[Tracks need small cells]
+All the tracks begin and end inside the well's own 250-m cell. PRT interpolates the flow within a cell, and this cell is
+itself the sink of the well. The tracks show the method; they are not a capture zone. A study of capture zones or travel
+times needs cells much smaller than the distances of interest around the well (\cmd{:GridRefinement WELLS}, or a smaller
+\cmd{:GridCellSize}).
+\end{note}

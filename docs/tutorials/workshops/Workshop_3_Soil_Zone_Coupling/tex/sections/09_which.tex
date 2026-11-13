@@ -1,0 +1,14 @@
+% 09_which.tex - which option to use, and the finished state
+\section{Which option to use}
+\begin{itemize}
+\item \cmd{CONCEPTUAL}: when the water table stays below the soil, or for a first model.
+\item \cmd{PHYSICAL}: where the water table reaches the soil, as on valley floors, wetlands and the foot of slopes. It
+  takes more computing time per day.
+\item \cmd{:SoilZoneVadose}: where the water table lies metres below the soil and the timing of the recharge matters.
+  \cmd{RICHARDS} is the reference method. \cmd{KINEMATIC} leaves out capillary forces and always converges. \cmd{LAG} is a
+  cascade of linear stores with a travel time per metre.
+\end{itemize}
+\cmd{\$WS/model/finished} holds the \cmd{.rvp} with all the parameters and the \cmd{.rvg} with \cmd{RICHARDS} and three
+depth classes. The manual of the coupling (section ``The soil zone and the water table'') gives the equations, and the
+user guide (section~4.3c) lists every \cmd{:SoilZone} command. Both are in the RavenHydroFramework-extra repository (see
+\cmd{bin/README.txt}).

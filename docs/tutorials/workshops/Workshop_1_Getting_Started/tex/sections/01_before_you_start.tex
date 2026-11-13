@@ -1,0 +1,21 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[Raven] A hydrological model. It divides a river basin into \emph{subbasins}, and each subbasin into
+  \emph{HRUs} (hydrological response units: areas with one land use, one soil and one elevation band).
+\item[MODFLOW~6] The groundwater model of the U.S. Geological Survey. Here it runs as a library (\cmd{libmf6.so}) inside
+  Raven.
+\item[Coupled run] A Raven run in which MODFLOW~6 computes the groundwater every day. Raven gives MODFLOW the
+  \emph{recharge} (the water that leaves the soil downwards); MODFLOW gives back the water that seeps out of the ground
+  and the exchange with the rivers.
+\item[\cmd{GROUNDWATER}] The Raven store whose water is handed to MODFLOW as recharge every day.
+\item[Head] The water level in the aquifer, in metres above sea level. The \emph{water table} is the head at the top of
+  the saturated ground.
+\end{description}
+
+\paragraph{How to read the commands.} You type every command in a terminal. In the grey boxes, a line that starts with
+\cmd{\$} is what you type (without the \cmd{\$}). The lines under it are what the computer prints. Long output is
+shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. The examples show a user called \cmd{user} with the home folder \cmd{/home/user}; your
+terminal shows your own name.

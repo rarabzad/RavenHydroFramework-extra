@@ -1,0 +1,44 @@
+% 09_run.tex - run the coupled model and read the summary
+\section{Run the coupled model}
+
+\step{Run Raven}
+\term{t2_run.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The run takes about \V{t2:runsec}~seconds. The line
+\cmd{Groundwater steady-state initialization converged in \V{t2:ssiter} outer iterations} confirms the steady start.
+\begin{tocheck}
+Raven prints \cmd{Exiting Gracefully: Successful Simulation}. The command
+\cmd{grep ERROR out/Raven\_errors.txt} prints nothing.
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \emph{``HRU \dots has an AQUIFER\_PROFILE but no polygon''}: the HRU numbers in \cmd{hrus.geojson} and in
+  \cmd{Creek.rvh} do not match, or the field is not called \cmd{HRU\_ID}.
+\item \emph{``\dots does not overlap any active groundwater cell''}: a small HRU under large cells. Make
+  \cmd{:GridCellSize} or \cmd{:MinCellCoverage} smaller.
+\item \emph{``:WellFlowRate 1 in the .rvt file names no well''} or \emph{``:BoundaryHead POND \dots names no
+  :GeneralHeadBoundary or :SpecifiedHeadBoundary''}: the ID or the name differs between the \cmd{.rvt} and the
+  \cmd{.rvg} file.
+\item A missing \cmd{:InputCRS} line: see Step~\ref{st:nocrs}.
+\item Compare your files with the finished ones: \cmd{diff \$WS/model/finished/Creek.rvg Creek.rvg} prints the lines that
+  differ (nothing if the files are the same).
+\end{itemize}
+\end{trouble}
+
+\step{Read what Raven built}
+\term{t2_summary.txt}
+\begin{tocheck}
+\begin{itemize}
+\item The grid has \V{t2:nlay}~layers of \V{t2:nrow}$\times$\V{t2:ncol} cells and \V{t2:activecols} active columns. The
+  \V{t2:inactivecols} other columns lie under the ridge or outside the HRUs. \V{t2:fidelity}\% of the active area lies in
+  the HRU that covers most of each cell.
+\item There are \V{t2:rivcells} river cells, one well cell, \V{t2:ghbcells} GHB cells (in both layers) and
+  \V{t2:chdcells} CHD cells under the pond.
+\item The observation wells are in layer \V{t2:owlay101} (OW\_NEAR), layer \V{t2:owlay102} (OW\_UPPER) and layer
+  \V{t2:owlay103} (OW\_SLOPE; the top layer is dry there).
+\item In the HRU table, \cmd{linked\_fraction\_of\_polygon} is close to 1 for every HRU. A low value means that an HRU lies
+  outside the grid, or that a projection is wrong.
+\end{itemize}
+\end{tocheck}
+Figure~\ref{fig:t2grid} shows the active cells (from \cmd{out/mf6/grid\_cells.geojson}) over the HRUs.
+\fig[0.86]{t2_grid.png}{The active cells of the grid that Raven built, over the HRUs. There are none under the ridge
+(HRU~4), which has no aquifer.\label{fig:t2grid}}

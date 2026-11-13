@@ -1,7 +1,0 @@
-Tutorial1_Getting_started.pdf 8
-Tutorial2_Own_groundwater_model.pdf 13
-Tutorial3_Soil_zone.pdf 8
-Tutorial4_Existing_MODFLOW_model.pdf 9
-Tutorial5_Restarts_ensembles_particles.pdf 6
-Tutorial6_Calibration_Ostrich.pdf 10
-Raven_MF6_Tutorials.pdf 58

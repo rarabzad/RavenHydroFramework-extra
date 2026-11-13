@@ -1,0 +1,14 @@
+% 08_rvt.tex - read the well and pond series
+\section{Read the well and pond series}
+
+\step{Look at \texttt{CreekGW.rvt}}
+The series file is already in the folder. Show its first lines:
+\term{t2_gwrvt_head.txt}
+\why \cmd{:WellFlowRate 1 m3/d} is the rate of the well with ID~1 in \cmd{:Wells}, and \cmd{:BoundaryHead POND m} the
+head of the boundary named POND. Both are daily series. The second line gives the start date and time, the interval
+(1~day) and the number of values.
+
+\step{Edit \texttt{Creek.rvt}}
+Tell Raven to read the file:
+\diff{t2_rvt.diff}
+Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvt .}

@@ -1,0 +1,55 @@
+% 04_first_run.tex - copy the Liard example, shorten it to one year, run it
+\section{Run the Liard River example}
+The Liard River example is a Raven model of the Liard River (65 subbasins in northern British Columbia and Yukon). A
+hypothetical aquifer lies under three of its subbasins. Raven builds the MODFLOW~6 model of this aquifer itself, from four
+inputs: the HRU outlines (polygons), the river lines, a raster of the land surface (a \emph{DEM}, digital elevation model)
+and a raster of the bedrock surface.
+
+\step{Copy the example into a work folder}
+Work on a copy, so that \cmd{model/start} stays as it came:
+\begin{shell}
+$ cp -r $WS/model/start $WS/work
+$ cd $WS/work
+\end{shell}
+\see no output. \cmd{ls} now shows the model files: \cmd{Liard.rvi}, \cmd{Liard.rvh}, \cmd{Liard.rvp}, \cmd{Liard.rvt},
+\cmd{Liard.rvc}, \cmd{Liard.rvg} and the data folders.
+
+\step{Shorten the run to one year}
+The example simulates \V{t1:fullDays} days (\V{t1:fullYears} years). That takes about \V{t1:fullmin}~minutes. For a first
+run, one year is enough. The \cmd{:Duration} line of \cmd{Liard.rvi} holds the number of days. Change 7305 to 365, with a
+text editor (for example \cmd{nano Liard.rvi}) or with this command:
+\term{t1_sed.txt}
+Check the result:
+\term{t1_duration.txt}
+\see the line above. The number after \cmd{:Duration} is now 365.
+\begin{trouble}
+If \cmd{grep} still shows 7305, the \cmd{sed} pattern did not match. Open \cmd{Liard.rvi} in a text editor and change the
+number by hand.
+\end{trouble}
+
+\step{Run Raven}
+Raven takes the model name and an output folder. \cmd{Liard} is the model name: Raven reads \cmd{Liard.rvi}, \cmd{.rvh},
+\cmd{.rvp}, \cmd{.rvt}, \cmd{.rvc} and, for groundwater, \cmd{Liard.rvg}. \cmd{-o out/} is the output folder.
+\term{t1_run.txt}
+\see Raven's progress (shortened here). The run takes about \V{t1:runsec}~seconds.
+\begin{tocheck}
+\begin{itemize}
+\item At the end, between two lines of \cmd{=} signs, Raven prints \cmd{Exiting Gracefully: Successful
+Simulation}.
+\item Raven printed \cmd{Initializing groundwater model (MODFLOW 6)}.
+\item Warnings are listed in \cmd{out/Raven\_errors.txt}: \V{t1:nwarn} in this run. \V{t1:nwarnpoly} of them say that
+  an HRU polygon does not match the HRU area of \cmd{Liard.rvh}. This is expected: the polygons are stand-ins, and
+  \cmd{README.md} of the example explains why. Raven still passes all the recharge and seepage between the two models;
+  only how it is spread over the cells is distorted. The other warnings come from the original Liard model
+  (\V{t1:nwarnchan} about channel cross-sections) and from gauges without observations in this one-year period
+  (\V{t1:nwarndiag}). They are expected too.
+\end{itemize}
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \cmd{Liard: command not found}: the variable \cmd{RAVEN} is empty in this terminal. Type the
+  \cmd{export} lines of Step~\ref{st:unpack} again.
+\item \cmd{Cannot find or read .rvh file} (or another file): you are not in \cmd{\$WS/work}. Type \cmd{cd \$WS/work}.
+\item Any other stop: read the reason with \cmd{cat out/Raven\_errors.txt}.
+\end{itemize}
+\end{trouble}

@@ -1,0 +1,24 @@
+% 06_soil_exchange.tex - GWSoilExchange.csv and plot_soilzone.py
+\section{Look at the exchange between soil and aquifer}
+
+\step{Read \texttt{GWSoilExchange.csv} and plot it}
+\cmd{GWSoilExchange.csv} has one line per HRU and day. Show the first columns of the first lines:
+\term{t3_soilex_head.txt}
+\why the columns are: the base of the soil zone, the soil water level and the water table (means over the HRU's
+columns), the saturated fraction (the share of the HRU where the water table reaches the soil), and the exchange in both
+directions. The script \cmd{plot\_soilzone.py} draws them for the HRUs you give (here 6 and 1):
+\term{t3_plot_soilzone.txt}
+\fig{t3_soilzone.png}{\cmd{soilzone.png} for the valley HRUs 6 and 1. Left: the water table rises above the base of the
+soil zone every winter, and the soil water level follows it. Right: the exchange (aquifer to soil is positive) and the
+saturated fraction (dotted). Bottom: the totals of all HRUs, the rejected recharge and the overflow, and the work of the
+daily iteration.}
+\begin{tocheck}
+\begin{itemize}
+\item Once the water table is in the soil, the soil water level follows it (left panels).
+\item The exchange changes sign only at real turning points of the seasons, not from one day to the next.
+\item The saturated fraction of HRU~6 rises and falls with the seasons (between \V{t3:F6min} and \V{t3:F6max}, mean
+  \V{t3:F6mean}). With 25 DEM points per cell, the low spots of the valley floor saturate first.
+\item The number of interface updates per day stays small, and the last change of the soil level stays below the
+  tolerance (bottom panels).
+\end{itemize}
+\end{tocheck}

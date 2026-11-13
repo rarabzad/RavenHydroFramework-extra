@@ -1,0 +1,48 @@
+% 08_compare.tex - compare the six runs
+\section{Compare the runs}
+
+\step{Compare the six runs}
+The script \cmd{compare\_runs.py} prints the mean values of each run and draws the recharge that reaches the water table,
+the water-table depth of the first HRU given, and the streamflow:
+\term{t3_compare.txt}
+\fig{t3_compare.png}{\cmd{compare\_runs.png}: the six runs. Recharge reaching the water table (30-day means), water-table
+depth under the north slope of the lower subbasin (HRU~7), and streamflow at the outlet.}
+\why the table shows three effects.
+\begin{itemize}
+\item \textbf{From CONCEPTUAL to PHYSICAL.} In the conceptual run, \V{t3:conceptual:leaves}~m\textsuperscript{3}/d leave
+  the subsoil and all of it reaches MODFLOW; \V{t3:conceptual:seep}~m\textsuperscript{3}/d seep back out. With the soil
+  zone, \V{t3:physical:leaves}~m\textsuperscript{3}/d leave the subsoil, because on the valley floor the soil now drains
+  into an aquifer whose water table is in the soil. But \V{t3:physical:rejected}~m\textsuperscript{3}/d of it is
+  rejected, and \V{t3:physical:aqsoil}~m\textsuperscript{3}/d rise back from the aquifer into the soil. A two-way exchange
+  replaces the one-way seepage drain: the seepage to Raven falls to \V{t3:physical:seep}~m\textsuperscript{3}/d, from the
+  lake HRU only. The water table under the valley floor (HRU~6) lies at \V{t3:physical:wt6}~m instead of
+  \V{t3:conceptual:wt6}~m, and more water reaches the creek through the soil (\V{t3:physical:q} instead of
+  \V{t3:conceptual:q}~m\textsuperscript{3}/s).
+\item \textbf{The unsaturated columns hold water.} At the end of the run, RICHARDS stores \V{t3:richards:uz}~million
+  m\textsuperscript{3} above its equilibrium profile (\V{t3:uzmm}~mm over the \V{t3:slopearea}~km\textsuperscript{2} of
+  slopes). LAG stores only \V{t3:lag:uz}~million m\textsuperscript{3} above the same profile, and KINEMATIC
+  \V{t3:kinematic:uz}~million m\textsuperscript{3} (counted from the residual water content). The difference is physical.
+  The columns start at rest, in equilibrium with a deep water table, and RICHARDS must wet this dry profile before it can
+  carry the recharge. Over the three years it holds back \V{t3:withheld}\% of what enters the columns. So only
+  \V{t3:richards:reaches}~m\textsuperscript{3}/d reach the water table, against \V{t3:kinematic:reaches} with KINEMATIC,
+  and the water table under the slopes ends \V{t3:wtdrop}~m deeper than without columns. Most of this is spin-up (see the
+  note below). The recharge also arrives later and smoother (Figure~\ref{fig:t3vz}). The flow out of the columns follows
+  the flow into them best \V{t3:richards:lag}~days later with RICHARDS, \V{t3:kinematic:lag} days with KINEMATIC and
+  \V{t3:lag:lag} days with LAG.
+\item \textbf{Depth classes change little here}: \V{t3:classes:reaches} against \V{t3:richards:reaches}
+  m\textsuperscript{3}/d reach the water table, and the run takes longer. Depth classes matter where the unsaturated
+  thickness within a cell varies a lot compared with its mean, as on uneven ground over a shallow water table.
+\end{itemize}
+The script \cmd{plot\_vadose.py} draws the unsaturated columns of the three methods:
+\term{t3_plot_vadose.txt}
+\fig{t3_vadose.png}{\cmd{vadose.png}: the unsaturated columns of the three methods: what enters them and what reaches the water table
+(30-day means), and the water they store.\label{fig:t3vz}}
+\begin{note}[A deep unsaturated zone needs a spin-up]
+A \emph{spin-up} is a run that brings the model's stores to a realistic state before the period you study. The columns
+start at rest (in equilibrium with the water table) and fill during the run. With RICHARDS, the water table under the
+slopes falls from \V{t3:physical:wt7}~m (no columns) to a mean of \V{t3:richards:wt7}~m, and the storage is still growing
+after three years. Look at the column \cmd{unsaturated zone storage} of \cmd{GWBudget.csv}: as long as it trends up or
+down, the run is still spinning up. There are two remedies. Run long enough and start the real run from its
+\cmd{solution.rvc} (Workshop~5 shows how; the columns are saved there). Or start each column at its steady profile for a
+typical recharge with \cmd{:SoilZoneVadoseInitialFlux} (in mm/d).
+\end{note}

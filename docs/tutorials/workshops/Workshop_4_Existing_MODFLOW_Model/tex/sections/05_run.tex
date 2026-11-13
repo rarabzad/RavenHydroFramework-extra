@@ -1,0 +1,61 @@
+% 05_run.tex - run the coupled model, read the summary, units, balance check
+\section{Run the coupled model}
+
+\step{Run Raven}\label{st:runa}
+\term{t4_run_a.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t4:runsec}~seconds. The files as they are in this step are in
+\cmd{\$WS/model/step\_07}. Now read the summary:
+\term{t4_summary.txt}
+\begin{tocheck}
+\begin{itemize}
+\item \cmd{existing model} names the model, its grid and its units (\emph{feet, days}).
+\item \cmd{packages taken over} and \cmd{packages in balance}. The packages in balance are the model's own packages that
+  stay (here the well and the head boundary). Their net flow is the column \cmd{other model packages} of
+  \cmd{GWBudget.csv}.
+\item \cmd{HRU coverage}: \V{t4:coverage}\% of the coupled HRUs' area lies on active cells. The rest lies outside the
+  model, whose edges do not follow the HRU outlines and cut off the outer parts of the slope HRUs. A low value usually
+  means a wrong projection or wrong length units.
+\item The second part of the file lists each HRU with \cmd{linked\_fraction\_of\_polygon}. The slope HRUs 3, 7 and 8 are
+  linked at \V{t4:link3}, \V{t4:link7} and \V{t4:link8}\%, the others at \V{t4:linkothers}\% or more.
+\end{itemize}
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \emph{``\dots must be named in :RavenTakesOver or :KeepPackages''}: name every recharge, ET and UZF package.
+\item \emph{``a stream cell whose subbasin does not exist''}: the \cmd{SUBBASIN} values must be subbasin numbers of the
+  \cmd{.rvh}.
+\item \emph{``each stress period must contain a whole number of Raven time steps''} or \emph{``\dots longer than the
+  model''}: check \cmd{:MF6StartDate}, and \cmd{:StartDate} and \cmd{:Duration} in the \cmd{.rvi}.
+\item Commands for a grid that Raven builds (\cmd{:GridCellSize}, \cmd{:LandSurface}, \cmd{:Wells} and others) stop the
+  run here: the model has its own grid and wells.
+\end{itemize}
+\end{trouble}
+
+\step{See what Raven changed in the working copy}
+The working copy in \cmd{out\_coupled/mf6/} shows what Raven did to the model's name file:
+\term{t4_mf6nam.txt}
+\why the packages that Raven took over are commented out, and Raven's own packages are added at the end, each marked as
+added by Raven.
+
+\paragraph{Units.} The model works in feet and days. Raven converts at the interface (1~ft = 0.3048~m,
+1~ft\textsuperscript{3} = 0.0283168~m\textsuperscript{3}). It writes the recharge, seepage, river and package flows to
+\cmd{GWBudget.csv} in m\textsuperscript{3}/d and the heads in metres, as for a model that Raven builds. A model in seconds
+or in centimetres is converted in the same way. A model that does not give its units is taken as metres and days.
+
+\step{Check the water balance}
+\term{t4_audit_a.txt}
+\begin{tocheck}
+The recharge line is 0 (all the water Raven sent reached the model's cells, in feet), the cumulative residual is
+\V{t4:a:auditRes}, and there are \V{t4:a:auditUnconv} unconverged steps.
+\end{tocheck}
+\why the mean flows, in m\textsuperscript{3}/d, are: recharge \V{t4:a:rech}, seepage to Raven \V{t4:a:seep}, discharge to
+the creek \V{t4:a:toriv}, leakage from the creek \V{t4:a:fromriv}, the model's own well and boundary \V{t4:a:other}, and
+storage release \V{t4:a:stor}.
+\begin{note}[Look at the storage]
+The storage release is large and positive: \V{t4:a:stor1}~m\textsuperscript{3}/d on average in the first year, and still
+\V{t4:a:stor3} in the third. The model's first period is a steady state. It is solved with the recharge of Raven's first
+day, \V{t4:a:rechday1}~m\textsuperscript{3}/d (\V{t4:a:rechday1mm}~mm over the coupled HRUs), which is high because the
+initial soil moisture of the \cmd{.rvc} lets the subsoil drain fast. So the model starts with too much water and drains for
+years. In a real study, start Raven from soil states after a spin-up (the \cmd{solution.rvc} of an earlier run), or let the
+model's steady period see a typical recharge.
+\end{note}

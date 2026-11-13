@@ -1,0 +1,61 @@
+% 03_restart.tex - split a run in two and continue it from solution.rvc
+\section{Continue a run from \texttt{solution.rvc}}
+At the end of every run, Raven writes the state of the model to \cmd{solution.rvc}: the soil and surface stores, the
+channels and the reservoirs, and in a coupled run the head of every MODFLOW cell (and, with a soil zone, its columns). Used
+as the \cmd{.rvc} file (the initial conditions) of the next run, it continues the run where it stopped.
+
+\step{Copy the start model and make a continuous run}
+The reference is the three years 2010--2012 in one run:
+\begin{shell}
+$ cp -r $WS/model/start $WS/work
+$ cd $WS/work
+\end{shell}
+\term{t5_run_full.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+
+\step{Run part 1: the first two years}
+Change the duration in \cmd{Creek.rvi} to two years and run into \cmd{out\_part1}:
+\diff{t5_part1.diff}
+\term{t5_run_part1.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+
+\step{Look at the saved state}
+\term{t5_rvc_blocks.txt}
+\why after Raven's own blocks (HRU states, basin states) comes \cmd{:GWHeads \V{t5:gwheads}}: the head of every cell,
+layer by layer and row by row, with 17 significant digits:
+\term{t5_rvc_head.txt}
+
+\step{Make a folder for part 2}
+Make a folder for the second part with the model files, and use \cmd{solution.rvc} of part~1 as its \cmd{.rvc} file:
+\begin{shell}
+$ mkdir ../work_part2
+$ cp Creek.* CreekMet.rvt CreekGW.rvt *.geojson *.tif ../work_part2/
+$ cp out_part1/solution.rvc ../work_part2/Creek.rvc
+$ cd ../work_part2
+\end{shell}
+\see no output.
+
+\step{Run part 2: the third year, from the hotstart}
+Change \cmd{Creek.rvi} in \cmd{work\_part2} to start on 1 January 2012 and to run the rest of the three years:
+\diff{t5_part2.diff}
+\term{t5_run_part2.txt}
+\term{t5_part2_advisory.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}, and a note that the groundwater heads come from the hotstart.
+\why the line \cmd{:GWInitialization STEADY\_STATE} of the \cmd{.rvg} is skipped: the heads come from the hotstart file.
+
+\step{Compare with the continuous run}
+\term{t5_diff.txt}
+\begin{tocheck}
+The largest difference is \V{t5:maxdiff}: the restarted run reproduces the continuous run bit for bit.
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \emph{``running more time steps than the MODFLOW 6 simulation holds''}: \cmd{:Duration} or \cmd{:TimeStep}
+  changed after Raven wrote the MODFLOW files. Run Raven again into a new output folder.
+\item A damaged \cmd{:GWHeads} header or a non-number in a groundwater block stops the run with a message that names it.
+  Copy \cmd{solution.rvc} again.
+\end{itemize}
+\end{trouble}
+\why restarts have three common uses. Spin a model up once (run it until its stores stop trending up or down) and start every later run from that state. Split long runs
+into parts. Carry the water in the unsaturated columns of the soil-zone coupling into the next run: it is saved in
+\cmd{solution.rvc} as well.

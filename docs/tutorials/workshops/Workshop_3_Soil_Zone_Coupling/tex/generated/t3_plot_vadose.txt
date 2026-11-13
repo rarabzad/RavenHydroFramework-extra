@@ -1,0 +1,5 @@
+$ python3 $WS/scripts/plot_vadose.py out_richards out_kinematic out_lag
+RICHARDS   inflow    63218 m3/d   to the water table    31729 m3/d   storage at the end   34511899 m3
+KINEMATIC  inflow    69604 m3/d   to the water table    66989 m3/d   storage at the end    2866364 m3
+LAG        inflow    69606 m3/d   to the water table    66960 m3/d   storage at the end    2900558 m3
+wrote vadose.png

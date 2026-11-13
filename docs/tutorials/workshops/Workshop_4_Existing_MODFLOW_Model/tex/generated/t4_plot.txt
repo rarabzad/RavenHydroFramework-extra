@@ -1,0 +1,12 @@
+$ python3 $WS/scripts/plot_gw.py out --title "existing model"
+1096 days, 2010-01-02 to 2013-01-01
+mean groundwater budget [m3/d]:
+  recharge from Raven                     55165
+  seepage to Raven                        61384
+  aquifer to rivers                       29166
+  rivers to aquifer                        8129
+  storage release                         39735
+  largest |MF6 balance error| [%]      9.18e-06
+  unconverged steps                           0
+mean water-table depth [m]: HRU 1 0.72, HRU 2 13.12, HRU 3 11.35, HRU 5 0.36, HRU 6 0.78, HRU 7 11.34, HRU 8 10.94, HRU 9 0.47
+wrote gw_budget.png, gw_map.png, gw_watertable.png

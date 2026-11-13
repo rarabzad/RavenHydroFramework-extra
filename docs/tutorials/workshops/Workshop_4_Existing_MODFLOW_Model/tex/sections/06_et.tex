@@ -1,0 +1,18 @@
+% 06_et.tex - evapotranspiration from the water table, computed by Raven
+\section{Add evapotranspiration from the water table}
+
+\step{Give the profiles an extinction depth and run}\label{st:et}
+The model's own ET package was removed with \cmd{EVT\_MODEL}. Raven can take ET from the water table itself. An
+\cmd{EXTINCTION\_DEPTH} in the profiles adds the package \cmd{EVT\_RAVEN} at the top active cells. Its rate is the
+evaporation demand of the HRU that Raven's soil could not meet. The rate falls to zero at the extinction depth below the
+cell top. Change \cmd{Creek.rvp}:
+\diff{t4_b_rvp.diff}
+\term{t4_run_b.txt}
+\term{t4_summary_b.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The files as they are in this step are in \cmd{\$WS/model/step\_10}.
+\why water-table ET takes \V{t4:b:et}~m\textsuperscript{3}/d on average (up to \V{t4:b:etmax} in summer), mostly where the
+water table is shallow. The seepage to Raven falls to \V{t4:b:seep}~m\textsuperscript{3}/d.
+\begin{trouble}
+\emph{``EXTINCTION\_DEPTH > 0 \dots the model keeps its EVT \dots package''}: ET from the model and from Raven would both
+act. Take the model's EVT or UZF package over, or set \cmd{EXTINCTION\_DEPTH} to 0.
+\end{trouble}

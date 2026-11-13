@@ -1,0 +1,14 @@
+% 10_further.tex - next steps and the finished state
+\section{Going further}
+\begin{itemize}
+\item More parameters ($S_y$ of the till, \cmd{SEEPAGE\_LEAKANCE}, soil parameters): first check, as in
+  Section~\ref{sec:ident}, that the observations see each of them, and see it on its own. DDS adapts its search to the
+  number of runs it is given.
+\item Several processors: OSTRICH's parallel DDS (\cmd{ParallelDDS}, Demo~C3 of the Raven--OSTRICH tutorial files) runs
+  each model in its own folder (\cmd{ModelSubdir}, \cmd{BeginExtraDirs}). Every Raven run builds its own MODFLOW model, so
+  parallel runs do not interfere.
+\item A model with the soil-zone coupling (Workshop~3) calibrates in the same way; its runs take longer.
+\end{itemize}
+\cmd{\$WS/model/finished} holds \cmd{OstOutput0.txt}, \cmd{OstModel0.txt}, \cmd{best} and \cmd{validation} of the
+calibration shown here, and the first attempt. To keep the zip small, its \cmd{best} holds only \cmd{Creek.rvp} and
+\cmd{Diagnostics.csv} of the best run.

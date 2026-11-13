@@ -1,0 +1,22 @@
+% 06_rvi.tex - switch the coupling on and send the recharge to MODFLOW
+\section{Switch the coupling on}
+
+\step{Edit \texttt{Creek.rvi}}\label{st:rvi}
+\diff{t2_rvi.diff}
+\why \cmd{:GroundwaterModel MODFLOW6} switches the coupling on. \cmd{:DefineHRUGroups} declares the group \cmd{AquiferHRUs}
+of Step~\ref{st:rvh}. In the coupled HRUs the subsoil now percolates to \cmd{GROUNDWATER}, Raven's store for
+the water that MODFLOW receives as recharge every day. The ridge keeps its \cmd{DEEP\_STORE}. Groundwater that seeps out at
+the surface returns to the lowest soil layer (\cmd{DEEP\_STORE}), and its baseflow process takes it to the creek. The
+exchange with the river cells goes straight to the river reaches.
+
+Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvi .}
+\begin{trouble}
+Raven stops when:
+\begin{itemize}
+\item a process takes water \emph{out} of \cmd{GROUNDWATER} in a coupled HRU (MODFLOW computes that water there);
+\item no process sends water to \cmd{GROUNDWATER};
+\item a process sends water to \cmd{GROUNDWATER} in an HRU without an \cmd{AQUIFER\_PROFILE} (the message ends with
+  ``\dots which has no AQUIFER\_PROFILE'').
+\end{itemize}
+Limit such processes to the right HRUs with \cmd{:-->Conditional}, as in this change.
+\end{trouble}

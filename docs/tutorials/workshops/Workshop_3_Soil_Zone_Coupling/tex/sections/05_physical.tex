@@ -1,0 +1,57 @@
+% 05_physical.tex - the soil zone: parameters, the :SoilZone command, the run, the summary and the warnings
+\section{Let the water table rise into the soil}
+
+\step{Add soil parameters to \texttt{Creek.rvp}}
+The soil zone will be \cmd{TOPSOIL} and \cmd{SUBSOIL} (\cmd{SOIL[0]} and \cmd{SOIL[1]}). The coupling needs three things:
+\begin{itemize}
+\item Recharge leaves from the bottom layer of the soil zone, \cmd{SUBSOIL}, by a vertical process. This model already
+  has one: \cmd{:Percolation \dots SUBSOIL GROUNDWATER}.
+\item Each soil-zone layer needs \cmd{POROSITY} and \cmd{FIELD\_CAPACITY}. The model has them.
+\item The class of the bottom layer needs \cmd{HYDRAUL\_COND} [mm/d], the hydraulic conductivity of the soil. With
+  \cmd{K\_VERT} of the top aquifer layer, it sets how easily water moves between soil and aquifer. Capillary rise (water
+  drawn up from the water table into the soil) is on by default with unsaturated columns (Section~\ref{sec:vz}) and uses
+  \cmd{CLAPP\_B} and \cmd{AIR\_ENTRY\_PRESSURE} [mm], two parameters of the soil's water retention curve.
+\end{itemize}
+Add the three columns to the soil parameter table of \cmd{Creek.rvp}:
+\diff{t3_soil.diff}
+
+\step{Switch the soil zone on in \texttt{Creek.rvg}}
+Add one command at the end of \cmd{Creek.rvg}:
+\diff{t3_physical.diff}
+
+\step{Run Raven}\label{st:physrun}
+Run into a new output folder:
+\term{t3_run_physical.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The run takes about \V{t3:secphysical}~seconds instead of
+\V{t3:secconceptual}, because every day the soil zone and MODFLOW are computed again and again until they agree. The files
+of this step are in \cmd{\$WS/model/step\_06}.
+\begin{trouble}
+\begin{itemize}
+\item \emph{``soil class \dots of SOIL[1] \dots needs HYDRAUL\_COND''}: the change to \cmd{Creek.rvp} is missing.
+\item \emph{``RECHARGE\_DELAY \dots cannot be used with :SoilZone PHYSICAL''}: a profile has a recharge delay. Set it to 0;
+  use \cmd{:SoilZoneVadose LAG} for a delay instead.
+\item \emph{``soil-zone interface did not converge''} (rare): raise \cmd{:SoilZoneIteration}. If that does not
+  help, increase \cmd{SEEPAGE\_SMOOTHING\_DEPTH} or use a shorter time step.
+\item Compare your files with those of this step. This command prints the lines that differ:
+\begin{shell}
+$ diff $WS/model/step_06/Creek.rvg Creek.rvg
+\end{shell}
+\end{itemize}
+\end{trouble}
+
+\step{Read the summary and the warnings}
+\term{t3_summary.txt}
+\why \V{t3:nszhru} HRUs have a soil zone. The lake HRU has no soil and keeps the seepage drain. The soil zone is 1.3~m
+thick under the valley and the wetland and 1.0~m under the slopes (from the soil profiles of the \cmd{.rvp}). Raven keeps
+one soil-zone column for every link between an HRU and a cell. The run wrote \V{t3:nwarn} warnings. Read them:
+\term{t3_warnings.txt}
+\begin{itemize}
+\item \emph{The soil-zone base lies up to \V{t3:offmax}~m from the model top on \V{t3:offlinks} links.} The top of a cell
+  is the land surface minus the soil thickness of the HRUs in it, weighted by their overlap with the cell. A cell shared by
+  the valley (1.3~m) and a slope (1.0~m), or by an HRU with soil and the lake (no soil), has a top between the two. The
+  warning says where. With HRUs whose soil profiles differ, this is expected.
+\item \emph{The specific yield differs from the drainable porosity of the bottom soil layer on \V{t3:sylinks} links}
+  (ratio down to \V{t3:syratio}). The till of the slopes has $S_y=0.08$. The subsoil has a drainable porosity of
+  $0.40\times(1-0.25)=0.30$. A water table rising from the till into the soil would change speed there. On these slopes
+  the water table stays far below the soil, so this does not matter here. On wet ground, make the two values agree.
+\end{itemize}

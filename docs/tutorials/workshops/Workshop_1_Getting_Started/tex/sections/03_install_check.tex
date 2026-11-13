@@ -1,0 +1,30 @@
+% 03_install_check.tex - check that Raven runs and loads the MODFLOW 6 library beside it
+\section{Check the installation}
+
+\step{Run the installation check}
+The script \cmd{RavenMF6InstallCheck.py} runs \cmd{bin/Raven} on a very small coupled model and checks the result.
+Run it from the workshop folder:
+\begin{shell}
+$ cd $WS
+\end{shell}
+\term{t1_installcheck.txt}
+\see one line per check, each starting with \cmd{ok}, and \cmd{install check: PASS} at the end.
+\begin{tocheck}
+\begin{itemize}
+\item The last line is \cmd{install check: PASS}.
+\item The line \emph{the library beside Raven was used} names \cmd{bin/libmf6.so} of your workshop folder, with version
+  \V{t1:mf6ver}. Raven loads the library from the folder it is in, so the two files must stay together in \cmd{bin}.
+\end{itemize}
+\end{tocheck}
+\begin{trouble}
+\begin{itemize}
+\item \cmd{Permission denied} for \cmd{bin/Raven}: the execute permission was lost on unpacking. Type
+  \cmd{chmod +x \$WS/bin/Raven} and run the check again.
+\item A message with \cmd{version \textasciigrave GLIBC\_2.34' not found} (for example after \cmd{cannot load MODFLOW 6
+  library}): your Linux is too old. The programs need glibc 2.34 or newer (Ubuntu 22.04 or newer, Debian 12 or newer); \cmd{ldd
+  --version} shows yours. On Windows, install a newer Ubuntu in WSL with \cmd{wsl --install -d Ubuntu-24.04}.
+\item \cmd{cannot load MODFLOW 6 library}: \cmd{libmf6.so} is not beside \cmd{Raven}. Keep both files in \cmd{bin}.
+\item A line marked \cmd{FAIL}: it says what is missing. The programs run only on Linux for x86\_64 processors. On other
+  computers, build Raven from its source code (see \cmd{bin/README.txt}).
+\end{itemize}
+\end{trouble}

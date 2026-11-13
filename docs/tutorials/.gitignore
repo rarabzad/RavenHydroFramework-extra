@@ -1,2 +1,7 @@
 _work/
 __pycache__/
+# the programs of a workshop are added only to its zip (build_tutorials.py --package)
+workshops/*/bin/*
+!workshops/*/bin/README.txt
+# what a student makes while working through a workshop
+workshops/*/work*/

@@ -1,0 +1,60 @@
+% 10_results.tex - the budget, the balance check and the plots
+\section{Check the results}
+
+\step{Read the groundwater budget}
+\cmd{GWBudget.csv} has one line per day. Show the first columns of the first lines:
+\term{t2_budget_head.txt}
+\why the mean budget over the three years, in m\textsuperscript{3}/d, is:
+\begin{center}\small
+\begin{tabular}{lr@{\qquad}lr}\toprule
+into the aquifer & & out of the aquifer &\\\midrule
+recharge from Raven & \V{t2:rech} & seepage to Raven & \V{t2:seep}\\
+river leakage & \V{t2:fromriv} & discharge to the creek & \V{t2:toriv}\\
+storage release & \V{t2:stor} & GHB OUTLET & \V{t2:ghb}\\
+ & & well PW\_1 & \V{t2:wel}\\
+ & & pond (CHD) & \V{t2:chd}\\\bottomrule
+\end{tabular}\end{center}
+The recharge is \V{t2:rechmm}~mm/year over the coupled HRUs. \V{t2:seeppct}\% of it seeps out again, mostly at the foot of
+the slopes and on the valley floor. MODFLOW converged on every day (\V{t2:unconv} unconverged steps, at most
+\V{t2:maxouter} outer iterations). Its largest daily balance error is \V{t2:balerr}~\% of the flow.
+
+\step{Check the water balance}
+The audit script works for any coupled run:
+\term{t2_audit.txt}
+\begin{tocheck}
+\begin{itemize}
+\item The recharge line is 0 and the cumulative MODFLOW residual is \V{t2:auditRes} of the gross flow.
+\item There are no unconverged steps, and \cmd{ERROR lines} is 0.
+\item The well delivered what was asked: \cmd{wells delivered / specified} is 1.
+\item Raven's own balance error (\cmd{Raven MB error max}) is \V{t2:auditMB}~mm.
+\end{itemize}
+\end{tocheck}
+
+\step{Plot the results}
+\term{t2_plot.txt}
+\see the run summary above. The four pictures are in \cmd{out/} (Figures~\ref{fig:t2b} to~\ref{fig:t2ow}).
+\fig{t2_gw_budget.png}{\cmd{gw\_budget.png}: the budget of Tutorial Creek (7-day means): recharge in winter, seepage and
+discharge to the creek through the year, and the outflow at the GHB, the well and the pond.\label{fig:t2b}}
+\fig{t2_gw_watertable.png}{\cmd{gw\_watertable.png}: the water table lies about \V{t2:wt6}~m deep under the valley floor
+(HRU~6) and \V{t2:wt7}~m deep under the north slope of the lower subbasin (HRU~7).}
+\fig[0.75]{t2_gw_map.png}{\cmd{gw\_map.png}: water-table depth at the last saved head field. It is shallow on the valley
+floor and tens of metres deep under the upper slopes.}
+The heads of the observation wells come from \cmd{GWHeads.csv}, one line per day:
+\term{t2_heads_head.txt}
+\fig{t2_gw_obswells.png}{\cmd{gw\_obswells.png}: heads at the three observation wells (\cmd{GWHeads.csv}). OW\_NEAR,
+200~m from the pumping well, follows the seasonal pumping.\label{fig:t2ow}}
+
+\step{Compare the streamflow with the run without groundwater}
+Groundwater changes the streamflow too (Figure~\ref{fig:t2hyd}). The mean flow at the outlet drops from \V{t2:qmeanNoGW}
+to \V{t2:qmean}~m\textsuperscript{3}/s, by about \V{t2:qdrop}~m\textsuperscript{3}/d. This water goes to three places:
+\begin{itemize}
+\item Most of it leaves the basin underground: \V{t2:ghb}~m\textsuperscript{3}/d at the GHB and \V{t2:wel}~m\textsuperscript{3}/d
+  through the well.
+\item The rest stays in Raven. The seepage from the aquifer collects in \cmd{DEEP\_STORE}. Over the three years this
+  store gains \V{t2:deepgw}~mm with groundwater, against \V{t2:deepnogw}~mm without (about \V{t2:deeprate}~m\textsuperscript{3}/d
+  over the basin). The store fills up to its new inflow.
+\item The aquifer itself releases water from storage (\V{t2:stor}~m\textsuperscript{3}/d, in the budget table above).
+\end{itemize}
+The model is not calibrated. Workshop~6 calibrates it. The script \cmd{plot\_hydrograph.py} draws the two runs:
+\term{t2_plot_hydrograph.txt}
+\fig{t2_hydrograph.png}{\cmd{hydrograph.png}: streamflow at the outlet in 2011, without and with the groundwater model.\label{fig:t2hyd}}

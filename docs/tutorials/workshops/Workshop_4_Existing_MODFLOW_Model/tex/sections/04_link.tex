@@ -1,0 +1,39 @@
+% 04_link.tex - the Raven files and the coupling file
+\section{Link the Raven model to the MODFLOW model}
+
+\step{Edit \texttt{Creek.rvh} and \texttt{Creek.rvi}}
+These two changes are the same as for a groundwater model that Raven builds. In \cmd{Creek.rvh}, mark the coupled HRUs
+with an aquifer profile and list them in the group \cmd{AquiferHRUs}:
+\diff{t4_a_rvh.diff}
+In \cmd{Creek.rvi}, switch the coupling on and send the percolation of the coupled HRUs to \cmd{GROUNDWATER} (Raven's store
+for the water that becomes MODFLOW recharge):
+\diff{t4_a_rvi.diff}
+
+\step{Edit \texttt{Creek.rvp}}
+The \cmd{.rvp} needs no aquifer classes: the layers and their properties come from the MODFLOW model. A profile is written
+as \cmd{name, 0} (zero layers). It only marks the coupled HRUs and carries the exchange settings, here the conductance of
+the \emph{seepage face} [1/d] (the land surface where the water table reaches it and groundwater seeps out):
+\diff{t4_a_rvp.diff}
+
+\step{Create \texttt{Creek.rvg}}\label{st:rvg}
+Create the coupling file \cmd{Creek.rvg} with this content:
+\lstinputlisting[style=file]{generated/t4_rvg_a.txt}
+Or copy the file: \cmd{cp \$WS/model/step\_07/Creek.rvg .}
+\why
+\begin{itemize}
+\item \cmd{:MF6Simulation} names the simulation file of the model. Raven copies the folder that holds it into
+  \cmd{out/mf6/} and runs the copy. The folder \cmd{model} is never changed.
+\item \cmd{:MF6CRS} gives the projection of the model's coordinates. Raven reads the cell outlines from the model
+  (\cmd{DELR}, \cmd{DELC}, \cmd{XORIGIN}, \cmd{YORIGIN}, \cmd{ANGROT}), converts feet to metres, and places them on the
+  map under the HRU polygons. For a model without a projection, \cmd{:MF6GridFile} (a file of cell polygons) or
+  \cmd{:OverlapWeights} (a table of the overlaps of HRUs and cells) link them instead.
+\item \cmd{:MF6StartDate} is the calendar date of the model's time zero. Raven keeps the model's stress periods and splits
+  each into Raven days.
+\item \cmd{:RavenTakesOver RCH\_MODEL EVT\_MODEL}: every recharge, ET or UZF package of the model must be named, either as
+  taken over (removed; Raven supplies the recharge) or as kept (\cmd{:KeepPackages}). A package that is not named stops
+  the run, so the recharge is never counted twice.
+\item \cmd{:StreamPackage RIV\_CREEK AUX SUBBASIN}: the river package whose flows go to Raven's river reaches, and the
+  auxiliary variable that gives the subbasin of each cell.
+\item \cmd{:SeepageToRaven ON} adds a drain (\cmd{DRN\_RAVEN}) at the top of the coupled columns. The water it drains goes
+  back to Raven.
+\end{itemize}

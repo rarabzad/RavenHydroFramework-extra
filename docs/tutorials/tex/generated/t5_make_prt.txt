@@ -1,3 +1,0 @@
-$ python3 $TOOLS/make_prt.py out_prt --backward --run $PKG/bin/libmf6.so
-make_prt: PRT simulation with 8 release points written to out_prt/prt (backward tracking, released at PRT time 0 d, tracking window 0 to 365 d)
-make_prt: 8 particles tracked; endpoints in out_prt/prt/endpoints.csv

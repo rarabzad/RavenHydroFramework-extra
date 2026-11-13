@@ -1,0 +1,48 @@
+% 07_vadose.tex - unsaturated columns: RICHARDS, KINEMATIC, LAG and depth classes
+\section{Add unsaturated columns}\label{sec:vz}
+Under the slopes the water table lies far below the soil: \V{t3:physical:wt7}~m deep on average under HRU~7. With
+\cmd{:SoilZoneVadose NONE} (the default), the recharge that leaves the soil reaches the water table on the same day. An
+unsaturated column in each cell carries it down instead.
+
+\step{Add the retention curve to the aquifer classes}
+The columns need the water retention curve of the aquifer materials: \cmd{POROSITY} (already there), \cmd{CLAPP\_B} and
+\cmd{AIR\_ENTRY\_PRESSURE} [m]. Add the two columns to \cmd{:AquiferClasses} in \cmd{Creek.rvp}:
+\diff{t3_aquifer.diff}
+\why the till values give a drainable porosity close to the till's specific yield. Otherwise Raven warns that a rising
+water table would release a different amount of water from the column than MODFLOW stores.
+
+\step{Add RICHARDS columns and run}\label{st:richards}
+Add one line at the end of \cmd{Creek.rvg}:
+\diff{t3_richards.diff}
+\term{t3_run_richards.txt}
+\term{t3_summary_rich.txt}
+\see \cmd{Exiting Gracefully: Successful Simulation}. The run takes about \V{t3:secrichards}~seconds. There is no new
+warning: \cmd{out\_richards/Raven\_errors.txt} holds the \V{t3:nwarnRich} warnings of Step~\ref{st:physrun}. The files of
+this step are in \cmd{\$WS/model/step\_10}.
+
+\step{Try KINEMATIC}
+Change one word in \cmd{Creek.rvg} and run into \cmd{out\_kinematic}:
+\diff{t3_kinematic.diff}
+\begin{shell}
+$ $RAVEN Creek -o out_kinematic/
+\end{shell}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+
+\step{Try LAG}
+Change the same word again and run into \cmd{out\_lag}:
+\diff{t3_lag.diff}
+\begin{shell}
+$ $RAVEN Creek -o out_lag/
+\end{shell}
+\see \cmd{Exiting Gracefully: Successful Simulation}.
+
+\step{Add depth classes}
+In a cell on a slope, the DEM points lie at different heights above the water table. With
+\cmd{:SoilZoneVadoseClasses 3}, each link between an HRU and a cell gets up to three columns, one per depth class of its
+points. Put \cmd{RICHARDS} back and add the line:
+\diff{t3_classes.diff}
+\begin{shell}
+$ $RAVEN Creek -o out_classes/
+\end{shell}
+\see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds. \cmd{Creek.rvg} is now as in
+\cmd{\$WS/model/finished}.

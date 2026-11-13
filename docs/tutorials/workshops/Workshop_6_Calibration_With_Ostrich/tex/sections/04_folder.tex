@@ -1,0 +1,51 @@
+% 04_folder.tex - the calibration folder, the observations and the initial guess
+\section{The calibration folder}
+
+\step{Copy the calibration folder}
+\begin{shell}
+$ cp -r $WS/model/start $WS/work
+$ cd $WS/work
+\end{shell}
+\see no output. As in Demo~C1, the folder holds the OSTRICH files and the Raven model in a subfolder \cmd{model}:
+\begin{center}\small
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.27\linewidth}X}\toprule
+File & Role\\\midrule
+\cmd{ostIn.txt} & OSTRICH's input: the search method, the parameters, the responses and the objective function\\
+\cmd{Creek.rvp.tpl} & the template of \cmd{Creek.rvp}: the parameters are names, which OSTRICH replaces by values\\
+\cmd{Ost-RAVEN.sh} & runs the model once: copies the new \cmd{Creek.rvp} into \cmd{model}, then runs Raven\\
+\cmd{save\_best.sh} & saves the files of the best run so far into \cmd{best}\\
+\cmd{model/} & the model of Tutorial Creek for 2010--2012, with a first guess of the parameters and the observations\\\bottomrule
+\end{tabularx}\end{center}
+
+\step{Look at the observations}
+\cmd{model/CreekObs.rvt} holds daily streamflow at the outlet (subbasin~2) and weekly heads at the three observation wells,
+for 2010--2014. They were made by running the model with the ``true'' parameters and adding noise (\V{t6:noiseq}\% on the
+flows, \V{t6:noiseh}~cm on the heads). Show the first lines:
+\term{t6_obs_head.txt}
+\why
+\begin{itemize}
+\item \cmd{:ObservationData HYDROGRAPH 2 m3/s} is streamflow at subbasin~2.
+\item \cmd{:ObservationData GW\_HEAD 101 m} is the head at the observation well with ID~101 in the \cmd{.rvg}. Raven
+  compares an observed head on a date with the simulated head on the same date.
+\item \cmd{-1.2345} marks a day without a value.
+\item Each series has an \cmd{:ObservationWeights} block of the same length: 0 in 2010, the model's warm-up year, and 1
+  afterwards. So the first year does not count in \cmd{Diagnostics.csv}.
+\end{itemize}
+The model reads the file through its \cmd{.rvt}. Compared with Workshop~2, \cmd{model/Creek.rvt} has one more line:
+\diff{t6_rvt.diff}
+
+\step{Run the first guess by hand}
+\cmd{model/Creek.rvp} has a first guess of the parameters, not the true ones. Run it once:
+\begin{shell}
+$ cd model
+\end{shell}
+\term{t6_run_init.txt}
+\term{t6_diag_init.txt}
+\why \cmd{Diagnostics.csv} has one line per observed series: \cmd{HYDROGRAPH\_ALL[2]} and \cmd{GW\_HEAD\_ALL[101]} to
+\cmd{[103]}, in the order of the \cmd{.rvt}. The columns are the metrics of \cmd{:EvaluationMetrics} in \cmd{Creek.rvi}.
+The first guess has wrong conductivities for the sand and the till (the other parameters are those of Workshop~2). The
+streamflow fits fairly well (KGE \V{t6:kgeInit}), but the heads are off by \V{t6:rmseInit101}~m at OW\_NEAR and
+\V{t6:rmseInit103}~m at OW\_SLOPE (RMSE). Go back up:
+\begin{shell}
+$ cd ..
+\end{shell}

@@ -1,0 +1,27 @@
+$ python3 $WS/scripts/tools_audit.py out
+                                                         out
+steps                                                   1096
+rows_complete                                           1096
+time step [d]                                              1
+dates_contiguous                                        True
+recharge: (Raven - MF6 - dStore - toCHD)/Raven             0
+recharge delay store at end [m3]                           0
+surface-store: applied - (discharge-leakage) (rel)         0
+MF6 cumulative residual / gross flow               -9.96e-11
+reservoir: sent(t) - awaiting(t-1) (rel)                   0
+reservoir: delivered / sent                                1
+reservoir: (delivered + not supplied) / sent               1
+reservoir: seepage not delivered [m3]                      0
+MF6 worst step error [%]                            9.18e-06
+unconverged steps                                          0
+max outer iterations                                      33
+seepage returned vs MF6 seepage (rel)                      0
+river: applied - net MF6 - carry change (rel)       7.89e-12
+safeguard-limited steps                                    0
+river loss carried at end [m3]                             0
+river loss carried max [m3]                                0
+Raven MB error max [mm]                             0.000228
+HRU heads finite                                        True
+max water table above land (HRU mean) [m]             -0.335
+unconverged-guard warnings                                 0
+ERROR lines                                                0

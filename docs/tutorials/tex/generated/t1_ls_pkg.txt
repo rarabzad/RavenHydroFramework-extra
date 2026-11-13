@@ -1,4 +1,0 @@
-$ ls $PKG
-README.md  Raven_MF6_Manual.pdf  bin  examples  source
-$ ls $PKG/bin
-Raven  libmf6.so  libmf6_version.txt

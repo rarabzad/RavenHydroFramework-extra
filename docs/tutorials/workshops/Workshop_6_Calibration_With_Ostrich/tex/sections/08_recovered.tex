@@ -1,0 +1,16 @@
+% 08_recovered.tex - the recovered parameters against the true ones
+\section{What DDS recovered}
+\begin{center}\small
+\begin{tabular}{lrrrrr}\toprule
+Parameter & range & initial & true & calibrated & error\\\midrule
+$K_h$ of SAND [m/d] & \V{t6:lowK_SAND}--\V{t6:highK_SAND} & \V{t6:initK_SAND} & \V{t6:trueK_SAND} & \V{t6:bestK_SAND} & \V{t6:errK_SAND}\%\\
+$K_h$ of TILL [m/d] & \V{t6:lowK_TILL}--\V{t6:highK_TILL} & \V{t6:initK_TILL} & \V{t6:trueK_TILL} & \V{t6:bestK_TILL} & \V{t6:errK_TILL}\%\\\bottomrule
+\end{tabular}\end{center}
+The till conductivity is recovered within \V{t6:errK_TILL}\%. The sand conductivity ends \V{t6:errK_SAND}\% from its true
+value. Yet the objective of the calibrated set, \V{t6:costBest}, is no worse than that of the true parameters,
+\V{t6:costcalibtrue}. With this noise, the observations cannot tell a sand conductivity of \V{t6:bestK_SAND}~m/d from one
+of \V{t6:trueK_SAND}~m/d: only OW\_SLOPE sees the sand, by centimetres, and its weight is small
+(Section~\ref{sec:ident}). This is a limit of the observations, not of the search. More runs would not change it. An
+observation that depends on the sand would change it: a pumping test (the change of the heads when PW\_1 starts or stops
+pumping), or a well where the sand carries the water of the slopes down the valley. Another well in the sand near PW\_1
+would not help: OW\_NEAR is one, and its seasonal heads do not see the sand.

@@ -1,0 +1,28 @@
+% 01_before_you_start.tex - the words used in this workshop and how to read the commands
+\section{Before you start}
+\paragraph{Words used in this workshop.}
+\begin{description}[itemsep=1pt]
+\item[HRU] Hydrological response unit: a part of a subbasin with one land use, one soil and one elevation band.
+  Raven computes the water balance of each HRU.
+\item[Aquifer] Ground that holds and passes groundwater. An \emph{aquifer class} is one material (gravel, sand, till)
+  with its hydraulic properties. An \emph{aquifer profile} is the stack of layers under an HRU.
+\item[Recharge] The water that leaves the soil downwards and reaches the groundwater.
+\item[Head] The water level in the aquifer, in metres. The \emph{water table} is the head at the top of the saturated
+  ground; its \emph{depth} is measured from the land surface.
+\item[Raster] A grid of values. A \emph{DEM} (digital elevation model) is a raster of the land surface. GeoTIFF and ESRI
+  ASCII are two raster file formats.
+\item[Projection] The coordinate system of a map (here UTM zone 11N, in metres). An \emph{EPSG code} names it
+  (EPSG:32611). \emph{CRS} (coordinate reference system) means the same.
+\item[Boundary condition] A rule at the edge of the groundwater model: a \emph{GHB} (general-head boundary) lets water flow
+  towards a fixed head; a \emph{CHD} (constant-head boundary) holds the head of a cell at a given value.
+\end{description}
+
+\paragraph{How to read the commands.} A line in a grey box that starts with \cmd{\$} is what you type (without the
+\cmd{\$}). The lines under it are what the computer prints; long output is shortened with \cmd{...}. A line that continues on the next line after the mark $\hookrightarrow$ is one line: type it
+as one line. The run times given are those of the computer that made this workshop; yours may differ. The examples show a
+user called \cmd{user} with the home folder \cmd{/home/user}.
+
+\paragraph{How to read a file change.} Every change to a file is shown as a \emph{diff}. A line starting with \cmd{-} (red)
+is removed, a line starting with \cmd{+} (green) is added, and the other lines are unchanged lines that help you find the
+place. A line starting with \cmd{@@} gives the line numbers. Make each change with a text editor. If you prefer, copy the
+changed file from \cmd{\$WS/model/finished} instead: each step says which file it changes.

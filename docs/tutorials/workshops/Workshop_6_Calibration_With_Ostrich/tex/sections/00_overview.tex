@@ -1,0 +1,16 @@
+% 00_overview.tex - what the workshop covers, what you need, how to read it
+\begin{goal}
+\textbf{What you do.} You calibrate the groundwater model of Tutorial Creek against the streamflow at the outlet and the
+heads at three observation wells, with the Dynamically Dimensioned Search (DDS) of the program OSTRICH. The observations
+were made with known (``true'') parameters, so you can check what the calibration recovers. First you look at which
+parameters the observations can see at all, and at a first attempt that went wrong. Then you calibrate the two parameters
+that the observations see clearly and separately: the hydraulic conductivities of the valley sand and of the slope till.
+Finally you validate the result on two years that the calibration has not seen. The set-up follows the official
+Raven--OSTRICH tutorial (Demo~C1: \cmd{ostIn.txt}, a template, \cmd{Ost-RAVEN.sh} and \cmd{save\_best.sh}).
+
+\textbf{What you need.} A Linux computer (x86\_64) with a terminal, or Windows with WSL. OSTRICH, which is not included
+(Step~\ref{st:ostrich} says where to get it). A text editor, for example \cmd{nano}. Workshop~2 is helpful but not needed.
+
+\textbf{Time.} About 30 minutes of work, plus about \V{t6:ddsmin}~minutes of computing for the calibration
+(\V{t6:maxiter} model runs).
+\end{goal}

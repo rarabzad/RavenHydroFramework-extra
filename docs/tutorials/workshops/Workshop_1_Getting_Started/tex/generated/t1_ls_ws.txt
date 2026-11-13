@@ -1,0 +1,6 @@
+$ ls
+README.txt  Workshop_1_Getting_Started.pdf  bin  model  scripts  tex
+$ ls bin
+README.txt  Raven  libmf6.so
+$ ls scripts
+RavenMF6InstallCheck.py  plot_gw.py  tools_audit.py

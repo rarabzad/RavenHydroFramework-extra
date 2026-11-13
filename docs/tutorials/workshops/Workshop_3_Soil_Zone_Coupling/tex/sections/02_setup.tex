@@ -1,0 +1,45 @@
+% 02_setup.tex - unpack the workshop, set the two variables, install the Python packages
+\section{Set up}
+
+\step{Unpack the workshop}\label{st:unpack}
+Copy \cmd{Workshop\_3\_Soil\_Zone\_Coupling.zip} into your home folder (on WSL, your Windows files are under
+\cmd{/mnt/c/}). Unpack it, go into the new folder and set two variables: \cmd{WS} is the workshop folder and \cmd{RAVEN}
+is the Raven program.
+\begin{shell}
+$ cd ~
+$ unzip -q Workshop_3_Soil_Zone_Coupling.zip
+$ cd Workshop_3_Soil_Zone_Coupling
+$ export WS=$PWD
+$ export RAVEN=$WS/bin/Raven
+$ ls
+\end{shell}
+\see \cmd{README.txt}, this PDF and the folders \cmd{bin} (Raven and the MODFLOW~6 library), \cmd{model} (the model at the
+start, after some steps and at the end), \cmd{scripts} (the helper programs) and \cmd{tex}.
+\begin{trouble}
+\begin{itemize}
+\item \cmd{unzip: command not found}: install it with \cmd{sudo apt install unzip}.
+\item \cmd{Permission denied} when you run Raven later: type \cmd{chmod +x \$WS/bin/Raven}.
+\item A message with \cmd{version \textasciigrave GLIBC\_2.34' not found} (for example after \cmd{cannot load MODFLOW 6
+  library}): your Linux is too old. The programs need glibc 2.34 or newer (Ubuntu 22.04 or newer, Debian 12 or newer); \cmd{ldd
+  --version} shows yours. On Windows, install a newer Ubuntu in WSL with \cmd{wsl --install -d Ubuntu-24.04}.
+\end{itemize}
+\end{trouble}
+\begin{note}[Every new terminal]
+\cmd{export} is valid only in the terminal where you typed it. In a new terminal, go to the workshop folder and type the
+two \cmd{export} lines again.
+\end{note}
+
+\step{Install the Python packages}\label{st:python}
+Install numpy, pandas and matplotlib in a \emph{virtual environment} (a private folder of Python packages). If you made
+\cmd{\textasciitilde/raven-venv} in another workshop, only type the \cmd{source} line.
+\begin{shell}
+$ sudo apt update
+$ sudo apt install python3-venv
+$ python3 -m venv ~/raven-venv
+$ source ~/raven-venv/bin/activate
+$ pip install numpy pandas matplotlib
+$ python3 -c "import numpy, pandas, matplotlib; print('ok')"
+ok
+\end{shell}
+\see \cmd{pip} prints a line that starts with \cmd{Successfully installed}, the test prints \cmd{ok}, and your prompt starts
+with \cmd{(raven-venv)}. Type the \cmd{source} line again in every new terminal.

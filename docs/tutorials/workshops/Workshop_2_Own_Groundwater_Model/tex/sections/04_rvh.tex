@@ -1,0 +1,15 @@
+% 04_rvh.tex - which HRUs have groundwater
+\section{Tell Raven which HRUs have groundwater}
+
+\step{Edit \texttt{Creek.rvh}}\label{st:rvh}
+The HRU table of \cmd{Creek.rvh} has a column \cmd{AQUIFER\_PROFILE}. It names the aquifer profile under each HRU;
+\cmd{[NONE]} means no groundwater. The valley floor (HRUs 1 and 6), the lake (5) and the wetland (9) lie on the valley
+fill, and the slopes (2, 3, 7, 8) on till. The ridge (4) keeps \cmd{[NONE]}. Below the table, a new HRU group
+\cmd{AquiferHRUs} lists the coupled HRUs; the \cmd{.rvi} file uses it in Step~\ref{st:rvi}.
+
+Open the file with \cmd{nano Creek.rvh} and make this change:
+\diff[basicstyle=\ttfamily\tiny]{t2_rvh.diff}
+\begin{tocheck}
+Eight HRUs have a profile name and HRU~4 has \cmd{[NONE]}. The group lists the same eight HRU numbers.
+\end{tocheck}
+Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvh .}
