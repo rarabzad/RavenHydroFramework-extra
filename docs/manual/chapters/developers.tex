@@ -101,7 +101,7 @@ File & Change\\\midrule\endhead
 \cmd{ProcessGroup.h}, \cmd{SoilWaterMovers.h} & accessors the coupling reads (\cmd{GetSubProcess}, \cmd{GetPercolationType}) (1)\\
 \cmd{ParseTimeSeriesFile.cpp} & \cmd{:WellFlowRate} (m$^3$/d, m$^3$/s or L/s), \cmd{:BoundaryHead} (m); other units stop (1); constituent name captured before parsing (4)\\
 \cmd{ParseInitial\allowbreak ConditionFile.cpp} & \cmd{:InitialGWHeads} and the groundwater hotstart blocks (\cmd{:GWHeads}, \cmd{:GWStartHeads}, \cmd{:GWRechargeStore}, \cmd{:GWReservoirSeepage}, \cmd{:GWRiverLossCarry}, \cmd{:GWRiverTake}, \cmd{:GWRiverInflowTakes}, \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns}, \cmd{:GWVadoseClassColumns}, \cmd{:GWVadoseColumnTops}, \cmd{:GWSoilZoneLag}), each value checked (not a number as a whole token, not finite, or a negative water amount, stops: a damaged file; \cmd{:InitialGWHeads} read strictly, as the \cmd{.rvg}'s numbers), ignored with a warning in a run without \cmd{:GroundwaterModel}; the capacity check of the initial soil water skipped for the seepage target and the \cmd{:SurfaceWaterExchange} stores of a coupled model (they can hold more than their capacity, as in a continuous run) (1); ensemble members restored (2); default reservoir stage (3); \cmd{:AgeTracerDatum} read, age-tracer masses detected in the state table, and the offset passed to the age tracers before their initial conditions are set (5)\\
-\cmd{SubBasin.cpp/.h} & channel depth at a given flow (1); last lateral inflow accessor, routing-memory get/set (\cmd{GetRoutingMemory}, \cmd{SetRoutingMemory}) (2)\\
+\cmd{SubBasin.cpp/.h} & channel depth at a given flow; in a coupled run the inflow history a restart rescales to another \cmd{:TimeStep} is written only within its array (\cmd{SetQinHist}'s argument \cmd{bounded}, set by \cmd{ParseInitial\allowbreak ConditionFile.cpp}) (1); last lateral inflow accessor, routing-memory get/set (\cmd{GetRoutingMemory}, \cmd{SetRoutingMemory}) (2)\\
 \cmd{EnKF.cpp/.h} & in a coupled run an EnKF member's \cmd{:ExtraRVTFilename} is read before its groundwater model is built (\cmd{ReadExtraRVT}) (1)\\
 \cmd{Reservoir.h/.cpp} & accessors for the seepage constant and local head (1); dynamic-state get/set (2); default initial stage, drying, \cmd{solution.rvc} precision (12 decimals, or the stream's 17 significant digits in a coupled run), constraint initialised (3)\\
 \cmd{RavenInclude.h}, \cmd{CommonFunctions.cpp} & references to the MODFLOW-USG coupling removed (1); \cmd{RC\_UNSET} (3)\\
@@ -345,7 +345,13 @@ are left to the Raven developers:
 \item Restart with another \cmd{:TimeStep}: \cmd{CSubBasin::SetQinHist} rescales a reach's inflow history only over the length
 of its lateral-inflow history and, when the step grows, reads past the end of the history in the \cmd{.rvc}, so such a
 restart's balance error is off by what those entries hold (up to 2.2~mm in test WB14's runs without the river, the same
-with the coupling).
+with the coupling). When the lateral-inflow history is the longer one (a long catchment routing such as
+\cmd{ROUTE\_TRI\_CONVOLUTION} with a large \cmd{TIME\_CONC} over a short reach), the rescaling also writes past the end of
+the inflow history's array, which overwrites other data of the run (MB errors of $10^{238}$~mm or a segmentation fault),
+and both \cmd{SetQinHist} and \cmd{CSubBasin::SetQlatHist} read past the end of the \cmd{.rvc} histories. In a coupled run
+the rescaled inflow history is written only within its array and the entries past the end of the \cmd{.rvc} inflow
+history are read as 0, as the river-take books assume, so routing and books agree (test WB15); a run without
+groundwater is left as Raven runs it.
 \item Reservoir routine: on the day after a reservoir has been drawn empty by a minimum flow, the outflow still averages in
 the release rate at the end of the previous day, although the lake is empty; this makes up most of such a reservoir's balance
 error (Section~\ref{sec:behaviour}, Reservoirs that run dry).

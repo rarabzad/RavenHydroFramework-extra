@@ -24,6 +24,11 @@ L6  the cell-room release cap of a rising water table (VZStep): one flat HRU, Sy
     rise, int Sy dz over [h, min(z_b, z_top)]), the second being the room the top cell has left above the water table.
     Checked: on every step the column survives its release (storage loss) is at most S_y A (z_top - h) for the head h it
     started from, and on at least one step that room is what limits it (release within 0.1 % of it; without the room cap that step releases 2269 m3 against a room of 1626 m3); identities.
+L8  the warning of the release cap names its cause: one flat HRU, LAG (derived t_m), aquifer POROSITY 0.3, CLAPP_B 4,
+    AIR_ENTRY_PRESSURE 0.3 m (drainable porosity 0.078), the water table 6 m down, 40 mm/d for 10 days: with Sy 0.078 (equal
+    to the drainable porosity) the cap binds while water is in transit, and the warning says that this is expected (the
+    LAG store) and names no specific yield; with Sy 0.02 (L6's run) it adds that a specific yield below the drainable
+    porosity adds to it.
 L7  the leak check: the L1 storm with LAG 2 passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3 per
     step put into "unsaturated zone storage [m3]" (on the steps above 5,000 m3, 10 significant digits) fail the
     script's checks.
@@ -365,11 +370,30 @@ def test_l7():
         ok &= caught and n >= 5
     return ok
 
+def test_l8():
+    print('L8 the release-cap warning: expected with water in transit (Sy = drainable porosity); Sy named only when it is too small')
+    cap, transit, low = 'releases at most Sy dh per step', 'This is expected while water is in transit in the column (the LAG store)', 'a specific yield below the drainable porosity'
+    d = run('l8_consistent', nhru=1, slope=0.0, Sy=0.078, aq_b=4.0, aq_psia=0.3, aq_thick=30.0, init_depth=6.0, rain=[40.0] * 10 + [0.0] * 20,
+            perc=40.0, days=30, Kh=1.0, Kv=0.1, extra_rvg=':SoilZoneVadose LAG\n')
+    if not d:
+        return False
+    ok, _ = check(d, 'l8_consistent')
+    w = [l for l in open(os.path.join(d, 'out', 'Raven_errors.txt')).read().split('\n') if cap in l]
+    g1 = len(w) == 1 and transit in w[0] and low not in w[0] and 'drainable porosity?' not in w[0]
+    print('  Sy 0.078: %s -> %s' % (w[0][:400] if w else 'no release-cap warning', 'ok' if g1 else 'FAIL'))
+    e6 = os.path.join(W, 'l6_room', 'out', 'Raven_errors.txt')
+    if not os.path.exists(e6):
+        test_l6()
+    w = [l for l in open(e6).read().split('\n') if cap in l] if os.path.exists(e6) else []
+    g2 = len(w) == 1 and low in w[0]
+    print('  Sy 0.02 (L6): %s -> %s' % (w[0][-160:] if w else 'no release-cap warning', 'ok' if g2 else 'FAIL'))
+    return ok and g1 and g2
+
 def main():
     tc.need_mf6() if hasattr(tc, 'need_mf6') else None
     res = {}
     for name, f in (('LU', test_u), ('L1', test_l1), ('L2', test_l2), ('L3', test_l3), ('L4', test_l4), ('L5', test_l5), ('L6', test_l6),
-                    ('L7', test_l7), ('LS', test_s), ('LB', test_b)):
+                    ('L7', test_l7), ('L8', test_l8), ('LS', test_s), ('LB', test_b)):
         t0 = time.time()
         try:
             res[name] = bool(f())

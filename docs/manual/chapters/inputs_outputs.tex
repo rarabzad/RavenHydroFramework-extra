@@ -90,7 +90,7 @@ Command & Meaning (default)\\\midrule\endfirsthead
 \toprule\hdr
 Command & Meaning (default)\\\midrule\endhead
 \cmd{:HRUGeometry file \{ID field\}} & HRU polygons, GeoJSON in lon/lat (or \cmd{:InputCRS}); ID field (\cmd{HRU\_ID}). \textbf{Required.}\\
-\cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically\\
+\cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically; lines whose ID is no subbasin of the model are left out with a warning (the run stops when no line is left)\\
 \cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU \cmd{ELEVATION})\\
 \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file; wells may then be given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
 \cmd{:BedrockSurface file} & bedrock elevation, same formats (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
@@ -255,7 +255,7 @@ File & Content\\\midrule
 \cmd{GWHeads.csv} & head at each monitoring well, from $t=0$ (missing value $-1.2345$ when the screened cell is dry)\\
 \cmd{GWConnectivity.csv} & number of separate wet areas; wet fraction of each profile\\
 \cmd{mf6/grid\_cells.geojson} & every cell as a lon/lat polygon: number, active, profile, dominant HRU, area\\
-\cmd{GWModelSummary.txt} & MODFLOW 6 library and its version, grid type and size, MODFLOW format, HRU fidelity of the cells, active and pass-through cells, profiles, the recharge delay storage at the start (when a profile has \cmd{RECHARGE\_DELAY} or the hotstart holds a store), river/well/boundary/store/reservoir cells, linkage per HRU (areas, fraction linked, cells), whether the linkage came from the cache\\
+\cmd{GWModelSummary.txt} & MODFLOW 6 library and its version, grid type and size, MODFLOW format, HRU fidelity of the cells, active and pass-through cells, profiles, the recharge delay storage at the start (when a profile has \cmd{RECHARGE\_DELAY} or the hotstart holds a store), the river loss carried at the start (when a hotstart file gives one, or a restart with another \cmd{:TimeStep} carries part of the last take), river/well/boundary/store/reservoir cells, linkage per HRU (areas, fraction linked, cells), whether the linkage came from the cache\\
 \cmd{GWHeads.nc} & (optional) head(time, layer, y, x) with 2-D latitude and longitude, CF conventions\\
 \cmd{mf6/} & the generated MODFLOW model, its list file (\cmd{gwf.lst}, \cmd{mfsim.lst}) and binary heads (\cmd{gwf.hds}); with \cmd{:WriteGWBudgetFile} also the budget file \cmd{gwf.cbc} and \cmd{gwf.porosity}\\
 \cmd{Diagnostics.csv} & Raven's usual file, with \cmd{GW\_HEAD} statistics\\

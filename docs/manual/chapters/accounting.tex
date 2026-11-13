@@ -60,7 +60,11 @@ it (test WB13). Where Raven averages a longer step's inflow history from the sho
 \cmd{solution.rvc} therefore also holds the takes from each reach's inflow over the steps of Raven's inflow history
 (\cmd{:GWRiverInflowTakes}), which the restart averages as Raven averages the inflows, and the first step books that
 average (test WB14). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
-exchange applied to Raven}), as MODFLOW receives it.
+exchange applied to Raven}), as MODFLOW receives it. On the first step of a run that starts from a hotstart file, that
+column also holds the river loss the run starts with, which the step takes from the reaches: the file's
+\cmd{:GWRiverLossCarry} and, after a restart with another \cmd{:TimeStep}, the rest of the last take carried as above.
+\cmd{GWModelSummary.txt} gives it (``river loss carried : $V$ m3 at the start''), so the river identity holds from the
+first step: applied $-$ net MODFLOW exchange $-$ carry at the end of the step $+$ carry at its start (tests WB13, WB14).
 
 \subsection{The whole system}
 The water that leaves Raven as recharge enters MODFLOW (directly or via the delay store); the water MODFLOW sends back

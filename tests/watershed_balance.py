@@ -65,7 +65,10 @@ WB13 a restart with another :TimeStep right after a take: the WB10 reach (inflow
      ROUTE_HYDROLOGIC and ROUTE_STORAGECOEFF, :TimeStep 0.5 then 1 and 1 then 0.25, restarted after day 5 (the last take
      from the outflow) and after day 3 (from the inflow), with the same pair of runs without the river: over both parts
      the outflow leaving the watershed is lower by the leakage MODFLOW received less the loss carried at the end (0.5 m3
-     + 1e-5, the file's digits), the channel storage ends the same (1e-5 of the leakage), and |MB error| <= 1e-6 mm.
+     + 1e-5, the file's digits), the channel storage ends the same (1e-5 of the leakage), and |MB error| <= 1e-6 mm; and
+     tools_audit.py finds the river identity (applied - net MODFLOW - carry change) of both parts within 1e-8 of the net
+     flow, from the first step of the restarted part on (the river loss the restarted run starts with is in
+     GWModelSummary.txt).
 WB14 a restart with a longer :TimeStep right after takes from the reach's inflow, where Raven averages the reach's inflow
      history to the longer step (ROUTE_DIFFUSIVE_WAVE; the WB13 reach, restarted after day 3): :TimeStep 0.5 then 1,
      0.25 then 1, and 0.25, then 0.5 for half a day, then 1 (the second restart averages a take of the 0.5-day part with
@@ -73,9 +76,18 @@ WB14 a restart with a longer :TimeStep right after takes from the reach's inflow
      step, then 1 (Raven rescales only the entries of the lateral-inflow history length); with the same runs without the
      river: in every part the MB error exceeds the run's without the river by at most 1e-6 mm on every step (the runs
      without the river carry Raven's own error of the rescaling, up to 2.2 mm here), and the leakage MODFLOW received less the
-     loss carried at the end equals the lower outflow plus the lower channel storage at the end (0.5 m3 + 1e-5). With
+     loss carried at the end equals the lower outflow plus the lower channel storage at the end (0.5 m3 + 1e-5); and
+     tools_audit.py's river identity holds within 1e-8 in every part. With
      RAVEN_EXE_REF: a restart (0.5 then 1) from a solution.rvc the reference build wrote, without :GWRiverInflowTakes, has
      an MB error no larger than the reference build's own restart from it.
+WB15 a restart with a longer :TimeStep where the reach's lateral-inflow history is longer than its inflow history (the
+     WB14 reach with ROUTE_TRI_CONVOLUTION, TIME_CONC 10 d, and an inflow of 0.05, 0.02, 0.06, 0.03, 0.05 m3/s on days 1-5;
+     :TimeStep 0.5 for 3 days, then 1): Raven rescales the inflow history over the lateral-inflow history's length, past
+     the end of the inflow history's array (5 entries for 13); in a coupled run only the array's entries are written, so
+     the restarted runs, with and without the river, complete; the river identity of tools_audit.py holds within 1e-8,
+     and the MB error exceeds the run's without the river by at most 1e-6 mm on every step (both carry Raven's own error
+     of the rescaling; without that bound the run's memory is overwritten: MB errors of 1e238 mm, or a segmentation
+     fault).
 
 Usage: python3 watershed_balance.py   (needs RAVEN_MF6_LIB; about a minute)
 """
@@ -256,6 +268,12 @@ def restart_parts(d, days, rday):
 def csv(d, f):
     x = pd.read_csv(os.path.join(d, 'out', f)); x.columns = [c.strip() for c in x.columns]
     return x
+
+
+def river_identity(parts):
+    """the largest |river identity| tools_audit.py finds over the runs (applied - net MODFLOW - carry change, relative to
+    the net flow), its first step included"""
+    return max(abs(float(tc.audit.audit(os.path.join(x, 'out')).get('river: applied - net MF6 - carry change (rel)', float('inf')))) for x in parts)
 
 
 def rel_dev(a, b):
@@ -540,11 +558,13 @@ for route in ('ROUTE_HYDROLOGIC', 'ROUTE_STORAGECOEFF'):
         drop = outflow_m3(n1) + outflow_m3(n2) - outflow_m3(r1) - outflow_m3(r2)
         dch = chan_end(r2) - chan_end(n2)
         mb = max(float(csv(x, 'WatershedStorage.csv')['MB Error [mm]'].abs().max()) for x in (r1, r2, n1, n2))
-        g = take is not None and float(take.group(1)) + float(take.group(2)) > 100.0 and leak > 1000.0 and abs(drop - leak) <= 0.5 + 1e-5 * leak and abs(dch) <= 1e-5 * leak and mb <= LIM
+        rid = river_identity((r1, r2))
+        g = take is not None and float(take.group(1)) + float(take.group(2)) > 100.0 and leak > 1000.0 and abs(drop - leak) <= 0.5 + 1e-5 * leak and abs(dch) <= 1e-5 * leak and mb <= LIM \
+            and rid <= 1e-8
         g13 &= g
-        print('%-70s %s  (last take from the inflow %s, from the outflow %s m3; leakage %.2f m3; outflow lower by %.2f m3; channel storage %+.2g m3; MB %.2g mm)' % (
+        print('%-70s %s  (last take from the inflow %s, from the outflow %s m3; leakage %.2f m3; outflow lower by %.2f m3; channel storage %+.2g m3; MB %.2g mm; tools_audit river identity %.1e)' % (
               'WB13 %s, :TimeStep %g then %g from day %d: outflow lower by the leakage' % (route, dt1, dt2, rday + 1), 'ok' if g else 'FAIL',
-              take.group(1)[:8] if take else '-', take.group(2)[:8] if take else '-', leak, drop, dch, mb))
+              take.group(1)[:8] if take else '-', take.group(2)[:8] if take else '-', leak, drop, dch, mb, rid))
 results.append(('WB13', g13))
 
 # WB14: a restart with a longer :TimeStep right after takes from the reach's inflow, with a routing method whose inflow
@@ -598,31 +618,59 @@ for parts in (((3, 0.5), (27, 1.0)), ((3, 0.25), (27, 1.0)), ((3, 0.25), (0.5, 0
     drop = sum(outflow_m3(x) for x in N) - sum(outflow_m3(x) for x in R)
     dch = chan_end(R[-1]) - chan_end(N[-1])
     mb, mbn = mb_dev(R, N)
+    rid = river_identity(R)
     # (the restart re-routes the averaged inflow history, so the take still in the channel at the end differs from a
     # continuous run's: the leakage is the lower outflow plus the lower channel storage)
-    g = take is not None and float(take.group(1)) > 10.0 and leak > 1000.0 and abs(drop - dch - leak) <= 0.5 + 1e-5 * leak and mb <= LIM
+    g = take is not None and float(take.group(1)) > 10.0 and leak > 1000.0 and abs(drop - dch - leak) <= 0.5 + 1e-5 * leak and mb <= LIM and rid <= 1e-8
     g14 &= g
-    print('%-70s %s  (last take from the inflow %s m3; leakage %.2f m3; outflow lower by %.2f m3, channel storage %+.2f m3; MB beyond the run without the river %.2g mm (its own %.2g))' % (
-          label, 'ok' if g else 'FAIL', take.group(1)[:8] if take else '-', leak, drop, dch, mb, mbn))
+    print('%-70s %s  (last take from the inflow %s m3; leakage %.2f m3; outflow lower by %.2f m3, channel storage %+.2f m3; MB beyond the run without the river %.2g mm (its own %.2g); tools_audit river identity %.1e)' % (
+          label, 'ok' if g else 'FAIL', take.group(1)[:8] if take else '-', leak, drop, dch, mb, mbn, rid))
 # a restart from a solution.rvc written by the reference build (no :GWRiverInflowTakes): the earlier takes are taken as equal
 # to the last one, so the restart is no worse than the reference build's own restart from that file
 if tc.REF:
     kw = dict(upstream=True, route='ROUTE_DIFFUSIVE_WAVE', reach=30.0, rain=[0.0] * DAYS13, qin=[0.05] * 5, rbk=200.0, croute='ROUTE_DUMP')
     R = chain_restart(river_case(os.path.join(W, 'wb14_oldfile'), DAYS13, **kw), DAYS13, ((3, 0.5), (27, 1.0)), first_exe=tc.REF)
     mbn = mbr = float('nan')
-    g = R is not None and ':GWRiverInflowTakes' not in open(os.path.join(R[0], 'out', 'solution.rvc')).read()
-    if g:
+    g = R is not None
+    newfile = g and ':GWRiverInflowTakes' in open(os.path.join(R[0], 'out', 'solution.rvc')).read()   # (a reference build that writes the block)
+    if g and not newfile:
         p2r = R[1] + '_ref'; shutil.rmtree(p2r, ignore_errors=True); shutil.copytree(R[1], p2r, ignore=shutil.ignore_patterns('out'))
         g = run_with(tc.REF, p2r)
-    if g:
+    if g and not newfile:
         mbn, mbr = (float(csv(x, 'WatershedStorage.csv')['MB Error [mm]'].abs().max()) for x in (R[1], p2r))
         g = mbn <= mbr + 1e-9
-    g14 &= g
-    print('%-70s %s  (%s)' % ('WB14 restart from a reference-build solution.rvc (:TimeStep 0.5 then 1)', 'ok' if g else 'FAIL',
-          'MB this build %.4g mm, reference build %.4g mm' % (mbn, mbr) if R is not None else 'a run FAILED'))
+    if newfile:
+        tc.skip('WB14 restart from a reference-build solution.rvc', 'the reference build writes :GWRiverInflowTakes (the check needs a build that does not)')
+    else:
+        g14 &= g
+        print('%-70s %s  (%s)' % ('WB14 restart from a reference-build solution.rvc (:TimeStep 0.5 then 1)', 'ok' if g else 'FAIL',
+              'MB this build %.4g mm, reference build %.4g mm' % (mbn, mbr) if R is not None else 'a run FAILED'))
 else:
     tc.skip('WB14 restart from a reference-build solution.rvc')
 results.append(('WB14', g14))
+
+# WB15: a restart with a longer :TimeStep where the lateral-inflow history is the longer one
+kw = dict(upstream=True, route='ROUTE_DIFFUSIVE_WAVE', reach=30.0, rain=[10.0, 0.0, 30.0] + [0.0] * (DAYS13 - 3), qin=[0.05, 0.02, 0.06, 0.03, 0.05], rbk=200.0,
+          croute='ROUTE_TRI_CONVOLUTION')
+d = river_case(os.path.join(W, 'wb15'), DAYS13, **kw)
+sub(os.path.join(d, 'm.rvh'), ':Parameters, Q_REFERENCE\n  :Units, m3/s\n  1, 0.05\n  2, 0.05\n',
+    ':Parameters, Q_REFERENCE, TIME_TO_PEAK, TIME_CONC\n  :Units, m3/s, d, d\n  1, 0.05, 1.0, 10.0\n  2, 0.05, 1.0, 10.0\n')
+R = chain_restart(d, DAYS13, ((3, 0.5), (27, 1.0)))
+dn = river_case(os.path.join(W, 'wb15_noriver'), DAYS13, river=False, **kw)
+sub(os.path.join(dn, 'm.rvh'), ':Parameters, Q_REFERENCE\n  :Units, m3/s\n  1, 0.05\n  2, 0.05\n',
+    ':Parameters, Q_REFERENCE, TIME_TO_PEAK, TIME_CONC\n  :Units, m3/s, d, d\n  1, 0.05, 1.0, 10.0\n  2, 0.05, 1.0, 10.0\n')
+N = chain_restart(dn, DAYS13, ((3, 0.5), (27, 1.0)))
+g15 = R is not None and N is not None
+if g15:
+    sol = open(os.path.join(R[0], 'out', 'solution.rvc')).read()
+    nq, nl = re.search(r':Qin ?,(\d+)', sol), re.search(r':Qlat ?,(\d+)', sol)
+    rid = river_identity(R)
+    mb, mbn = mb_dev(R, N)
+    g15 = rid <= 1e-8 and mb <= LIM and np.isfinite(mbn)
+print('%-70s %s  (%s)' % ('WB15 restart 0.5 then 1 d, lateral-inflow history longer than the inflow history', 'ok' if g15 else 'FAIL',
+      'history sizes in solution.rvc: inflow %s, lateral inflow %s; tools_audit river identity %.1e; MB beyond the run without the river %.2g mm (its own %.2g)'
+      % (nq.group(1), nl.group(1), rid, mb, mbn) if g15 or (R is not None and N is not None) else 'a run FAILED'))
+results.append(('WB15', g15))
 
 n = sum(1 for _, g in results if g)
 print('watershed balance: %s (%d of %d)' % ('ALL PASSED' if n == len(results) else 'FAILED', n, len(results)))

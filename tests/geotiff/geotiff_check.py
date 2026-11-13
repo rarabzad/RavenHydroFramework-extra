@@ -23,7 +23,13 @@ Reader checks (unit driver):
     "metre" and "m above NAVD88" are metres; PROJ's short ids (ch, mi, fath, link, in, also after us/ind: "us-in",
     "us-ch") stop only as the first word and without a metre word, so "Elevation in m (CH1903+)", "elevation [m] CH",
     "H\u00f6he in m \u00fc. M. (CH)", "Elevation (m) see link" and "height in metres, mi" are metres and "hauteur \u00e0
-    mi-mar\u00e9e" an unknown unit; a number before the metre word ("0.1 m") gives the unknown-unit warning;
+    mi-mar\u00e9e" an unknown unit; a number before the metre word ("0.1 m") gives the unknown-unit warning, a word
+    that ends in a digit does not ("CH1903 m", "CH1903 metres", "NAVD88 m", "EGM96 m" are metres); feet written in
+    camel case or as one word ("SurveyFeet", "InternationalFeet", "USSurveyFoot", "esriSRUnit_SurveyFoot",
+    "decimalfeet", "fasl") stop, as do "fmsl", the EPSG feet codes (EPSG:9002, EPSG:9003; EPSG:9001 is metres) and
+    "pies", "pieds", "Fu\u00df", "voet"; "mASL" is metres and "Micrometer" another unit; a number with punctuation or a
+    factor sign before the metre word ("[0.1 m]", "(0.1 m)", "1,5 m", "1/1000 m", "x0.1 m", "1:1000 m") gives the
+    unknown-unit warning;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -289,7 +295,17 @@ for text, want, part in (('m (Admiralty datum)', 'OK', ''), ('metres above Hydro
                          ('Elevation (m) see link', 'OK', ''), ('height in metres, mi', 'OK', ''),
                          ('hauteur \u00e0 mi-mar\u00e9e', 'OK', "has the band unit 'hauteur"), ('0.1 m', 'OK', "has the band unit '0.1 m'"),
                          ('us-in', 'ERROR', 'elevations are in us-in'), ('us-ch', 'ERROR', 'elevations are in us-ch'), ('mi', 'ERROR', 'elevations are in mi'),
-                         ('link', 'ERROR', 'elevations are in link')):
+                         ('link', 'ERROR', 'elevations are in link'),
+                         ('CH1903 m', 'OK', ''), ('CH1903 metres', 'OK', ''), ('in CH1903 m', 'OK', ''), ('NAVD88 m', 'OK', ''), ('EGM96 m', 'OK', ''),
+                         ('SurveyFeet', 'ERROR', 'elevations are in SurveyFeet'), ('InternationalFeet', 'ERROR', 'elevations are in InternationalFeet'),
+                         ('USSurveyFoot', 'ERROR', 'elevations are in USSurveyFoot'), ('esriSRUnit_SurveyFoot', 'ERROR', 'elevations are in esriSRUnit_SurveyFoot'),
+                         ('decimalfeet', 'ERROR', 'elevations are in decimalfeet'), ('fasl', 'ERROR', 'elevations are in fasl'),
+                         ('mASL', 'OK', ''), ('Micrometer', 'ERROR', 'elevations are in Micrometer'),
+                         ('[0.1 m]', 'OK', "has the band unit '[0.1 m]'"), ('(0.1 m)', 'OK', "has the band unit '(0.1 m)'"), ('1,5 m', 'OK', "has the band unit '1,5 m'"),
+                         ('1/1000 m', 'OK', "has the band unit '1/1000 m'"), ('x0.1 m', 'OK', "has the band unit 'x0.1 m'"), ('1:1000 m', 'OK', "has the band unit '1:1000 m'"),
+                         ('EPSG:9002', 'ERROR', 'elevations are in EPSG:9002'), ('EPSG:9003', 'ERROR', 'elevations are in EPSG:9003'), ('EPSG:9001', 'OK', ''),
+                         ('fmsl', 'ERROR', 'elevations are in fmsl'), ('pies', 'ERROR', 'elevations are in pies'), ('pieds', 'ERROR', 'elevations are in pieds'),
+                         ('Fu\u00df', 'ERROR', 'elevations are in Fu\u00df'), ('voet', 'ERROR', 'elevations are in voet')):
     o = unit('raster', with_unit(text, 'unit_%s.tif' % re.sub(r'\W', '_', text)), 'NONE').strip()
     good = o.startswith(want) and part in o and (part != '' or o == 'OK')
     report('band unit "%s": %s' % (text, {'OK': 'read as metres' if not part else 'read as metres, with a note', 'ERROR': 'stops'}[want]), good, o[:160])

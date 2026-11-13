@@ -45,6 +45,25 @@ Units of the series (the subbasin-52 grid model with its 5,000 m3/d pumping well
   U1 the rates given as m3/s (-0.0578704) and U2 as L/s (-57.8704): GWBudget.csv "wells specified" is -5,000 m3/d, as with
      m3/d (U0);
   U3 ":WellFlowRate 1 ft3/s" and U4 ":BoundaryHead EDGE ft" stop: "units ... are not supported".
+River lines (the routed one-subbasin strip of combinations.py, :RiverGeometry river.geojson SUBID):
+  N25 a second line whose SUBID (99) is no subbasin of the model: the run completes with the cells of the first line, and
+      a warning names the line left out ("1 line of the river file ... names no subbasin of the model ... (ID 99)");
+  N26 the only line has SUBID 99: the run stops, "no line of the river file ... has a subbasin of the model".
+Time discretization of an existing model, read as MODFLOW 6 reads it (the existing-model example; TDIS PERIODDATA):
+  E1 the first two period lengths written with Fortran exponents (10.0D-1, 0.31d2), a "//" comment line and a "!" comment
+     line among the rows, and a comma between the values: the run completes and the working copy's TDIS holds the
+     periods 1 d and DAYS - 1 d (MODFLOW 6 reads 10.0D-1 as 1);
+  E2 a period length "1.0x" stops: "the length of stress period 1 in ... is '1.0x', which is not a number";
+  E3 NPER 25 with 24 rows stops: "gives NPER 25 but 24 stress periods in PERIODDATA";
+  E4 the forms mf6 6.8.1 also reads (checked against the mf6 program): a repeat count "2*1.0" (1 d), a slash "31.0/"
+     and an exponent letter without digits "30.0e": the run completes with the periods 1 d and DAYS - 1 d;
+  E5 period numbers "BEGIN period 2.0" and "BEGIN period 3/" in the well package, Raven starting a day after the
+     model's time zero (period 1 dropped): the run completes and the working copy's well package starts with period 2's
+     rates (-3000) as its period 1;
+  E6 the river package's AUXILIARY line with a comment after the name ("auxiliary SUBBASIN # id": three auxiliary
+     variables for MODFLOW, which reads every word of that line) and two more values on every river row: the run
+     completes with GWBudget.csv and Hydrographs.csv identical to the unmodified model's (the subbasin ID is read with
+     MODFLOW's stride of three values).
 Reserved package names (the existing-model example):
   RN1 a model package named DRN_RAVEN (the GHB package renamed) stops with Raven's message ("a name Raven reserves for
      the packages it adds"), not MODFLOW's "Package name already exists";
@@ -297,6 +316,41 @@ open(os.path.join(d, 'Liard.rvt'), 'a').write('\n:BoundaryHead EDGE ft\n  1985-1
 stops('U4 :BoundaryHead EDGE ft stops (units not supported)', d, 'units ft are not supported')
 shutil.rmtree(d, ignore_errors=True)
 
+# ---- river lines whose subbasin ID is not in the model ----
+import combinations as CB   # noqa: E402
+RS = dict(sz='CONC', vz='NONE', K=1, x={'riv'}, st=set(), dt=1.0)
+
+
+def riv_cells(d):
+    p = os.path.join(d, 'out', 'mf6', 'gwf.riv')
+    return sorted(' '.join(l.split()[:3]) for l in open(p).read().split('BEGIN PERIOD')[1].split('END PERIOD')[0].split('\n')[1:] if l.strip()) if os.path.exists(p) else []
+
+
+def riv_case(name, ids):
+    d = CB.generated(os.path.join(W, name), RS)
+    sub_rvi = os.path.join(d, 'm.rvi'); tt = open(sub_rvi).read(); open(sub_rvi, 'w').write(re.sub(r':Duration\s+\S+', ':Duration 1', tt, count=1))
+    g = json.load(open(os.path.join(d, 'river.geojson'))); f0 = g['features'][0]
+    g['features'] = [dict(f0, properties={'SUBID': i}) for i in ids]
+    json.dump(g, open(os.path.join(d, 'river.geojson'), 'w'))
+    try:
+        r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=600); out = r.stdout + r.stderr; rc = r.returncode
+    except subprocess.TimeoutExpired:
+        out, rc = '(timeout)', -9
+    e = os.path.join(d, 'out', 'Raven_errors.txt'); out += open(e, errors='replace').read() if os.path.exists(e) else ''
+    return d, ('Successful Simulation' in out), out + '\n(return code %s)' % rc
+d1, ok1, _ = riv_case('n25_ref', [1])
+c1 = riv_cells(d1)
+d2, ok2, out2 = riv_case('n25', [1, 99])
+c2 = riv_cells(d2)
+wl = (re.findall(r'.*names no subbasin of the model.*', out2) or [''])[0].strip()
+report('N25 a river line of an unknown subbasin (99) is left out with a warning', ok1 and ok2 and len(c1) > 0 and c2 == c1 and '(ID 99)' in wl,
+       '%d river cells (one line alone: %d); %s' % (len(c2), len(c1), wl[:120] if wl else 'no warning; ' + out2.strip().split('\n')[-1][:100]))
+d3, ok3, out3 = riv_case('n26', [99])
+wl = (re.findall(r'.*no line of the river file.*', out3) or [''])[0].strip()
+report('N26 a river file whose only line has an unknown subbasin stops', (not ok3) and bool(wl), wl[:150] if wl else out3.strip().split('\n')[-1][:150])
+for x in (d1, d2, d3):
+    shutil.rmtree(x, ignore_errors=True)
+
 # ---- names Raven reserves (existing model) ----
 if not os.path.exists(os.path.join(W, 'Liard_groundwater')):    # (the example reads its forcing from ../Liard_groundwater)
     try: os.symlink(tc.LIARD, os.path.join(W, 'Liard_groundwater'))
@@ -311,6 +365,68 @@ edit(d, 'Liard.rvg', ':RavenTakesOver    RCH_MODEL EVT_MODEL', ':RavenTakesOver 
 ok, out = run(d, DAYS)
 report('RN2 a recharge package named RCH_RAVEN that Raven takes over runs (%d days)' % DAYS, ok, '' if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
+
+# ---- the existing model's time discretization, read as MODFLOW 6 reads it ----
+def tdis_case(name, rows):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    p = os.path.join(d, 'model', 'ext.tdis'); tt = open(p).read()
+    i = tt.index('BEGIN perioddata\n') + len('BEGIN perioddata\n'); j = tt.index('END perioddata')
+    old = tt[i:j].split('\n')[:-1]
+    open(p, 'w').write(tt[:i] + ''.join(l + '\n' for l in rows(old)) + tt[j:])
+    return d
+
+
+def periods(d):
+    p = os.path.join(d, 'out', 'mf6', 'ext.tdis')
+    if not os.path.exists(p): return []
+    m = re.search(r'BEGIN PERIODDATA(.*?)END PERIODDATA', open(p).read(), re.S)   # (the rewritten file; none when the run stopped first)
+    return [float(l.split()[0]) for l in m.group(1).split('\n') if l.strip()] if m else []
+
+
+d = tdis_case('e1', lambda r: ['  // stress periods: one day, then the months', '      10.0D-1  1       1.00000000', '  ! October', '      0.31d2,  31,  1.0'] + r[2:])
+ok, out = run(d, DAYS)
+pl = periods(d)
+report('E1 period lengths 10.0D-1 and 0.31d2 with // and ! comment rows are read as MODFLOW reads them', ok and pl == [1.0, float(DAYS - 1)],
+       'working-copy periods %s' % pl if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tdis_case('e2', lambda r: ['      1.0x  1       1.00000000'] + r[1:])
+stops('E2 a period length 1.0x stops', d, "is '1.0x', which is not a number")
+shutil.rmtree(d, ignore_errors=True)
+d = tdis_case('e3', lambda r: r[:-1])
+stops('E3 NPER 25 with 24 period rows stops', d, 'gives NPER 25 but 24 stress periods in PERIODDATA')
+shutil.rmtree(d, ignore_errors=True)
+d = tdis_case('e4', lambda r: ['      2*1.0  1  1.0', '      31.0/  31  1.0', '      30.0e  30  1.0'] + r[3:])
+ok, out = run(d, DAYS)
+pl = periods(d)
+report('E4 period lengths 2*1.0, 31.0/ and 30.0e are read as MODFLOW reads them', ok and pl == [1.0, float(DAYS - 1)],
+       'working-copy periods %s' % pl if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e5'))
+edit(d, 'model/gwf_liard.wel', 'BEGIN period  2\n', 'BEGIN period  2.0\n')
+edit(d, 'model/gwf_liard.wel', 'BEGIN period  3\n', 'BEGIN period  3/\n')
+edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-10-02')
+ok, out = run(d, DAYS)
+p = os.path.join(d, 'out', 'mf6', 'gwf_liard.wel'); wl = open(p).read() if os.path.exists(p) else ''
+m = re.search(r'BEGIN PERIOD 1[^\n]*\n(.*?)END PERIOD', wl, re.S)
+report('E5 period numbers 2.0 and 3/ are read as MODFLOW reads them (start a day after time zero)', ok and m is not None and '-3.00000000E+03' in m.group(1),
+       ('new period 1: %s' % ' | '.join(m.group(1).split('\n')[:2]) if m else 'no renumbered period 1') if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+
+res = {}
+for k in ('e6_ref', 'e6'):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, k))
+    if k == 'e6':
+        p = os.path.join(d, 'model', 'gwf_liard.riv'); tt = open(p).read()
+        tt = tt.replace('  auxiliary  SUBBASIN\n', '  auxiliary  SUBBASIN   # id\n')
+        tt = re.sub(r'(?m)^(  \d+ \d+ \d+ \S+ \S+ \S+ \S+)$', r'\1  0  0', tt)
+        open(p, 'w').write(tt)
+    res[k] = (run(d, DAYS), d)
+okb = all(v[0][0] for v in res.values()) and all(
+    open(os.path.join(res['e6_ref'][1], 'out', f), 'rb').read() == open(os.path.join(res['e6'][1], 'out', f), 'rb').read() for f in ('GWBudget.csv', 'Hydrographs.csv'))
+report('E6 AUXILIARY SUBBASIN # id (three auxiliary variables, as MODFLOW reads them) maps the rivers as without the comment', okb,
+       '' if all(v[0][0] for v in res.values()) else res['e6'][0][1].strip().split('\n')[-1][:150])
+for v in res.values():
+    shutil.rmtree(v[1], ignore_errors=True)
 
 print('input checks: ALL PASSED' if fails == 0 else 'input checks: %d FAILED' % fails)
 sys.exit(1 if fails else 0)

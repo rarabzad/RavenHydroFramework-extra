@@ -90,7 +90,10 @@ def audit(run,dt=1.0):
     net=(b['aquifer discharge to rivers [m3/d]']-b['river leakage to aquifer [m3/d]']).sum()*dt
     cc='river loss carried to next step [m3]' if 'river loss carried to next step [m3]' in b else 'river loss deficit [m3]'
     if cc.startswith('river loss carried'):
-        c=b[cc].fillna(0); cp=c.shift(1).fillna(0); n=(b['aquifer discharge to rivers [m3/d]']-b['river leakage to aquifer [m3/d]'])*dt; ok=b['converged'].astype(int)>=1
+        #the river loss the run starts with (a restart: the hotstart's carry and the rest of the last take after a change of
+        #:TimeStep), which the first step takes: from GWModelSummary.txt, 0 without that line
+        sm=o+'GWModelSummary.txt'; mc=re.search(r'^\s*river loss carried\s*:\s*(\S+) m3 at the start',open(sm).read(),re.M) if os.path.exists(sm) else None
+        c=b[cc].fillna(0); cp=c.shift(1).fillna(float(mc.group(1)) if mc else 0.0); n=(b['aquifer discharge to rivers [m3/d]']-b['river leakage to aquifer [m3/d]'])*dt; ok=b['converged'].astype(int)>=1
         sh=b['reservoir gain not supplied by MODFLOW [m3]'].fillna(0) if 'reservoir gain not supplied by MODFLOW [m3]' in b else 0.0   #taken from the reach in the same step
         wr=b['river gains withheld [m3]'].fillna(0) if 'river gains withheld [m3]' in b else 0.0   #:SoilZone PHYSICAL guard
         ud=b['reservoir seepage not delivered by MODFLOW [m3]'].fillna(0) if 'reservoir seepage not delivered by MODFLOW [m3]' in b else 0.0   #returned to the reach in the same step

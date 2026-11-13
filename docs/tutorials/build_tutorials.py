@@ -1700,7 +1700,7 @@ def tut3():
     G.val('t3:nszhru', m.group(1)); G.val('t3:nnosz', m.group(2))
     m = re.search(r'on (\d+) links the soil-zone base of the HRU lies up to ([0-9.]+) m', errs)
     G.val('t3:offlinks', m.group(1) if m else '?'); G.val('t3:offmax', fmt(float(m.group(2)), 2) if m else '?')
-    m = re.search(r'on (\d+) links the specific yield .* \(ratio ([0-9.]+) to ([0-9.]+)\)', errs)
+    m = re.search(r'on (\d+) links the specific yield .* \(ratio ([0-9.]+)(?: to ([0-9.]+))?\)', errs)   # (the ratios of the links counted)
     G.val('t3:sylinks', m.group(1) if m else '?')
     G.val('t3:syratio', fmt(float(m.group(2)), 2) if m else '?')
     s = summary_text(os.path.join(w, 'out_physical'))

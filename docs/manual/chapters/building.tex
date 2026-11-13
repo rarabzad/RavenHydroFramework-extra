@@ -146,10 +146,17 @@ projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}), each with a property
 \end{minipage}\par\smallskip
 Only HRUs with an \cmd{AQUIFER\_PROFILE} need polygons; others may be present and are ignored.
 Every GeoJSON file Raven reads (HRUs, grids, boundaries, refinement features) is read as strict JSON: a coordinate must be a
-JSON number: a string such as \cmd{"-124.91"}, \cmd{null} or \cmd{true} stops the run, naming the file, the feature, the
-ring and the vertex, and \cmd{NaN}, \cmd{Infinity} and hexadecimal numbers are not JSON (the file is refused as invalid
-JSON, naming the line and column of the token). A feature without a \cmd{"properties"} member stops the run where an ID field is read (a boundary or refinement
-file needs none).
+finite JSON number: a string such as \cmd{"-124.91"}, \cmd{null}, \cmd{true}, \cmd{NaN} or \cmd{Infinity} stops the run,
+naming the file, the feature, the ring and the vertex, and so does a position that is not an array of at least two
+numbers (coordinates nested one level too deep or too shallow for the geometry type, a vertex \cmd{[1]}); hexadecimal
+numbers and numbers with leading zeros are not JSON, and neither is text after the root object (the file is refused as
+invalid JSON, naming the line and column). \cmd{NaN}, \cmd{Infinity} and \cmd{-Infinity} are read in the attributes, as
+GDAL and Python's \cmd{json} write them, and \cmd{\textbackslash uXXXX} escapes are read as the characters they stand for,
+so a field name such as \cmd{H\"ohe\_ID} matches. An ID field must hold a whole number, or a string that holds exactly
+one (\cmd{7}, \cmd{7.0}, \cmd{"7"}, \cmd{" 7"}, \cmd{"7.0"}); \cmd{null}, \cmd{true}, a fraction or other text stops the run
+(features of other geometry types than the file's are skipped before their ID is read), naming the file, the
+feature and the value. A feature without a \cmd{"properties"} member stops the run where an ID field is read (a boundary
+or refinement file needs none).
 \subsection{Raster maps}\label{sec:rasters}
 \cmd{:LandSurface} and \cmd{:BedrockSurface} take an ESRI ASCII grid or a GeoTIFF file (Section~\ref{sec:geotiff}), in
 longitude/latitude or in the projection of \cmd{:InputCRS} (Section~\ref{sec:inputcrs}). An ESRI ASCII grid, for example:
@@ -197,8 +204,13 @@ know gives a warning (read as metres); the band unit's words are matched whole, 
 follows), while \cmd{feet above sea level} is not; feet fused with a qualifier, as GDAL and PROJ write US survey feet
 (\cmd{ftUS}, \cmd{usft}, \cmd{us-ft}, \cmd{USfeet}, \cmd{Foot\_US}), stop as feet; PROJ's short ids \cmd{ch}, \cmd{mi},
 \cmd{fath}, \cmd{link} and \cmd{in} (also \cmd{us-in}, \cmd{us-ch}) stop only as the first word and without a metre word, so
-\cmd{Elevation in m (CH1903+)} is metres; a unit without letters (\cmd{'}, \cmd{?}), a metre word glued to a digit or a
-non-ASCII letter (\cmd{$\mu$m}) or after a number (\cmd{0.1 m}, a scaled unit) is a unit Raven does not know\\
+\cmd{Elevation in m (CH1903+)} is metres; a word that ends in \cmd{feet} or \cmd{foot}, and words written together in camel
+case (\cmd{SurveyFeet}, \cmd{InternationalFeet}, \cmd{USSurveyFoot}), are split and matched in the same way, so these stop
+as feet, as do \cmd{fasl}, \cmd{fmsl}, the EPSG unit codes of feet (\cmd{EPSG:9002}, \cmd{9003}) and \cmd{pies},
+\cmd{pieds}, \cmd{Fu\ss} and \cmd{voet}, and \cmd{mASL} is metres; a unit without letters (\cmd{'}, \cmd{?}), a metre word glued to a
+digit or a non-ASCII letter (\cmd{$\mu$m}) or after a number (\cmd{0.1 m}, \cmd{[0.1 m]}, \cmd{1,5 m}, \cmd{1:1000 m}: a
+scaled unit) is a unit Raven does not know, while a word with letters other than an exponent is no number (\cmd{CH1903 m}
+and \cmd{NAVD88 m} are metres)\\
 scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
 \cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
 applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and

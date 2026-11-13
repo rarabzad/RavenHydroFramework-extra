@@ -95,6 +95,10 @@ I22 strict numbers in the .rvc: ":InitialGWHeads ELEVATION 98,5" (a decimal comm
 I23 two specified-head boundaries that select the same cells (:SpecifiedHeadBoundary EDGE and EDGE2 on the same file, HEAD
    99 and 99.5) stop before MODFLOW starts, with a message naming both boundaries and the cell; two general-head boundaries
    on the same cells (legal in MODFLOW) run.
+I24 the warning that the specific yield differs from the soil's drainable porosity by more than a factor 2 gives the ratios
+   of the links it counts: 2 HRUs, :SoilZone PHYSICAL, drainable porosity 0.2, HRU 1 over SAND (Sy 0.2, ratio 1) and HRU 2
+   over TILL (Sy 0.05, ratio 0.25): "on N links ... (ratio 0.25)", N the links of HRU 2, while GWModelSummary.txt gives
+   the range of all links (0.25 to 1).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -699,6 +703,23 @@ def main():
     print('  I23: two CHD boundaries on the same cells: %s; two GHB boundaries on the same cells: %s -> %s'
           % ('stops: ' + msg[0][:160] if (msg and not ok) else ('runs' if ok else 'stops without the message'), 'run' if ok2 else 'FAIL', 'ok' if (g1 and g2) else 'FAIL'))
     res.append(('I23 two specified-head boundaries on one cell', g1 and g2))
+    # I24: the factor-2 warning gives the ratios of the links it counts
+    d = case('I24', nhru=2, days=2)
+    p = os.path.join(d, 'm.rvp')
+    edit(p, '  SAND, 10, 1, 1.0E-5, 0.2, 0.3\n', '  SAND, 10, 1, 1.0E-5, 0.2, 0.3\n  TILL, 10, 1, 1.0E-5, 0.05, 0.3\n')
+    edit(p, '  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n', '  AQ, 1, SAND, TO_BEDROCK, AQUIFER\n  AQ2, 1, TILL, TO_BEDROCK, AQUIFER\n')
+    t = open(p).read(); m = re.search(r'\n  AQ, ([^\n]*)\n', t[t.index(':AquiferProfileParameters'):])
+    edit(p, '\n  AQ, %s\n' % m.group(1), '\n  AQ, %s\n  AQ2, %s\n' % (m.group(1), m.group(1)))
+    h = os.path.join(d, 'm.rvh'); t = open(h).read().split('\n')
+    t = [re.sub(r', AQ, ', ', AQ2, ', l) if l.strip().startswith('2,') else l for l in t]; open(h, 'w').write('\n'.join(t))
+    ok, txt = run_err(d)
+    w = [l for l in errors(d).split('\n') if 'by more than a factor 2' in l]
+    sm = open(os.path.join(d, 'out', 'GWModelSummary.txt')).read() if ok else ''
+    r = re.search(r'Sy/drainable porosity (\S+) to (\S+)', sm)
+    g = ok and len(w) == 1 and '(ratio 0.250000)' in w[0] and r is not None and abs(float(r.group(1)) - 0.25) < 1e-6 and abs(float(r.group(2)) - 1.0) < 1e-6
+    print('  I24: %s; summary range %s -> %s' % (re.search(r'on \d+ links|$', w[0]).group(0) + ' ' + re.search(r'\(ratio [^)]*\)|$', w[0]).group(0) if w else ('no warning' if ok else 'run FAILED'),
+                                               '%s to %s' % r.groups() if r else '-', 'ok' if g else 'FAIL'))
+    res.append(('I24 the factor-2 warning gives the counted links\' ratios', g))
     for n, g in res:
         print('  %-50s %s' % (n, 'ok' if g else 'FAILED'))
     good = all(g for _, g in res)

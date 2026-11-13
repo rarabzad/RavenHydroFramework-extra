@@ -172,7 +172,16 @@ start. A time of day in Raven's \cmd{:StartDate}
 counts in the offset, so restarts work with sub-daily time steps too (the start must fall on a Raven step of its stress
 period); the working copy's \cmd{START\_DATE\_TIME} is set to Raven's start, with the time of day when there is one.
 The TDIS period data may be listed in the TDIS file or in an \cmd{OPEN/CLOSE} text file (path relative to the simulation
-folder); Raven writes the rewritten periods into the working copy's TDIS file.
+folder); Raven writes the rewritten periods into the working copy's TDIS file. Raven reads the model's text files as
+MODFLOW~6 reads them: a line whose first character other than a blank, comma or tab is \cmd{\#} or \cmd{!}, or that
+begins with \cmd{//}, is a comment; blanks, commas and tabs separate the words, and a quoted word may hold them. Where
+MODFLOW reads a fixed number of words (a period row, a time-series row), text after them is ignored; where it reads
+every word of a line, such text is data, as for MODFLOW: an \cmd{AUXILIARY} line names one auxiliary variable per word,
+and the third word of a name-file \cmd{PACKAGES} row names the package. Period lengths, time-series times and period
+numbers are read as MODFLOW reads them (Fortran list-directed input): \cmd{5}, \cmd{5.0E-1}, \cmd{50.0D-1} (\cmd{D},
+\cmd{d}, \cmd{Q} or \cmd{E} for the exponent, which may be left without digits), \cmd{5.0/} (a slash ends the value),
+\cmd{2*5.0} (a repeat count) and, for a period number, the whole part of such a value. A value that is not a number, or a
+\cmd{PERIODDATA} block with other than \cmd{NPER} rows, stops the run, naming the file and the line.
 
 \section{Units}
 Length units (metres, feet, centimetres) are read from the discretization package and time units (seconds to years) from
