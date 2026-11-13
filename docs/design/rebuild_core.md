@@ -1,5 +1,9 @@
 # Rebuild note: `:SoilZone PHYSICAL` version 1 (agent "core", stage 1)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Status (28 Oct 2026): soil zone v1 is rebuilt to its final audited state (end of audit round 14, original builds
 r38 / commits b4d2748 + "withheld gains split", turn 241 of conversation 45baf48d). Stage 2 (v2: Richards columns,
 capillary rise, LAGGED timing, column classes, CHD columns, existing models; turns 246 onward) is not started.

@@ -50,15 +50,17 @@ The heads of the observation wells come from \cmd{GWHeads.csv}, one line per day
 
 \step{Compare the streamflow with the run without groundwater}
 Groundwater changes the streamflow too (Figure~\ref{fig:t2hyd}). The mean flow at the outlet drops from \V{t2:qmeanNoGW}
-to \V{t2:qmean}~m\textsuperscript{3}/s, by about \V{t2:qdrop}~m\textsuperscript{3}/d. This water goes to three places:
+to \V{t2:qmean}~m\textsuperscript{3}/s, by about \V{t2:qdrop}~m\textsuperscript{3}/d. This water goes to two places:
 \begin{itemize}
 \item Most of it leaves the basin underground: \V{t2:ghb}~m\textsuperscript{3}/d at the GHB and \V{t2:wel}~m\textsuperscript{3}/d
   through the well.
 \item The rest stays in Raven. The seepage from the aquifer collects in \cmd{DEEP\_STORE}. Over the three years this
   store gains \V{t2:deepgw}~mm with groundwater, against \V{t2:deepnogw}~mm without (about \V{t2:deeprate}~m\textsuperscript{3}/d
   over the basin). The store fills up to its new inflow.
-\item The aquifer itself releases water from storage (\V{t2:stor}~m\textsuperscript{3}/d, in the budget table above).
 \end{itemize}
+Together these two take more than the drop. Part of what they take is made up by the aquifer itself, which releases
+\V{t2:stor}~m\textsuperscript{3}/d from storage (in the budget table above): a source of water, not a place where the
+lost streamflow goes.
 The model is not calibrated. Workshop~6 calibrates it. The script \cmd{plot\_hydrograph.py} draws the two runs:
 \term{t2_plot_hydrograph.txt}
 \fig{t2_hydrograph.png}{\cmd{hydrograph.png}: streamflow at the outlet in 2011, without and with the groundwater model.\label{fig:t2hyd}}

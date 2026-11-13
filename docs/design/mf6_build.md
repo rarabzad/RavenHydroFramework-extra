@@ -1,5 +1,9 @@
 # MODFLOW 6 build integration (rebuild, final form incl. audit rounds 8-10)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Code: RavenHydroFramework `CMakeLists.txt`, `cmake/RavenMF6.cmake`, `RavenMF6Verify.cmake` (git clone + pinned-commit check,
 build time), `RavenMF6Copy.cmake` (library + `libmf6_version.txt` next to Raven, build time), `RavenMF6Bundle.cmake`
 (Fortran runtime at install time), `src/MF6Engine.cpp/.h` (version guard), `.github/workflows/raven-mf6.yml`,

@@ -1,5 +1,9 @@
 # Defects D1-D3 (found by the tutorials work, after phase 13)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Base: phase 13 merged (code 7c3de8e, extra 2f0b372 on soil-zone). Worktrees `wt/p13d/code` (rb-p13d) and `wt/p13d/extra`
 (rb-p13d-tests); nothing committed (diffs in `wt/p13d/patches/`). This build: `wt/p13d/Raven_p13d.exe` (md5
 `b0f670c6a854ed7646d8697f3538ffec`, with the review fixes); the build before: `wt/p13/Raven_p13.exe` (md5 `7ddfcc28ee4c9b990b06f8b2de52f5f9`);

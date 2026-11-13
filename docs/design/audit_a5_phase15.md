@@ -1,5 +1,9 @@
 # Audit A5, phase 15: inputs, GeoTIFF, tools and documentation
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Issues: IB5-1 to IB5-9, VZ5-3, MT5-1, MT5-3 to MT5-6, SZ5-2, SZ5-3 (findings in `spec/audit_A5/F_IB.md`, `F_VZ.md`,
 `F_MT.md`, `F_SZ.md`). MT5-2 (commit-message history) waits for the user's decision; a tool for option (a) is prepared
 outside the repositories (see the end). Code on top of `5f042ff`, extra on top of `a7de343`.

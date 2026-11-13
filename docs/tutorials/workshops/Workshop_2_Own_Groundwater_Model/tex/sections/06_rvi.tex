@@ -14,9 +14,11 @@ Or copy the finished file: \cmd{cp \$WS/model/finished/Creek.rvi .}
 Raven stops when:
 \begin{itemize}
 \item a process takes water \emph{out} of \cmd{GROUNDWATER} in a coupled HRU (MODFLOW computes that water there);
-\item no process sends water to \cmd{GROUNDWATER};
-\item a process sends water to \cmd{GROUNDWATER} in an HRU without an \cmd{AQUIFER\_PROFILE} (the message ends with
-  ``\dots which has no AQUIFER\_PROFILE'').
+\item no process sends water to \cmd{GROUNDWATER}.
 \end{itemize}
-Limit such processes to the right HRUs with \cmd{:-->Conditional}, as in this change.
+Raven does not stop, but warns, when a process sends water to \cmd{GROUNDWATER} in an HRU without an
+\cmd{AQUIFER\_PROFILE}: that water then leaves the model. The warning in \cmd{out/Raven\_errors.txt} begins
+``process \#N sends water to GROUNDWATER in HRU N, which has no AQUIFER\_PROFILE''; look for it with
+\cmd{grep WARNING out/Raven\_errors.txt}. Limit such processes to the right HRUs with \cmd{:-->Conditional}, as in this
+change.
 \end{trouble}

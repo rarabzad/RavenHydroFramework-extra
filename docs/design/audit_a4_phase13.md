@@ -1,5 +1,9 @@
 # Audit A4, phase 13: documentation, code comments, hand-over kit
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Phase 13 of the round-4 audit (issue list: `spec/audit_A4/AUDIT_A4_issues_and_phases.md`; brief:
 `spec/phase13_brief.md`): MT4-4, MT4-5, SZ4-3, VZ4-5, MT4-8 = IB4-6 (code comments included), MT4-9, the user-guide gaps
 (MT4-10, third point) and the restart wording, the repositories and clone instructions (MT4-6, the publication step),

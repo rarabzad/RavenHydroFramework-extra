@@ -26,7 +26,10 @@ TC6 tools_audit checks the recharge identity on step 1: with 500 m3/d added to s
    with step 1 checked, and the same step-1 change is found there too.
 TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the public branch's commits the kit does not hold
    only when the public check found them (their IDs and subjects), and says nothing about them otherwise.
-Without the MODFLOW 6 library TC1, TC2 and TC6 print SKIP.
+TC8 tools/check_manual_pdf.py on a two-chapter stand-in of docs/manual (a copy in the work folder): a main.pdf built
+   from its chapters passes; after a chapter is changed it fails (the changed line shown), --write replaces the PDF, and
+   then it passes again.
+Without the MODFLOW 6 library TC1, TC2 and TC6 print SKIP; without pdflatex and pdftotext TC8 prints SKIP.
 """
 import os, sys, re, shutil, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -197,6 +200,34 @@ def t7():
     report('TC7 make_handover: five found commits, three named and the count', '5 commits' in many and 'and 2 more' in many, many[:120])
 
 
+def t8():
+    import shutil as sh
+    if not (sh.which('pdflatex') and sh.which('pdftotext')):
+        tc.skip('TC8 (manual PDF check)', 'pdflatex or pdftotext not found'); return
+    tool = os.path.join(os.path.dirname(HERE), 'tools', 'check_manual_pdf.py')
+    rep = os.path.join(W, 'manual_repo'); m = os.path.join(rep, 'docs', 'manual')
+    if os.path.exists(rep):
+        shutil.rmtree(rep)
+    os.makedirs(os.path.join(m, 'chapters'))
+    open(os.path.join(m, 'main.tex'), 'w').write('\\documentclass{report}\n\\begin{document}\n\\input{chapters/a}\n'
+                                                 '\\input{chapters/b}\n\\end{document}\n')
+    open(os.path.join(m, 'chapters', 'a.tex'), 'w').write('\\chapter{One}\nThe recharge reaches the water table.\n')
+    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\nThe balance error is 0.006 mm.\n')
+    chk = lambda *x: subprocess.run([sys.executable, tool, '--repo', rep] + list(x), capture_output=True, text=True)
+    last = lambda r: r.stdout.strip().split('\n')[-1][:90]
+    open(os.path.join(m, 'main.pdf'), 'wb').write(b'')
+    chk('--write')                                                      # (builds the first main.pdf)
+    r1 = chk()
+    report('TC8 check_manual_pdf: a main.pdf built from its chapters passes', r1.returncode == 0 and 'PASS' in r1.stdout, last(r1))
+    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\nThe balance error is 0.431061 mm.\n')
+    r2 = chk()
+    report('TC8 check_manual_pdf: a changed chapter fails, the changed line shown', r2.returncode == 1 and 'FAIL' in r2.stdout
+           and '+The balance error is 0.431061 mm.' in r2.stdout, last(r2))
+    r3 = chk('--write'); r4 = chk()
+    report('TC8 check_manual_pdf: --write replaces the PDF, which then passes', r3.returncode == 1 and r4.returncode == 0, last(r4))
+    shutil.rmtree(rep)
+
+
 def main():
     if tc.MF6LIB and os.path.exists(tc.MF6LIB) and os.path.exists(tc.RAVEN):
         t1_t2()
@@ -204,6 +235,7 @@ def main():
         tc.skip('TC1, TC2 and TC6 (runs)', 'RAVEN_MF6_LIB not set')
     t3_t5()
     t7()
+    t8()
     print('tool checks: %s' % ('ALL PASSED' if fails == 0 else '%d FAILED' % fails))
     return fails == 0
 

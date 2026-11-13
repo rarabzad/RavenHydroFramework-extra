@@ -1,5 +1,9 @@
 # Audit A1, phase 3: documentation and package (agent p3)
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Issue list: spec/audit_final/AUDIT_A1_issues_and_phases.md; findings F_CB, F_IB, F_MT. Built on phases 1-2 (rb-p2,
 audit_a1_phase1.md, audit_a1_phase2.md). Code unchanged in this phase (rb-p3 = a2133bf, the phase-2 code). Build used
 for the measurements: Raven_p2.exe (make -O2) and, for the package, a CMake Release build of the same commit.

@@ -4,7 +4,7 @@
 Copyright (c) 2026 Rezgar Arabzadeh. All rights not granted by the licenses below are reserved.
 
 This repository (RavenHydroFramework-extra) holds the documentation, examples, tests and tools of the coupling. Its source code is
-part of Raven (RavenHydroFramework), offered to the Raven Development Team as pull requests.
+part of Raven (RavenHydroFramework, branch `mf6-coupling`), offered to the Raven Development Team for inclusion.
 
 | Part | Copyright | License |
 |---|---|---|
@@ -19,7 +19,7 @@ part of Raven (RavenHydroFramework), offered to the Raven Development Team as pu
 ## Differences from the Standard Version of Raven
 As the Artistic License 2.0 asks for modified versions, the differences from Raven 4.15 (v593) are documented file by
 file in the manual (chapter "Developer guide and limitations", "Changes to existing Raven files") and in full in the
-pull requests to RavenHydroFramework. The modifications are offered to the Raven Development Team for inclusion in
+branch `mf6-coupling` of RavenHydroFramework. The modifications are offered to the Raven Development Team for inclusion in
 Raven under the Artistic License 2.0.
 
 ## Third-party names

@@ -22,7 +22,9 @@ Or copy the file: \cmd{cp \$WS/model/finished/work/Creek.rve .}
 \term{t5_run_ens.txt}
 \term{t5_ls_ens.txt}
 \see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t5:enssec}~seconds for \V{t5:nens} members. Each
-folder \cmd{ens\_N} holds the outputs of one member, with its own \cmd{mf6}.
+folder \cmd{ens\_N} holds the outputs of one member, with its own \cmd{mf6}. The groundwater files and \cmd{mf6/}
+directly in \cmd{out\_ens} come from the set-up before the first member and hold no results (headers only); use
+\cmd{ens\_N}.
 The script \cmd{plot\_ensemble.py} draws the members, with the continuous run of Step~3 for comparison:
 \term{t5_plot_ensemble.txt}
 \fig{t5_ensemble.png}{\cmd{ensemble.png}: the \V{t5:nens} members: the head at OW\_SLOPE and the recharge that reaches MODFLOW. The members' mean

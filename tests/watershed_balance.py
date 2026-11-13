@@ -33,6 +33,9 @@ WB8  a headwater reach (one subbasin, no inflow) with a 10-day in-catchment unit
      MODFLOW's river leakage, and the outflow is lower than in the same model without the river by the loss applied
      (summed over the run, within 1 %); |MB error| <= 1e-6 mm; a run restarted on day 6 (a day whose loss came from the
      outflow) has the continuous run's hydrographs and channel storage (1e-9 relative).
+WB9  the same reach with :CatchmentRoute ROUTE_DUMP: the reach stops flowing on day 4, whose loss it can no longer
+     supply; that loss is carried and reported: a warning in Raven_errors.txt and the run total 'river loss carried' in
+     GWModelSummary.txt, equal to the last value of 'river loss carried to next step' in GWBudget.csv (1e-6 relative).
 WB10 every channel routing method (MUSKINGUM and MUSKINGUM_CUNGE over a 300 km reach; STORAGECOEFF, ROUTE_HYDROLOGIC,
      DIFFUSIVE_WAVE and PLUG_FLOW over 30 km): SB2 losing (bed conductivity 200 m/d), fed only by a 0.05 m3/s inflow on
      days 1-5 (no rain, so no lateral flow), then 35 dry days of recession, so the loss is taken from the inflow and then
@@ -49,9 +52,6 @@ WB11 a reach whose outflow is set from outside the routing: both subbasins ROUTE
      ends as in the run without the river (1e-6 of the takes; added back to the set outflow, the last take would hide the
      take from the flows and lower the channel storage by it every step), and Raven warns that the outflow was set from
      outside the routing.
-WB9  the same reach with :CatchmentRoute ROUTE_DUMP: the reach stops flowing on day 4, whose loss it can no longer
-     supply; that loss is carried and reported: a warning in Raven_errors.txt and the run total 'river loss carried' in
-     GWModelSummary.txt, equal to the last value of 'river loss carried to next step' in GWBudget.csv (1e-6 relative).
 
 Usage: python3 watershed_balance.py   (needs RAVEN_MF6_LIB; about a minute)
 """

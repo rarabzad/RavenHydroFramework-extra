@@ -11,24 +11,31 @@
 #   OUT_EXE         the executable to write (pass it to build_tutorials.py --package --raven OUT_EXE)
 #   COMMIT          the commit to build (default HEAD); it is exported with git archive, so the checkout is not touched
 #
-# Needs git, make, strip, objdump (binutils), Python 3 and the zig compiler (C++ through clang and libc++, any glibc as target). Without zig on the
-# PATH the script installs the Python package ziglang into BUILD_DIR/zig (pip, no root). The flags are those of the
-# repository's optimized build (-O2 -std=c++11 -fPIC -Wno-deprecated, -ldl), plus -Wno-date-time (zig rejects __DATE__
-# by default; the build date in Raven's banner then comes from __DATE__ as usual). At the end it prints the highest GLIBC
-# symbol version the executable needs; the script fails if it is above 2.28.
+# Needs git, make, strip, objdump (binutils), Python 3 and the zig compiler ZIG_VERSION below (C++ through clang and
+# libc++, any glibc as target). The zips are built with that version: the same commit then gives the same executable,
+# byte for byte. A zig of that version on the PATH is used; otherwise the script installs the Python package
+# ziglang==ZIG_VERSION into BUILD_DIR/zig (pip, no root). The compiler flags are the script's own: -O2 -std=c++11 -fPIC
+# -Wno-deprecated and -ldl, plus -Wno-date-time (zig rejects __DATE__ by default; the build date in Raven's banner then
+# comes from __DATE__ as usual). They are not those of the repository's builds (CMake Release uses -O3 -DNDEBUG; the
+# Makefile sets no optimisation). At the end it prints the highest GLIBC symbol version the executable needs; the
+# script fails if it is above 2.28.
 set -euo pipefail
 SRC=$(cd "$1" && pwd); B=$2; OUT=$(realpath -m "$3"); COMMIT=${4:-HEAD}
 TARGET_GLIBC=2.28
+ZIG_VERSION=0.17.1
 mkdir -p "$B"; B=$(cd "$B" && pwd)
-if command -v zig >/dev/null 2>&1; then
+if command -v zig >/dev/null 2>&1 && [ "$(zig version)" = "$ZIG_VERSION" ]; then
   ZIG="zig"
 else
-  if ! PYTHONPATH="$B/zig" python3 -m ziglang version >/dev/null 2>&1; then
-    python3 -m pip install -q --target "$B/zig" ziglang
+  if [ "$(PYTHONPATH="$B/zig" python3 -m ziglang version 2>/dev/null)" != "$ZIG_VERSION" ]; then
+    python3 -m pip install -q --upgrade --target "$B/zig" "ziglang==$ZIG_VERSION"
   fi
   ZIG="env PYTHONPATH=$B/zig python3 -m ziglang"
 fi
 echo "zig $($ZIG version)"
+if [ "$($ZIG version)" != "$ZIG_VERSION" ]; then
+  echo "ERROR: zig $ZIG_VERSION is needed, found $($ZIG version)"; exit 1
+fi
 # the sources of the commit, flat in BUILD_DIR/src (as the repository's Makefile expects); files that did not change
 # keep their date, so that a second build compiles only what changed
 rm -rf "$B/export"; mkdir -p "$B/export" "$B/src"

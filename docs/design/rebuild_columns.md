@@ -1,5 +1,9 @@
 # Rebuild note: soil zone v2 (agent "v2")
 
+*Commit IDs in this record are those of the development repositories. For publishing, the commit messages are made
+neutral in new clones, so the published history holds the same changes, with the same trees, under new IDs; base
+Raven's commits (e7e2868 and its ancestors) and commits that are already public keep theirs.*
+
 Status (28 Oct 2026): soil zone v2 is rebuilt to its state at the end of turn 275 of conversation 45baf48d (v2 audit
 rounds 1-10 and the manual subsection "Sloping and irregular land"), i.e. the original's branch `soil-zone-v2` before
 the v3 hooks commit (turn 276, debb63a). Nothing of v3 is in it.
