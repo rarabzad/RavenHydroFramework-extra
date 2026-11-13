@@ -39,8 +39,8 @@ echo "zig $($ZIG version)"
 if [ "$($ZIG version)" != "$ZIG_VERSION" ]; then
   echo "ERROR: zig $ZIG_VERSION is needed, found $($ZIG version)"; exit 1
 fi
-# the sources of the commit, flat in BUILD_DIR/src (as the repository's Makefile expects); files that did not change
-# keep their date, so that a second build compiles only what changed
+# the sources of the commit, flat in BUILD_DIR/src (as the repository's Makefile expects); every object is compiled
+# again (the Makefile does not track headers, so an object of an earlier commit could be linked)
 rm -rf "$B/export"; mkdir -p "$B/export" "$B/src"
 git -C "$SRC" archive "$COMMIT" src | tar -x -C "$B/export"
 for f in "$B"/export/src/*; do [ -f "$f" ] || continue; t="$B/src/$(basename "$f")"; cmp -s "$f" "$t" || cp "$f" "$t"; done
@@ -49,7 +49,7 @@ rm -rf "$B/export"
 REV=$(git -C "$SRC" rev-parse --short "$COMMIT")
 # the build date of the banner: the commit's date, so that a rebuild on another day gives the same bytes
 SOURCE_DATE_EPOCH=$(git -C "$SRC" log -1 --format=%ct "$COMMIT"); export SOURCE_DATE_EPOCH
-rm -f "$B/src/RavenMain.o"       # (the one object that holds __DATE__: compiled again with this date)
+rm -f "$B"/src/*.o "$B/src/Raven.exe"
 echo "building Raven $REV for x86_64-linux-gnu.$TARGET_GLIBC (build date $(date -u -d "@$SOURCE_DATE_EPOCH" '+%b %e %Y'), the commit's date)"
 cd "$B/src"
 make -j"$(nproc)" CXX="$ZIG c++ -target x86_64-linux-gnu.$TARGET_GLIBC" \

@@ -8,7 +8,7 @@ the Linux programs in bin/.
 
     python3 build_tutorials.py [--raven EXE] [--mf6 LIB] [--ostrich EXE] [--raven-src DIR] [--tools DIR] [--work DIR]
                                [--only t1,t2,...] [--quick] [--check] [--no-pdf | --pdf-only]
-    python3 build_tutorials.py --package OUT_DIR --raven EXE --mf6 LIB [--raven-src DIR]
+    python3 build_tutorials.py --package OUT_DIR --raven EXE --mf6 LIB --raven-src DIR [--source-commit ID]
 
   --raven EXE     Raven with the MODFLOW 6 coupling (default: $RAVEN_EXE)
   --mf6 LIB       the MODFLOW 6 library libmf6.so (default: $RAVEN_MF6_LIB; --mf6lib is the same option)
@@ -33,6 +33,11 @@ the Linux programs in bin/.
                   filled: the given Raven (as bin/Raven), the given libmf6.so and a bin/README.txt with their versions and
                   licences. Nothing is run; the zips have fixed timestamps (a rebuild with the same files gives the same
                   zips). Run --check with the same Raven first: the numbers in the texts belong to that build
+  --source-commit ID  with --package: the commit of RavenHydroFramework (branch mf6-coupling) that bin/README.txt names
+                  as the source of bin/Raven: the published commit, whose committer date is the build date in Raven's
+                  banner (tools/make_package.py passes the tip of the code it packages). When --raven-src is a git
+                  checkout that holds ID, its tree must be the tree of the checkout's HEAD. Without the option, the HEAD
+                  of --raven-src is named
 
 Needs Python 3 with numpy, pandas, matplotlib and pyproj; pdflatex for the PDFs; FloPy for the particle tracking of
 workshop 5 (make_prt.py). Run times quoted in the texts are measured on the build machine and are not compared by
@@ -1678,7 +1683,7 @@ def tut3():
     G.val('t3:nwarn', '%d' % sum(1 for l in errs.splitlines() if l.startswith('WARNING')))
     # the warnings of the KINEMATIC, LAG and depth-class runs: the text (Steps 11-13) says that LAG and the depth classes
     # (RICHARDS) add one warning, the release cap of a rising water table, and that KINEMATIC adds none
-    cap = 'releases at most Sy dh per step'
+    cap = 'more water above equilibrium'
     W3 = {}
     for o in ('out_richards', 'out_kinematic', 'out_lag', 'out_classes'):
         wl = [l for l in open(os.path.join(w, o, 'Raven_errors.txt')).read().splitlines() if l.startswith('WARNING')]
@@ -1695,7 +1700,7 @@ def tut3():
     if 'LAG' not in W3['out_lag'][1][0] or 'RICHARDS' not in W3['out_classes'][1][0]:
         raise RuntimeError('t3: the release-cap warnings name %s and %s, the text LAG and RICHARDS'
                            % (W3['out_lag'][1][0][:80], W3['out_classes'][1][0][:80]))
-    G.text('t3_warn_lag.txt', '$ grep "%s" out_lag/Raven_errors.txt\n' % 'releases at most' + sanitize(W3['out_lag'][1][0] + '\n', w, uw))
+    G.text('t3_warn_lag.txt', '$ grep "%s" out_lag/Raven_errors.txt\n' % cap + sanitize(W3['out_lag'][1][0] + '\n', w, uw))
     m = re.search(r'soil zone\s*:\s*PHYSICAL, SOIL\[0\.\.1\]; (\d+) HRUs with a soil zone, (\d+) without', summary_text(os.path.join(w, 'out_physical')))
     G.val('t3:nszhru', m.group(1)); G.val('t3:nnosz', m.group(2))
     m = re.search(r'on (\d+) links the soil-zone base of the HRU lies up to ([0-9.]+) m', errs)
@@ -1990,9 +1995,10 @@ def tut5():
     G.val('t5:ensrmin', fmt(min(rs), 0)); G.val('t5:ensrmax', fmt(max(rs), 0))
     shutil.rmtree(os.path.join(w, 'out_ens'))
     wfile(os.path.join(w, 'Creek.rvi'), rvi0)
-    # C. MODFLOW's budget file and particle tracking: one year from the start, flows saved every day
+    # C. MODFLOW's budget file and particle tracking: one year from the start, flows saved every day. The student's
+    # Creek.rvi is still the ensemble's: the diff removes :EnsembleMode and :RandomSeed and sets :Duration
     rviP = rvi0.replace(':Duration           %d' % DUR3, ':Duration           365')
-    G.text('t5_prt_rvi.diff', udiff(rvi0, rviP, 'Creek.rvi', 'Creek.rvi', 0))
+    G.text('t5_prt_rvi.diff', udiff(rviE, rviP, 'Creek.rvi', 'Creek.rvi', 0))
     wfile(os.path.join(w, 'Creek.rvi'), rviP)
     rvg0 = open(os.path.join(w, 'Creek.rvg')).read()
     rvgP = rvg0.replace(':GWInitialization  STEADY_STATE 1.2                # start from the steady state for 1.2 mm/d of recharge\n',
@@ -2076,7 +2082,7 @@ your own model.
 ```
 cp -r $WS/model/start $WS/work_full      # as in the last steps of the workshop
 cd $WS/work_full
-$RAVEN Liard -o out/                      # 20 years, daily; about 10 minutes on one core
+$RAVEN Liard -o out/                      # 20 years, daily; about @FULLMIN@ minutes on one core
 python3 $WS/scripts/tools_audit.py out    # water-balance and consistency audit
 ```
 (`RAVEN=$WS/bin/Raven`, as set in Step 1 of the workshop.)
@@ -2112,6 +2118,27 @@ Raven and MODFLOW are the names of their respective projects; their use here des
 """
 
 
+def fullmin_committed():
+    """the committed run time of Workshop 1's 20-year run (t1:fullmin), which model/start/README.md gives as the PDF"""
+    v = (committed_values('t1:fullmin').get('t1:fullmin') or (None,))[0]
+    if not (v and re.match(r'^\d+$', v)):
+        raise RuntimeError('t1: no committed value t1:fullmin for model/start/README.md (%s)' % v)
+    return v
+
+
+def liard_readme_minutes(t):
+    """after the 20-year run of a build: model/start/README.md gives the measured t1:fullmin, as the PDF and README.txt"""
+    p = tutfiles(t, 'start', 'README.md')
+    rd = open(p).read()
+    m = re.search(r'# 20 years, daily; about (\d+) minutes on one core', rd)
+    if not m:
+        raise RuntimeError('t1: model/start/README.md does not give the time of the 20-year run')
+    v = G.values.get('t1:fullmin')
+    if v and m.group(1) != v:
+        wfile(p, rd[:m.start(1)] + v + rd[m.end(1):])
+        log('t1: model/start/README.md: %s minutes (was %s), as the PDF (t1:fullmin)' % (v, m.group(1)))
+
+
 def liard_for_workshop(d):
     """the Liard example as workshop 1 ships it: its README with paths of the workshop (sections 0 and 1 replaced), and
     the copyright notice its DATA_NOTICE.md points to"""
@@ -2124,7 +2151,7 @@ def liard_for_workshop(d):
     for bad in ('docs/ostrich_example', 'examples/', 'tools/get_mf6', '../', 'output/'):
         if bad in rest:
             raise RuntimeError('workshop 1: the Liard README still names %s' % bad)
-    wfile(os.path.join(d, 'README.md'), LIARD_README_HEAD + rest)
+    wfile(os.path.join(d, 'README.md'), LIARD_README_HEAD.replace('@FULLMIN@', fullmin_committed()) + rest)
     dn = open(os.path.join(d, 'DATA_NOTICE.md')).read()
     if '`../../NOTICE.md`' not in dn:
         raise RuntimeError('workshop 1: DATA_NOTICE.md no longer points to ../../NOTICE.md')
@@ -2215,6 +2242,7 @@ def tut1():
     out = os.path.join(lf, 'out')
     G.val('t1:fullmin', '%d' % max(1, round(dt2 / 60.0)), volatile=True)
     readme_minutes(t, r'plus about (\d+) minutes for the optional 20-year run', 't1:fullmin')
+    liard_readme_minutes(t)
     o2 = audit(t, out, 't1_audit_full.txt', u_ws() + '/work_full')
     G.val('t1:fullUnconv', '%d' % float(re.search(r'unconverged steps\s+([-0-9.eE+]+)', o2).group(1)))
     G.val('t1:fullRes', sci(float(re.search(r'MF6 cumulative residual / gross flow\s+([-0-9.eE+]+)', o2).group(1))))
@@ -2445,7 +2473,26 @@ def mf6_version(lib):
     return 'unknown'
 
 
-def package(out, raven, mf6, ravensrc=None):
+def source_commit(ravensrc, commit=None):
+    """the Raven source commit bin/README.txt names: commit (the published ID, given by the release) or the HEAD of
+    the checkout ravensrc; '' when neither is known. A given commit that the checkout holds must have HEAD's tree"""
+    top = subprocess.run(['git', '-C', ravensrc, 'rev-parse', '--show-toplevel'], capture_output=True, text=True).stdout.strip() if ravensrc else ''
+    isgit = bool(top) and os.path.realpath(top) == os.path.realpath(ravensrc)     # (the checkout itself, not a folder inside another)
+    if commit:
+        if not re.match(r'^[0-9a-f]{7,40}$', commit):
+            sys.exit('--source-commit %s: give a commit ID (7 to 40 hexadecimal digits)' % commit)
+        if isgit:
+            t = [subprocess.run(['git', '-C', ravensrc, 'rev-parse', '-q', '--verify', x + '^{tree}'], capture_output=True,
+                                text=True).stdout.strip() for x in (commit, 'HEAD')]
+            if t[0] and t[0] != t[1]:
+                sys.exit('--source-commit %s: its tree differs from the HEAD of %s' % (commit, ravensrc))
+        return commit
+    if isgit:
+        return subprocess.run(['git', '-C', ravensrc, 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True).stdout.strip()
+    return ''
+
+
+def package(out, raven, mf6, ravensrc=None, commit=None):
     """the six zips Workshop_N_<Name>.zip in out, each with its workshop folder and bin/ filled"""
     for p, what in ((raven, 'Raven (--raven)'), (mf6, 'libmf6.so (--mf6)')):
         if not (p and os.path.isfile(p)):
@@ -2456,10 +2503,9 @@ def package(out, raven, mf6, ravensrc=None):
     ver = (re.search(r'Version:\s*(\S+)', ban) or re.search(r'(\d+\.\d+)', ban))
     bd = re.search(r'BuildDate:\s*(.+)', ban)
     rv = 'Raven %s%s' % (ver.group(1) if ver else '?', (', built %s' % bd.group(1).strip()) if bd else '')
-    if ravensrc and os.path.isdir(os.path.join(ravensrc, '.git')):
-        c = subprocess.run(['git', '-C', ravensrc, 'rev-parse', '--short', 'HEAD'], capture_output=True, text=True).stdout.strip()
-        if c:
-            rv += ', source commit %s' % c
+    c = source_commit(ravensrc, commit)
+    if c:
+        rv += ', source commit %s' % c
     versions = [('Raven', rv), ('', 'sha256 ' + sha256(raven)),
                 ('libmf6.so', 'MODFLOW 6 version %s' % mf6_version(mf6)), ('', 'sha256 ' + sha256(mf6))]
     readme = bin_readme(versions).encode()
@@ -2605,12 +2651,13 @@ def main():
     ap.add_argument('--no-pdf', action='store_true')
     ap.add_argument('--pdf-only', action='store_true', help='only compile the PDFs (from the committed sources)')
     ap.add_argument('--package', metavar='OUT_DIR', help='write the six workshop zips into OUT_DIR')
+    ap.add_argument('--source-commit', dest='source_commit', help='with --package: the Raven commit bin/README.txt names')
     a = ap.parse_args()
     if a.package:
         raven = a.raven or os.environ.get('RAVEN_EXE')
         mf6 = a.mf6 or os.environ.get('RAVEN_MF6_LIB')
         package(os.path.abspath(a.package), raven and os.path.abspath(raven), mf6 and os.path.abspath(mf6),
-                a.raven_src or os.environ.get('RAVEN_SRC'))
+                a.raven_src or os.environ.get('RAVEN_SRC'), a.source_commit)
         return
     setup(a)
     only = [x.strip() for x in a.only.split(',') if x.strip()]

@@ -55,12 +55,15 @@ runs it in the test suite.
 ## Release: the six zips
 
 ```
-python3 build_tutorials.py --package OUT_DIR --raven RAVEN_EXE --mf6 libmf6.so --raven-src RAVEN_CHECKOUT
+python3 build_tutorials.py --package OUT_DIR --raven RAVEN_EXE --mf6 libmf6.so --raven-src RAVEN_CHECKOUT [--source-commit ID]
 ```
 
 writes `OUT_DIR/Workshop_N_<Name>.zip`, each holding its folder with `bin/Raven`, `bin/libmf6.so` and a `bin/README.txt`
-that lists their versions and SHA-256 sums and the licences (Raven: Artistic License 2.0; MODFLOW 6: U.S. Geological
+that lists their versions (with the Raven source commit: `--source-commit`, else the HEAD of `RAVEN_CHECKOUT`) and SHA-256
+sums and the licences (Raven: Artistic License 2.0; MODFLOW 6: U.S. Geological
 Survey, public domain). The zips have fixed timestamps. Run `--check` with the same Raven first: the numbers in the texts
 belong to that build. The Raven of the zips is built with `build_release_raven.sh RAVEN_CHECKOUT BUILD_DIR RAVEN_EXE
 [COMMIT]` (a Linux executable for glibc 2.28 or newer, with zig 0.17.1, pinned in the script). The script takes the
 build date in Raven's banner from the commit, so the same commit gives the same executable, byte for byte, on any day.
+`tools/make_package.py` makes the zips as part of the release package and names the commit of RavenHydroFramework
+(branch `mf6-coupling`) that it packages.

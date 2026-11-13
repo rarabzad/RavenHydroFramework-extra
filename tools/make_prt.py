@@ -7,7 +7,8 @@ and the saturation, and mf6/gwf.porosity with the porosity of every cell) and a 
 or DISV; HRU meshes, imported grids and :LayerConnection ELEVATION use DISU). For tracking through time, save the flows
 every step (:HeadSaveFrequency 1, which tracking needs): the script checks that mf6/gwf.cbc and mf6/gwf.hds hold every
 time step of the flow model and stops with a message before writing the PRT files when they do not (a coarser
-:HeadSaveFrequency saves only some steps, and PRT can follow the flows only through saved steps).
+:HeadSaveFrequency saves only some steps, and PRT can follow the flows only through saved steps). The output folder of
+an ensemble run (MonteCarloOutput.csv) is refused: its mf6/ holds no flows.
 
     python3 make_prt.py OUTPUT_FOLDER [--backward] [--points FILE] [--radius F] [--run LIBMF6]
 
@@ -61,6 +62,10 @@ def main():
     ap.add_argument('--radius', type=float, default=0.25); ap.add_argument('--run')
     a = ap.parse_args()
     mf = os.path.join(a.output, 'mf6'); prt = os.path.join(a.output, 'prt')
+    if os.path.exists(os.path.join(a.output, 'MonteCarloOutput.csv')):
+        sys.exit('make_prt: %s holds an ensemble run (MonteCarloOutput.csv): its mf6/ comes from the set-up before the first '
+                 'member and holds no flows. Track the flows of a single run: remove :EnsembleMode from the .rvi and run '
+                 'Raven again' % a.output)
     for f in ('gwf.nam', 'gwf.cbc', 'gwf.hds', 'gwf.porosity', 'sim.tdis'):
         if not os.path.exists(os.path.join(mf, f)):
             sys.exit('make_prt: %s not found: run Raven with :WriteGWBudgetFile (generated models)' % os.path.join(mf, f))

@@ -387,7 +387,10 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   that switches to or from it the columns start at rest, and the run warns and reports the water dropped
   (`hotstart columns unused` in the run totals, as for hotstart lines that match no column of the run). Give the aquifer classes
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
-  curve implies (a warning when they differ by more than a factor two). Column water goes back to the soil zone, as
+  curve implies (a warning when they differ by more than a factor two). A rising water table takes from a column at most
+  what MODFLOW stores for the rise (Sy dh, and no more than the room left in the top cell); the column keeps the rest for
+  the next steps. With water in transit in the column (the `LAG` store, a `RICHARDS` wetting front) this happens with a
+  consistent `SPEC_YIELD` too; Raven warns the first time in a run, and no water is lost. Column water goes back to the soil zone, as
   rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
   column vanishes beyond what MODFLOW stores for the rise (rule (ii)); it is subtracted from the unsaturated-zone inflow,
   which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
@@ -448,7 +451,8 @@ seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), `:GWRiv
 reach inflows and outflows in the last step, which Raven's channel storage and balance book half in the next step, with
 the time step of the takes: a restart with another `:TimeStep` still gives up exactly the take), `:GWRiverInflowTakes`
 (the takes from each reach's inflow over the steps of Raven's inflow history, which a restart with a longer `:TimeStep`
-averages as Raven averages the inflows),
+averages as Raven averages the inflows; Raven's own averaging of the inflow history can still change its `MB Error` in
+such a restart, also without groundwater: a known issue of Raven itself, section 9),
 `:GWStartHeads` (after an unconverged step: the heads of the last converged step, for the far-head test), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
 (unsaturated columns; the column lines name the method that wrote them; a column whose top, node count, classes or
@@ -612,6 +616,20 @@ digits, so closed-loop and forecast members continue the aquifer from there.
   `WatershedStorage.csv` and `solution.rvc` show a larger rivulet storage (and total) than a single run, by a constant,
   because Raven adds the rivulet storage again at every initialization (the flows, channel storage and balance error
   equal the single run's);
+  a restart with another `:TimeStep` (as the `.rvc` of a run with a longer or shorter step): Raven's `CSubBasin::SetQinHist`
+  rescales a reach's inflow history only over the length of its lateral-inflow history and, when the step grows, reads past
+  the end of the inflow history in the `.rvc`, so the restarted run's `MB Error` is off by what those entries hold (up to
+  2.2 mm in test WB14's runs without the river, the same with the coupling); when the lateral-inflow history is the longer
+  one (a long catchment routing such as `ROUTE_TRI_CONVOLUTION` with a large `TIME_CONC`), the rescaling also writes past
+  the end of the inflow history's array, which overwrites other data and can crash Raven (base Raven ends such a
+  restart in a segmentation fault); in a coupled run the rescaling stays within the array and the entries past the end
+  of the `.rvc` history are read as 0 (test WB15); and when the step grows after the inflows
+  varied, Raven averages a reach's inflow history to the new step while the reach upstream books its first outflow from
+  its last outflow, so the first step's `MB Error` changes by half the new step times the difference between the averaged
+  and the last outflow, for every such reach (-1.42 mm in a 0.16 km2 test watershed whose inflow varied, without
+  groundwater; in a coupled run river takes on an upstream reach make its outflow vary in the same way: 0.071 mm in that
+  watershed restarted from 0.5 to 1 d; the take itself is restored exactly, and a restart with the same `:TimeStep` is
+  exact);
   after a hotstart of a model whose reservoir spills, Raven's `MB Error` (`WatershedStorage.csv`) is offset by a
   constant, half the water that crossed the reservoir in the step before the restart (its outflow, and reservoir seepage
   returned to the subbasin or a gain MODFLOW did not supply on its way into the reservoir), because Raven's initial storage

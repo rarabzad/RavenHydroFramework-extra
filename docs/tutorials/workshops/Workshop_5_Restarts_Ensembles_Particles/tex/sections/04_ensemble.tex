@@ -30,6 +30,6 @@ The script \cmd{plot\_ensemble.py} draws the members, with the continuous run of
 \fig{t5_ensemble.png}{\cmd{ensemble.png}: the \V{t5:nens} members: the head at OW\_SLOPE and the recharge that reaches MODFLOW. The members' mean
 recharge ranges from \V{t5:ensrmin} to \V{t5:ensrmax}~m\textsuperscript{3}/d, and the final head at OW\_SLOPE from
 \V{t5:enshmin} to \V{t5:enshmax}~m.}
-\why Raven's DDS and EnKF modes rebuild the groundwater model for each member in the same way. Now remove the two lines
-\cmd{:EnsembleMode} and \cmd{:RandomSeed} from \cmd{Creek.rvi} again. Raven reads the ensemble file only in ensemble mode,
-so \cmd{Creek.rve} can stay.
+\why Raven's DDS and EnKF modes rebuild the groundwater model for each member in the same way. The next step removes
+the two lines \cmd{:EnsembleMode} and \cmd{:RandomSeed} again. Raven reads the ensemble file only in ensemble mode, so
+\cmd{Creek.rve} can stay.

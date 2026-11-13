@@ -345,13 +345,22 @@ are left to the Raven developers:
 \item Restart with another \cmd{:TimeStep}: \cmd{CSubBasin::SetQinHist} rescales a reach's inflow history only over the length
 of its lateral-inflow history and, when the step grows, reads past the end of the history in the \cmd{.rvc}, so such a
 restart's balance error is off by what those entries hold (up to 2.2~mm in test WB14's runs without the river, the same
-with the coupling). When the lateral-inflow history is the longer one (a long catchment routing such as
-\cmd{ROUTE\_TRI\_CONVOLUTION} with a large \cmd{TIME\_CONC} over a short reach), the rescaling also writes past the end of
-the inflow history's array, which overwrites other data of the run (MB errors of $10^{238}$~mm or a segmentation fault),
-and both \cmd{SetQinHist} and \cmd{CSubBasin::SetQlatHist} read past the end of the \cmd{.rvc} histories. In a coupled run
-the rescaled inflow history is written only within its array and the entries past the end of the \cmd{.rvc} inflow
-history are read as 0, as the river-take books assume, so routing and books agree (test WB15); a run without
-groundwater is left as Raven runs it.
+with the coupling). When the lateral-inflow history is longer than the inflow history (a long catchment routing such
+as \cmd{ROUTE\_TRI\_CONVOLUTION} with a large \cmd{TIME\_CONC} over a short reach), the rescaling also writes past the end
+of the inflow history's array: it overwrites other data of the run, which can crash Raven (a segmentation fault in base
+Raven's restart of such a case) or give absurd balance errors ($10^{238}$~mm). Both \cmd{SetQinHist} and
+\cmd{CSubBasin::SetQlatHist} also read past the end of the \cmd{.rvc} histories. In a coupled run \cmd{SetQinHist} is
+guarded: the rescaled inflow history is written only within its array, and the entries past the end of the \cmd{.rvc}
+inflow history are read as 0, as the river-take books assume, so routing and books agree (test WB15);
+\cmd{SetQlatHist}'s read remains. A run without groundwater is left as Raven runs it.
+\item Restart with a longer \cmd{:TimeStep} after the inflows varied: \cmd{SetQinHist} averages a reach's inflow history
+to the new step, while the reach upstream books its first outflow from its last stored outflow. In the first step the two
+differ by $\tfrac12\,\Delta t\,(\bar Q-Q_\mathrm{last})$ per reach ($\bar Q$ the mean of the averaged outflows,
+$Q_\mathrm{last}$ the last one), and Raven's balance error changes by that amount: $-1.42$~mm in a 0.16~km$^2$ test
+watershed of two 30~km reaches (\cmd{ROUTE\_DIFFUSIVE\_WAVE}) whose specified inflow varied, without groundwater. In a
+coupled run, river takes on the upstream reach make its outflow vary in the same way (0.071~mm in that watershed with a
+steady inflow, restarted from 0.5 to 1~d; 0.009~mm from 0.25 to 1~d). The take itself is restored exactly
+(\cmd{:GWRiverInflowTakes}); the difference is Raven's averaging, and a restart with the same \cmd{:TimeStep} is exact.
 \item Reservoir routine: on the day after a reservoir has been drawn empty by a minimum flow, the outflow still averages in
 the release rate at the end of the previous day, although the lake is empty; this makes up most of such a reservoir's balance
 error (Section~\ref{sec:behaviour}, Reservoirs that run dry).

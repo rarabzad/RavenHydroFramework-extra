@@ -4,8 +4,8 @@ VI1  steady start: columns started at the steady profile for q carry q from the 
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
     (K = 3) too, and for KINEMATIC and LAG (gwvz::InitSteadyKinematic, the LAG cascade's S_i = q k_i). Enforced: step-1
     outflow = inflow (1e-6) and a positive start storage; the storage change over the run is printed, not enforced (the
-    water table rises under the recharge in this closed model, so the columns shorten). A build whose steady start is a
-    stub ("not available in this build") gives SKIP.
+    water table rises under the recharge in this closed model, so the columns shorten). Columns that start at rest fail
+    (start storage 0, step-1 outflow below the inflow).
 VI2  a hotstart taken before any column exists (water table above the soil-zone base at the end of the first run), the
     second run with the initial flux: the flux is ignored with the warning "... start at rest (their reference profile)",
     no steady profile is put in, identities from step 1.
@@ -70,8 +70,6 @@ def shift_heads(rvc, dh, out):
 import sz_models, sz_check
 
 tc = sz_check.tc
-if not hasattr(tc, 'skip'):
-    tc.skip = lambda what, why: print('SKIP %s: %s' % (what, why))
 W = tc.work('soilzone', 'vz_initial')
 QUICK = os.environ.get('RAVEN_TEST_QUICK', '') not in ('', '0')
 LIM = dict(sz_check.STD_LIMITS); LIM['vz_identity'] = 1e-8
@@ -112,9 +110,6 @@ def i1():
         if K > 1:
             cfg['dem_fn'] = lambda x, y: 0.8 * np.sin(2 * np.pi * (x + 25.0) / 100.0) * np.sin(2 * np.pi * (y + 25.0) / 100.0); cfg['dem_res'] = 400
         d = case('i1_%s_k%d' % (meth, K), ex, **cfg)
-        if d and ('not available in this build' in errs(d)):
-            tc.skip('VI1 %s steady start' % meth, 'the method\'s steady start is a stub until its solver is merged (columns start at rest)')
-            ok &= check('i1_%s_k%d' % (meth, K), d); continue
         good = check('i1_%s_k%d' % (meth, K), d)
         if d:
             b = budget(d); qin = b['unsaturated zone inflow [m3]'].iloc[0]; qout = b['unsaturated zone to aquifer [m3]'].iloc[0]

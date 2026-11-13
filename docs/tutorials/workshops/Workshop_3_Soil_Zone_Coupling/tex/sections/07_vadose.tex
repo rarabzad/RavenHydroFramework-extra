@@ -38,10 +38,12 @@ $ $RAVEN Creek -o out_lag/
 \see \cmd{Exiting Gracefully: Successful Simulation}. The run wrote \V{t3:nwarnLag} warnings into
 \cmd{out\_lag/Raven\_errors.txt}: the \V{t3:nwarnRich} of Step~\ref{st:physrun} and one more:
 \term{t3_warn_lag.txt}
-\why it is not the warning of Step~\ref{st:aquifer}. In a step where the water table rose into a column, the column held
-more water above equilibrium than MODFLOW stores for that rise: at most $S_y\,\Delta h$, and no more than the room left in
-the top cell above the water table. The column then releases only that much and keeps the rest, which it releases in
-the next steps. No water is lost. Raven writes this warning once per run. The KINEMATIC run does not write it.
+\why it is not the warning of Step~\ref{st:aquifer}, and the specific yields are not its cause. In a step where the
+water table rose into a column, the column held more water above equilibrium than MODFLOW stores for that rise:
+$S_y\,\Delta h$, and no more than the room left in the top cell above the water table. The column releases that much and
+keeps the rest, which it releases in the next steps. The LAG store holds water in transit, so a rise meets more water
+than the equilibrium profile. No water is lost. Raven writes this warning once per run. The KINEMATIC run does not
+write it.
 
 \step{Add depth classes}
 In a cell on a slope, the DEM points lie at different heights above the water table. With
