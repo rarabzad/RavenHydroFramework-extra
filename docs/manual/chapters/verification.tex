@@ -53,7 +53,7 @@ Reservoirs with absolute stages and no initial stage & start at the crest (not a
 A reservoir that dries out & books only the water it has (evaporation and seepage); under a minimum or override flow it books the evaporation the outflow formula removed, and no seepage\\
 Reservoir state in \cmd{solution.rvc} & stage and flows with 12 digits\\
 A reservoir whose \cmd{:HRUID} lies in another subbasin & stops with a message\\
-Ensembles & every member starts from the first run's balance, routing memory (histories, local outflow, irrigation and diversion memory) and reservoir states, then reads its own \cmd{.rvc}; member 1 equals the single run, also with \cmd{ROUTE\_HYDROLOGIC}, \cmd{ROUTE\_STORAGECOEFF} and \cmd{ROUTE\_TVD} (test WB12)\\
+Ensembles & every member starts from the first run's balance, routing memory (histories, local outflow, irrigation and diversion memory) and reservoir states, then reads its own \cmd{.rvc}; member 1's hydrographs and groundwater books equal the single run's, also with \cmd{ROUTE\_HYDROLOGIC}, \cmd{ROUTE\_STORAGECOEFF} and \cmd{ROUTE\_TVD} (test WB12); the rivulet storage keeps base Raven's offset (Section~\ref{ch:limits})\\
 Age tracer started from a hotstart file & the ages continue from the run that wrote the file; \cmd{solution.rvc} keeps the datum of the first run of a chain (\cmd{:AgeTracerDatum}; tests I14--I16, Table~\ref{tab:vszinputs})\\
 \cmd{:rvg\_Filename} & the path is taken relative to the \cmd{.rvi}; a line without a file name stops the run\\
 \cmd{:ObservationData}, \cmd{:ObservationWeights} with a constituent & the constituent name is read correctly\\\bottomrule
@@ -137,16 +137,25 @@ $10^{-5}$ of the loss taken, 0.065~m$^3$ for Muskingum; the run ends 0.007~m$^3$
 the reach. WB11: a \cmd{ROUTE\_EXTERNAL} reach whose outflow a live file sets to
 0.02~m$^3$/s every step delivers that outflow less the step's take (220.4~m$^3$/d), and its channel storage ends as without
 the river. WB12: 2-member ensembles with \cmd{ROUTE\_HYDROLOGIC}, \cmd{ROUTE\_STORAGECOEFF} and \cmd{ROUTE\_TVD}, with and
-without groundwater: every member's hydrographs (and \cmd{GWBudget.csv}) equal the single run's exactly; without
-groundwater member 1 is byte-identical to base Raven's. WB13: the WB10 reach restarted with another \cmd{:TimeStep}
+without groundwater: every member's \cmd{Hydrographs.csv} (and \cmd{GWBudget.csv}) equals the single run's (the test
+allows no difference without groundwater and $10^{-12}$ relative with it; the runs differ by 0). That member 1's
+\cmd{Hydrographs.csv} and \cmd{WatershedStorage.csv} without groundwater are byte-identical to base Raven's member 1
+was checked separately with base Raven for the three methods; WB12 does not run base Raven. WB13: the WB10 reach restarted with another \cmd{:TimeStep}
 (0.5 then 1~d, 1 then 0.25~d) right after a take from the outflow or from the inflow, with \cmd{ROUTE\_HYDROLOGIC} and
 \cmd{ROUTE\_STORAGECOEFF}: the outflow leaving the watershed over both parts is lower than without the river by the leakage
-MODFLOW received (2\,980.96 against 2\,981.16~m$^3$, the file's digits), the channel storage ends the same (within
-$10^{-11}$~m$^3$) and Raven's balance error stays at round-off.
+MODFLOW received (2\,980.96 against 2\,981.16~m$^3$, the file's digits), the channel storage ends the same (the test
+allows $10^{-5}$ of the leakage, about 0.03~m$^3$; the runs end within $10^{-11}$~m$^3$) and Raven's balance error stays
+at round-off.
 WB14: the same reach with \cmd{ROUTE\_DIFFUSIVE\_WAVE}, whose inflow history Raven averages to a longer step, restarted
-right after a take from the inflow (0.5 then 1~d, 0.25 then 1~d, and 0.25, 0.5 for half a day, then 1~d): Raven's balance
-error stays at round-off ($3\times10^{-14}$~mm) in every part, and the leakage equals the lower outflow plus the lower
-channel storage at the end (2\,910.19 against 2\,910.11~m$^3$ for 0.5 then 1~d, the file's digits).
+right after a take from the inflow, in five chains of \cmd{:TimeStep}: 0.5 then 1~d; 0.25 then 1~d; 0.25, 0.5 for half a
+day, then 1~d; and two with a middle part of one step, 0.1, 0.2, 1~d and 1, 0.2, 1~d. In every part Raven's balance error
+of the river run equals that of the same run without the river (the test allows $10^{-6}$~mm; the runs differ by at most
+$6\times10^{-14}$~mm; the runs without the river carry Raven's own error of up to 2.2~mm in the chains with a one-step
+part, Section~\ref{ch:limits}), and the leakage equals the lower outflow plus the lower channel storage at the end (the
+test allows 0.5~m$^3$ plus $10^{-5}$ of the leakage; 2\,910.19 against 2\,910.11~m$^3$ for 0.5 then 1~d, the file's
+digits). A restart (0.5 then 1~d) from a \cmd{solution.rvc} without \cmd{:GWRiverInflowTakes}, written by
+\cmd{RAVEN\_EXE\_REF}, has no larger balance error than that build's own restart from the file (0.01742~mm in both; run
+only when \cmd{RAVEN\_EXE\_REF} is set).
 \cmd{tests/boundary\_recharge.py}: an HRU over specified-head cells whose polygon reaches 0.05~m into a
 neighbouring cell gives that 10~m$^2$ sliver its own share of the recharge only (399.9 of the 400~m$^3$/d go to the
 specified heads; seepage to Raven 135.1 against 134.8~m$^3$/d without the sliver). The same holds for an HRU without soil under \cmd{:SoilZone PHYSICAL} (BR3: 799.8 of 800~m$^3$/d to the specified heads).

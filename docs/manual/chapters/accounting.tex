@@ -259,7 +259,10 @@ groundwater model is rebuilt from scratch, MODFLOW is restarted, and its files g
 Each member starts with a fresh water balance and, unless its own \cmd{.rvc} says
 otherwise, from the routing memory and reservoir states of the first run (the inflow and lateral-inflow histories, the
 local outflow, the irrigation and diversion memory with each demand's delivered and returned flow; stage, outflow, loss
-terms), so member 1 equals the single run. These defaults are
+terms), so the hydrographs, flows, groundwater books and Raven's balance error of member 1 equal the single run's.
+The rivulet storage in \cmd{WatershedStorage.csv} and \cmd{solution.rvc} keeps base Raven's behaviour: Raven adds it
+again at every initialization, so a member reports more rivulet storage than the single run (a constant offset, also
+without groundwater; Section~\ref{ch:limits}, known issues). These defaults are
 restored before the member's \cmd{.rvc} is read, so member-specific initial conditions (as used by EnKF forecasting) still
 apply; groundwater hotstart values are likewise cleared, so each member uses only its own \cmd{.rvc}, and the steady-state
 start is decided for each member separately

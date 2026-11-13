@@ -1,0 +1,2 @@
+$ grep "releases at most" out_lag/Raven_errors.txt
+WARNING  : CGroundwaterModel: :SoilZoneVadose LAG: a rising water table met more water above equilibrium in an unsaturated column than MODFLOW stores with Sy; the column releases at most Sy dh per step (Sy below the drainable porosity?)

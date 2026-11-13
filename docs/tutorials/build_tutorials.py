@@ -905,8 +905,8 @@ the Raven source code). This Raven is a modified version of Raven: its source co
 in the RavenHydroFramework repository (https://github.com/rarabzad/RavenHydroFramework, branch mf6-coupling) and its
 documentation in RavenHydroFramework-extra (https://github.com/rarabzad/RavenHydroFramework-extra). It was compiled
 with docs/tutorials/build_release_raven.sh of RavenHydroFramework-extra (zig %s, clang with libc++ linked
-statically); that script with zig %s gives this executable again from the Raven source commit that the versions
-name.
+statically); that script with zig %s gives this executable again, byte for byte and on any day, from the Raven
+source commit that the versions name (the build date in Raven's banner is that commit's date).
 
 MODFLOW 6: software of the U.S. Geological Survey, in the public domain (licence "Public Domain, CC0-1.0"); see
 NOTICE-MODFLOW6.txt. libmf6.so is the unchanged library of the official release.
@@ -929,15 +929,25 @@ def bin_readme(versions=None):
 
 
 def readme_minutes(t, pattern, key):
-    """the hand-written README.txt of workshop t gives a run time that the PDF gives as the generated value key: they
-    must agree (within 30 %, at least 5 minutes: both are rounded and the build machine's speed varies)"""
-    rd = open(os.path.join(WSROOT, WS[t], 'README.txt')).read()     # (hand-written: the committed file in both modes)
+    """the hand-written README.txt of workshop t gives a run time that the PDF gives as the generated value key: one
+    number in both. A build writes the generated value into README.txt (the number the PDF prints); --check requires
+    README.txt's number to equal the committed value exactly (a run time measured again is not compared)"""
+    p = os.path.join(WSROOT, WS[t], 'README.txt')                   # (hand-written: the committed file in both modes)
+    rd = open(p, newline='').read()
     m = re.search(pattern, rd)
-    v = G.values.get(key)
     if not m:
         raise RuntimeError('%s: README.txt does not give the time "%s"' % (t, pattern))
-    if v and re.match(r'^\d+$', v) and abs(int(m.group(1)) - int(v)) > max(5, 0.3 * int(v)):
-        raise RuntimeError('%s: README.txt says %s minutes, the PDF %s (%s): make them agree' % (t, m.group(1), v, key))
+    v = (committed_values(key).get(key) or (None,))[0] if C.check else G.values.get(key)
+    if not (v and re.match(r'^\d+$', v)):
+        raise RuntimeError('%s: no value %s for the time in README.txt (%s)' % (t, key, v))
+    if m.group(1) == v:
+        return
+    if C.check:
+        raise RuntimeError('%s: README.txt says %s minutes, the PDF %s (%s): build the workshop to write the PDF\'s '
+                           'number into README.txt' % (t, m.group(1), v, key))
+    with open(p, 'w', newline='') as f:
+        f.write(rd[:m.start(1)] + v + rd[m.end(1):])
+    log('%s: README.txt: %s minutes (was %s), as the PDF (%s)' % (t, v, m.group(1), key))
 
 
 def install_ws_files(t):
@@ -1666,6 +1676,26 @@ def tut3():
     errs2 = open(os.path.join(w, 'out_richards', 'Raven_errors.txt')).read()
     G.val('t3:nwarnRich', '%d' % sum(1 for l in errs2.splitlines() if l.startswith('WARNING')))
     G.val('t3:nwarn', '%d' % sum(1 for l in errs.splitlines() if l.startswith('WARNING')))
+    # the warnings of the KINEMATIC, LAG and depth-class runs: the text (Steps 11-13) says that LAG and the depth classes
+    # (RICHARDS) add one warning, the release cap of a rising water table, and that KINEMATIC adds none
+    cap = 'releases at most Sy dh per step'
+    W3 = {}
+    for o in ('out_richards', 'out_kinematic', 'out_lag', 'out_classes'):
+        wl = [l for l in open(os.path.join(w, o, 'Raven_errors.txt')).read().splitlines() if l.startswith('WARNING')]
+        W3[o] = (len(wl), [l for l in wl if cap in l])
+    G.val('t3:nwarnLag', '%d' % W3['out_lag'][0]); G.val('t3:nwarnClasses', '%d' % W3['out_classes'][0])
+    nr = W3['out_richards'][0]
+    expect = {'out_richards': (nr, 0), 'out_kinematic': (nr, 0), 'out_lag': (nr + 1, 1), 'out_classes': (nr + 1, 1)}
+    got = {o: (n, len(c)) for o, (n, c) in W3.items()}
+    if nr != int(G.values['t3:nwarn']):      # (Step 10: "no new warning", the warnings of the PHYSICAL run)
+        got['out_physical'] = (int(G.values['t3:nwarn']), 0); expect['out_physical'] = (nr, 0)
+    if got != expect:
+        raise RuntimeError('t3: warnings (total, release cap) per run %s; the text of Steps 10-13 says %s: make them agree'
+                           % (got, expect))
+    if 'LAG' not in W3['out_lag'][1][0] or 'RICHARDS' not in W3['out_classes'][1][0]:
+        raise RuntimeError('t3: the release-cap warnings name %s and %s, the text LAG and RICHARDS'
+                           % (W3['out_lag'][1][0][:80], W3['out_classes'][1][0][:80]))
+    G.text('t3_warn_lag.txt', '$ grep "%s" out_lag/Raven_errors.txt\n' % 'releases at most' + sanitize(W3['out_lag'][1][0] + '\n', w, uw))
     m = re.search(r'soil zone\s*:\s*PHYSICAL, SOIL\[0\.\.1\]; (\d+) HRUs with a soil zone, (\d+) without', summary_text(os.path.join(w, 'out_physical')))
     G.val('t3:nszhru', m.group(1)); G.val('t3:nnosz', m.group(2))
     m = re.search(r'on (\d+) links the soil-zone base of the HRU lies up to ([0-9.]+) m', errs)

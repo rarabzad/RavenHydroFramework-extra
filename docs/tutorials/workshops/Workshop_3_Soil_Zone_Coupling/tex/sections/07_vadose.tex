@@ -4,12 +4,13 @@ Under the slopes the water table lies far below the soil: \V{t3:physical:wt7}~m 
 \cmd{:SoilZoneVadose NONE} (the default), the recharge that leaves the soil reaches the water table on the same day. An
 unsaturated column in each cell carries it down instead.
 
-\step{Add the retention curve to the aquifer classes}
+\step{Add the retention curve to the aquifer classes}\label{st:aquifer}
 The columns need the water retention curve of the aquifer materials: \cmd{POROSITY} (already there), \cmd{CLAPP\_B} and
 \cmd{AIR\_ENTRY\_PRESSURE} [m]. Add the two columns to \cmd{:AquiferClasses} in \cmd{Creek.rvp}:
 \diff{t3_aquifer.diff}
-\why the till values give a drainable porosity close to the till's specific yield. Otherwise Raven warns that a rising
-water table would release a different amount of water from the column than MODFLOW stores.
+\why the till values give a drainable porosity close to the till's specific yield. Otherwise Raven warns at the start of
+the run that the two differ, because a rising water table would then release a different amount of water from the
+column than MODFLOW stores.
 
 \step{Add RICHARDS columns and run}\label{st:richards}
 Add one line at the end of \cmd{Creek.rvg}:
@@ -34,7 +35,13 @@ Change the same word again and run into \cmd{out\_lag}:
 \begin{shell}
 $ $RAVEN Creek -o out_lag/
 \end{shell}
-\see \cmd{Exiting Gracefully: Successful Simulation}.
+\see \cmd{Exiting Gracefully: Successful Simulation}. The run wrote \V{t3:nwarnLag} warnings into
+\cmd{out\_lag/Raven\_errors.txt}: the \V{t3:nwarnRich} of Step~\ref{st:physrun} and one more:
+\term{t3_warn_lag.txt}
+\why it is not the warning of Step~\ref{st:aquifer}. In a step where the water table rose into a column, the column held
+more water above equilibrium than MODFLOW stores for that rise: at most $S_y\,\Delta h$, and no more than the room left in
+the top cell above the water table. The column then releases only that much and keeps the rest, which it releases in
+the next steps. No water is lost. Raven writes this warning once per run. The KINEMATIC run does not write it.
 
 \step{Add depth classes}
 In a cell on a slope, the DEM points lie at different heights above the water table. With
@@ -44,5 +51,6 @@ points. Put \cmd{RICHARDS} back and add the line:
 \begin{shell}
 $ $RAVEN Creek -o out_classes/
 \end{shell}
-\see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds. \cmd{Creek.rvg} is now as in
-\cmd{\$WS/model/finished}.
+\see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds.
+\cmd{out\_classes/Raven\_errors.txt} holds \V{t3:nwarnClasses} warnings: those of the LAG run, with \cmd{RICHARDS} in the
+last one, for the same reason. \cmd{Creek.rvg} is now as in \cmd{\$WS/model/finished}.
