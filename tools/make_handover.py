@@ -43,7 +43,7 @@ Checks (the exit code is 0 only when all pass):
     not hold: one that applies (4-keep and 4-keep-push publish it on top of the kit, with the backup branch) and one
     that conflicts (4-keep stops; 4-keep-push and 4-merge then stop and push nothing, 4-keep-push also after
     git cherry-pick --abort; 4-keep run again stops, and the commands it prints delete branch release, after which it
-    starts again; 4-merge run again inside its unfinished merge); two kept commits whose first conflict
+    starts again; 4-merge run again inside its unfinished merge, and 4-keep there); two kept commits whose first conflict
     is finished with git commit (4-keep-push stops while the cherry-pick sequence holds the second). Nothing is pushed
     to GitHub;
   - unless --no-public-check: the public branch mf6-coupling is read (git ls-remote; nothing is pushed) and, when it can
@@ -241,6 +241,10 @@ def run_blocks(text, out, rec, pubs, tmp):
     rc3, o3 = blk('4-merge'); rc4, o4 = blk('4-merge'); now = head(code_gh, 'refs/heads/' + cb)
     step('4-merge', rc3 != 0 and rc4 != 0 and 'STOP: the merge is not finished' in o4 and now == conf,
          'run again in its unfinished merge: stops, nothing pushed' if rc4 != 0 and now == conf else o4[-300:])
+    # 4-keep inside that unfinished merge: its own STOP line, nothing pushed
+    rc5, o5 = blk('4-keep'); now = head(code_gh, 'refs/heads/' + cb)
+    step('4-keep', rc5 != 0 and 'STOP: a merge (block 4-merge) is not finished' in o5 and now == conf,
+         'in an unfinished 4-merge: stops, nothing pushed' if rc5 != 0 and now == conf else o5[-300:])
     # two kept commits, the first conflicting, its conflict finished with git commit (not --continue): the sequence still
     # holds the second, so 4-keep-push stops and pushes nothing
     g(['checkout', '-q', '--detach', conf], mk)
@@ -323,8 +327,10 @@ was made:
 - Copy each block whole. Each runs in a subshell `( ... )` with `set -eu`: it stops at the first command that fails,
   it uses no variable from an earlier block (it works out what it needs again), and it leaves your shell in the
   working folder. A block that would push checks first and pushes nothing when a check fails.
-- Nothing here changes any branch other than `{cb}` (and creates `{cb}-before-release` only where it does not exist),
-  and nothing deletes a branch.
+- On GitHub, nothing here deletes a branch, and nothing changes a branch other than `{cb}` of RavenHydroFramework
+  (and `{cb}-before-release`, created only where it does not exist) and `{xb}` of the new RavenHydroFramework-extra.
+  Step 4 creates the local branches `release` (4-keep) and `release-merge` (4-merge) in your clone
+  `RavenHydroFramework/`; the advice for running 4-keep again deletes the local `release`.
 
 Check the kit's files first:
 
@@ -602,6 +608,7 @@ Then choose:
     test -d handover || {{ echo "STOP: run this in the folder that holds handover/"; exit 1; }}
     [ -d RavenHydroFramework/.git ] || git clone -q {cu}.git RavenHydroFramework
     cd RavenHydroFramework
+    ! git rev-parse -q --verify MERGE_HEAD >/dev/null || {{ echo "STOP: a merge (block 4-merge) is not finished: finish it or run git merge --abort first"; exit 1; }}
     git fetch -q ../handover/{cbundle} "+refs/heads/{cb}:refs/remotes/handover/{cb}"
     git fetch -q --prune origin
     OLD=$(git rev-parse -q --verify refs/remotes/origin/{cb}-before-release || git rev-parse -q --verify refs/remotes/origin/{cb}) \

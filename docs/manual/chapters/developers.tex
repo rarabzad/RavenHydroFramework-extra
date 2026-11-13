@@ -346,6 +346,14 @@ are left to the Raven developers:
 of its lateral-inflow history and, when the step grows, reads past the end of the history in the \cmd{.rvc}, so such a
 restart's balance error is off by what those entries hold (up to 2.2~mm in test WB14's runs without the river, the same
 with the coupling).
+\item Restart with a longer \cmd{:TimeStep} after the inflows varied: \cmd{SetQinHist} averages a reach's inflow history
+to the new step, while the reach upstream books its first outflow from its last stored outflow. In the first step the two
+differ by $\tfrac12\,\Delta t\,(\bar Q-Q_\mathrm{last})$ per reach ($\bar Q$ the mean of the averaged outflows,
+$Q_\mathrm{last}$ the last one), and Raven's balance error changes by that amount: $-1.42$~mm in a 0.16~km$^2$ test
+watershed of two 30~km reaches (\cmd{ROUTE\_DIFFUSIVE\_WAVE}) whose specified inflow varied, without groundwater. In a
+coupled run, river takes on the upstream reach make its outflow vary in the same way (0.071~mm in that watershed with a
+steady inflow, restarted from 0.5 to 1~d; 0.009~mm from 0.25 to 1~d). The take itself is restored exactly
+(\cmd{:GWRiverInflowTakes}); the difference is Raven's averaging, and a restart with the same \cmd{:TimeStep} is exact.
 \item Reservoir routine: on the day after a reservoir has been drawn empty by a minimum flow, the outflow still averages in
 the release rate at the end of the previous day, although the lake is empty; this makes up most of such a reservoir's balance
 error (Section~\ref{sec:behaviour}, Reservoirs that run dry).

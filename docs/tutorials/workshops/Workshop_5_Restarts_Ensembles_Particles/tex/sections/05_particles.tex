@@ -3,8 +3,8 @@
 MODFLOW~6's particle tracking (PRT) runs after the coupled run, on the flows that MODFLOW saved.
 
 \step{Save MODFLOW's flows every day and run}
-Still in \cmd{\$WS/work} (with the ensemble lines removed), run one year and ask Raven to save MODFLOW's flows every day.
-Change \cmd{Creek.rvi} and \cmd{Creek.rvg}:
+Still in \cmd{\$WS/work}, run a single year again and ask Raven to save MODFLOW's flows every day. Change
+\cmd{Creek.rvi} (the ensemble lines go, and the run is one year) and \cmd{Creek.rvg}:
 \diff{t5_prt_rvi.diff}
 \diff{t5_prt.diff}
 \term{t5_run_prt.txt}
@@ -28,6 +28,8 @@ coordinates shifted by its \cmd{XORIGIN} and \cmd{YORIGIN}).
 \item \emph{``No module named flopy''}: type \cmd{pip install flopy} with the virtual environment active.
 \item \cmd{make\_prt.py} stops with a message when the flows were not saved every day: add \cmd{:HeadSaveFrequency 1} and
   \cmd{:WriteGWBudgetFile} to the \cmd{.rvg}.
+\item \emph{``\dots\ holds an ensemble run''}: \cmd{Creek.rvi} still has \cmd{:EnsembleMode}. Apply the diff of
+  \cmd{Creek.rvi} above and run Raven again.
 \item PRT needs a regular or a quadtree grid (MODFLOW's DIS or DISV). HRU meshes and imported grids use DISU, which PRT
   cannot track.
 \end{itemize}

@@ -20,6 +20,8 @@ Checks:
       every endpoint lies within Raven's run (0 < travel time <= the run's length, counted from the release)
   BF8  the BF7 run again with :HeadSaveFrequency 5: make_prt.py stops before running PRT, forward and backward, with a
       message naming :HeadSaveFrequency 1 and the steps saved (no traceback, no PRT run)
+  BF9  the output folder of an ensemble run (MonteCarloOutput.csv): make_prt.py stops with a message naming the ensemble
+      and :EnsembleMode (no traceback, no PRT files)
 Quick mode (RAVEN_TEST_QUICK=1): 10 days; full mode 60 days.
 Usage: python3 budget_file.py     (prints 'budget file checks: ALL PASSED')"""
 import os, sys, re, json, shutil, subprocess, filecmp
@@ -189,6 +191,16 @@ if 'Successful' in m8:
               r.returncode != 0 and ':HeadSaveFrequency 1' in msg and 'Traceback' not in msg and not os.path.exists(s8 + '/out/prt/prt.trk.csv'),
               msg.split('\n')[-1][:150])
 shutil.rmtree(s8, ignore_errors=True)
+# BF9 the output folder of an ensemble run (MonteCarloOutput.csv; its mf6/ comes from the set-up): make_prt.py stops naming
+# the ensemble and :EnsembleMode
+s9 = W + '/ensemble/out'; shutil.rmtree(W + '/ensemble', ignore_errors=True); shutil.copytree(a + '/out/mf6', s9 + '/mf6')
+open(s9 + '/MonteCarloOutput.csv', 'w').write('member\n1\n')
+r = subprocess.run([sys.executable, MP, s9, '--run', tc.MF6LIB], capture_output=True, text=True, timeout=600)
+msg = (r.stdout + r.stderr).strip()
+check('BF9 make_prt.py on an ensemble run\'s folder: stops naming the ensemble and :EnsembleMode',
+      r.returncode != 0 and 'ensemble run' in msg and ':EnsembleMode' in msg and 'Traceback' not in msg and not os.path.exists(s9 + '/prt'),
+      msg.split('\n')[-1][:150])
+shutil.rmtree(W + '/ensemble', ignore_errors=True)
 # BF6 existing model
 if not os.path.exists(W + '/Liard_groundwater'): os.symlink(tc.LIARD, W + '/Liard_groundwater')   # (the example reads ../Liard_groundwater/data_forcing)
 e = tc.copy_case(tc.EXISTING, W + '/existing', duration=2)

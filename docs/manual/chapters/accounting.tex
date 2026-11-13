@@ -59,7 +59,10 @@ it (test WB13). Where Raven averages a longer step's inflow history from the sho
 \cmd{ROUTE\_DIFFUSIVE\_WAVE}), the start of the first step's inflow is lowered by the average of the last takes' rates;
 \cmd{solution.rvc} therefore also holds the takes from each reach's inflow over the steps of Raven's inflow history
 (\cmd{:GWRiverInflowTakes}), which the restart averages as Raven averages the inflows, and the first step books that
-average (test WB14). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
+average (test WB14). This restores the take exactly. Raven's averaging itself still books a downstream reach's first
+inflow against the upstream reach's last outflow, so where takes on an upstream reach made its outflow vary, a restart
+with a longer step changes Raven's balance error by Raven's own amount, as without groundwater whenever the inflows vary
+(a known issue of Raven, Section~\ref{ch:limits}). \cmd{GWBudget.csv} books the whole take in its step (\emph{river
 exchange applied to Raven}), as MODFLOW receives it.
 
 \subsection{The whole system}

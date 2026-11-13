@@ -3,3 +3,6 @@
 @@ -3 +3 @@
 -:Duration           1096
 +:Duration           365
+@@ -42,2 +41,0 @@
+-:EnsembleMode       ENSEMBLE_MONTECARLO 5
+-:RandomSeed         7
