@@ -104,9 +104,12 @@ def rvc_same(a, b):
     of each, and a unit of a double for each number read back: a coupled run writes its states with 17 significant digits,
     a run without groundwater with fewer); the
     :GWVadoseColumnTops block
-    (written with the unsaturated columns) is compared when both files hold it and left out when only one does"""
+    (written with the unsaturated columns) is compared when both files hold it and left out when only one does; the
+    method named on a :GWVadoseColumns or :GWVadoseClassColumns line is compared when both files name one"""
     if not (os.path.exists(a) and os.path.exists(b)): return False
     ta, tb = open(a).read(), open(b).read()
+    meth = re.compile(r'^(:GWVadose(?:Class)?Columns) (RICHARDS|KINEMATIC|LAG)\b', re.M)
+    if bool(meth.search(ta)) != bool(meth.search(tb)): ta, tb = meth.sub(r'\1', ta), meth.sub(r'\1', tb)
     tops = re.compile(r':GWVadoseColumnTops[^\n]*\n.*?:EndGWVadoseColumnTops\n', re.S)
     if bool(tops.search(ta)) != bool(tops.search(tb)): ta, tb = tops.sub('', ta), tops.sub('', tb)
     if ta == tb: return True

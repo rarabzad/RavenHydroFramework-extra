@@ -31,6 +31,12 @@ W10 W9 with a limit of 1: the step stops, naming the head, the cell "(l r c)", t
 W11 a head crossing the model (position-based test): SKIP (not implemented).
 W12 an existing NEWTON model whose top layer is inactive (IDOMAIN 0), 40 mm/d, limit 2: every interface warning names a
     cell of layer 2 (the link's top active cell, not layer 1).
+W13 restarts after unconverged steps keep the heads the far-head test compares with: the W7 model as a generated model
+    (the well a :Wells entry pumping 1e4 m3/d) with :SolverMaxOuterIterations 3, whose steps 1-8 do not converge. A run
+    of 3 days ends on an unconverged step: its solution.rvc holds :GWStartHeads (the heads of the last converged step, here
+    those at the start of the run); a 1-day run restarted from it (again unconverged) writes the same :GWStartHeads, value
+    for value; a run of 10 days (ending converged) writes none; a run restarted on day 4 from the 3-day run equals the
+    continuous run (GWBudget.csv, 1e-9 relative).
 """
 import os, sys, re, shutil
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -233,8 +239,44 @@ def w12():
     print('  W12: %d interface warnings, layers named %s -> %s' % (len(w), sorted(set(cells)), 'ok' if g else 'FAIL'))
     return g
 
+def w13():
+    print('W13 restarts after unconverged steps: the heads the far-head test compares with are carried (:GWStartHeads)')
+    days = 12
+    def gen(name, nd, start=1, rvc=None):
+        d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+        L = FAR['nhru'] * FAR['hru_w']; lon, lat = sz_models.ll(-0.5 * L + 1.25 * FAR['hru_w'], 0.0)
+        sz_models.make_case(d, **dict(FAR, days=days, extra_rvg=':SolverMaxOuterIterations 3\n:Wells\n  :Attributes, NAME, LATITUDE, LONGITUDE, SCREEN_TOP, SCREEN_BOT\n'
+                                      '  1, PW_1, %.7f, %.7f, 90, 60\n:EndWells\n' % (lat, lon)))
+        open(os.path.join(d, 'm.rvt'), 'a').write('\n:WellFlowRate 1 m3/d\n  2000-01-01 00:00:00 1.0 %d\n' % days + '  -10000\n' * days + ':EndWellFlowRate\n')
+        p = os.path.join(d, 'm.rvi'); x = open(p).read().replace(':Duration %d' % days, ':Duration %d' % nd)
+        open(p, 'w').write(x.replace(':StartDate 2000-01-01', ':StartDate 2000-01-%02d' % start))
+        if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+        ok, txt = sz_check.run(d)
+        if not ok: print('  %s: run FAILED\n%s' % (name, txt[-700:]))
+        return d if ok else None
+    def start_heads(d):
+        r = open(os.path.join(d, 'out', 'solution.rvc')).read()
+        m = re.search(r':GWStartHeads\s+(\d+)[^\n]*\n([\s\S]*?):EndGWStartHeads', r)
+        return [float(x) for x in m.group(2).split()] if m else None
+    c, a = gen('w13_cont', days), gen('w13_a', 3)
+    if c is None or a is None: return False
+    b, e = gen('w13_b', 1, start=4, rvc=os.path.join(a, 'out', 'solution.rvc')), gen('w13_c', 10)
+    r = gen('w13_rs', days - 3, start=4, rvc=os.path.join(a, 'out', 'solution.rvc'))
+    if b is None or e is None or r is None: return False
+    nc = int((sz_check.outputs(c)[0]['converged'] == 0).sum())
+    ha, hb, he = start_heads(a), start_heads(b), start_heads(e)
+    g1 = ha is not None and hb == ha and he is None and nc >= 4
+    B, R = sz_check.outputs(c)[0].iloc[3:].reset_index(drop=True), sz_check.outputs(r)[0]
+    num = [k for k in B.columns if pd.api.types.is_numeric_dtype(B[k]) and k != 'time [d]']   # (the restarted run's time starts at 0)
+    dev = max(float(sz_check.tc.max_diff(B[k], R[k], max(float(B[k].abs().max()), 1e-6))) for k in num) if len(B) == len(R) else float('inf')
+    g2 = dev <= 1e-9
+    print('  W13: %d unconverged steps; :GWStartHeads %s after day 3, %s after a restarted unconverged day, %s after a converged day 10 -> %s'
+          % (nc, '%d heads' % len(ha) if ha else 'MISSING', 'the same' if (hb == ha and ha) else 'DIFFERENT or missing', 'none' if he is None else 'WRITTEN', 'ok' if g1 else 'FAIL'))
+    print('  W13: restart on day 4 against the continuous run: largest relative difference in GWBudget.csv %.1e -> %s' % (dev, 'ok' if g2 else 'FAIL'))
+    return g1 and g2
+
 if __name__ == '__main__':
-    names = [a.lower() for a in sys.argv[1:]] or ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w9', 'w10', 'w11', 'w12']
+    names = [a.lower() for a in sys.argv[1:]] or ['w1', 'w2', 'w3', 'w4', 'w5', 'w6', 'w7', 'w9', 'w10', 'w11', 'w12', 'w13']
     ok = all([globals()[n]() for n in names])
     print('confined-cell tests: %s' % ('ALL PASSED' if ok else 'FAILED'))
     sys.exit(0 if ok else 1)

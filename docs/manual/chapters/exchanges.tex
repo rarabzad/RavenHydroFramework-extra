@@ -82,16 +82,20 @@ water table as 16.5 m$^3$ on the first day, then less each day; after 60 days 63
 \end{example}
 
 \subsection{Spreading recharge over the cells}
-The released volume is shared among the HRU's cells in proportion to overlap. Cells whose top cell holds a fixed head
-(Section~\ref{ch:wells}) are skipped, because MODFLOW ignores recharge there:
+The released volume is shared among the HRU's cells in proportion to overlap. MODFLOW ignores recharge on a column whose
+top cell holds a fixed head (Section~\ref{ch:wells}): the share of the HRU's overlap with such columns passes to the fixed
+head instead, so each cell receives the recharge that falls on it:
 \begin{equation}
-Q^{\mathrm{rch}}_i=\sum_{k\in\mathcal{K}}\frac{V_k^{\mathrm{out}}}{\dt}\,\frac{A_{k,i}}{\sum_{j\notin\mathcal{C}}A_{k,j}}
-\quad[\mathrm{m}^3/\mathrm{d}],\qquad r_i=\frac{Q^{\mathrm{rch}}_i}{|\Omega_i|}\quad[\mathrm{m/d}],
+Q^{\mathrm{rch}}_i=\sum_{k\in\mathcal{K}}\frac{V_k^{\mathrm{out}}}{\dt}\,\frac{A_{k,i}}{\sum_{j}A_{k,j}}\quad(i\notin\mathcal{C}),\qquad
+Q^{\mathrm{CHD}}=\sum_{k\in\mathcal{K}}\frac{V_k^{\mathrm{out}}}{\dt}\,\frac{\sum_{j\in\mathcal{C}}A_{k,j}}{\sum_{j}A_{k,j}}\quad[\mathrm{m}^3/\mathrm{d}],
 \end{equation}
-where $\mathcal{C}$ are the fixed-head columns. $|\Omega_i|$ is the area of cell $i$ [m$^2$] and $r_i$ the recharge rate given to MODFLOW's RCH package, applied to the top cell of the column
-(the top layer of an active column is always active). The fractions for one HRU always add up to one, so exactly $V_k^{\mathrm{out}}$
-enters MODFLOW. If an HRU lies entirely on fixed-head cells, its recharge passes to that boundary and is reported in the
-column \emph{recharge onto CHD cells}.
+where $\mathcal{C}$ are the fixed-head columns and the sums over $j$ run over all the HRU's linked columns. The recharge
+rate given to MODFLOW's RCH package is $r_i=Q^{\mathrm{rch}}_i/|\Omega_i|$ [m/d], $|\Omega_i|$ the area of cell $i$
+[m$^2$], applied to the top cell of the column (the top layer of an active column is always active). The fractions for one HRU always add up to one, so exactly
+$V_k^{\mathrm{out}}$ enters MODFLOW or the fixed heads; $Q^{\mathrm{CHD}}$ is reported in the column \emph{recharge onto
+CHD cells}. The rule is continuous in the overlap: a sliver of an HRU over another cell receives the recharge of the
+sliver, not that of the whole HRU. (With \cmd{:SoilZone PHYSICAL} the recharge of a soil-zone HRU is shared by its columns'
+free water, the columns over fixed heads included, Section~\ref{sec:szchd}.)
 \begin{example}[: spreading recharge]
 The 10 km$^2$ HRU of the Section~\ref{ch:grid} example receives 2 mm in a day: $V=0.002\times10^7=20\,000$ m$^3$. The three
 cells get 8\,000, 7\,000 and 5\,000 m$^3$/d; for 4 km$^2$ cells the recharge rates are 2.0, 1.75 and 1.25 mm/d
@@ -108,7 +112,7 @@ depth ($d_x=2$ m).}\label{fig:curves}\end{figure}
 active column), optionally through the recharge-delay store (internal to the coupling, saved in \cmd{solution.rvc}).\par\smallskip
 \textbf{Constraints/notes.} In a coupled HRU \cmd{GROUNDWATER} is a pass-through: no Raven process may draw water from it (start-up error). A
 process that moves water into it may return a negative flux (e.g.\ \cmd{PERC\_GR4JEXCH}): a negative recharge, taken out of the
-aquifer (Section~\ref{sec:negrecharge}). The volume of each HRU is conserved exactly; recharge of HRUs lying wholly on fixed-head cells is reported
+aquifer (Section~\ref{sec:negrecharge}). The volume of each HRU is conserved exactly; recharge on fixed-head cells (each HRU's share of its overlap with them) is reported
 separately.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
@@ -628,11 +632,15 @@ $D_c=-L_c-r_c$, is settled after the step's exchange:
 Over the step the column receives exactly MODFLOW's booked exchange; only the order changes, and the splitting error
 scales with $q^n-q^{n-1}$ instead of $q^n$. If the column cannot give back $D_c$ (the processes used more of the lent
 water than the step's exchange supplied), the remainder is a \emph{debt} that the aquifer repays in the following
-steps through \cmd{SZQ\_RAVEN}; nothing is created or lost (\emph{lagged-exchange debt}, \emph{lagged-exchange
-repayment}). A column that was a specified head in the last step exchanged exactly, so it has no lagged source in the
+steps through \cmd{SZQ\_RAVEN} (\emph{lagged-exchange debt}, \emph{lagged-exchange repayment}). Raven's soil already
+holds that water, so it is owed by the aquifer until it is repaid: a debt on a cell that is a specified head is repaid
+once the cell is released, and the debt still open at the end of a run is a run total of \cmd{GWModelSummary.txt}, with
+the part on cells that are specified heads. A column that was a specified head in the last step exchanged exactly, so it has no lagged source in the
 next step, whether or not its head is held in that step (a \cmd{:BoundaryHead} series can switch it). The last step's
 exchange (0 for such a column) and any open debt are saved in \cmd{solution.rvc} (\cmd{:GWSoilZoneLag}), so a restart
-continues exactly, also at a switch of the specified heads. On the hillslope test the mean head difference to the MODFLOW-only reference falls from
+continues exactly, also at a switch of the specified heads. A restart with \cmd{AFTER} timing or without
+\cmd{:SoilZone PHYSICAL} does not repay a debt of the file: the run warns, and the debt left unrepaid is a run total
+(\emph{hotstart debt unused}). On the hillslope test the mean head difference to the MODFLOW-only reference falls from
 1.8~cm to 0.7~cm and the largest from 6.6~cm to 2.5~cm, with 20\% fewer outer iterations (Figure~\ref{fig:sztiming}).
 
 \subsection{Raven's processes on each part of an HRU}\label{sec:szclasses}
@@ -656,11 +664,15 @@ solved with the specified head $h^{\mathrm{chd}}_i$,
 which is exact for that column (the head does not respond), and the flow is booked as \emph{soil zone to specified
 heads} or \emph{specified heads to soil zone}; capillary rise there comes from the head as well. The column's recharge
 goes to the specified head (\emph{recharge onto CHD cells}), rejected where the ground is saturated. With an existing
-model the specified-head cells may change with its stress periods; the columns follow them step by step. An existing
-model's specified heads are known only once MODFLOW has read the step's period (from the first step on), so unsaturated
-columns (Section~\ref{sec:szvadose}) can exist on such cells: in a step in which a link's cell is a specified head its
-unsaturated columns end, their water above their reference profiles going to the specified head (\emph{recharge onto CHD
-cells}; a run total in \cmd{GWModelSummary.txt}), and a column forms again, at rest, when the cell is no longer one. The
+model the specified-head cells may change with its stress periods, and in a generated model the cells of a
+\cmd{:BoundaryHead} series are held on some steps and not on others (Section~\ref{ch:wells}); the columns follow them step
+by step. Unsaturated columns (Section~\ref{sec:szvadose}) exist on such a cell while it is not held: in a step in which a
+link's cell is a specified head its unsaturated columns end, their water above their reference profiles going to the
+specified head (\emph{recharge onto CHD cells}, and \emph{unsaturated zone to aquifer}; the columns that held water and
+their water are a run total of \cmd{GWModelSummary.txt}), and a column forms again, at rest, when the cell is no longer
+one. A generated model knows the cells held at the start, so no column is built on them; an existing model's specified
+heads are known only once MODFLOW has read the first step's period, so its columns on such cells are built and end in the
+first step. The
 rest column of an HRU covers only the part outside the grid, where there is no aquifer to exchange with.
 
 \subsection{With an existing MODFLOW model}\label{sec:szexisting}
@@ -821,7 +833,7 @@ Raven's channel top width. Positive $q$ is a losing river. When the water table 
 direction); below the bed the river is disconnected and leaks at $C(s-z_{\mathrm{bed}})$.}\label{fig:river}
 \end{figure}
 
-\subsection{Never taking water the river does not have}
+\subsection{Limiting the loss to the channel flow}
 A losing river cannot give more than it carries. The conductance is therefore limited each day so that the largest
 possible loss --- the disconnected rate $C(s-z_{\mathrm{bed}})$ --- is no more than the cell's share (by river length) of
 the flow in the channel reach at the start of the day (the channel flow, upstream of any reservoir at the subbasin outlet):
@@ -832,18 +844,34 @@ with $Q^{\mathrm{out}}_p$ in m$^3$/s ($\times86\,400$ gives m$^3$/d) and $L_p$ t
 release instead would cut off every river cell above a lake whenever the lake is not spilling.) Rivers of disabled
 subbasins get no river cells.
 
-\subsection{Back to Raven's rivers}
+\subsection{Back to Raven's rivers}\label{sec:riverback}
 For each subbasin the net aquifer discharge is $G_p=-\sum_i q^{\mathrm{riv}}_{p,i}$ [m$^3$/d]. A gain is added to the
-subbasin's in-catchment inflow for the day (so it passes Raven's catchment routing like other runoff). A loss is taken
-first from that in-catchment inflow and then, inside Raven's routing loop, from the flow entering the reach from
-upstream. A loss that still cannot be supplied in the day --- rare, because of the limit above --- is \emph{carried} to the
-next day and taken from the river first thing then, so no water is created:
+subbasin's in-catchment inflow for the day (so it passes Raven's catchment routing like other runoff). A loss is taken,
+in this order, from that in-catchment inflow, then inside Raven's routing loop from the flow entering the reach from
+upstream, and then from the reach's own routed outflow (kept at or above 0), before Raven's irrigation demand. The
+outflow holds the water already in the channel and in the in-catchment routing (the runoff of earlier days), so a
+headwater reach on a dry day supplies its loss from it. The take lowers only the outflow delivered downstream (and the
+hydrograph); the reach is routed in the next step from its outflow before the take, so routing methods that keep the
+outflow as their state (Muskingum, Muskingum-Cunge, storage coefficient, \cmd{ROUTE\_HYDROLOGIC}) route the channel's
+own water as without the take. The channel storage therefore follows the routing without the take, the outflow
+delivered is that routing's outflow less the take, and the outflow leaving the watershed is lower by exactly the water
+MODFLOW receives, with every routing method (test WB10). An outflow set from outside the routing after a take
+(streamflow assimilation, a live file, BMI, an ensemble state update; \cmd{ROUTE\_EXTERNAL} reaches are fed this way) is
+the reach's state as set: the take is not added back to it, Raven's books start from it, the step's take is taken from
+the outflow routed from it, and Raven warns (test WB11). Raven's channel storage and outflow integrate the flows over
+the step (the mean of the values at the start and at the end); a take from the inflow or the outflow therefore leaves
+Raven half in the step and half in the next, and Raven's balance books it so (Section~\ref{sec:accraven}); the half of
+the last step's take still to be booked at the end of a run is a run total (\emph{river take in transit}). A loss that the outflow cannot supply either --- a reach whose
+flow stops within the day, after the start-of-day flow allowed the loss --- is \emph{carried} to the next day and taken
+from the river first thing then, so no water is created; Raven warns (the first ten such steps) and the loss still
+carried at the end of a run is a run total of \cmd{GWModelSummary.txt} (\emph{river loss carried}):
 \begin{equation}
 V^{\mathrm{applied},n}_p=G^n_p\,\dt-V^{\mathrm{carry},n-1}_p+V^{\mathrm{carry},n}_p,
 \end{equation}
 where $G^n_p$ is $G_p$ on day $n$ and $V^{\mathrm{carry},n}_p$ [m$^3$] is the loss carried out of day $n$. Summed over a run, the water applied to Raven equals MODFLOW's net
 river exchange minus whatever is still carried at the end (written to \cmd{solution.rvc} as \cmd{:GWRiverLossCarry} and
-taken on the first day of a restart).
+taken on the first day of a restart; the takes of the last day, whose second half Raven books on the next day, are
+written as \cmd{:GWRiverTake}).
 \begin{example}[: river exchange]
 $K_b=0.5$ m/d, $M_b=1$ m, width 40 m, 2\,500 m of river in the cell: $C=0.5\times40\times2\,500/1=50\,000$ m$^2$/d. Bed
 590 m, depth 1.5 m, stage 591.5 m. Water table at 590.8 m: $q=50\,000\times0.7=35\,000$ m$^3$/d lost to the aquifer.
@@ -853,9 +881,9 @@ leaks $50\,000\times1.5=75\,000$ m$^3$/d.
 
 \begin{refcard}{rivers}
 \textbf{Sources/sinks.} Exchanges water in both directions between the aquifer (MODFLOW RIV package \cmd{RIV\_RAVEN} in every river cell) and Raven's
-reaches: gains are added to the subbasin's in-catchment inflow; losses are taken from it and then from the reach inflow.\par\smallskip
+reaches: gains are added to the subbasin's in-catchment inflow; losses are taken from it, then from the reach inflow, then from the reach outflow.\par\smallskip
 \textbf{Constraints/notes.} The conductance is limited by the channel flow at the start of the step; a loss that cannot be supplied is carried to the next
-step. The stage never exceeds the land surface; the bed is never above the model top. Disabled subbasins get no river cells.\par\smallskip
+step (warned about; the loss carried at the end is a run total). The stage never exceeds the land surface; the bed is never above the model top. Disabled subbasins get no river cells.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
 # .rvg

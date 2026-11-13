@@ -14,8 +14,10 @@ Cases (metres/days model md, feet/seconds model fs, linked through :MF6CRS):
             sent/awaiting/delivered), budget file and list file of SWX_RAVEN and RES_RAVEN
   all_ft    the same on the feet/seconds model, equal to all
   restart   all, restarted half-way from solution.rvc (heads, :GWReservoirSeepage in transit): equal to the continuous run
-  plain     (with RAVEN_EXE_REF) the coupled case without these options: outputs and the mf6 folder identical to the
-            reference build (solution.rvc the same state, testconfig.rvc_same)
+  plain     (with RAVEN_EXE_REF) the coupled case without these options and without :StreamPackage (its river package
+            then is one of the model's own, so the river loss taken from Raven's reaches, whose rules the manual gives,
+            is left out): outputs and the mf6 folder identical to the reference build (solution.rvc the same state,
+            testconfig.rvc_same)
 Dry and specified-head cells under the exchanges (the md model edited with flopy; 6 days, 15 in the full mode):
   et_dry    the model without NEWTON, layer 1 made 4 m thick, heads 5 m deep (in layer 2), EXTINCTION_DEPTH 6 m: MODFLOW
             moves the ET of each dry top cell to the cell below; GWBudget.csv's water-table ET is MODFLOW's (budget file,
@@ -62,7 +64,7 @@ def lake_hru(d):
     return int(r[0]), float(r[ie])
 
 
-def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=False, start='1985-10-01', rvc=None, exe=None, model=None, ed=2.0):
+def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=False, start='1985-10-01', rvc=None, exe=None, model=None, ed=2.0, stream=True):
     subprocess.run([sys.executable, tc.SETUP_EXT, d, model or (X + '/' + units)], capture_output=True, check=True)
     t = open(d + '/Liard.rvi').read()
     t = re.sub(r':StartDate\s+\S+\s+\S+', ':StartDate %s 00:00:00' % start, t); t = re.sub(r':Duration\s+\S+', ':Duration %d' % days, t)
@@ -76,6 +78,8 @@ def prep(d, units='md', days=DAYS, et=False, swx=False, res=False, keep_evt=Fals
         g += ':SurfaceWaterExchange SOIL[0] AquiferHRUs LEAKANCE 0.001\n'   # (the example's wetland HRUs are not coupled)
     if res:
         g += ':ReservoirExchange\n'
+    if not stream:   # (the river package stays the model's own: no river exchange with Raven's reaches)
+        g = re.sub(r'\n:StreamPackage[^\n]*', '\n', g)
     open(d + '/Liard.rvg', 'w').write(g)
     if et or keep_evt:
         p = open(d + '/Liard.rvp').read()
@@ -373,7 +377,7 @@ shutil.rmtree(M, ignore_errors=True)
 if tc.REF:
     print('plain: no water-table ET, surface-water or reservoir exchange, against the reference build', flush=True)
     p1, p2 = W + '/plain_new', W + '/plain_ref'
-    m1 = prep(p1, days=10); m2 = prep(p2, days=10, exe=tc.REF)
+    m1 = prep(p1, days=10, stream=False); m2 = prep(p2, days=10, exe=tc.REF, stream=False)
     diffs = []
     for sub in ('out', 'out/mf6'):
         for fn in sorted(os.listdir(p2 + '/' + sub)):

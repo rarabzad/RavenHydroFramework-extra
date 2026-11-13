@@ -382,9 +382,11 @@ others run exactly as they do without groundwater.
 leakage between layers are computed by MODFLOW like any other flow.
 \paragraph{What happens where the water table reaches the surface?} The seepage drains return the water to Raven, where it
 follows Raven's processes (for example baseflow to the river).
-\paragraph{Can the aquifer take more water than a river carries?} Hardly from a river Raven builds: the supply limit caps
-each river cell's largest possible loss at its share of the reach's flow at the start of the step (on a receding river
-a small rest can be carried to the next step). An existing model's stream package keeps its own
+\paragraph{Can the aquifer take more water than a river carries?} Not from a river Raven builds: the supply limit caps
+each river cell's largest possible loss at its share of the reach's flow at the start of the step, and the loss is taken
+from the reach's runoff, inflow and outflow, so the outflow leaving the watershed falls by it. Only a reach whose flow stops within the step
+can leave part of its loss to be carried to the next step (warned about; the loss carried at the end of the run is a run
+total of \cmd{GWModelSummary.txt}). An existing model's stream package keeps its own
 conductance and has no supply limit (Section~\ref{sec:extlimits}): a losing reach can take more than the channel holds, and
 the part the channel cannot supply is carried to the next step (\emph{river loss carried to next step}; exactly accounted).
 Example~B does this for months: the carry reaches about $10^{8}$~m$^3$ and is repaid by the end of the run.

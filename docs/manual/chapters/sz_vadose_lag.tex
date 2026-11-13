@@ -69,8 +69,8 @@ the saturated fraction limit what reaches it); an upward demand ($q_{\mathrm{top
 capillary rise into the soil zone comes from the water table through the column by the steady formula
 (Section~\ref{sec:szcaprise}), even where a column is active; and an inactive column rejects its inflow and returns
 nothing (the contract shared by all methods). A node below equilibrium ($S_i<0$) does not drain; inflow first fills
-it. That state arises only from a hotstart written by another method (\cmd{:GWVadoseColumns} of a \cmd{RICHARDS} run:
-contents below equilibrium after evaporation or capillary rise): a moving water table remaps the excess and the
+it. That state arises only from a hotstart written by \cmd{RICHARDS}, the other method with the hydrostatic reference
+(\cmd{:GWVadoseColumns RICHARDS}: contents below equilibrium after evaporation or capillary rise): a moving water table remaps the excess and the
 equilibrium together, and the cascade itself never takes a node below equilibrium.
 
 \paragraph{Steady start.} With \cmd{:SoilZoneVadoseInitialFlux} $q$ the cascade starts at its steady state for the flux
@@ -112,8 +112,9 @@ flux (only on $t_m$): a wet year travels as fast as a dry one.
 unsaturated share of the recharge, outflow to MODFLOW's recharge (\cmd{RCH\_RAVEN}).\par\smallskip
 \textbf{Constraints/notes.} Linear reservoirs $k_i=t_m\Delta z_i$ on the Richards grid and its equilibrium profile; mass
 conserved to round-off; no content above $\theta_s$; nothing rejected at the top of an active column; capillary rise from
-the water table (steady formula); saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}), interchangeable with the other
-methods' hotstarts.\par\smallskip
+the water table (steady formula); saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns LAG}), interchangeable with
+\cmd{RICHARDS} hotstarts (the same reference profile); a \cmd{KINEMATIC} hotstart's columns start at rest, their water
+reported as dropped.\par\smallskip
 \par\noindent\begin{minipage}{\linewidth}\textbf{Command syntax}
 \begin{lstlisting}
 # .rvg

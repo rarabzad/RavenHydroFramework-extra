@@ -17,7 +17,10 @@ You never edit MODFLOW files; Raven writes them to `<output>/mf6/` so you can in
   2. river stages come from Raven reach depths; well rates and boundary heads from `.rvt` time series;
   3. MODFLOW solves (Newton–Raphson, so cells dry and rewet automatically);
   4. seepage where the water table reaches the model top returns to a Raven store, and aquifer–river
-     exchange is added to or taken from the reaches.
+     exchange is added to or taken from the reaches (a loss from the reach's runoff, then its inflow, then its
+     routed outflow: the take lowers the outflow delivered downstream, while the reach's routing keeps its own water,
+     with every routing method; a loss no reach water can supply is carried to the next step, warned about, and
+     reported in the run totals when still carried at the end).
 
 Raven owns the soil and vadose zone; MODFLOW owns the saturated zone. In coupled HRUs `GROUNDWATER` is a
 pass-through store: its end-of-step value is the recharge sent to MODFLOW. Raven's water balance counts it as
@@ -178,8 +181,9 @@ order where profiles meet.
 | `:SpecifiedHeadBoundary name file HEAD h {LAYERS ALL\|TOP}` | none | fixed-head boundary |
 
 Boundary files are GeoJSON: polygons select cells whose centre lies inside; lines select cells they cross.
-A boundary is placed only in layers whose bottom lies below its head. Recharge falling on specified-head
-cells is spread over the HRU's other cells.
+A boundary is placed only in layers whose bottom lies below its head. MODFLOW ignores recharge on a
+specified-head cell: the recharge of an HRU's overlap with such cells goes to the specified head (`recharge onto CHD
+cells` in `GWBudget.csv`), and its other cells receive the recharge of their own overlap.
 
 ```
 :Wells
@@ -368,7 +372,10 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   conserved even on a step that did not converge (reported in `Raven_errors.txt`, first ten warnings of each kind).
 - Unsaturated columns (`:SoilZoneVadose`) carry the recharge from the soil-zone base down to a water table more than 5 cm
   below it, with its delay and spreading, and follow the water table as it moves (saved as `:GWVadoseColumns`, and
-  `:GWVadoseClassColumns` with depth classes; the methods' hotstarts are interchangeable). Give the aquifer classes
+  `:GWVadoseClassColumns` with depth classes, each naming the method that wrote it). `RICHARDS` and `LAG` read each
+  other's hotstarts (the same reference profile); `KINEMATIC` counts the water from another reference, so on a restart
+  that switches to or from it the columns start at rest, and the run warns and reports the water dropped
+  (`hotstart columns unused` in the run totals, as for hotstart lines that match no column of the run). Give the aquifer classes
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
   curve implies (a warning when they differ by more than a factor two). Column water goes back to the soil zone, as
   rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
@@ -427,9 +434,14 @@ the run naming the command.
 In a coupled run Raven's `solution.rvc` holds every value with 17 significant digits (the HRU states, the channel and
 reservoir states and the groundwater blocks; a run without groundwater writes Raven's usual 5 decimals, and reservoir stages and flows with 12 digits, with or without groundwater). It also contains
 `:GWHeads nlay nrow ncol` (the head of every cell), and when needed `:GWRechargeStore` (recharge-delay stores), `:GWReservoirSeepage` (reservoir
-seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), and with `:SoilZone PHYSICAL`
+seepage in transit), `:GWRiverLossCarry` (river loss still to be taken), `:GWRiverTake` (the river loss taken from
+reach inflows and outflows in the last step, which Raven's channel storage and balance book half in the next step),
+`:GWStartHeads` (after an unconverged step: the heads of the last converged step, for the far-head test), and with `:SoilZone PHYSICAL`
 `:GWSoilZoneColumns` (soil-zone columns), `:GWVadoseColumns`, `:GWVadoseClassColumns` and `:GWVadoseColumnTops`
-(unsaturated columns; a column whose top differs starts at rest) and `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt), each closed by its `:End...` line. A corrupt
+(unsaturated columns; the column lines name the method that wrote them; a column whose top, node count, classes or
+method's reference profile differ starts at rest, and the water of lines no column uses is warned about and reported as
+dropped) and `:GWSoilZoneLag` (LAGGED timing: last step's exchange and open debt; a restart with AFTER timing or without
+`:SoilZone PHYSICAL` does not repay that debt, and warns and reports it), each closed by its `:End...` line. A corrupt
 `:GWHeads` header, a value that is not a finite number in any of these blocks, or negative water in the soil-zone or
 unsaturated columns stops the run with a message. In a coupled run, a run continued from `solution.rvc` (as the `.rvc`
 of the next run) carries on exactly where the previous run stopped (the restarted run starts from the states as they
@@ -448,11 +460,11 @@ by a constant (a known issue of Raven itself, section 9).
 | --- | --- |
 | `GWBudget.csv` | per step: Raven recharge, MODFLOW recharge, seepage, storage release, balance error (m3/d and % of the gross flow), returned to Raven, outer iterations and convergence, river leakage and discharge, river exchange applied to Raven, river loss carried to next step, water-table ET, wells (specified, actual), GHB, CHD, recharge-delay storage, recharge onto CHD cells, surface-store and reservoir exchange; existing models: other model packages; soil-zone columns (section 4.3c) |
 | `GWHRUState.csv` | per coupled HRU: mean water-table head and depth below land surface |
-| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level and water table (means over all the HRU's soil-zone columns, those over specified heads included; empty for an HRU without a column), saturated fraction, exchange with the aquifer both ways, rejected recharge, overflow, soil water and capacity; with specified heads also the exchange with them both ways. Summed over the HRUs, the exchange columns equal those of `GWBudget.csv`. Two model-wide values of the step, `interface updates` and `interface change [m]`, are repeated on every row |
+| `GWSoilExchange.csv` | `:SoilZone PHYSICAL`: per soil-zone HRU and step, soil-zone base, soil water level and water table (means over all the HRU's soil-zone columns, those over specified heads included; empty for an HRU without a column; the soil water level of a column without free water is the lowest soil-zone base of its DEM points, which can lie below the mean base), saturated fraction, exchange with the aquifer both ways, rejected recharge, overflow, soil water and capacity; with specified heads also the exchange with them both ways. Summed over the HRUs, the exchange columns equal those of `GWBudget.csv`. Two model-wide values of the step, `interface updates` and `interface change [m]`, are repeated on every row |
 | `GWHeads.csv` | head at each observation well, starting at t = 0 (a monitoring well whose screened cell is dry reports the missing value -1.2345) |
 | `GWConnectivity.csv` | saturated fraction of the top layer per profile; number of connected saturated areas |
 | `GWHeads.nc` | head(time, layer, y, x) with latitude/longitude (optional, :WriteNetCDFHeads) |
-| `GWModelSummary.txt` | MODFLOW library and version, grid, active cells, profiles, river/well/boundary cells, HRU-to-grid linkage per HRU; run totals at the end (unconverged steps, discharge withheld on unconverged steps, soil-zone counts) |
+| `GWModelSummary.txt` | MODFLOW library and version, grid, active cells, profiles, river/well/boundary cells, HRU-to-grid linkage per HRU; run totals at the end (unconverged steps, discharge withheld on unconverged steps, soil-zone counts, river loss still carried, lagged-exchange debt open, hotstart columns and debt not used) |
 | `mf6/` | the generated MODFLOW 6 model, list file (`mfsim.lst`) and head file (`gwf.hds`); with `:WriteGWBudgetFile` also `gwf.cbc` and `gwf.porosity` |
 | `prt/` | written by `tools/make_prt.py OUTPUT [--backward] [--points file] [--run libmf6]`: a MODFLOW 6 PRT simulation on the run's flows (release points around the `:Wells`, or from a file), and after `--run` its tracks (`prt.trk.csv`) and `endpoints.csv` (release time, end point and travel time of each particle; one release per point, forward at the start of Raven's run, backward at its end, a steady-state initialization period left out of the window). PRT needs DIS or DISV grids (REGULAR, QUADTREE); PRT needs the flows of every step (`:HeadSaveFrequency 1`); the script stops with a message when steps are missing |
 
@@ -575,7 +587,3 @@ rebuilt and MODFLOW 6 restarted each time, with its files in each member's outpu
   2,364 m3 in that step (without groundwater, in base Raven and with the coupling alike), +14.92 mm coupled (4,776 m3), about 50 mm for a
   lake spilling 16,100 m3/d, 0.1 to 0.6 mm for seepage in transit. The restarted run's states, flows and stages are the
   continuous run's (exactly in a coupled run); only that column, and the Raven balance `tools_audit.py` reports, is offset.
-  A restart right after a step in which a river loss was taken from a reach's upstream inflow (a loss larger than the
-  runoff reaching the reach) offsets `MB Error` by minus half that take in the same way (this one needs the coupling's river exchange: the loss is
-  booked in its step, Raven's channel storage takes in half of it in the next step; -0.0011 mm in the Liard example
-  after a take of 591,414 m3); the flows are not affected.

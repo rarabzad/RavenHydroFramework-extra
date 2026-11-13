@@ -21,8 +21,9 @@ Checks:
     member, files in EPSG:32610 with :InputCRS EPSG:32609, and a well given by X and Y without :InputCRS stop Raven with a
     message naming the file or :InputCRS; with :InputCRS, a DEM raster, an HRU file and a boundary file left in
     longitude/latitude stop with "looks like longitude/latitude";
-  - with RAVEN_EXE_REF: the lon/lat run is byte-identical to the reference build (solution.rvc the same state,
-    testconfig.rvc_same; otherwise SKIP).
+  - with RAVEN_EXE_REF: the lon/lat run with the GHB boundary only is byte-identical to the reference build
+    (solution.rvc the same state, testconfig.rvc_same; otherwise SKIP). The specified-head lake is left out of that
+    comparison: its cells lie under parts of HRUs, whose recharge share goes to them (the recharge rule of the manual).
 Quick mode (RAVEN_TEST_QUICK=1): 10 days; full mode: 120 days.
 """
 import os, sys, re, json, shutil, subprocess, filecmp
@@ -159,6 +160,13 @@ def ow_block(xy):
 def make_lonlat(d, days):
     copy_liard(d, days)
     edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :', ':'))] + HEADS, ow_block(False)); add_lake_series(d, days)
+
+
+def make_lonlat_ghb(d, days):
+    """the lon/lat run with the GHB boundary only: the reference comparison leaves out the specified-head lake, whose cells
+    lie under parts of HRUs (their recharge share goes to the lake's cells: an intended change of the recharge rule)"""
+    copy_liard(d, days)
+    edit_rvg(d, [(BOUNDS, BOUNDS.replace('# :GeneralHeadBoundary', ':GeneralHeadBoundary'))] + HEADS, ow_block(False))
 
 
 def make_utm(d, days, crs_line=':InputCRS EPSG:32610\n', well_xy=True):
@@ -322,15 +330,16 @@ if not NOLIB:
             eh, ch = csv_rel(os.path.join(dl, 'out', 'Hydrographs.csv'), os.path.join(du, 'out', 'Hydrographs.csv'))
             report('Hydrographs.csv agree within 1e-2 (resampled rasters)', eh < 1e-2, '%.2e (%s)' % (eh, ch))
             if tc.REF:
-                dr = os.path.join(W, 'rasters_lonlat_ref'); make_lonlat(dr, DAYS); run(dr, exe=tc.REF)
+                dr, dn = os.path.join(W, 'rasters_lonlat_ref'), os.path.join(W, 'rasters_lonlat_ghb')
+                make_lonlat_ghb(dr, DAYS); run(dr, exe=tc.REF); make_lonlat_ghb(dn, DAYS); run(dn)
                 diffs = []
-                for f in sorted(os.listdir(os.path.join(dl, 'out'))):
-                    pa, pb = os.path.join(dl, 'out', f), os.path.join(dr, 'out', f)
+                for f in sorted(os.listdir(os.path.join(dn, 'out'))):
+                    pa, pb = os.path.join(dn, 'out', f), os.path.join(dr, 'out', f)
                     if os.path.isdir(pa) or f in ('GWModelSummary.txt', 'Raven_errors.txt'):
                         continue
                     if not tc.same_output(pa, pb):
                         diffs.append(f)
-                report('lon/lat run byte-identical to RAVEN_EXE_REF (outputs except the two text logs)', not diffs, ', '.join(diffs))
+                report('lon/lat run (GHB boundary only) byte-identical to RAVEN_EXE_REF (outputs except the two text logs)', not diffs, ', '.join(diffs))
             else:
                 tc.skip('lon/lat run against the reference build')
 print('crs inputs: ALL PASSED' if fails == 0 else 'crs inputs: %d FAILED' % fails)

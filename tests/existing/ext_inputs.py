@@ -12,6 +12,10 @@ time series (TS6) on a restart. On the synthetic Liard model of make_ext_model.p
                   package Raven takes over: the rows are written into the working copy without that mover, and the run
                   equals the one with the rows inline, byte for byte, with exact accounts
   tas6_refused    a time-array series (TAS6) still stops a later start
+  package_names   the discretization and storage packages given names of their own in the model's name file
+                  (DIS6 ... grid_main, STO6 ... storage_main): MODFLOW keeps them in its memory under its fixed names, which
+                  Raven reads, so the run equals the run with the usual names (GWBudget.csv byte for byte; 5 days) and
+                  has no "storage flows not accessible" warning (the storage column and MODFLOW's balance check kept)
 Quick mode (RAVEN_TEST_QUICK=1): 50 days, restart at day 23; full mode 120 days, restart at day 53.
 Usage: python3 ext_inputs.py     (prints 'existing-model input forms: ALL PASSED')"""
 import os, sys
@@ -138,6 +142,24 @@ if 'Successful' in rc and 'Successful' in r:
     check('restarted run: recharge identity, residual', abs(A['recharge: (Raven - MF6 - dStore - toCHD)/Raven']) < 1e-9 and abs(A['MF6 cumulative residual / gross flow']) < 1e-7,
           '%.1e %.1e' % (A['recharge: (Raven - MF6 - dStore - toCHD)/Raven'], A['MF6 cumulative residual / gross flow']))
 for x in (c, r1, r2): shutil.rmtree(x, ignore_errors=True)
+
+# ---- DIS6 and STO6 under names of their own in the name file
+print('package_names', flush=True)
+def pkgnames(md):
+    t = open(md + '/gwf_liard.nam').read()
+    t2 = re.sub(r'(DIS6\s+\S+\s+)dis\b', r'\1grid_main', t); t2 = re.sub(r'(STO6\s+\S+\s+)sto\b', r'\1storage_main', t2)
+    assert t2.count('grid_main') == 1 and t2.count('storage_main') == 1
+    open(md + '/gwf_liard.nam', 'w').write(t2)
+m_pk = model('pkgnames', pkgnames); m_std = model('pkgstd', lambda md: None)
+d1, d2 = W + '/pk_std', W + '/pk_named'
+r1, r2 = run(d1, m_std, day(0), 5), run(d2, m_pk, day(0), 5)
+check('run with the usual package names', 'Successful' in r1, r1[:120])
+check('run with DIS6 and STO6 named grid_main and storage_main', 'Successful' in r2, r2[:150])
+if 'Successful' in r1 and 'Successful' in r2:
+    err = open(d2 + '/out/Raven_errors.txt').read()
+    check('no "storage flows not accessible" warning', 'storage flows not accessible' not in err)
+    check('GWBudget.csv equals the usual names\' run, byte for byte', filecmp.cmp(d1 + '/out/GWBudget.csv', d2 + '/out/GWBudget.csv', shallow=False))
+for x in (d1, d2, m_pk, m_std): shutil.rmtree(x, ignore_errors=True)
 
 # ---- TAS6 still refused on a later start
 print('tas6_refused', flush=True)

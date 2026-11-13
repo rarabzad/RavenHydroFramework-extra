@@ -18,7 +18,8 @@ TC5 testconfig.rvc_same, the comparison of solution.rvc with a reference build's
    significant digits are the same state when they agree to the 5 decimals; a value that differs in the 5th decimal, a
    whole number written as 200 against 199.6, a changed word, two 17-digit heads 1e-13 m apart, or a :GWVadoseColumnTops
    value that differs when both files hold the block are not; 481.457924970300 (12 decimals) and 481.4579249703005 (17
-   digits), two roundings of one value 5.1e-13 apart, are; a block only one file holds is left out.
+   digits), two roundings of one value 5.1e-13 apart, are; a block only one file holds is left out, and so is the method
+   named on a :GWVadoseColumns line when only one file names it (two different methods are not the same).
 Without the MODFLOW 6 library TC1 and TC2 print SKIP.
 """
 import os, sys, re, shutil, subprocess
@@ -144,7 +145,11 @@ def t3_t5():
                                 full.replace('97.5', '481.4579249703005'), True),
                                ('column tops in both files, the same', full + tops, full + tops, True),
                                ('column tops in both files, a top 1e-13 m apart', full + tops, full + tops.replace('99.012345678901234', '99.012345678901334'), False),
-                               ('column tops in one file only', full + tops, full, True)):
+                               ('column tops in one file only', full + tops, full, True),
+                               ('the columns\' method named in one file only', full + ':GWVadoseColumns\n  1, 1, 95.5, 0.31\n:EndGWVadoseColumns\n',
+                                full + ':GWVadoseColumns RICHARDS\n  1, 1, 95.5, 0.31\n:EndGWVadoseColumns\n', True),
+                               ('another method named in each file', full + ':GWVadoseColumns LAG\n  1, 1, 95.5, 0.31\n:EndGWVadoseColumns\n',
+                                full + ':GWVadoseColumns RICHARDS\n  1, 1, 95.5, 0.31\n:EndGWVadoseColumns\n', False)):
         open(p, 'w').write(a_); open(q, 'w').write(b_)
         report('TC5 rvc_same, %s' % name, tc.rvc_same(p, q) == want)
 

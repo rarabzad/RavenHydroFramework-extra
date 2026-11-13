@@ -64,7 +64,10 @@ at $\theta_r$ and soak up recharge until they are wetted (below).
 digits, which is the whole state of a kinematic column. The contents are restored as written, including those below the
 air-dry content of the retention curve (the reference $\theta_r=\theta_s-S_y$ is there when $S_y$ is close to the
 porosity), so a restart continues the run exactly (test K5: 60 + 60 days equal 120 days in one go, largest relative
-deviation 0; \cmd{test\_restart.py} RS4 with $S_y$ equal to the porosity).
+deviation 0; \cmd{test\_restart.py} RS4 with $S_y$ equal to the porosity). The block names the method
+(\cmd{:GWVadoseColumns KINEMATIC}): the contents are water above $\theta_s-S_y$, not above the hydrostatic profile of
+\cmd{RICHARDS} and \cmd{LAG}, so a restart with one of those (or a \cmd{KINEMATIC} restart from their hotstart) starts
+the columns at rest and reports the water dropped (test VI9).
 
 \paragraph{Nodes.} The grid is the capped one of Section~\ref{sec:szvadose}: with $N\le18$ it grows from 5~cm-scale
 end volumes towards the middle; from $N=19$ on the extra volumes fill the middle, so raising $N$ refines the whole

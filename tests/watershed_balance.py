@@ -20,14 +20,46 @@ WB5  a disabled HRU: WB1's model with HRU 4 in a subbasin of its own, disabled (
 WB6  a cold start whose .rvc sets GROUNDWATER (5 mm, :UniformInitialConditions): the first step empties the store before any
      exchange, so MODFLOW never receives it; Raven warns (Raven_errors.txt names GROUNDWATER and :GWHeads), books it as
      leaving Raven in the first step (Cum. Outflow of step 1 at least 5 mm) and its |MB error| <= 1e-6 mm.
+River losses (a losing river: RIVERBED_K 20 m/d, the water table 6 m below the land, 40 mm/d of rain on days 1-3):
+WB7  a loss taken from a reach's inflow: two subbasins, the lower one losing and fed by a 0.02 m3/s
+     :BasinInflowHydrograph, so the loss is taken from the inflow on every step. Raven's channel storage and outflow take a
+     change of inflow half in the step and half in the next, and so does Raven's balance: |MB error| <= 1e-6 mm on every
+     step, with a take on at least 5 steps, and the run total 'river take in transit' is half the last step's take
+     (:GWRiverTake; the summary's 6 digits); a run restarted on day 5 (a take day) from the first part's solution.rvc
+     (:GWRiverTake) has |MB error| <= 1e-6 mm and the continuous run's hydrographs (1e-9 relative); each member of a 2-member
+     Monte Carlo ensemble equals the single run (GWBudget.csv, Hydrographs.csv: 1e-12 relative) and has |MB error| <= 1e-6 mm.
+WB8  a headwater reach (one subbasin, no inflow) with a 10-day in-catchment unit hydrograph (ROUTE_TRI_CONVOLUTION): on the
+     dry days the loss is taken from the reach's outflow, so the loss carried at the end of the run is at most 1 % of
+     MODFLOW's river leakage, and the outflow is lower than in the same model without the river by the loss applied
+     (summed over the run, within 1 %); |MB error| <= 1e-6 mm; a run restarted on day 6 (a day whose loss came from the
+     outflow) has the continuous run's hydrographs and channel storage (1e-9 relative).
+WB10 every channel routing method (MUSKINGUM and MUSKINGUM_CUNGE over a 300 km reach; STORAGECOEFF, ROUTE_HYDROLOGIC,
+     DIFFUSIVE_WAVE and PLUG_FLOW over 30 km): SB2 losing (bed conductivity 200 m/d), fed only by a 0.05 m3/s inflow on
+     days 1-5 (no rain, so no lateral flow), then 35 dry days of recession, so the loss is taken from the inflow and then
+     from the reach's outflow. Against the same run without the river: the volume that left the watershed is lower by
+     exactly the loss taken (0.5 m3 + 1e-5, the file's digits), and the channel storage at the end is the same (1e-5 of
+     the take, the water still in transit at the end of the 300 km reaches: the methods that keep the outflow as their state route the channel's own water as without the take).
+     Also with an irrigation demand of 0.003 m3/s on SB2, the run without the river given the irrigation the river run
+     delivered, so both withdraw the same (Raven's own irrigation withdrawal lowers its routing state with these methods;
+     the take adds nothing to that).
+WB11 a reach whose outflow is set from outside the routing: both subbasins ROUTE_EXTERNAL, a live file (:ReadLiveFile)
+     setting SB1's outflow to 0 and SB2's to 0.02 m3/s every step, no rain and no inflow, so SB2's loss is taken from the
+     outflow the live file set: the outflow delivered at the end of each step is that outflow less the step's take
+     (hydrograph: the mean of the two, against the run without the river; 0.01 m3 + 1e-4 per step), the channel storage
+     ends as in the run without the river (1e-6 of the takes; added back to the set outflow, the last take would hide the
+     take from the flows and lower the channel storage by it every step), and Raven warns that the outflow was set from
+     outside the routing.
+WB9  the same reach with :CatchmentRoute ROUTE_DUMP: the reach stops flowing on day 4, whose loss it can no longer
+     supply; that loss is carried and reported: a warning in Raven_errors.txt and the run total 'river loss carried' in
+     GWModelSummary.txt, equal to the last value of 'river loss carried to next step' in GWBudget.csv (1e-6 relative).
 
-Usage: python3 watershed_balance.py   (needs RAVEN_MF6_LIB; seconds)
+Usage: python3 watershed_balance.py   (needs RAVEN_MF6_LIB; about a minute)
 """
-import os, sys, re, shutil
+import os, sys, re, shutil, json, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, os.path.join(HERE, 'soilzone')); sys.path.insert(0, HERE)
 import testconfig as tc
 import sz_models, sz_check
-import pandas as pd
+import numpy as np, pandas as pd
 
 tc.need_mf6()
 W = os.path.dirname(tc.work('watershed_balance', 'x'))
@@ -121,6 +153,246 @@ if c is not None:
           % ('WB6 cold start with GROUNDWATER in the .rvc: warned and booked', 'ok' if good else 'FAIL', 'given' if warned else 'MISSING', out1, mbx))
 else:
     judge('WB6 cold start with GROUNDWATER in the .rvc', None, t)
+
+
+# ---- river losses ------------------------------------------------------------------------------------------------------
+RCFG = dict(nhru=4, hru_w=200.0, width=200.0, cell=100.0, slope=0.01, z0=100.0, init_depth=6.0, Kh=10.0, Kv=1.0, aq_thick=12.0,
+            Sy=0.1, perc=10.0, physical=False)
+CHAN = (':ChannelProfile CHAN\n  :Bedslope 0.01\n  :SurveyPoints\n    0 2.0\n    2 0\n    8 0\n    10 2.0\n  :EndSurveyPoints\n'
+        '  :RoughnessZones\n    0 0.035\n  :EndRoughnessZones\n:EndChannelProfile\n')
+
+
+def sub(p, a, b):
+    t = open(p).read(); assert a in t, (p, a); open(p, 'w').write(t.replace(a, b))
+
+
+def river_case(d, days, upstream, croute='ROUTE_TRI_CONVOLUTION', river=True, route='ROUTE_DIFFUSIVE_WAVE', reach=0.8, rain=None, qin=None,
+               rbk=20.0, irr=None):
+    """the losing-river set-up; upstream: two subbasins (SB1 -> SB2, SB2 losing, with an inflow hydrograph: qin [m3/s]
+    per day, default 0.02 throughout), else one headwater subbasin; route the channel routing, reach the reach length
+    [km]; rain [mm/d] per day (default 40 on days 1-3); irr an irrigation demand on SB2 [m3/s]"""
+    shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, rain=rain if rain is not None else [40.0] * 3 + [0.0] * (days - 3), days=days, **RCFG)
+    rvh, rvi, rvp, rvg = (os.path.join(d, 'm.' + e) for e in ('rvh', 'rvi', 'rvp', 'rvg'))
+    L = RCFG['nhru'] * RCFG['hru_w']; XS = -0.5 * L
+    if upstream:
+        sub(rvh, '  1, box, -1, NONE, ZERO-, 1', '  1, up, 2, CHAN, %g, 1\n  2, down, -1, CHAN, %g, 1' % (reach, reach))
+        h = open(rvh).read().split('\n')
+        for i, l in enumerate(h):
+            w = [x.strip() for x in l.split(',')]
+            if len(w) > 10 and w[0] in ('3', '4'):
+                w[5] = '2'; h[i] = '  ' + ', '.join(w)
+        open(rvh, 'w').write('\n'.join(h) + '\n:SubBasinProperties\n  :Parameters, Q_REFERENCE\n  :Units, m3/s\n  1, 0.05\n  2, 0.05\n:EndSubBasinProperties\n')
+        line, sbid = [sz_models.ll(XS + 0.5 * L + 20.0, 0.0), sz_models.ll(XS + L - 20.0, 0.0)], 2
+        q = list(qin) + [0.0] * (days + 5 - len(qin)) if qin is not None else [0.02] * (days + 5)
+        open(os.path.join(d, 'm.rvt'), 'a').write('\n:BasinInflowHydrograph 2\n  2000-01-01 00:00:00 1.0 %d\n' % len(q) + ''.join('  %g\n' % x for x in q)
+                                                  + ':EndBasinInflowHydrograph\n')
+        if irr is not None:   # (a demand [m3/s], or a series of daily demands)
+            v = list(irr) + [0.0] * (days + 5 - len(irr)) if isinstance(irr, (list, tuple)) else [irr] * (days + 5)
+            open(os.path.join(d, 'm.rvt'), 'a').write('\n:IrrigationDemand 2\n  2000-01-01 00:00:00 1.0 %d\n' % len(v) + ''.join('  %.17g\n' % x for x in v)
+                                                      + ':EndIrrigationDemand\n')
+            open(os.path.join(d, 'm.rvi'), 'a').write(':WriteDemandFile\n')
+        open(rvp, 'a').write(':AvgAnnualRunoff 300\n')
+    else:
+        sub(rvh, '  1, box, -1, NONE, ZERO-, 1', '  1, box, -1, CHAN, 0.8, 1')
+        open(rvh, 'a').write('\n:SubBasinProperties\n  :Parameters, Q_REFERENCE, TIME_TO_PEAK, TIME_CONC\n  :Units, m3/s, d, d\n  1, 0.05, 2.0, 10.0\n:EndSubBasinProperties\n')
+        line, sbid = [sz_models.ll(XS + 20.0, 0.0), sz_models.ll(XS + L - 20.0, 0.0)], 1
+    sub(rvi, ':Routing ROUTE_NONE', ':Routing ' + route)
+    sub(rvi, ':CatchmentRoute ROUTE_DUMP', ':CatchmentRoute ' + croute)
+    open(rvp, 'a').write(CHAN)
+    sub(rvp, ':Parameters, PARTITION_COEFF\n  :Units, none\n  [DEFAULT], 0.0', ':Parameters, PARTITION_COEFF\n  :Units, none\n  [DEFAULT], 0.6')
+    sub(rvp, ':Attributes, INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH',
+        ':Attributes, INITIAL_HEAD_DEPTH, DEFAULT_BEDROCK_DEPTH, SEEPAGE_LEAKANCE, SEEPAGE_SMOOTHING_DEPTH, RIVERBED_K, RIVERBED_THICKNESS')
+    sub(rvp, '  :Units, m, m, 1/d, m\n', '  :Units, m, m, 1/d, m, m/d, m\n')
+    t = open(rvp).read(); i = t.find('\n  AQ, ', t.find('RIVERBED_THICKNESS')); j = t.find('\n', i + 1)
+    open(rvp, 'w').write(t[:j] + ', %g, 1.0' % rbk + t[j:])
+    if river:
+        json.dump({"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"SUBID": sbid}, "geometry": {"type": "LineString", "coordinates": line}}]},
+                  open(os.path.join(d, 'river.geojson'), 'w'))
+        open(rvg, 'a').write(':RiverGeometry river.geojson SUBID\n')
+    return d
+
+
+def restart_parts(d, days, rday):
+    """the first rday days and the rest from the first part's solution.rvc; returns (first, second) folders or None"""
+    p1, p2 = d + '_p1', d + '_p2'
+    for x in (p1, p2):
+        shutil.rmtree(x, ignore_errors=True); shutil.copytree(d, x, ignore=shutil.ignore_patterns('out'))
+    sub(os.path.join(p1, 'm.rvi'), ':Duration %d' % days, ':Duration %d' % rday)
+    ok1, _ = sz_check.run(p1)
+    sub(os.path.join(p2, 'm.rvi'), ':Duration %d' % days, ':Duration %d' % (days - rday))
+    sub(os.path.join(p2, 'm.rvi'), ':StartDate 2000-01-01', ':StartDate 2000-01-%02d' % (rday + 1))
+    if not ok1:
+        return None
+    shutil.copy(os.path.join(p1, 'out', 'solution.rvc'), os.path.join(p2, 'm.rvc'))
+    ok2, _ = sz_check.run(p2)
+    return (p1, p2) if ok2 else None
+
+
+def csv(d, f):
+    x = pd.read_csv(os.path.join(d, 'out', f)); x.columns = [c.strip() for c in x.columns]
+    return x
+
+
+def rel_dev(a, b):
+    a = np.asarray(a, dtype=float); b = np.asarray(b, dtype=float)
+    return float(np.max(np.abs(a - b) / np.maximum(np.abs(a), 1e-12))) if len(a) == len(b) and len(a) else float('inf')
+
+
+def flows(d):
+    h = csv(d, 'Hydrographs.csv')
+    return h[[c for c in h.columns if c.endswith('[m3/s]') and 'precip' not in c.lower()]].values.ravel()
+
+
+# WB7: a loss taken from the reach's inflow
+DAYS7 = 12
+d7 = river_case(os.path.join(W, 'wb7_inflow_take'), DAYS7, upstream=True)
+ok7, txt7 = sz_check.run(d7)
+if not ok7:
+    results.append(('WB7', False)); print('WB7 FAIL (the run failed: %s)' % txt7.strip().split('\n')[-1][:120])
+else:
+    b, w = csv(d7, 'GWBudget.csv'), csv(d7, 'WatershedStorage.csv')
+    ntake = int((b['river exchange applied to Raven [m3]'] < -1e-6).sum()); mbx = float(w['MB Error [mm]'].abs().max())
+    m = re.search(r':GWRiverTake[^\n]*\n([\s\S]*?):EndGWRiverTake', open(os.path.join(d7, 'out', 'solution.rvc')).read())
+    half = 0.5 * sum(float(x) for l in m.group(1).strip().split('\n') for x in l.split(',')[1:3]) if m else 0.0
+    mt = re.search(r'river take in transit\s*: (\S+) m3', open(os.path.join(d7, 'out', 'GWModelSummary.txt')).read())
+    g1 = ntake >= 5 and mbx <= LIM and half > 0.0 and mt is not None and abs(float(mt.group(1)) - half) <= 5e-6 * half
+    print('%-70s %s  (loss taken on %d steps; largest |MB error| %.2g mm; take in transit %s m3, half of the last step: %.6g)' % (
+          'WB7 river loss taken from the inflow: MB error at round-off', 'ok' if g1 else 'FAIL', ntake, mbx, mt.group(1) if mt else 'MISSING', half))
+    parts = restart_parts(d7, DAYS7, 5)
+    if parts is None:
+        g2 = False; print('WB7 restart FAIL (a run failed)')
+    else:
+        rvc = open(os.path.join(parts[0], 'out', 'solution.rvc')).read(); w2 = csv(parts[1], 'WatershedStorage.csv')
+        fc, fr = flows(d7), flows(parts[1]); n2 = len(fr)
+        dq = rel_dev(fc[-n2:], fr); mb2 = float(w2['MB Error [mm]'].abs().max())
+        g2 = ':GWRiverTake' in rvc and mb2 <= LIM and dq <= 1e-9
+        print('%-70s %s  (:GWRiverTake %s; largest |MB error| %.2g mm; hydrographs %.1e)' % ('WB7 restart on a take day: MB error at round-off, the same flows', 'ok' if g2 else 'FAIL',
+              'written' if ':GWRiverTake' in rvc else 'MISSING', mb2, dq))
+    e = d7 + '_ens'; shutil.rmtree(e, ignore_errors=True); shutil.copytree(d7, e, ignore=shutil.ignore_patterns('out'))
+    open(os.path.join(e, 'm.rvi'), 'a').write('\n:EnsembleMode ENSEMBLE_MONTECARLO 2\n')
+    open(os.path.join(e, 'm.rve'), 'w').write(':OutputDirectoryFormat ./ens_*/\n:ParameterDistributions\n  HYDRAUL_COND SOIL SOIL 100 DIST_UNIFORM 100 100\n:EndParameterDistributions\n')
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=e, capture_output=True, text=True, env=tc.ENV)
+    devs, mbs = [], []          # (WatershedStorage.csv: only the MB error; in ensemble mode base Raven reports other channel
+    for m in (1, 2):            #  and rivulet storages than in a single run, also without groundwater)
+        o = os.path.join(e, 'ens_%d' % m)
+        if not os.path.exists(os.path.join(o, 'GWBudget.csv')):
+            devs.append(float('inf')); continue
+        for f in ('GWBudget.csv', 'Hydrographs.csv'):
+            A = csv(d7, f); B = pd.read_csv(os.path.join(o, f)); B.columns = [c.strip() for c in B.columns]
+            devs.append(max(float(tc.max_diff(A[c], B[c], max(float(A[c].abs().max()), 1e-9))) for c in A.columns if pd.api.types.is_numeric_dtype(A[c])))
+        B = pd.read_csv(os.path.join(o, 'WatershedStorage.csv')); B.columns = [c.strip() for c in B.columns]
+        mbs.append(float(B['MB Error [mm]'].abs().max()))
+    g3 = 'Successful' in r.stdout + r.stderr and max(devs) <= 1e-12 and max(mbs + [float('inf')] * (len(mbs) < 2)) <= LIM
+    print('%-70s %s  (largest relative difference %.1e; largest |MB error| of the members %.2g mm)' % ('WB7 2-member ensemble: each member equals the single run', 'ok' if g3 else 'FAIL',
+          max(devs), max(mbs) if mbs else float('inf')))
+    results.append(('WB7', g1 and g2 and g3))
+
+# WB8: a headwater reach; the loss taken from its outflow
+DAYS8 = 20
+d8 = river_case(os.path.join(W, 'wb8_headwater'), DAYS8, upstream=False)
+d8n = river_case(os.path.join(W, 'wb8_headwater_noriver'), DAYS8, upstream=False, river=False)
+(ok8, txt8), (ok8n, _) = sz_check.run(d8), sz_check.run(d8n)
+if not (ok8 and ok8n):
+    results.append(('WB8', False)); print('WB8 FAIL (a run failed: %s)' % txt8.strip().split('\n')[-1][:120])
+else:
+    b, w = csv(d8, 'GWBudget.csv'), csv(d8, 'WatershedStorage.csv')
+    leak = float(b['river leakage to aquifer [m3/d]'].sum()); applied = float(b['river exchange applied to Raven [m3]'].sum())
+    carried = float(b['river loss carried to next step [m3]'].iloc[-1])
+    q, q0 = flows(d8) * 86400.0, flows(d8n) * 86400.0                 # [m3/d] (daily mean flows: their sum is the volume)
+    drop = float((q0 - q).sum()); mbx = float(w['MB Error [mm]'].abs().max())
+    g1 = leak > 100.0 and carried <= 0.01 * leak and abs(drop + applied) <= 0.01 * abs(applied) and mbx <= LIM
+    print('%-70s %s  (leakage %.1f m3, carried at the end %.2f m3, outflow lower by %.1f m3 for %.1f m3 applied; |MB error| %.2g mm)'
+          % ('WB8 headwater reach: the loss taken from its outflow', 'ok' if g1 else 'FAIL', leak, carried, drop, -applied, mbx))
+    parts = restart_parts(d8, DAYS8, 6)
+    if parts is None:
+        g2 = False; print('WB8 restart FAIL (a run failed)')
+    else:
+        rvc = open(os.path.join(parts[0], 'out', 'solution.rvc')).read()
+        fc, fr = flows(d8), flows(parts[1]); n2 = len(fr)
+        wc, wr = csv(d8, 'WatershedStorage.csv'), csv(parts[1], 'WatershedStorage.csv')
+        ch = [c for c in wc.columns if c.startswith('Channel Storage')]
+        dq = rel_dev(fc[-n2:], fr); dch = rel_dev(wc[ch[0]].values[-len(wr):], wr[ch[0]].values) if ch else float('inf')
+        g2 = ':GWRiverTake' in rvc and dq <= 1e-9 and dch <= 1e-9
+        print('%-70s %s  (:GWRiverTake %s; hydrographs %.1e, channel storage %.1e)' % ('WB8 restart after a take from the outflow: the same flows and channel', 'ok' if g2 else 'FAIL',
+              'written' if ':GWRiverTake' in rvc else 'MISSING', dq, dch))
+    results.append(('WB8', g1 and g2))
+
+# WB9: a reach that stops flowing: the loss it cannot supply is carried, warned about and in the run totals
+d9 = river_case(os.path.join(W, 'wb9_dump'), 12, upstream=False, croute='ROUTE_DUMP')
+ok9, txt9 = sz_check.run(d9)
+if not ok9:
+    results.append(('WB9', False)); print('WB9 FAIL (the run failed: %s)' % txt9.strip().split('\n')[-1][:120])
+else:
+    b = csv(d9, 'GWBudget.csv'); carried = float(b['river loss carried to next step [m3]'].iloc[-1])
+    err = open(os.path.join(d9, 'out', 'Raven_errors.txt')).read(); sm = open(os.path.join(d9, 'out', 'GWModelSummary.txt')).read()
+    m = re.search(r'river loss carried\s*: (\S+) m3 at the end of the run', sm)
+    tot = float(m.group(1)) if m else None
+    warned = 'of river leakage to the aquifer could not be taken from the reaches' in err
+    g = carried > 1.0 and warned and tot is not None and abs(tot - carried) <= 1e-6 * carried
+    print('%-70s %s  (carried %.3f m3; warning %s; run total %s)' % ('WB9 a loss the reach cannot supply: carried, warned, in the run totals', 'ok' if g else 'FAIL',
+          carried, 'given' if warned else 'MISSING', tot))
+    results.append(('WB9', g))
+
+# WB10: every routing method; the routing state keeps the outflow before the take
+def chan_end(d):
+    """the channel storage of every subbasin at the end of the run [m3] (solution.rvc, 17 digits)"""
+    return sum(float(x) for x in re.findall(r':ChannelStorage,\s*(\S+)', open(os.path.join(d, 'out', 'solution.rvc')).read()))
+
+
+def outflow_m3(d):
+    """the volume that left the watershed at its outlet and through the irrigation demand [m3] (Cum. Outflow)"""
+    return float(csv(d, 'WatershedStorage.csv')['Cum. Outflow [mm]'].iloc[-1]) * 1e-3 * RCFG['nhru'] * RCFG['hru_w'] * RCFG['width']
+
+
+DAYS10 = 40
+g10 = True
+for route, reach in (('ROUTE_MUSKINGUM', 300), ('ROUTE_MUSKINGUM_CUNGE', 300), ('ROUTE_STORAGECOEFF', 30), ('ROUTE_HYDROLOGIC', 30),
+                     ('ROUTE_DIFFUSIVE_WAVE', 30), ('ROUTE_PLUG_FLOW', 30)):
+    for irrigated in (False, True):
+        kw = dict(upstream=True, route=route, reach=reach, rain=[0.0] * DAYS10, qin=[0.05] * 5, rbk=200.0, croute='ROUTE_DUMP')
+        tag = 'wb10_%s%s' % (route.lower(), '_irr' if irrigated else '')
+        d1 = river_case(os.path.join(W, tag + '_river'), DAYS10, irr=(0.003 if irrigated else None), **kw)
+        ok1, _ = sz_check.run(d1)
+        dl = None
+        if ok1 and irrigated:   # (the run without the river is given the irrigation the river run delivered, so both runs withdraw the same)
+            dl = list(pd.read_csv(os.path.join(d1, 'out', 'Demands.csv'))['down (total del.) [m3/s]'].iloc[1:])
+        d0 = river_case(os.path.join(W, tag + '_noriver'), DAYS10, river=False, irr=dl, **kw)
+        ok0, _ = sz_check.run(d0)
+        if not (ok1 and ok0):
+            g10 = False; print('WB10 %s: a run FAILED' % tag); continue
+        b = csv(d1, 'GWBudget.csv'); applied = -float(b['river exchange applied to Raven [m3]'].sum())
+        drop = outflow_m3(d0) - outflow_m3(d1); dch = chan_end(d1) - chan_end(d0)
+        if irrigated:
+            dd = abs(pd.read_csv(os.path.join(d0, 'out', 'Demands.csv'))['down (total del.) [m3/s]'].fillna(0.0).iloc[1:].values - np.array(dl)).max()   # (blank: no demand)
+        g = applied > 1000.0 and abs(drop - applied) <= 0.5 + 1e-5 * applied and abs(dch) <= 1e-5 * applied and (not irrigated or dd <= 1e-12)
+        g10 &= g
+        print('%-70s %s  (taken %.2f m3; outflow lower by %.2f m3; channel storage %+.2g m3%s)' % ('WB10 %s%s: outflow lower by the take, channel unchanged'
+              % (route, ', irrigated' if irrigated else ''), 'ok' if g else 'FAIL', applied, drop, dch, ('; irrigation equal within %.1g m3/s' % dd) if irrigated else ''))
+results.append(('WB10', g10))
+
+# WB11: an outflow set from outside the routing (ROUTE_EXTERNAL reaches fed by a live file every step)
+QOBS, DAYS11 = 0.02, 12
+r11 = {}
+for riv in (1, 0):
+    d = river_case(os.path.join(W, 'wb11_external_%s' % ('river' if riv else 'noriver')), DAYS11, upstream=True, river=bool(riv), route='ROUTE_EXTERNAL',
+                   rain=[0.0] * DAYS11, qin=[0.0] * DAYS11, rbk=200.0, croute='ROUTE_DUMP')
+    open(os.path.join(d, 'm.rvi'), 'a').write(':ReadLiveFile\n')
+    open(os.path.join(d, 'm.rvl'), 'w').write(':SetStreamflow 1 0.0\n:SetStreamflow 2 %g\n' % QOBS)
+    ok, _ = sz_check.run(d)
+    r11[riv] = d if ok else None
+if None in r11.values():
+    results.append(('WB11', False)); print('WB11 FAIL (a run failed)')
+else:
+    b = csv(r11[1], 'GWBudget.csv'); T = -b['river exchange applied to Raven [m3]'].values          # (all from the outflow: no runoff, no inflow)
+    h1, h0 = csv(r11[1], 'Hydrographs.csv')['down [m3/s]'].values[1:], csv(r11[0], 'Hydrographs.csv')['down [m3/s]'].values[1:]
+    # the hydrograph is the mean of the outflow at the start of the step (the live file's) and at its end (the delivered one)
+    dev = float(np.max(np.abs(2.0 * (h0 - h1) * 86400.0 - T)))
+    dch = chan_end(r11[1]) - chan_end(r11[0]); err = open(os.path.join(r11[1], 'out', 'Raven_errors.txt')).read()
+    g = T.min() > 100.0 and dev <= 0.01 + 1e-4 * T.max() and abs(dch) <= 1e-6 * T.sum() and 'was set from outside Raven' in err
+    results.append(('WB11', g))
+    print('%-70s %s  (take %.2f m3/d; delivered outflow lower by the take within %.2g m3; channel storage %+.2g m3; warning %s)' % (
+          'WB11 outflow set by a live file (ROUTE_EXTERNAL): the take from it', 'ok' if g else 'FAIL', T.mean(), dev, dch, 'given' if 'was set from outside Raven' in err else 'MISSING'))
 
 n = sum(1 for _, g in results if g)
 print('watershed balance: %s (%d of %d)' % ('ALL PASSED' if n == len(results) else 'FAILED', n, len(results)))

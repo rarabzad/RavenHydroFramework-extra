@@ -185,7 +185,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \toprule\hdr Exchange & MODFLOW package (name) & Formulation & Safeguard\\\midrule\endfirsthead
 \caption[]{Exchange algorithms and their safeguards (continued)}\\
 \toprule\hdr Exchange & MODFLOW package (name) & Formulation & Safeguard\\\midrule\endhead
-Recharge & RCH (\cmd{RCH\_RAVEN}) & $V_k=10^{6}A_k\,r_k/1000$; optional linear delay; spread by overlap & fixed-head cells skipped; exact per HRU\\
+Recharge & RCH (\cmd{RCH\_RAVEN}) & $V_k=10^{6}A_k\,r_k/1000$; optional linear delay; spread by overlap & the share over fixed-head cells to the fixed heads; exact per HRU\\
 Seepage & DRN (\cmd{DRN\_RAVEN}) & $C f(h)(h-z_{\mathrm{top}}+d_s)$, $C=\Lambda_s|\Omega_i|$ & returned by overlap; soil-less HRUs to \cmd{SURFACE\_WATER}\\
 Rivers & RIV (\cmd{RIV\_RAVEN}) & $C(s-h)$, or $C(s-z_{\mathrm{bed}})$ below the bed; $C=K_bW_pL_{p,i}/M_b$ & $C$ limited by channel flow; unsupplied loss carried\\
 Water-table ET & EVT (\cmd{EVT\_RAVEN}) & unmet PET over the cell, linear to $d_x$ & only ET-enabled HRUs; never above unmet demand\\
@@ -229,10 +229,10 @@ Column & Meaning\\\midrule\endhead
 \cmd{returned to Raven [m3]} & seepage added to Raven stores\\
 \cmd{outer iterations}, \cmd{converged} & Newton iterations; 1 target, 2 relaxed, 0 not converged\\
 \cmd{recharge delay storage [m3]} & water in delay reservoirs\\
-\cmd{recharge onto CHD cells [m3/d]} & recharge of HRUs lying wholly on fixed-head cells\\
+\cmd{recharge onto CHD cells [m3/d]} & recharge falling on fixed-head cells (each HRU's share of its overlap with them)\\
 \cmd{river leakage to aquifer [m3/d]}, \cmd{aquifer discharge to rivers [m3/d]} & river exchange by direction\\
-\cmd{river exchange applied to Raven [m3]} & net volume applied to Raven reaches\\
-\cmd{river loss carried to next step [m3]} & unsupplied loss taken next step (normally 0 for rivers Raven builds; an existing model's stream package can carry it for months)\\
+\cmd{river exchange applied to Raven [m3]} & net volume applied to Raven reaches (the whole step's take; Raven's own balance books a take from a reach's inflow or outflow half in the step and half in the next)\\
+\cmd{river loss carried to next step [m3]} & loss no reach water could supply (its runoff, inflow and outflow), taken next step (0 unless a reach stops flowing within a step; an existing model's stream package can carry it longer; warning and run total)\\
 \cmd{water-table ET [m3/d]} & evaporation from the water table\\
 \cmd{wells specified [m3/d]}, \cmd{wells actual [m3/d]} & requested and delivered well rates\\
 \cmd{GHB [m3/d]}, \cmd{CHD [m3/d]} & boundary flows (positive into the aquifer)\\
@@ -248,7 +248,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{soil-zone layer redistribution [m3]} & percolation Raven computed on the HRU mean that no soil-zone column could take (it stays in the layer above)\\
 \cmd{seepage and soil inflow withheld [m3]}, \cmd{river gains withheld [m3]}, \cmd{surface-store gains withheld [m3]} & discharge not handed to Raven for the soil-zone shortfall and, on unconverged steps, MODFLOW's negative residual (0)\\
 \cmd{negative recharge the soil zone did not hold [m3]} & the cut of a negative recharge (Section~\ref{sec:negrecharge}) that the soil zone could not hold (0)\\
-\cmd{unsaturated zone inflow [m3]}, \cmd{unsaturated zone to aquifer [m3]} & \cmd{:SoilZoneVadose} other than \cmd{NONE}: water entering the unsaturated columns, less the water they hand back to the soil zone (rules (i) and (ii), Section~\ref{sec:szvadose}; negative on steps where they hand back more than they receive); water they pass to the water table (including the excess a rising water table absorbs), less the hand-back of rule (i)\\
+\cmd{unsaturated zone inflow [m3]}, \cmd{unsaturated zone to aquifer [m3]} & \cmd{:SoilZoneVadose} other than \cmd{NONE}: water entering the unsaturated columns, less the water they hand back to the soil zone (rules (i) and (ii), Section~\ref{sec:szvadose}; negative on steps where they hand back more than they receive); water they pass to the water table (including the excess a rising water table absorbs, the water of columns that end over specified heads and the water of negative uptakes), less the hand-back of rule (i)\\
 \cmd{capillary rise to soil zone [m3]}, \cmd{unsaturated zone storage [m3]} & (same) rise from the columns' top nodes into the soil zone (\cmd{RICHARDS}); water in the columns relative to their reference profile at the end of the step\\
 \cmd{capillary rise from the water table [m3]} & capillary rise on: rise from the water table into the soil-zone layers (Section~\ref{sec:szcaprise})\\
 \cmd{lagged-exchange debt [m3]}, \cmd{lagged-exchange repayment [m3]} & \cmd{LAGGED} timing: lent water Raven's processes used that the step's exchange did not supply; the aquifer's repayment in the step (Section~\ref{sec:sztiming})\\
@@ -257,7 +257,7 @@ Column & Meaning\\\midrule\endhead
 \cmd{reservoir seepage not delivered by MODFLOW [m3]} & an existing model with \cmd{:ReservoirExchange}, or a generated one with a lake over specified heads that follow a \cmd{:BoundaryHead} series: reservoir seepage MODFLOW did not take (cells under the lake that are specified heads or inactive), returned to the reservoir's subbasin in the same step (normally 0)\\\bottomrule
 \end{longtable}
 Other output files: \cmd{GWSoilExchange.csv} (\cmd{:SoilZone PHYSICAL}, per soil-zone HRU and step: soil-zone base, soil
-water level, water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
+water level (for a column without free water the lowest base of its DEM points, which can lie below the mean base), water table, saturated fraction, exchange with the aquifer both ways, rejected recharge and overflow [mm], soil
 water and capacity [mm], and with specified heads the exchange with them both ways; the exchange columns summed over the
 HRUs equal those of \cmd{GWBudget.csv}; two model-wide values of the step, interface updates and change, are repeated on
 every row; Table~\ref{tab:outputs}), \cmd{GWHRUState.csv} (water table and depth per coupled HRU), \cmd{GWHeads.csv} (monitoring wells;
@@ -281,9 +281,13 @@ iterations and steps in which drained columns were kept 1~mm above their bottoms
 supply-limited link updates and the largest take beyond the free water, and the connection-test drops (link updates, steps,
 and those followed by a plain update); without \cmd{:SoilZone PHYSICAL} the discharge withheld on unconverged steps for
 MODFLOW's negative residual (only when such steps occurred); the negative recharge cut and the part not held (only when not zero); the
-unsaturated columns of the hotstart file a run without columns did not use, with their water (only when there were such
-columns); for an existing model with unsaturated columns, and a generated one whose specified heads follow a
-\cmd{:BoundaryHead} series, the columns that ended on cells that were specified heads and their water; with a
+unsaturated columns of the hotstart file the run did not use (a run without columns, lines written for other columns or
+on cells that are no longer exchange links), with their water (only when there were such columns); with \cmd{LAGGED} timing
+the lagged-exchange debt open at the end of the run and the part of it on cells that are specified heads (only when not
+zero); the debt of the hotstart file the run did not repay (only when there was such debt); for an existing model with unsaturated columns, and a generated one whose specified heads follow a
+\cmd{:BoundaryHead} series, the columns that ended on cells that were specified heads and their water (columns that held
+water); the river loss still carried at the end and the half of the last step's take from reach inflows and outflows that
+Raven books in the next step (each only when not zero); with a
 \cmd{:BoundaryHead} series, the boundary cell-steps switched off (a steady-state first period included); with
 \cmd{:ReservoirExchange} the reservoir gain not supplied; for an existing model with \cmd{:ReservoirExchange}, and a
 generated one with a lake over specified heads that follow a \cmd{:BoundaryHead} series, the reservoir seepage not
@@ -300,13 +304,15 @@ delivered, and for an existing model without \cmd{NEWTON} the recharge not appli
 \cmd{:GWRechargeStore} & HRU ID, water in the recharge-delay reservoir [m$^3$]\\
 \cmd{:GWReservoirSeepage} & subbasin ID, reservoir seepage in transit [m$^3$], share of the lake's cells able to take seepage when it was computed (read as 1 when absent)\\
 \cmd{:GWRiverLossCarry} & subbasin ID, unsupplied river loss to take next step [m$^3$] (only when non-zero)\\
+\cmd{:GWRiverTake} & subbasin ID, river loss taken from the reach's inflow and from its outflow in the last step [m$^3$], the reach's outflow after Raven's routing [m$^3$/s] (only when a take is non-zero): Raven's channel storage and balance book half of the take in the next step; the outflow detects one set from outside the routing\\
+\cmd{:GWStartHeads n} & after a step MODFLOW did not converge: MODFLOW's heads of the active cells (MODFLOW's order) at the end of the last converged step, which the far-head test of the next step compares with (Section~\ref{sec:farheads})\\
 \cmd{:GWSoilZoneColumns} & \cmd{:SoilZone PHYSICAL}: HRU ID, cell (grid column number; 0 for the rest of the HRU), water of each soil-zone layer from the bottom up [mm]; a block that does not match the HRU's columns is reported and the columns start from the water table\\
-\cmd{:GWVadoseColumns} & \cmd{:SoilZoneVadose RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG} (interchangeable between the methods): HRU ID, cell (grid column number), water table [m], water contents of the column's nodes from the top [--]\\
-\cmd{:GWVadoseClassColumns} & \cmd{:SoilZoneVadoseClasses} $K>1$: HRU ID, cell (grid column number), depth class, classes of the cell, water table [m], water contents of the class column's nodes from the top [--]\\
-\cmd{:GWVadoseColumnTops} & with either block above: HRU ID, cell, depth class (1 without classes), column top [m], water above the column's reference profile [m$^3$]. A column whose top differs by more than 1~mm from the restarted run's (another \cmd{:SoilZoneSubgrid}, ground or soil-zone thickness) does not match and starts at rest, with a warning; a run without columns reports the water it drops\\
+\cmd{:GWVadoseColumns method} & \cmd{:SoilZoneVadose} \cmd{RICHARDS}, \cmd{KINEMATIC} or \cmd{LAG}, the method that wrote the block: HRU ID, cell (grid column number), water table [m], water contents of the column's nodes from the top [--]. \cmd{RICHARDS} and \cmd{LAG} read each other's lines (the same reference profile); lines of \cmd{KINEMATIC} (whose reference is $\theta_s-S_y$) are not used by the other two, nor theirs by \cmd{KINEMATIC}: those columns start at rest and the lines' water is reported as dropped\\
+\cmd{:GWVadoseClassColumns method} & \cmd{:SoilZoneVadoseClasses} $K>1$: HRU ID, cell (grid column number), depth class, classes of the cell, water table [m], water contents of the class column's nodes from the top [--]\\
+\cmd{:GWVadoseColumnTops} & with either block above: HRU ID, cell, depth class (1 without classes), column top [m], water above the column's reference profile [m$^3$]. A column whose top differs by more than 1~mm from the restarted run's (another \cmd{:SoilZoneSubgrid}, ground or soil-zone thickness) does not match and starts at rest; the water of every line no column uses (other columns, cells no longer exchange links, or a run without columns) is warned about and reported as dropped\\
 \cmd{:GWSoilZoneLag} & \cmd{LAGGED} timing: HRU ID, cell, exchange of the last step into the aquifer [m$^3$/d], debt the aquifer still repays [m$^3$]\\
 \cmd{:AgeTracerDatum date time} & with an age tracer (Raven core, also without groundwater), when the datum of the tracer's entry times is before the run's start: that datum (the start of the first run of a chain of restarts); \cmd{:StartTime} is the start of the run that wrote the file\\\bottomrule
-\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWVadoseColumnTops}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning. A value that is not a finite number in any block (the whole token must be a number: \cmd{98.5x} is not), or negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or \cmd{:GWVadoseClassColumns}, stops the run with a message naming the block.}\\
+\multicolumn{2}{p{\dimexpr\linewidth-2\tabcolsep}}{\footnotesize Each block ends with the matching \cmd{:End} line (\cmd{:EndGWHeads}, \cmd{:EndGWRechargeStore}, \cmd{:EndGWReservoirSeepage}, \cmd{:EndGWRiverLossCarry}, \cmd{:EndGWRiverTake}, \cmd{:EndGWStartHeads}, \cmd{:EndGWSoilZoneColumns}, \cmd{:EndGWVadoseColumns}, \cmd{:EndGWVadoseClassColumns}, \cmd{:EndGWVadoseColumnTops}, \cmd{:EndGWSoilZoneLag}). In a run without \cmd{:GroundwaterModel MODFLOW6} these blocks are ignored with a warning. A value that is not a finite number in any block (the whole token must be a number: \cmd{98.5x} is not), or negative water in \cmd{:GWSoilZoneColumns}, \cmd{:GWVadoseColumns} or \cmd{:GWVadoseClassColumns}, stops the run with a message naming the block.}\\
 \end{longtable}
 
 \section{Error messages}\label{app:errors}

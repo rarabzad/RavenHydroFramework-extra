@@ -77,7 +77,7 @@ at or below its bottom is set 1~mm above that bottom in MODFLOW's iterate, once 
 step that leaves the lowest cell more than 1~m below its bottom, and after a solve with heads that are not finite; never in
 the last two outer iterations (except for heads that are not finite). A column with an active confined cell is never drained.
 
-\paragraph{Heads far outside the model.} A step whose heads are not finite stops the run at once. A step MODFLOW did not
+\paragraph{Heads far outside the model.}\label{sec:farheads} A step whose heads are not finite stops the run at once. A step MODFLOW did not
 converge on that holds a head beyond the model's highest top or lowest bottom by more than ten times its relief (at least
 1~km) is carried on only if every such head that moved in the step (relative to the heads of the last converged step, by
 position) moved by at most that margin in the last outer iteration and MODFLOW's residual is at most 1\,\% of the gross flow
@@ -86,7 +86,8 @@ IN$+$OUT, half MODFLOW's PERCENT DISCREPANCY); such a step is warned with its re
 head, its cell, its last move, the residual and the usual causes. An unconverged step without a far head is carried on
 whatever its residual, as MODFLOW's own \cmd{CONTINUE} option would: the residual is MODFLOW's balance error and a negative one
 is withheld from the discharge returned to Raven. A far head on a converged step is warned about once per run (per ensemble
-member).
+member). A hotstart written after an unconverged step carries the heads of the last converged step (\cmd{:GWStartHeads}),
+so a restarted run tests its next step against the same heads as the continuous run.
 
 \paragraph{Existing models.} \cmd{:SoilZone PHYSICAL} needs an existing model with \cmd{NEWTON} (start-up stop naming the name
 file; MODFLOW then needs \cmd{LINEAR\_ACCELERATION BICGSTAB}). A model without a storage package is steady state: storage 0,

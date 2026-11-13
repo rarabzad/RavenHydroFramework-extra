@@ -27,8 +27,16 @@ negative recharge) whose :BoundaryHead series holds the outlet column at 91.9 m 
 switches every cell off, in the pattern held, off, held, off, off, held, held, off, restarted on day 3 (off to held), day
 4 (held to off) and day 6 (off to held): a column held in the restart's first step still receives the lagged exchange of
 the last step, in which it was an ordinary column.
+RS6 a lagged-exchange debt open at a restart (:SoilZoneExchangeTiming LAGGED): 2 HRUs, a 0.2 m soil zone drained by
+baseflow (BASE_LINEAR, BASEFLOW_COEFF 5) under 100 mm/d of PET, the water table at the soil-zone base: the processes use
+more of the lagged source than the exchange supplies, a debt the aquifer repays in the next step. A 2-day run ends with
+the debt open: GWModelSummary.txt reports it ('lagged debt open', equal to the debt of :GWSoilZoneLag in its
+solution.rvc to the summary's 6 digits). Restarted from that file with LAGGED timing the
+debt is repaid in the first step (1e-9); restarted with :SoilZoneExchangeTiming AFTER, or without :SoilZone PHYSICAL, no
+step repays it: the run warns and reports it ('hotstart debt unused', equal to the file's debt to 6 digits), as the
+aquifer keeps that water.
 Quick mode (RAVEN_TEST_QUICK=1): the hillslope runs 120 days against 60 + 60 (the first 120 days of the same rain);
-RS2-RS5 are the same in both modes (seconds).
+RS2-RS6 are the same in both modes (seconds).
 """
 import os, sys, shutil, re, datetime
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -217,32 +225,75 @@ def rs5_exact():
         good &= g
     return good
 
-def verdict(hill, r2, r3, r4, r5=True):
-    """the last line: PASS only when the hillslope restart RS1 and RS2-RS5 all pass"""
-    ok = bool(hill) and bool(r2) and bool(r3) and bool(r4) and bool(r5)
-    print('restart test: %s (RS1 hillslope restart %s, RS2 %s, RS3 %s, RS4 %s, RS5 %s)' % tuple(['PASS' if ok else 'FAIL'] +
-          ['PASS' if x else 'FAIL' for x in (hill, r2, r3, r4, r5)]))
+def debt_case(name, days, timing='LAGGED', start=None, rvc=None, physical=True):
+    """the RS6 set-up: soil water drawn up from the water table by baseflow and PET beyond the lagged exchange"""
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=2, slope=0.0, H0=0.1, H1=0.1, init_depth=0.0, rain=0.0, perc=0.0, pet=100.0, days=12, aq_thick=10.0, Sy=0.2, Kv=1.0,
+                        Kh=10.0, ksat=100.0, phi0=(10.0, 10.0), physical=physical, extra_proc='  :Baseflow BASE_LINEAR SOIL[1] SURFACE_WATER\n',
+                        extra_soil={'BASEFLOW_COEFF': 5.0})
+    p = os.path.join(d, 'm.rvi'); x = open(p).read().replace(':Evaporation PET_CONSTANT', ':Evaporation PET_DATA')
+    if start: x = x.replace(':StartDate 2000-01-01 00:00:00', ':StartDate %s 00:00:00' % start)
+    open(p, 'w').write(re.sub(r':Duration \d+', ':Duration %d' % days, x))
+    if physical: open(os.path.join(d, 'm.rvg'), 'a').write(':SoilZoneExchangeTiming %s\n' % timing)
+    if rvc: shutil.copy(rvc, os.path.join(d, 'm.rvc'))
+    ok, txt = sz_check.run(d)
+    if not ok: print('  %s: run FAILED\n%s' % (name, txt[-600:]))
+    return d if ok else None
+
+def rs6_debt():
+    print('RS6 a lagged-exchange debt open at a restart')
+    a = debt_case('rs6_first', 2)
+    if a is None: return False
+    rvc = os.path.join(a, 'out', 'solution.rvc'); r = open(rvc).read()
+    m = re.search(r':GWSoilZoneLag[^\n]*\n([\s\S]*?):EndGWSoilZoneLag', r)
+    D = sum(float(l.split(',')[3]) for l in m.group(1).strip().split('\n')) if m else 0.0
+    sm = re.search(r'lagged debt open\s*: (\S+) m3 at the end of the run', sz_check.summary(a))
+    g1 = D > 0.1 and sm is not None and abs(float(sm.group(1)) - D) <= 5e-6 * D
+    print('  2 days: debt open at the end %.4f m3 (:GWSoilZoneLag); run total %s -> %s' % (D, sm.group(1) if sm else 'MISSING', 'ok' if g1 else 'FAIL'))
+    ok = g1
+    c = debt_case('rs6_lagged', 4, start='2000-01-03', rvc=rvc)
+    if c is None: return False
+    rep = float(pd.read_csv(os.path.join(c, 'out', 'GWBudget.csv'))['lagged-exchange repayment [m3]'].iloc[0])
+    g2 = abs(rep - D) <= 1e-9 * max(D, 1.0)
+    print('  restarted with LAGGED: repaid in the first step %.4f m3 -> %s' % (rep, 'ok' if g2 else 'FAIL'))
+    ok &= g2
+    for tag, kw in (('AFTER', dict(timing='AFTER')), ('CONCEPTUAL', dict(physical=False))):
+        e = debt_case('rs6_' + tag.lower(), 4, start='2000-01-03', rvc=rvc, **kw)
+        if e is None: ok = False; continue
+        err = sz_check.errors(e); u = re.search(r'hotstart debt unused\s*: (\S+) m3', sz_check.summary(e))
+        g = 'lagged-exchange debt' in err and u is not None and abs(float(u.group(1)) - D) <= 5e-6 * D
+        print('  restarted with %s: warning %s, run total %s -> %s' % (':SoilZoneExchangeTiming AFTER' if tag == 'AFTER' else 'no :SoilZone PHYSICAL',
+              'present' if 'lagged-exchange debt' in err else 'MISSING', u.group(1) if u else 'MISSING', 'ok' if g else 'FAIL'))
+        ok &= g
+    return ok
+
+def verdict(hill, r2, r3, r4, r5=True, r6=True):
+    """the last line: PASS only when the hillslope restart RS1 and RS2-RS6 all pass"""
+    ok = bool(hill) and bool(r2) and bool(r3) and bool(r4) and bool(r5) and bool(r6)
+    print('restart test: %s (RS1 hillslope restart %s, RS2 %s, RS3 %s, RS4 %s, RS5 %s, RS6 %s)' % tuple(['PASS' if ok else 'FAIL'] +
+          ['PASS' if x else 'FAIL' for x in (hill, r2, r3, r4, r5, r6)]))
     return ok
 
 def main():
-    r3 = rs3_clip(); r4 = rs4_vz(); r5 = rs5_exact()
+    r3 = rs3_clip(); r4 = rs4_vz(); r5 = rs5_exact(); r6 = rs6_debt()
     print('RS3 restart with seepage above soil capacity: %s' % ('PASS' if r3 else 'FAIL'))
     print('RS4 unsaturated columns restored as written: %s' % ('PASS' if r4 else 'FAIL'))
     print('RS5 a coupled restart continues exactly: %s' % ('PASS' if r5 else 'FAIL'))
-    if '--rs3rs4' in sys.argv:          # (only RS3-RS5)
-        print('restart test: %s' % ('PASS' if (r3 and r4 and r5) else 'FAIL'))
-        return r3 and r4 and r5
+    print('RS6 a lagged-exchange debt open at a restart: %s' % ('PASS' if r6 else 'FAIL'))
+    if '--rs3rs4' in sys.argv:          # (only RS3-RS6)
+        print('restart test: %s' % ('PASS' if (r3 and r4 and r5 and r6) else 'FAIL'))
+        return r3 and r4 and r5 and r6
     r2 = ext_restart()
     full = case('full', NT, RAIN[:NT])
     first = case('first', N1, RAIN[:N1])
     if not (full and first):
-        return verdict(False, r2, r3, r4, r5)
+        return verdict(False, r2, r3, r4, r5, r6)
     rvc = os.path.join(first, 'out', 'solution.rvc')
     has = ':GWSoilZoneColumns' in open(rvc).read()
     start = (datetime.date(2000, 1, 1) + datetime.timedelta(days=N1)).isoformat()
     second = case('second', NT - N1, RAIN[N1:NT], start, rvc)
     if not second:
-        return verdict(False, r2, r3, r4, r5)
+        return verdict(False, r2, r3, r4, r5, r6)
     cols = ['water table [m]', 'soil water level [m]', 'saturated fraction [-]', 'soil-zone water [mm]',
             'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]']
     a = pd.read_csv(os.path.join(full, 'out', 'GWSoilExchange.csv'))
@@ -260,7 +311,7 @@ def main():
     flows = ('saturated fraction [-]', 'soil zone to aquifer [m3/d]', 'aquifer to soil zone [m3/d]', 'overflow [mm]', 'rejected recharge [mm]')
     good &= has and len(m) == (NT - N1) * CFG['nhru'] and all(dev[c] < (1e-4 if c in flows else 1e-6) for c in cols)
     print('RS1 hillslope restart: %s' % ('PASS' if good else 'FAIL'))
-    return verdict(good, r2, r3, r4, r5)
+    return verdict(good, r2, r3, r4, r5, r6)
 
 if __name__ == '__main__':
     sys.exit(0 if main() else 1)

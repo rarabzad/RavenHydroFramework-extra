@@ -29,7 +29,7 @@ C9  the connection-test regression with three classes: the rough-terrain regress
 C10 a hotstart written by the same configuration whose last step dropped a class column: 2 HRUs, hummocks
     +-1.2 m, RICHARDS K = 3, a specified head at 96 m drains the water table through the class bases; a hotstart after
     n1 days (10; also 4 and 13 in the full mode) lacks a line for such a column, and the restart (12 days) builds it at
-    rest, as the continuous run does: no "do not match the columns" warning, the restart within 1e-6 of the continuous
+    rest, as the continuous run does: no "columns of the hotstart file are not used" warning, the restart within 1e-6 of the continuous
     run, identities. (The link's other lines made the missing one count as a mismatch.)
 C11 one limit on the source cell: RICHARDS K = 4 under hummocks +-0.8 m, a thin aquifer (0.15 m of water above the cell
     bottom at the start, S_y 0.05), dry soil under PET: some class columns draw water up through their bottoms while the
@@ -274,15 +274,15 @@ def c6():
         mm = case('c6_mismatch_k1', extra_rvg=vz('RICHARDS', 1), start='2000-01-21', rvc=rvc, rain=rain[20:], days=20, **cfg)
         ok &= check('c6_mismatch_k1', mm)
         w = warnings(mm) if mm else ''
-        ok &= 'do not match the columns' in w
-        print('  K = 3 hotstart read with K = 1: %s' % ('warning' if 'do not match the columns' in w else 'NO WARNING'))
+        ok &= 'columns of the hotstart file are not used' in w
+        print('  K = 3 hotstart read with K = 1: %s' % ('warning' if 'columns of the hotstart file are not used' in w else 'NO WARNING'))
     k1 = case('c6_first_k1', extra_rvg=vz('RICHARDS', 1), rain=rain[:20], days=20, **cfg)
     if k1:
         mm = case('c6_mismatch_k3', extra_rvg=vz('RICHARDS', 3), start='2000-01-21', rvc=os.path.join(k1, 'out', 'solution.rvc'), rain=rain[20:], days=20, **cfg)
         ok &= check('c6_mismatch_k3', mm)
         w = warnings(mm) if mm else ''
-        ok &= 'do not match the columns' in w
-        print('  K = 1 hotstart read with K = 3: %s' % ('warning' if 'do not match the columns' in w else 'NO WARNING'))
+        ok &= 'columns of the hotstart file are not used' in w
+        print('  K = 1 hotstart read with K = 3: %s' % ('warning' if 'columns of the hotstart file are not used' in w else 'NO WARNING'))
     # a thin top layer that dries: the water table in the cell below (SZW_RAVEN), with classes
     d = case('c6_szw', extra_rvg=vz('RICHARDS', 3) + ':SoilZoneCapillaryRise ON\n', rain=[0.0] * 30, days=30,
              **dict(BASE, init_depth=2.4, pet=5.0, soil_b=5.0, soil_psia=200.0, dem_fn=hummocks(0.8)))
@@ -359,7 +359,7 @@ def c10():
         # step empties the store, so raven_mb_mm holds here too)
         g = check('c10_second_%d' % n1, sec, LIM)
         if sec:
-            w = warnings(sec); bad = 'do not match the columns' in w
+            w = warnings(sec); bad = 'columns of the hotstart file are not used' in w
             a, b = budget(full).iloc[n1:].reset_index(drop=True), budget(sec)
             cols = ['MF6 recharge [m3/d]', 'unsaturated zone storage [m3]', 'unsaturated zone to aquifer [m3]', 'rejected recharge [m3]']
             dq = max((a[c] - b[c]).abs().max() / max(a[c].abs().max(), 1.0) for c in cols)

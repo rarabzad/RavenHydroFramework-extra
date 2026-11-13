@@ -1,4 +1,4 @@
-""":SoilZoneVadoseInitialFlux and the columns' initial state (VI1-VI8).
+""":SoilZoneVadoseInitialFlux and the columns' initial state (VI1-VI12).
 
 VI1  steady start: columns started at the steady profile for q carry q from the first step, with the start line in
     GWModelSummary.txt ("unsaturated storage : V m3 at the start") and the columns' balance from step 1; with depth classes
@@ -28,6 +28,26 @@ VI8  a restart whose columns have other tops: the same case with RICHARDS, writt
     with :SoilZoneSubgrid 8. Lines whose column top differs by more than 1 mm do not match (the warning names the column
     top); the restart starts with no more unsaturated water than the file holds (columns of other tops given the written
     water would start with 18.2 m3 from 7.4 m3 written). Restarted with :SoilZoneSubgrid 5 the columns are read and start with the written water (1e-9).
+VI9  a restart with another :SoilZoneVadose method: the combinations.py column case (K = 1) written by RICHARDS and read by
+    KINEMATIC, and written by KINEMATIC and read by RICHARDS. The methods count the water from different reference profiles
+    (the file's :GWVadoseColumns line names the method that wrote it), so the columns start at rest (start storage 0), the
+    warning names the writing method and the volume, and the run total 'hotstart columns unused' equals the first run's
+    final 'unsaturated zone storage' (5e-6). Read as the contents of the other method, the columns would start with
+    +3,669 or -3,628 m3 from 3.7 or 491 m3 written. RICHARDS read by LAG (the same reference) starts with the written water
+    (1e-9).
+VI10 hotstart lines that match no column: the column case (LAG, K = 1, :SoilZoneVadoseInitialFlux 30) run 4 days, restarted
+    with a :SpecifiedHeadBoundary over HRU 1's cells (no exchange link there, so no column): the warning gives the lines
+    not used and their volume, the run total 'hotstart columns unused' gives them, and the restart's start storage plus
+    that volume equals the file's water (:GWVadoseColumnTops, 1e-6).
+VI11 columns of a generated model's cells held as specified heads at the start (a :BoundaryHead series, held on days 1-3;
+    the column case, LAG, K = 1, :SoilZoneVadoseInitialFlux 30): no column is built on them, so the start storage equals
+    that of the same case with a fixed :SpecifiedHeadBoundary (1e-9), and the first step ends no column on them (its
+    recharge onto CHD cells equals the second held step's, 1e-6; columns built there would ship their initial-flux
+    profile, about 120 m3, to the specified heads in step 1).
+VI12 an existing model's own specified heads (stress periods 3-5, the cells of HRU 1) under the column case (KINEMATIC,
+    K = 3): a run restarted on day 4 rebuilds those columns at rest and the first step ends them again; such columns hold
+    no water and are not counted: the run total 'columns over specified heads' of the first part (days 1-3) plus that of
+    the restarted part equals the continuous run's, columns and volume (1e-6).
 """
 import os, sys, shutil, re
 HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE)
@@ -226,9 +246,110 @@ def i8():
           % (v0, s1 if s1 is not None else float('nan'), 'present' if 'another column top' in e else 'MISSING', s2 if s2 is not None else float('nan'), 'ok' if good else 'FAIL'))
     return good
 
+def restart_ms(name, m1, m2, K, n1, extra='', st=None, post2=None):
+    """the combinations.py column case written by method m1 (n1 days) and restarted with method m2"""
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    def mk(tag, m, dur, start):
+        s = dict(sz='PHYS', vz=m, K=K, x={'swx', 'et'} if st is None else set(), st=set(st or ()), dt=1.0)
+        d = os.path.join(W, name + tag); shutil.rmtree(d, ignore_errors=True); sz_models.make_case(d, **C.cfg_of(s)); C.options(d, s)
+        if extra: open(os.path.join(d, 'm.rvg'), 'a').write(extra)
+        p = os.path.join(d, 'm.rvi'); x = re.sub(r':Duration \d+', ':Duration %d' % dur, open(p).read())
+        if start: x = x.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+        open(p, 'w').write(x)
+        return d, C
+    a, C = mk('_first', m1, n1, None); oka = 'Successful Simulation' in C.run(a)
+    b, _ = mk('_second', m2, C.DAYS - n1, '2000-01-%02d' % (n1 + 1))
+    if not oka: return a, b, False
+    shutil.copy(os.path.join(a, 'out', 'solution.rvc'), os.path.join(b, 'm.rvc'))
+    if post2: post2(b, C)
+    return a, b, 'Successful Simulation' in C.run(b)
+
+def unused(d):
+    m = re.search(r'hotstart columns unused: (\d+) unsaturated columns of the hotstart file, (\S+) m3', sz_check.summary(d))
+    return (int(m.group(1)), float(m.group(2))) if m else None
+
+def i9():
+    print('VI9 a restart with another :SoilZoneVadose method')
+    ok = True
+    for m1, m2 in (('RICHARDS', 'KINEMATIC'), ('KINEMATIC', 'RICHARDS')):
+        a, b, good = restart_ms('i9_%s_%s' % (m1[:3].lower(), m2[:3].lower()), m1, m2, 1, 4, st=())
+        if not good: print('  %s -> %s: runs FAILED' % (m1, m2)); ok = False; continue
+        v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); s0 = sz_check.vz_start(b); e = errs(b); u = unused(b)
+        g = v0 > 0.0 and s0 is not None and abs(s0) <= 1e-9 and ':SoilZoneVadose %s' % m1 in e and 'is dropped' in e and u is not None and abs(u[1] - v0) <= 5e-6 * v0
+        print('  written by %s (%.3f m3), read by %s: starts with %s m3, warning %s, run total %s -> %s' % (m1, v0, m2, s0, 'present' if 'is dropped' in e else 'MISSING',
+              ('%d lines, %g m3' % u) if u else 'MISSING', 'ok' if g else 'FAIL'))
+        ok &= g
+    a, b, good = restart_ms('i9_ric_lag', 'RICHARDS', 'LAG', 1, 4, st=())
+    if not good: print('  RICHARDS -> LAG: runs FAILED'); return False
+    v0 = float(budget(a)['unsaturated zone storage [m3]'].iloc[-1]); s0 = sz_check.vz_start(b)
+    g = s0 is not None and abs(s0 - v0) <= 1e-9 * max(v0, 1.0) and unused(b) is None
+    print('  written by RICHARDS (%.4f m3), read by LAG: starts with %.4f m3 -> %s' % (v0, s0 if s0 is not None else float('nan'), 'ok' if g else 'FAIL'))
+    return ok and g
+
+def i10():
+    print('VI10 hotstart lines that match no column (a specified head added over HRU 1)')
+    ex = ':SoilZoneVadoseInitialFlux 30\n'
+    def add_chd(d, C):
+        C.polygon(os.path.join(d, 'up.geojson'), C.XS - C.HW, C.XS + 0.75 * C.CELL)
+        open(os.path.join(d, 'm.rvg'), 'a').write(':SpecifiedHeadBoundary UP up.geojson HEAD %.2f\n' % (C.land(C.XS + 0.5 * C.CELL) - 2.0))
+    a, b, good = restart_ms('i10', 'LAG', 'LAG', 1, 4, extra=ex, st=(), post2=add_chd)
+    if not good: print('  runs FAILED'); return False
+    r = open(os.path.join(a, 'out', 'solution.rvc')).read()
+    blk = re.search(r':GWVadoseColumnTops[^\n]*\n([\s\S]*?):End', r).group(1).strip().split('\n')
+    vf = sum(float(l.split(',')[4]) for l in blk); s0 = sz_check.vz_start(b); u = unused(b); e = errs(b)
+    g = u is not None and u[0] > 0 and s0 is not None and abs(s0 + u[1] - vf) <= 1e-6 * vf and 'no longer exchange links' in e
+    print('  file %d lines, %.4f m3; restart starts with %s m3; not used: %s; warning %s -> %s' % (len(blk), vf, s0, ('%d lines, %g m3' % u) if u else 'MISSING',
+          'present' if 'no longer exchange links' in e else 'MISSING', 'ok' if g else 'FAIL'))
+    return g
+
+def i11():
+    print('VI11 no columns on a generated model\'s cells held as specified heads at the start')
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    res = {}
+    for tag, st in (('series', {'bhs'}), ('fixed', set())):
+        s = dict(sz='PHYS', vz='LAG', K=1, x={'chd', 'swx'}, st=st, dt=1.0)
+        d = os.path.join(W, 'i11_' + tag); shutil.rmtree(d, ignore_errors=True); sz_models.make_case(d, **C.cfg_of(s)); C.options(d, s)
+        open(os.path.join(d, 'm.rvg'), 'a').write(':SoilZoneVadoseInitialFlux 30\n')
+        if 'Successful Simulation' not in C.run(d): print('  %s: run FAILED' % tag); return False
+        res[tag] = (sz_check.vz_start(d), budget(d)['recharge onto CHD cells [m3/d]'].values)
+    (s1, c1), (s2, _) = res['series'], res['fixed']
+    g = s1 is not None and s2 is not None and s2 > 0 and abs(s1 - s2) <= 1e-9 * s2 and abs(c1[0] - c1[1]) <= 1e-6 * max(abs(c1[1]), 1.0)
+    print('  start storage %.4f (series held) against %.4f m3 (fixed head); recharge onto CHD cells on days 1 and 2 (both held) %.4f, %.4f m3/d -> %s'
+          % (s1, s2, c1[0], c1[1], 'ok' if g else 'FAIL'))
+    return g
+
+def i12():
+    print('VI12 an existing model\'s own specified heads: columns ended over them counted once across a restart')
+    sys.path.insert(0, os.path.dirname(HERE))
+    import combinations as C
+    s = dict(sz='PHYS', vz='KINEMATIC', K=3, x={'swx', 'et'}, st={'reschd'}, dt=1.0)
+    g0 = os.path.join(W, 'i12_gen'); shutil.rmtree(g0, ignore_errors=True); sz_models.make_case(g0, **C.cfg_of(s)); C.options(g0, s)
+    if 'Successful Simulation' not in C.run(g0): print('  generated twin FAILED'); return False
+    def mk(tag, start=None, dur=None, rvc=None):
+        e = os.path.join(W, 'i12' + tag); shutil.rmtree(e, ignore_errors=True); C.existing(g0, e, s)
+        open(os.path.join(e, 'm.rvg'), 'a').write(':SoilZoneAquiferClass SAND\n')
+        p = os.path.join(e, 'm.rvi'); x = open(p).read()
+        if dur: x = re.sub(r':Duration \d+', ':Duration %d' % dur, x)
+        if start: x = x.replace(':StartDate 2000-01-01', ':StartDate ' + start)
+        open(p, 'w').write(x)
+        if rvc: shutil.copy(rvc, os.path.join(e, 'm.rvc'))
+        return e if 'Successful Simulation' in C.run(e) else None
+    def ended(d):
+        m = re.search(r'columns over specified heads: (\d+) unsaturated columns ended on cells that were specified heads, their water \((\S+) m3', sz_check.summary(d))
+        return (int(m.group(1)), float(m.group(2))) if m else None
+    f = mk('_full'); a = mk('_a', dur=3)
+    b = mk('_b', start='2000-01-04', dur=C.DAYS - 3, rvc=os.path.join(a, 'out', 'solution.rvc')) if a else None
+    if not (f and a and b): print('  runs FAILED'); return False
+    nf, na, nb = ended(f), ended(a), ended(b)
+    g = None not in (nf, na, nb) and nf[0] > 0 and na[0] + nb[0] == nf[0] and abs(na[1] + nb[1] - nf[1]) <= 1e-6 * max(abs(nf[1]), 1.0)
+    print('  continuous %s; first part %s + restarted part %s -> %s' % (nf, na, nb, 'ok' if g else 'FAIL'))
+    return g
+
 def main():
     tc.need_mf6()
-    res = {'VI1': i1(), 'VI2': i2(), 'VI4': i4(), 'VI5': i5(), 'VI6': i6(), 'VI7': i7(), 'VI8': i8()}
+    res = {'VI1': i1(), 'VI2': i2(), 'VI4': i4(), 'VI5': i5(), 'VI6': i6(), 'VI7': i7(), 'VI8': i8(), 'VI9': i9(), 'VI10': i10(), 'VI11': i11(), 'VI12': i12()}
     print('results: ' + ', '.join('%s %s' % (k, 'ok' if v else 'FAIL') for k, v in res.items()))
     good = all(res.values())
     print('initial-state tests: ALL PASSED' if good else 'initial-state tests: FAILED')

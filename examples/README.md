@@ -219,8 +219,9 @@ python ..\Liard_groundwater\tools_audit.py output
 Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gross flow` about -1.9e-11,
 `unconverged steps` 0, river bookkeeping about -5e-12, `ERROR lines` 0, `max outer iterations` 245 (the first step).
 `river loss carried max` is about 1.06e+08 m3: the model's stream package keeps its own conductance and has no supply
-limit, so its losing reaches take more than the channels hold (on 288 of the 731 days, from the first day); the part a
-channel cannot supply is carried to the next step and taken then (`river loss carried at end` 0). The manual explains
+limit, so its losing reaches take more than the channels hold (on 271 of the 731 days, from the first day); the part a
+channel's runoff, inflow and outflow cannot supply is carried to the next step and taken then (`river loss carried at end`
+0; Raven warns on the first ten such steps). The manual explains
 this under "Limits" in the chapter "Coupling an existing MODFLOW 6 model".
 
 ---
