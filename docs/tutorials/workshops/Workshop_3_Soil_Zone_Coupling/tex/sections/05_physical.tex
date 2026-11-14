@@ -32,9 +32,10 @@ of this step are in \cmd{\$WS/model/step\_06}.
   use \cmd{:SoilZoneVadose LAG} for a delay instead.
 \item \emph{``soil-zone interface did not converge''} (rare): raise \cmd{:SoilZoneIteration}. If that does not
   help, increase \cmd{SEEPAGE\_SMOOTHING\_DEPTH} or use a shorter time step.
-\item Compare your files with those of this step. This command prints the lines that differ:
+\item Compare your files with those of this step. This command prints the lines that differ, leaving spacing and
+  empty lines aside:
 \begin{shell}
-$ diff $WS/model/step_06/Creek.rvg Creek.rvg
+$ diff -wB $WS/model/step_06/Creek.rvg Creek.rvg
 \end{shell}
 \end{itemize}
 \end{trouble}

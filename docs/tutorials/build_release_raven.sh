@@ -20,8 +20,10 @@
 # the commit's committer time (git log -1 --format=%ct COMMIT), which clang uses for __DATE__ and __TIME__. So the same
 # commit gives the same executable, byte for byte, on any day. zig keeps compiled objects in its cache without regard to
 # SOURCE_DATE_EPOCH, so the script also passes the date as a macro (-DRAVEN_SOURCE_DATE_EPOCH=...; Raven does not use
-# it): an object compiled with another date is then not taken from the cache. At the end it prints the highest GLIBC
-# symbol version the executable needs; the script fails if it is above 2.28.
+# it): an object compiled with another date is then not taken from the cache. The order of the objects on the link
+# line enters the executable's bytes, so the script gives make the source files sorted by name (LC_ALL=C) instead of
+# the Makefile's $(wildcard *.cpp), whose order depends on the version of GNU make. At the end it prints the highest
+# GLIBC symbol version the executable needs; the script fails if it is above 2.28.
 set -euo pipefail
 SRC=$(cd "$1" && pwd); B=$2; OUT=$(realpath -m "$3"); COMMIT=${4:-HEAD}
 TARGET_GLIBC=2.28
@@ -52,7 +54,8 @@ SOURCE_DATE_EPOCH=$(git -C "$SRC" log -1 --format=%ct "$COMMIT"); export SOURCE_
 rm -f "$B"/src/*.o "$B/src/Raven.exe"
 echo "building Raven $REV for x86_64-linux-gnu.$TARGET_GLIBC (build date $(date -u -d "@$SOURCE_DATE_EPOCH" '+%b %e %Y'), the commit's date)"
 cd "$B/src"
-make -j"$(nproc)" CXX="$ZIG c++ -target x86_64-linux-gnu.$TARGET_GLIBC" \
+SRCFILES=$(LC_ALL=C ls -- *.cpp | tr '\n' ' ')   # sorted: the link order, and so the bytes, do not depend on make
+make -j"$(nproc)" srcfiles="$SRCFILES" CXX="$ZIG c++ -target x86_64-linux-gnu.$TARGET_GLIBC" \
      CXXFLAGS="-Wno-deprecated -Wno-date-time -std=c++11 -fPIC -O2 -DRAVEN_SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" LDLIBS="-ldl" > make.log 2>&1 \
   || { grep -m20 -B2 -A5 "error" make.log; exit 1; }
 cp Raven.exe "$OUT"

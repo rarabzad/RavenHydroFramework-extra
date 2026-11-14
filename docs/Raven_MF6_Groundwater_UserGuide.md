@@ -389,8 +389,11 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
   curve implies (a warning when they differ by more than a factor two). A rising water table takes from a column at most
   what MODFLOW stores for the rise (Sy dh, and no more than the room left in the top cell); the column keeps the rest for
-  the next steps. With water in transit in the column (the `LAG` store, a `RICHARDS` wetting front) this happens with a
-  consistent `SPEC_YIELD` too; Raven warns the first time in a run, and no water is lost. Column water goes back to the soil zone, as
+  the next steps. This happens when the rise meets more water above equilibrium than Sy dh: water in transit in the
+  column (the `LAG` store, a `RICHARDS` wetting front, a recharge pulse) or a nearly full top cell, and the more readily
+  the smaller `SPEC_YIELD` is against the drainable porosity. A column at rest or under a small steady flux, and a water
+  table raised by a boundary or lateral inflow, do not reach it, whatever `SPEC_YIELD`. Raven warns the first time in a
+  run, and no water is lost. Column water goes back to the soil zone, as
   rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
   column vanishes beyond what MODFLOW stores for the rise (rule (ii)); it is subtracted from the unsaturated-zone inflow,
   which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
@@ -607,7 +610,12 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 - Raven's `:Transport` (tracers, nutrients, the age tracer, temperature) is not available in a coupled run: the coupling exchanges water, not constituent mass, so a coupled run with a `:Transport` command stops with a message naming the constituent.
 - Known issues in Raven itself (also without groundwater; left to the Raven developers): channel storage in
   `solution.rvc` can be negative in some subbasins; on the day after a reservoir has been drawn empty by a minimum flow its
-  outflow still averages in the previous release rate (most of such a reservoir's balance error); valgrind reports
+  outflow still averages in the previous release rate (most of such a reservoir's balance error); the reservoir's stage
+  iteration stops once its change falls below 0.1 mm, so on a step whose stage ends within a millimetre of the weir
+  crest, where the outflow curve has its kink, the reservoir's `MB error` (`ReservoirMassBalance.csv`) and Raven's
+  balance show up to about the lake area times 0.1 mm (3 to 7 m3 on a 0.04 km2 lake whose stage falls slowly through the
+  crest, in base Raven without groundwater; with `:ReservoirExchange` where the aquifer holds a lake near its crest);
+  valgrind reports
   uninitialised reads in `RVPParameterWarning` and `CVegetationClass::RecalculateRootParams` while the `.rvp` file is read;
   Raven's `MB Error` of the first step is not zero in some models and stays at that value (0.431 mm in the Liard example,
   0.216 mm with half-day steps, also in base Raven 4.15); without `:GroundwaterModel`, Raven empties the `GROUNDWATER`
@@ -623,7 +631,8 @@ digits, so closed-loop and forecast members continue the aquifer from there.
   one (a long catchment routing such as `ROUTE_TRI_CONVOLUTION` with a large `TIME_CONC`), the rescaling also writes past
   the end of the inflow history's array, which overwrites other data and can crash Raven (base Raven ends such a
   restart in a segmentation fault); in a coupled run the rescaling stays within the array and the entries past the end
-  of the `.rvc` history are read as 0 (test WB15); and when the step grows after the inflows
+  of the `.rvc` history are read as 0 (test WB15); Raven's `CSubBasin::SetQlatHist` also reads past the end of the
+  `.rvc` lateral-inflow history, and coupled runs do not guard that read; and when the step grows after the inflows
   varied, Raven averages a reach's inflow history to the new step while the reach upstream books its first outflow from
   its last outflow, so the first step's `MB Error` changes by half the new step times the difference between the averaged
   and the last outflow, for every such reach (-1.42 mm in a 0.16 km2 test watershed whose inflow varied, without

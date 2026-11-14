@@ -176,7 +176,7 @@ specified heads; seepage to Raven 135.1 against 134.8~m$^3$/d without the sliver
 \subsection{Geometry against standard libraries}
 The geometry functions are compiled into a stand-alone test and compared with widely used libraries
 (Table~\ref{tab:geom}); the readers of the spatial inputs are checked against the same libraries and against files
-that must be refused (Table~\ref{tab:readers}).
+that must be refused (Tables~\ref{tab:readers} and~\ref{tab:rasters}).
 \begin{table}[!htbp]\centering
 \caption{Geometry functions against independent libraries.}\label{tab:geom}
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
@@ -195,10 +195,17 @@ Bilinear raster sampling of a plane, which bilinear sampling reproduces exactly 
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Input & Reference & Result\\\midrule
 GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\
-GeoJSON numbers (14 files): coordinates that are strings, \cmd{null}, \cmd{true} or too large; \cmd{NaN}, \cmd{Infinity}, hexadecimal numbers and leading zeros; features with and without \cmd{"properties"} & the JSON standard & the invalid ones refused, naming the feature, ring and vertex or the line and column; a feature without \cmd{"properties"} refused only where an ID is read\\
+GeoJSON numbers: coordinates that are strings, \cmd{null}, \cmd{true} or too large; \cmd{NaN}, \cmd{Infinity}, hexadecimal numbers and leading zeros; features with and without \cmd{"properties"} & the JSON standard & the invalid ones refused, naming the feature, ring and vertex or the line and column; a feature without \cmd{"properties"} refused only where an ID is read\\
+GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"7.5"} and \cmd{""}; IDs \cmd{"7"}, \cmd{"\ 7\ "}, \cmd{"7.0"} and 7.0; features of other geometry types with a \cmd{null} ID; a Polygon nested one level too shallow, a vertex \cmd{[1]} (polygon and line), a LineString whose coordinates are a number; \cmd{NaN} and \cmd{Infinity} attributes; field names written with \cmd{\textbackslash u} escapes; text after the root object; a truncated file & the JSON standard & the first six IDs refused, naming the file, the feature and the value, the next four read; features of other types skipped before their ID; each malformed structure refused, naming the vertex or member; the attributes and the escaped names read; the trailing text and the truncated file refused (\cmd{geomtest\_check.py})\\
 \cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\
 \cmd{"crs"} members: EPSG:4326, 4269, 4617, 6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 and 4647 (projections, not built in) & EPSG registry (pyproj) & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 and 4647 ask for their parameters, which are then accepted\\
-\cmd{"crs"} EPSG:2227 (US survey feet); a file with a UTF-8 byte-order mark; \cmd{:InputCRS} with letters or units in a parameter (\cmd{-ll7}, \cmd{O.9996}, \cmd{500km}), surplus or missing values, an unknown ellipsoid, \cmd{EPSG:32610x} & -- & 2227 refused; the file read; each specification refused, naming the parameter or value (\cmd{geomtest\_check.py})\\
+\cmd{"crs"} EPSG:2227 (US survey feet); a file with a UTF-8 byte-order mark; \cmd{:InputCRS} with letters or units in a parameter (\cmd{-ll7}, \cmd{O.9996}, \cmd{500km}), surplus or missing values, an unknown ellipsoid, \cmd{EPSG:32610x} & -- & 2227 refused; the file read; each specification refused, naming the parameter or value (\cmd{geomtest\_check.py})\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{Readers of the raster inputs against independent libraries and reference files.}\label{tab:rasters}
+\begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
+Input & Reference & Result\\\midrule
 GeoTIFF reader: 228 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes; GDAL's band scale and offset, and role-less items of those names) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
 ESRI ASCII grids: GDAL's \cmd{dx}/\cmd{dy} header (with corner or centre), \cmd{NODATA\_value nan}; more values than \cmd{ncols}$\times$\cmd{nrows}, a wrapped grid, fewer values, an unknown key, a value or header value that is not a number & the GeoTIFF with the same pixels; the $-9999$ twin & the same samples bit for bit; each malformed grid refused with its reason\\
 GeoTIFF reader: 34 unsupported or damaged files (also a prime meridian given only by its longitude or by the datum, a projected code in feet without its units key, a band unit in feet), an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
@@ -292,7 +299,7 @@ writes: FloPy reads every model; cells are valid and do not overlap; the grid or
 select the right cells. All 127 checks pass.
 
 \paragraph{Faulty and unusual input.} Thirty-nine faulty or unusual set-ups of the Liard model check the messages
-(Table~\ref{tab:faulty}): every error stops the run with a message that names the problem --- no crash --- and every
+(Tables~\ref{tab:faulty} and~\ref{tab:faultynum}): every error stops the run with a message that names the problem --- no crash --- and every
 tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
 MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
 renumbering, the original model untouched). All 53 behave as required.
@@ -309,13 +316,21 @@ Duplicate IDs or names; two exchanges on one store; boundary without \cmd{HEAD} 
 Malformed groundwater command in \cmd{.rvg}, \cmd{.rvt} or \cmd{.rvc} & stops; names the command\\
 Hotstart heads for a different grid; cells larger than the HRUs & stops; explains the mismatch\\
 Monitoring well outside the model; unknown \cmd{.rvg} command & runs with a warning\\
-\cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\
+\cmd{TO\_BEDROCK} in a middle layer; no DEM or bedrock map; coupling switched off & runs as documented\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{Response to malformed numbers, grid-size limits and other unusual input.}\label{tab:faultynum}
+\begin{tabularx}{\linewidth}{Y P{0.4\linewidth}}\toprule\hdr
+Input & Response\\\midrule
 Malformed numbers in the \cmd{.rvg} (\cmd{:GridCellSize 2,000.0}, \cmd{2km}, \cmd{HEAD H1146}, \cmd{1146.85m}, \cmd{50.5} iterations, a \cmd{:Wells} value); a cell size giving more than $5\times10^6$ cells per layer (\cmd{:GridCellSize 50} and \cmd{60} on Liard), a refinement size giving more on a regular grid (counted with its 2:1 smoothing: 60 short lines on 400~$\times$~300~km, N24) or, by its estimate, on a quadtree grid (\cmd{:GridRefinement RIVERS 0.1}) & stops before the grid is built; names the command and the value or the estimated cells per layer (\cmd{tests/input\_checks.py})\\
 A quadtree grid within the limit that needs more memory than there is (\cmd{RIVERS 0.5} on Liard, about $4.6\times10^6$ cells per layer, under a 3~GB limit) & stops naming \cmd{:GridRefinement} and the estimated cells per layer (no crash)\\
 Overlapping and adjacent refinement features: 200 copies of one line (\cmd{LINES 0.1}) and 20 adjacent squares (\cmd{POLYGONS 0.5}) on a 4-HRU strip & built (the estimate counts each square once)\\
 An HRU mesh of 4 HRUs of 5~$\times$~5~km with 500~m cells and one short refinement line of 0.1~m (N17) and of 2~m (N18) & N17 stops before the mesh is built (``too slow to build''); N18 is built within 120~s (65\,484 cells per layer)\\
 Boundary polygons that overlap: two features, the same feature twice, a MultiPolygon of two overlapping parts (N19) & each selects the cells of the union (as the larger polygon alone)\\
 Malformed numbers in the \cmd{.rvp} aquifer tables: \cmd{K\_HORIZ 1O}, \cmd{SPEC\_YIELD O.2}, a thickness \cmd{3m}, a profile parameter \cmd{2.O} (N20--N23) & stops; names the table, the row and the token\\
+River lines of \cmd{:RiverGeometry} whose subbasin ID is not in the model: one of two lines (N25), the only line (N26) & N25 runs with the other line's cells and a warning naming the line left out; N26 stops (no line of the file has a subbasin of the model)\\
+An existing model's TDIS and package text in forms MODFLOW~6 reads: period lengths \cmd{10.0D-1}, \cmd{0.31d2}, \cmd{2*1.0}, \cmd{31.0/} and \cmd{30.0e}, \cmd{//} and \cmd{!} comment rows, commas between values; period numbers such as \cmd{2.0} and \cmd{3/}; an \cmd{AUXILIARY} line with a comment after the name; and a period length \cmd{1.0x}, \cmd{NPER} 25 with 24 rows (E1--E6) & read as MODFLOW~6 reads them (checked against the \cmd{mf6} program); the runs complete; \cmd{1.0x} and the \cmd{NPER} mismatch stop, naming the period or both counts\\
 Malformed numbers in the \cmd{.rvc}: \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5} or \cmd{0x62}, \cmd{:InitialGWHeads FROM\_PROFILE 0}, a \cmd{:GWHeads} value \cmd{98.5x} & stops; names the command and the token (\cmd{test\_inputs.py} I22)\\
 \cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
 A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule
