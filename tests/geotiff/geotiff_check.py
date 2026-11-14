@@ -14,29 +14,11 @@ Reader checks (unit driver):
     8 bit) give no data at the masked pixels; tiles of 2048 x 2048 on a small raster; the EPSG code and its kind as written;
   - GDAL's band scale and offset (GDAL_METADATA) are applied (16-bit decimetres against a twin of the scaled values,
     NODATA pixels no data); items named SCALE, OFFSET and UNITTYPE without GDAL's role are ordinary metadata (values as
-    stored); a band unit in feet stops, an unknown band unit gives a warning; the unit's words are matched whole: "m
-    (Admiralty datum)", "metres above Hydrographic Datum", "elevation in metres", "in metres", "in m" and "in meters above
-    sea level" are metres, "hydraulic head" is an unknown unit (a warning), "feet above sea level", "US survey foot",
-    "kilometres" and "in" (inches) stop; so do the US-foot spellings of GDAL and PROJ, also fused ("ftUS", "usft",
-    "us-ft", "USfeet", "foot_us", "Foot_US", "foot_survey_us", "NAVD88 ftUS", "sft", "ind-ft") and "fathom"; a unit
-    without letters ("'", "?") and "\u00b5m" (micrometres: m glued to a non-ASCII letter) give the unknown-unit warning;
-    "metre" and "m above NAVD88" are metres; PROJ's short ids (ch, mi, fath, link, in, also after us/ind: "us-in",
-    "us-ch") stop only as the first word and without a metre word, so "Elevation in m (CH1903+)", "elevation [m] CH",
-    "H\u00f6he in m \u00fc. M. (CH)", "Elevation (m) see link" and "height in metres, mi" are metres and "hauteur \u00e0
-    mi-mar\u00e9e" an unknown unit; a number before the metre word ("0.1 m") gives the unknown-unit warning, a word
-    that ends in a digit does not ("CH1903 m", "CH1903 metres", "NAVD88 m", "EGM96 m" are metres); feet written in
-    camel case or as one word ("SurveyFeet", "InternationalFeet", "USSurveyFoot", "esriSRUnit_SurveyFoot",
-    "decimalfeet", "fasl") stop, as do "fmsl", the EPSG feet codes (EPSG:9002, EPSG:9003; EPSG:9001 is metres) and
-    "pies", "pieds", "Fu\u00df", "voet", "Fuss", "FUSS", "piedi", "p\u00e9s", "P\u00c9S", "fot", "Fod"; "mASL" is metres
-    and "Micrometer" another unit; a number with punctuation or a factor sign before the metre word ("[0.1 m]", "(0.1 m)",
-    "1,5 m", "1/1000 m", "x0.1 m", "1:1000 m") gives the unknown-unit warning, and so does a number after it that is a
-    scale: after a factor sign or word, or a fraction ("m*0.1", "metres x 0.1", "m (scaled by 0.1)", "m \u00d70.1",
-    "m / 10"), while datum years, versions and other whole numbers after it are not ("m NAVD 88", "m (NAVD 1988)",
-    "m CGVD 2013", "m (RH 2000)", "metres NN 2016", "m \u00fc. NHN 2016", "m, EGM 2008", "height m 2020", "m above datum
-    1", "Elevation, m, version 2", "m (2 m grid)", "m, 1 m resolution": metres); the EPSG codes of other lengths
-    (EPSG:9036 km, 1033 cm, 1025 mm, 9030 nautical mile, 9093 mile, 9301 British chain), a prefix written as a word and
-    attached to the metre word ("kiloMeters", "Kilo Meter") and "tenths of metres" stop, a prefix word elsewhere does not
-    ("nano DEM m", "m kilo": metres); "pesos" (no unit word) gives the unknown-unit warning;
+    stored); band units (UNITTYPE): every text of the table band_units.tsv gets its class (read as metres, read with
+    the unknown-unit warning, or the run stops): the first unit expression of the text decides (a metre text that names
+    feet or a coordinate-system code later is metres; parts and multiples of the metre, SI prefixes written out or as
+    symbols, feet, inches, yards and miles in other languages and scripts, and EPSG length-unit codes other than 9001
+    stop; no unit, a scaled metre, a coordinate-system code or a short id that is not the first word give the warning);
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -277,7 +259,7 @@ for m in M:
 o = unit('raster', fx('matrix_int16_c8_p2_le_strip_classic.tif') if os.path.exists(fx('matrix_int16_c8_p2_le_strip_classic.tif')) else fx('twin_int16.asc'), 'NONE').strip()
 report('no NODATA tag and no such values: no warning', o == 'OK', o[:120])
 
-# ---- band units (UNITTYPE): matched as whole words
+# ---- band units (UNITTYPE): the first unit expression decides
 def with_unit(text, name):
     """unit_height_meta.tif with another UNITTYPE text (the GDAL_METADATA string rewritten at the end of the file)"""
     import struct
@@ -285,49 +267,21 @@ def with_unit(text, name):
     for i in range(n):
         e = off + 2 + 12 * i; t, ty, c, v = struct.unpack('<HHII', b[e:e + 12])
         if t == 42112:
-            meta = (bytes(b[v:v + c]).rstrip(b'\0').decode().replace('>height<', '>%s<' % text)).encode() + b'\0'
+            esc = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            meta = (bytes(b[v:v + c]).rstrip(b'\0').decode().replace('>height<', '>%s<' % esc)).encode() + b'\0'
             b[e:e + 12] = struct.pack('<HHII', t, ty, len(meta), len(b)); b += meta
     p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
-for text, want, part in (('m (Admiralty datum)', 'OK', ''), ('metres above Hydrographic Datum', 'OK', ''), ('elevation in metres', 'OK', ''),
-                         ('in metres', 'OK', ''), ('in m', 'OK', ''), ('in meters above sea level', 'OK', ''),
-                         ('hydraulic head', 'OK', "has the band unit 'hydraulic head'"), ('feet above sea level', 'ERROR', 'elevations are in feet above sea level'),
-                         ('US survey foot', 'ERROR', 'elevations are in US survey foot'), ('kilometres', 'ERROR', 'elevations are in kilometres'), ('in', 'ERROR', 'elevations are in in'),
-                         ('ftUS', 'ERROR', 'elevations are in ftUS'), ('usft', 'ERROR', 'elevations are in usft'), ('us-ft', 'ERROR', 'elevations are in us-ft'),
-                         ('USfeet', 'ERROR', 'elevations are in USfeet'), ('foot_us', 'ERROR', 'elevations are in foot_us'), ('Foot_US', 'ERROR', 'elevations are in Foot_US'),
-                         ('foot_survey_us', 'ERROR', 'elevations are in foot_survey_us'), ('NAVD88 ftUS', 'ERROR', 'elevations are in NAVD88 ftUS'),
-                         ('sft', 'ERROR', 'elevations are in sft'), ('ind-ft', 'ERROR', 'elevations are in ind-ft'), ('fathom', 'ERROR', 'elevations are in fathom'),
-                         ("'", 'OK', "has the band unit '''"), ('?', 'OK', "has the band unit '?'"), ('\u00b5m', 'OK', "has the band unit '\u00b5m'"),
-                         ('metre', 'OK', ''), ('m above NAVD88', 'OK', ''),
-                         ('Elevation in m (CH1903+)', 'OK', ''), ('elevation [m] CH', 'OK', ''), ('H\u00f6he in m \u00fc. M. (CH)', 'OK', ''),
-                         ('Elevation (m) see link', 'OK', ''), ('height in metres, mi', 'OK', ''),
-                         ('hauteur \u00e0 mi-mar\u00e9e', 'OK', "has the band unit 'hauteur"), ('0.1 m', 'OK', "has the band unit '0.1 m'"),
-                         ('us-in', 'ERROR', 'elevations are in us-in'), ('us-ch', 'ERROR', 'elevations are in us-ch'), ('mi', 'ERROR', 'elevations are in mi'),
-                         ('link', 'ERROR', 'elevations are in link'),
-                         ('CH1903 m', 'OK', ''), ('CH1903 metres', 'OK', ''), ('in CH1903 m', 'OK', ''), ('NAVD88 m', 'OK', ''), ('EGM96 m', 'OK', ''),
-                         ('SurveyFeet', 'ERROR', 'elevations are in SurveyFeet'), ('InternationalFeet', 'ERROR', 'elevations are in InternationalFeet'),
-                         ('USSurveyFoot', 'ERROR', 'elevations are in USSurveyFoot'), ('esriSRUnit_SurveyFoot', 'ERROR', 'elevations are in esriSRUnit_SurveyFoot'),
-                         ('decimalfeet', 'ERROR', 'elevations are in decimalfeet'), ('fasl', 'ERROR', 'elevations are in fasl'),
-                         ('mASL', 'OK', ''), ('Micrometer', 'ERROR', 'elevations are in Micrometer'),
-                         ('[0.1 m]', 'OK', "has the band unit '[0.1 m]'"), ('(0.1 m)', 'OK', "has the band unit '(0.1 m)'"), ('1,5 m', 'OK', "has the band unit '1,5 m'"),
-                         ('1/1000 m', 'OK', "has the band unit '1/1000 m'"), ('x0.1 m', 'OK', "has the band unit 'x0.1 m'"), ('1:1000 m', 'OK', "has the band unit '1:1000 m'"),
-                         ('EPSG:9002', 'ERROR', 'elevations are in EPSG:9002'), ('EPSG:9003', 'ERROR', 'elevations are in EPSG:9003'), ('EPSG:9001', 'OK', ''),
-                         ('fmsl', 'ERROR', 'elevations are in fmsl'), ('pies', 'ERROR', 'elevations are in pies'), ('pieds', 'ERROR', 'elevations are in pieds'),
-                         ('Fu\u00df', 'ERROR', 'elevations are in Fu\u00df'), ('voet', 'ERROR', 'elevations are in voet'),
-                         ('Fuss', 'ERROR', 'elevations are in Fuss'), ('FUSS', 'ERROR', 'elevations are in FUSS'), ('piedi', 'ERROR', 'elevations are in piedi'),
-                         ('p\u00e9s', 'ERROR', 'elevations are in p\u00e9s'), ('P\u00c9S', 'ERROR', 'elevations are in P\u00c9S'), ('fot', 'ERROR', 'elevations are in fot'),
-                         ('Fod', 'ERROR', 'elevations are in Fod'), ('EPSG:9036', 'ERROR', 'elevations are in EPSG:9036'), ('EPSG:1033', 'ERROR', 'elevations are in EPSG:1033'),
-                         ('EPSG:1025', 'ERROR', 'elevations are in EPSG:1025'), ('EPSG:9030', 'ERROR', 'elevations are in EPSG:9030'), ('EPSG:9093', 'ERROR', 'elevations are in EPSG:9093'),
-                         ('kiloMeters', 'ERROR', 'elevations are in kiloMeters'), ('Kilo Meter', 'ERROR', 'elevations are in Kilo Meter'),
-                         ('tenths of metres', 'ERROR', 'elevations are in tenths of metres'), ('m*0.1', 'OK', "has the band unit 'm*0.1'"),
-                         ('metres x 0.1', 'OK', "has the band unit 'metres x 0.1'"), ('m (scaled by 0.1)', 'OK', "has the band unit 'm (scaled by 0.1)'"),
-                         ('pesos', 'OK', "has the band unit 'pesos'"), ('EPSG:9301', 'ERROR', 'elevations are in EPSG:9301'),
-                         ('m NAVD 88', 'OK', ''), ('m (NAVD 1988)', 'OK', ''), ('m CGVD 2013', 'OK', ''), ('m (RH 2000)', 'OK', ''), ('metres NN 2016', 'OK', ''),
-                         ('m \u00fc. NHN 2016', 'OK', ''), ('m, EGM 2008', 'OK', ''), ('height m 2020', 'OK', ''), ('m above datum 1', 'OK', ''),
-                         ('Elevation, m, version 2', 'OK', ''), ('m (2 m grid)', 'OK', ''), ('m, 1 m resolution', 'OK', ''), ('nano DEM m', 'OK', ''),
-                         ('m kilo', 'OK', ''), ('m \u00d70.1', 'OK', "has the band unit 'm \u00d70.1'"), ('m / 10', 'OK', "has the band unit 'm / 10'")):
-    o = unit('raster', with_unit(text, 'unit_%s.tif' % re.sub(r'\W', '_', text)), 'NONE').strip()
-    good = o.startswith(want) and part in o and (part != '' or o == 'OK')
-    report('band unit "%s": %s' % (text, {'OK': 'read as metres' if not part else 'read as metres, with a note', 'ERROR': 'stops'}[want]), good, o[:160])
+# the table band_units.tsv: class M (read as metres, no note), W (read as metres with the unknown-unit warning) or F (the
+# run stops: another length unit), a TAB, the text
+for line in open(os.path.join(HERE, 'band_units.tsv'), encoding='utf-8'):
+    line = line.rstrip('\n')
+    if not line.strip() or line.startswith('#'):
+        continue
+    want, text = line.split('\t', 1)
+    o = unit('raster', with_unit(text, 'unit_band.tif'), 'NONE').strip()
+    good = {'M': o == 'OK', 'W': o.startswith('OK') and ("has the band unit '%s'" % text) in o,
+            'F': o.startswith('ERROR') and ('elevations are in %s (the band unit' % text) in o}[want]
+    report('band unit "%s": %s' % (text, {'M': 'read as metres', 'W': 'read as metres, with a note', 'F': 'stops'}[want]), good, o[:160])
 
 # ---- ESRI ASCII grids (CGWRaster): GDAL's rectangular-pixel header, NaN NODATA, and malformed grids
 def asc_write(name, header, rows):

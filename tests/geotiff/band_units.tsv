@@ -1,0 +1,243 @@
+# Band units (UNITTYPE in GDAL_METADATA) and the class Raven gives them: M read as metres, F the run stops (another length
+# unit), W read as metres with the warning "a unit Raven does not know". The first unit expression of the text decides
+# (GWGeoTIFF::BandUnit and its table, src/GWGeoTIFF.cpp). Read by geotiff_check.py; columns: class, a TAB, the text.
+# -- whole words, feet fused or in camel case, short ids, numbers before and scales after the metre, datum names and versions
+M	m (Admiralty datum)
+M	metres above Hydrographic Datum
+M	elevation in metres
+M	in metres
+M	in m
+M	in meters above sea level
+W	hydraulic head
+F	feet above sea level
+F	US survey foot
+F	kilometres
+F	in
+F	ftUS
+F	usft
+F	us-ft
+F	USfeet
+F	foot_us
+F	Foot_US
+F	foot_survey_us
+F	NAVD88 ftUS
+F	sft
+F	ind-ft
+F	fathom
+W	'
+W	?
+F	µm
+M	metre
+M	m above NAVD88
+M	Elevation in m (CH1903+)
+M	elevation [m] CH
+M	Höhe in m ü. M. (CH)
+M	Elevation (m) see link
+M	height in metres, mi
+W	hauteur à mi-marée
+W	0.1 m
+F	us-in
+F	us-ch
+F	mi
+F	link
+M	CH1903 m
+M	CH1903 metres
+M	in CH1903 m
+M	NAVD88 m
+M	EGM96 m
+F	SurveyFeet
+F	InternationalFeet
+F	USSurveyFoot
+F	esriSRUnit_SurveyFoot
+F	decimalfeet
+F	fasl
+M	mASL
+F	Micrometer
+W	[0.1 m]
+W	(0.1 m)
+W	1,5 m
+W	1/1000 m
+W	x0.1 m
+W	1:1000 m
+F	EPSG:9002
+F	EPSG:9003
+M	EPSG:9001
+F	fmsl
+F	pies
+F	pieds
+F	Fuß
+F	voet
+F	Fuss
+F	FUSS
+F	piedi
+F	pés
+F	PÉS
+F	fot
+F	Fod
+F	EPSG:9036
+F	EPSG:1033
+F	EPSG:1025
+F	EPSG:9030
+F	EPSG:9093
+F	kiloMeters
+F	Kilo Meter
+F	tenths of metres
+W	m*0.1
+W	metres x 0.1
+W	m (scaled by 0.1)
+W	pesos
+F	EPSG:9301
+M	m NAVD 88
+M	m (NAVD 1988)
+M	m CGVD 2013
+M	m (RH 2000)
+M	metres NN 2016
+M	m ü. NHN 2016
+M	m, EGM 2008
+M	height m 2020
+M	m above datum 1
+M	Elevation, m, version 2
+M	m (2 m grid)
+M	m, 1 m resolution
+M	nano DEM m
+M	m kilo
+W	m ×0.1
+W	m / 10
+# -- metre first: metres, whatever follows (other units, EPSG coordinate-system codes, numbers); metre words in other languages
+M	Elevation (m), converted from feet
+M	Elevation in metres (converted from ft)
+M	Height (m) - original data in feet
+M	Elevation (m), 1 km grid
+M	Mean elevation (m) within 1 km
+M	Elevation (m), 30 cm vertical accuracy
+M	Height above sea level (m), 50 cm LiDAR
+M	DEM elevation (meters), mm precision
+M	Elevation, metres (not feet)
+M	Elevation (meters); previously FT
+M	Elevation in metres; 1 foot = 0.3048 metres
+M	Elevation in metres (EPSG:9057)
+M	Height (m), ETRF2000 EPSG:9067
+M	Elevation [m] EPSG:9005
+M	water level in m (chain survey)
+M	Altitude in metres (pie chart)
+M	elevation in m; 1 mm = 0.001 m
+M	m, accuracy +/- 0.5 m
+M	m (version 2.1)
+M	metres (tenths of a metre precision)
+M	MASL
+M	moh
+M	möh
+M	Höhe in Metern
+M	Meter über NN
+M	altitude en mètres
+M	Altitud (metros)
+M	Altezza (metri)
+M	Wysokość (m n.p.m.)
+M	Wysokość w metrach
+M	Výška v metrech
+M	Magasság (méter)
+M	Высота (м)
+M	ВИСОТА, МЕТРЫ
+M	μέτρα
+M	高程（米）
+M	公尺
+M	標高（メートル）
+M	미터
+M	urn:ogc:def:uom:EPSG::9001
+M	Ellipsoidal height, EPSG:9057, metres
+# -- another length unit first: parts and multiples of the metre, prefixes, other languages and scripts, EPSG unit codes
+F	tenths of a metre
+F	hundredths of a meter
+F	thousandths of a metre
+F	tenths of the metre
+F	hundredths of one metre
+F	thousands of metres
+F	hundreds of meters
+F	tens of metres
+F	m (thousands)
+F	m (in 1000s)
+F	km (in m)
+F	centimetres of water
+F	cm H2O
+F	Kilometer
+F	Millimeter
+F	milli-metres
+F	centi metres
+F	voeten
+F	Voeten
+F	Zentimeter
+F	Dezimeter
+F	centimètres
+F	millimètres
+F	centímetros
+F	milímetros
+F	centymetry
+F	milimetry
+F	decameter
+F	dekametres
+F	hectometer
+F	megametre
+F	dam
+F	hm
+F	nm
+F	μm
+F	kms
+F	cms
+F	stopa
+F	stopy
+F	jalka
+F	láb
+F	Zoll
+F	pulgadas
+F	фут
+F	ФУТОВ
+F	см
+F	мм
+F	км
+F	Километры
+F	πόδια
+F	英尺
+F	厘米
+F	フィート
+F	米国フィート
+F	피트
+F	urn:ogc:def:uom:EPSG::9002
+F	EPSG:9031
+F	Feet (converted to metres)
+F	ft above sea level
+F	10 ft
+F	tenths
+# -- no unit, a coordinate-system code, a scaled metre, a short id that is not the first word: the warning
+W	CH1903+ LN02
+W	EPSG:9057
+W	Meter (x 1000)
+W	米 x 0.1
+W	10m
+W	metric
+W	elevation in situ
+M	dam crest elevation (m)
+# -- a scale after punctuation, a number with a factor before the metre, more languages, full-width letters, NM (New Mexico)
+W	Elevation (m) x 0.1
+W	m, scaled by 0.1
+W	height [m] /10
+W	Elevation, in meters, scaled x10
+W	m: scale 0.1
+W	m, 1/10
+W	height (m), divide by 10
+W	m per 10
+W	10 x m
+W	10*m
+W	10 * metres
+W	0.1 of a metre
+W	m3
+M	méterben
+M	müNN
+M	Elevation NM state plane (m)
+M	Elevation (m) nm state plane
+M	Elevation （ｍ）
+M	m, see doc 1.2
+F	ｆｅｅｔ
+F	quilômetros
+F	chilometri
+F	hectómetros
+F	кілометрів

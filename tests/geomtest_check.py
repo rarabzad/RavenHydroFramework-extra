@@ -42,13 +42,16 @@ runs geomtest, then compares:
     longitude): LCC and ALBERS with their origin at either pole, also at the pole opposite the cone (LCC 50 60 -90,
     LCC -50 -60 90: PROJ takes the pole as the cone's apex), ordinary origins, points more than 180 degrees from the
     central meridian (Alaska Albers, EPSG:3338, at Attu, lon 172.9; an LCC centred on -96 at lon 151.2), which PROJ
-    takes within +-180 degrees of it, and a point exactly 180 degrees from it (lon 26 with lon0 -154: the side PROJ keeps);
+    takes within +-180 degrees of it, and a point exactly 180 degrees from it (lon 26 with lon0 -154: the side PROJ keeps),
+    also written beyond +-180 degrees (lon -334; lon -540 with lon0 0), and the apex of a southern cone (LCC with
+    parallels -30 and -10 at lat -90);
   - GeoJSON IDs beyond 9e15 written as numbers are refused, with the advice to write them as strings for a whole number
     written in digits (the int64 9007199254740993) and to write them as strings of at most 18 digits otherwise (1e+16);
     a missing ID field whose feature has an "id" member names GDAL's ID_FIELD option; an ID none of whose polygons has an
-    area (an outline of fewer than 3 distinct vertices, alone or with a hole; an empty Polygon) is left out and reported
-    with the feature and why ("no outline of 3 or more distinct vertices", "has no polygon"), the other IDs are read; a
-    MultiPolygon with such a part beside a proper one is read.
+    area (an outline of fewer than 3 distinct vertices, alone or with a hole; an outline of 3 vertices on one line; a
+    square traced out and back; a figure eight of equal lobes; an empty Polygon) is left out and reported with the feature and why ("has no area",
+    "has no polygon"), the other IDs are read; a MultiPolygon with such a part (fewer than 3 distinct vertices, or on
+    one line) beside a proper one is read.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -177,6 +180,10 @@ HOLE = '[[-122.98, 49.02], [-122.92, 49.02], [-122.92, 49.08], [-122.98, 49.08],
 gjp('degen', '{"ID": 7}', '[[[-123.0, 49.0], [-123.0, 49.0]], %s]' % HOLE)
 gjp('degen3', '{"ID": 7}', '[[[-123.0, 49.0], [-122.9, 49.0], [-123.0, 49.0], [-122.9, 49.0]]]')
 gjp('degen_part', '{"ID": 7}', '[[[[-123.0, 49.0], [-123.0, 49.0]], %s], %s]' % (HOLE, SQ % '-122.9'), 'MultiPolygon')
+gjp('col', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.0], [-79.98, 45.0], [-80.0, 45.0]]]')
+gjp('retrace', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.0], [-79.99, 45.01], [-80.0, 45.01], [-79.99, 45.01], [-79.99, 45.0], [-80.0, 45.0]]]')
+gjp('eight', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.01], [-79.99, 45.0], [-80.0, 45.01], [-80.0, 45.0]]]')
+gjp('col_part', '{"ID": 7}', '[[[[-80.0, 45.0], [-79.99, 45.0], [-79.98, 45.0], [-80.0, 45.0]]], %s]' % (SQ % '-122.9'), 'MultiPolygon')
 gjp('id_bigexp', '{"ID": 1e+16}')
 open('test_json_empty.geojson', 'w').write('{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "Polygon", '
                                            '"coordinates": %s}}, {"type": "Feature", "properties": {"ID": 2}, "geometry": {"type": "Polygon", "coordinates": []}}]}' % (SQ % '-122.9'))
@@ -217,8 +224,12 @@ JSON_CASES = [  # (name, file, reader, ID field, accepted, part of the message)
     ('json_id_big', 'id_big', 'poly', 'ID', 0, "its ID field 'ID' is the number 9007199254740993, larger than 9e15, the largest ID Raven reads as a number (write it as a string"),
     ('json_gdalid', 'gdalid', 'poly', 'ID', 0, "missing ID field 'ID' in test_json_gdalid.geojson (the feature has an \"id\" member, where GDAL's ID_FIELD option puts the field"),
     ('json_id_bigexp', 'id_bigexp', 'poly', 'ID', 0, "is the number 1e+16, larger than 9e15, the largest ID Raven reads as a number (write the ID as a string of at most 18 digits)"),
-    ('json_degen', 'degen', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_degen.geojson, feature 1 (ID 7): its polygon has no outline of 3 or more distinct vertices, so no area;'),
-    ('json_degen3', 'degen3', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_degen3.geojson, feature 1 (ID 7): its polygon has no outline of 3 or more distinct vertices'),
+    ('json_degen', 'degen', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_degen.geojson, feature 1 (ID 7): its polygon has no area (its outline has fewer than 3 distinct vertices, lies on one line or encloses no net area);'),
+    ('json_degen3', 'degen3', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_degen3.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_col', 'col', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_col.geojson, feature 1 (ID 7): its polygon has no area (its outline has fewer than 3 distinct vertices, lies on one line or encloses no net area);'),
+    ('json_retrace', 'retrace', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_retrace.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_eight', 'eight', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_eight.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_col_part', 'col_part', 'poly', 'ID', 1, 'ids=7(1) noarea='),
     ('json_degen_part', 'degen_part', 'poly', 'ID', 1, 'ids=7(1) noarea='),
     ('json_empty', 'empty', 'poly', 'ID', 1, 'ids=1(1) noarea=2: GeoJSON file test_json_empty.geojson, feature 2 (ID 2): it has no polygon (its coordinates are empty);')]
 with open('json_cases.txt', 'w', encoding='utf-8') as f:
@@ -230,7 +241,9 @@ CONIC_CASES = [('LCC 50 60 -90 -96 0 0', -96.0, 55.0), ('LCC 50 60 -90 -96 0 0',
                ('LCC 49 77 49 -95 0 0', -110.0, 60.0), ('ALBERS 50 60 -90 -96 0 0', -96.0, 55.0), ('ALBERS -50 -60 90 -96 0 0', -96.0, -55.0),
                ('ALBERS 50 70 40 -96 1000 2000', -120.0, 61.0),
                ('ALBERS 55 65 50 -154 0 0', 172.9, 52.9), ('LCC 33 45 23 -96 0 0', 151.2, 40.0),   # (more than 180 degrees from lon0)
-               ('ALBERS 55 65 50 -154 0 0', 26.0, 60.0)]   # (exactly 180 degrees from lon0: PROJ keeps the side, |l| < pi + 1e-12)
+               ('ALBERS 55 65 50 -154 0 0', 26.0, 60.0),   # (exactly 180 degrees from lon0: PROJ keeps the side, |l| < pi + 1e-12)
+               ('ALBERS 55 65 50 -154 0 0', -334.0, 60.0), ('ALBERS 60 90 90 0 0 0', -540.0, 70.0),   # (the same, written beyond +-180)
+               ('LCC -30 -10 -20 -170 500000 0', -170.0, -90.0)]   # (the apex of a southern cone)
 with open('conic_cases.txt', 'w') as f:
     for spec, lon, lat in CONIC_CASES:
         f.write('%s|%r %r\n' % (spec, lon, lat))
@@ -315,7 +328,7 @@ cn = np.atleast_2d(np.loadtxt('conic.txt'))
 for (spec, lon, lat), r in zip(CONIC_CASES, cn):
     w = spec.split(); p = dict(zip(('lat_1', 'lat_2', 'lat_0', 'lon_0', 'x_0', 'y_0'), map(float, w[1:7])))
     x, y = pyproj.Proj(proj={'LCC': 'lcc', 'ALBERS': 'aea'}[w[0]], ellps='WGS84', **p)(lon, lat)
-    e = float(np.hypot(r[1] - x, r[2] - y)) if r[0] == 1 else 1e9; rt = max(abs((r[3] - lon + 180.0) % 360.0 - 180.0), abs(r[4] - lat))   # (the inverse's longitude may differ by 360 degrees)
+    e = float(np.hypot(r[1] - x, r[2] - y)) if r[0] == 1 else 1e9; rt = max(abs((r[3] - lon + 180.0) % 360.0 - 180.0) if abs(lat) < 90 else 0.0, abs(r[4] - lat))   # (the inverse's longitude may differ by 360 degrees; none at a pole)
     report('projection: %-26s at %g, %g against PROJ (m)' % (spec, lon, lat), r[0] == 1 and e < 1e-3 and rt < 1e-9, e)
 for n, k, spec, ok, msg, nomsg in CRS_CASES:
     got = st.get(n, (-1, 'missing'))

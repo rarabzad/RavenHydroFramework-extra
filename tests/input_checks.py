@@ -86,6 +86,27 @@ Time discretization of an existing model, read as MODFLOW 6 reads it (the existi
   E11 a period length of -5 stops: "a stress period cannot be shorter than 0";
   E12 the model name file with CRLF line ends (RCH_MODEL and EVT_MODEL taken over): the run completes (the rows Raven
       comments out keep their line end, so MODFLOW finds no isolated carriage return).
+  E13 the name file's RCH and EVT rows in an OPEN/CLOSE file of its PACKAGES block (MODFLOW 6 reads such a file in place
+      of the line): taken over as when written inline (the working copy holds the rows, commented out), GWBudget.csv
+      and Hydrographs.csv identical to the unmodified model's;
+  E14 the same without :RavenTakesOver stops ("would add recharge or evapotranspiration beside Raven's") instead of
+      running the model's recharge and ET beside Raven's, outside its books;
+  E15 the MODELS and SOLUTIONGROUP blocks of mfsim.nam, each through an OPEN/CLOSE file (MODFLOW 6 reads both): results
+      identical to the unmodified model's;
+  E17 an :OverlapWeights cell number of 4294967297 (2^32 + 1, which a cut to int reads as cell 1) and E18 one of 20
+      digits (beyond the long long range) stop, naming the number;
+  E19 the OPTIONS block of the name file (SAVE_FLOWS, NEWTON) and of mfsim.nam each starting with OPEN/CLOSE (MODFLOW 6
+      reads both): results identical to the unmodified model's (NEWTON found; CONTINUE written after the OPEN/CLOSE line);
+  E20 OPEN/CLOSE as a later row of the PACKAGES block stops (MODFLOW 6 reads it only as a block's first line);
+  E21 an OPEN/CLOSE file named by its absolute path: results identical to the unmodified model's;
+  E22 an :OverlapWeights cell number of -20 digits stops ("out of range"); E23 a row of weight 0 with cell number
+      4294967297 is skipped (the run completes);
+  E16 loose solver tolerances (OUTER_DVCLOSE and INNER_DVCLOSE 10 m, inner_rclose 1e8): a converged step with an MF6
+      balance error above 1 % of the gross flow gives a warning (once a run).
+A model across the antimeridian:
+  AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
+     longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
+     recharge, storage and CHD flows (relative 1e-6) as the same model at longitude 0, and no DEM column without a value.
 Reserved package names (the existing-model example):
   RN1 a model package named DRN_RAVEN (the GHB package renamed) stops with Raven's message ("a name Raven reserves for
      the packages it adds"), not MODFLOW's "Package name already exists";
@@ -534,6 +555,89 @@ open(p, 'w').write(tt)
 stops('E10 AUXILIARY ZONE, then AUXILIARY SUBBASIN stops (SUBBASIN is no auxiliary variable for MODFLOW)', d,
       'has no auxiliary variable SUBBASIN (MODFLOW 6 reads the auxiliary variables ZONE, from the first AUXILIARY line)')
 shutil.rmtree(d, ignore_errors=True)
+# ---- OPEN/CLOSE in the name files (MODFLOW 6 reads the rows of the file in place of the OPEN/CLOSE line)
+def oc_case(name):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    edit(d, 'model/gwf_liard.nam', '  RCH6  gwf_liard.rcha  rch_model\n', '')
+    edit(d, 'model/gwf_liard.nam', '  EVT6  gwf_liard.evta  evt_model\n', '')
+    edit(d, 'model/gwf_liard.nam', 'BEGIN packages\n', 'BEGIN packages\n  OPEN/CLOSE  pk.txt\n')
+    open(os.path.join(d, 'model', 'pk.txt'), 'w').write('# recharge and ET\n  RCH6  gwf_liard.rcha  rch_model\n  EVT6  gwf_liard.evta  evt_model\n')
+    return d
+d = oc_case('e13')
+ok, out = run(d, DAYS)
+rows = [r[0] for r in mf6_row(d, 'gwf_liard.rcha') + mf6_row(d, 'gwf_liard.evta')]
+nam = open(os.path.join(d, 'out', 'mf6', 'gwf_liard.nam')).read() if os.path.exists(os.path.join(d, 'out', 'mf6', 'gwf_liard.nam')) else ''
+okc = ok and same(res['e6_ref'][1], d) and not rows and re.search(r'(?m)^#\s+RCH6\s+gwf_liard.rcha\s+rch_model\s+# taken over by Raven', nam) is not None \
+    and in_balance(d) == in_balance(res['e6_ref'][1])
+report('E13 RCH and EVT rows in an OPEN/CLOSE file of the PACKAGES block are taken over as when written inline', okc,
+       ('in balance: %s; active rows %s' % (' '.join(in_balance(d)), rows)) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = oc_case('e14')
+edit(d, 'Liard.rvg', ':RavenTakesOver    RCH_MODEL EVT_MODEL', '')
+stops('E14 the same without :RavenTakesOver stops (the model\'s RCH would run beside Raven\'s)', d,
+      'package RCH_MODEL would add recharge or evapotranspiration beside Raven\'s')
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e15'))
+edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  OPEN/CLOSE  models.txt\n')
+open(os.path.join(d, 'model', 'models.txt'), 'w').write('  gwf6  gwf_liard.nam  gwf_liard\n')
+edit(d, 'model/mfsim.nam', '  ims6  ext.ims  gwf_liard\n', '  OPEN/CLOSE  solution.txt\n')
+open(os.path.join(d, 'model', 'solution.txt'), 'w').write('  ims6  ext.ims  gwf_liard\n')
+ok, out = run(d, DAYS)
+report('E15 the MODELS and SOLUTIONGROUP blocks of mfsim.nam through OPEN/CLOSE files run as written inline', ok and same(res['e6_ref'][1], d),
+       '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e19'))
+edit(d, 'model/gwf_liard.nam', 'BEGIN options\n  SAVE_FLOWS\n  NEWTON\n', 'BEGIN options\n  OPEN/CLOSE  options.txt\n')
+open(os.path.join(d, 'model', 'options.txt'), 'w').write('  SAVE_FLOWS\n  NEWTON\n')
+edit(d, 'model/mfsim.nam', 'BEGIN options\n', 'BEGIN options\n  OPEN/CLOSE  simoptions.txt\n')
+open(os.path.join(d, 'model', 'simoptions.txt'), 'w').write('  MEMORY_PRINT_OPTION  summary\n')
+ok, out = run(d, DAYS)
+report('E19 the OPTIONS blocks of the name file (NEWTON) and of mfsim.nam starting with OPEN/CLOSE run as written inline', ok and same(res['e6_ref'][1], d),
+       '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = oc_case('e20')
+edit(d, 'model/gwf_liard.nam', 'BEGIN packages\n  OPEN/CLOSE  pk.txt\n', 'BEGIN packages\n')
+edit(d, 'model/gwf_liard.nam', '  OC6  gwf_liard.oc  oc\n', '  OC6  gwf_liard.oc  oc\n  OPEN/CLOSE  pk.txt\n')
+stops('E20 OPEN/CLOSE after the first row of the PACKAGES block stops, as MODFLOW 6 refuses it', d, 'has OPEN/CLOSE after its first line')
+shutil.rmtree(d, ignore_errors=True)
+d = oc_case('e21')
+edit(d, 'model/gwf_liard.nam', '  OPEN/CLOSE  pk.txt\n', '  OPEN/CLOSE  %s\n' % os.path.join(d, 'model', 'pk.txt'))
+ok, out = run(d, DAYS)
+report('E21 an OPEN/CLOSE file named by its absolute path is read', ok and same(res['e6_ref'][1], d), '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# ---- :OverlapWeights cell numbers beyond the int range
+def ow_case(name, cell):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    blk = open(os.path.join(d, 'overlap_weights_alternative.rvg')).read()
+    blk = re.sub(r'(?m)^  2736 3867 ', '  2736 %s ' % cell, blk, count=1)
+    t = open(os.path.join(d, 'Liard.rvg')).read()
+    t = '\n'.join(l for l in t.split('\n') if not re.match(r'\s*:(MF6CRS|HRUGeometry)\b', l)) + '\n' + blk
+    open(os.path.join(d, 'Liard.rvg'), 'w').write(t)
+    return d
+d = ow_case('e17', '4294967297')
+stops('E17 an :OverlapWeights cell number of 4294967297 (2^32 + 1) stops instead of being read as cell 1', d, 'the cell number 4294967297 is not between 1 and')
+shutil.rmtree(d, ignore_errors=True)
+d = ow_case('e18', '99999999999999999999')
+stops('E18 an :OverlapWeights cell number of 20 digits stops', d, "'99999999999999999999' is out of range")
+shutil.rmtree(d, ignore_errors=True)
+d = ow_case('e22', '-99999999999999999999')
+stops('E22 an :OverlapWeights cell number of -20 digits stops as out of range', d, "'-99999999999999999999' is out of range (beyond -9223372036854775808)")
+shutil.rmtree(d, ignore_errors=True)
+d = ow_case('e23', '4294967297')
+edit(d, 'Liard.rvg', '  2736 4294967297 0.0725014080', '  2736 4294967297 0.0')
+ok, out = run(d, 1)
+report('E23 an :OverlapWeights row of weight 0 is skipped, whatever its cell number', ok, '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# ---- a converged step with a large MF6 balance error is reported
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e16'))
+edit(d, 'model/ext.ims', 'OUTER_DVCLOSE  1.00000000E-05', 'OUTER_DVCLOSE  10.0')
+edit(d, 'model/ext.ims', 'INNER_DVCLOSE  1.00000000E-06', 'INNER_DVCLOSE  10.0')
+edit(d, 'model/ext.ims', 'inner_rclose       1.00000000  strict', 'inner_rclose       1.0E+08')
+ok, out = run(d, DAYS)
+e = budget_err(d); warned = 'MODFLOW converged with a balance error of' in out
+report('E16 a converged step with an MF6 balance error above 1 % of the gross flow gives a warning (loose solver tolerances)', ok and warned,
+       'max |MF6 balance error| %s m3/d; warning %s' % (e, warned) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
 shutil.rmtree(res['e6_ref'][1], ignore_errors=True)
 d = tdis_case('e11', lambda r: ['      -5.0  1       1.00000000'] + r[1:])
 stops('E11 a negative period length stops', d, 'a stress period cannot be shorter than 0')
@@ -543,6 +647,48 @@ p = os.path.join(d, 'model', 'gwf_liard.nam'); b = open(p, 'rb').read(); open(p,
 ok, out = run(d, DAYS)
 report('E12 a name file with CRLF line ends and packages Raven takes over runs', ok, '' if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
+
+# ---- a model across the antimeridian: the same model as at longitude 0
+sys.path.insert(0, os.path.join(HERE, 'soilzone'))
+import math
+import sz_models   # noqa: E402
+
+
+def am_case(name, lon0, wrap):
+    """two HRUs of 400 m x 400 m whose shared edge lies on longitude lon0 + 0 (on 180 when lon0 is 180), a specified head on
+    the downslope edge, 3 days; wrap: every longitude written within +-180 (as GDAL, QGIS and Raven's .rvh take them)"""
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.LAT0, sz_models.LON0 = -16.8, lon0
+    sz_models._P0, sz_models._L0 = math.radians(sz_models.LAT0), math.radians(sz_models.LON0)
+    sz_models.make_case(d, nhru=2, hru_w=400, width=400, cell=100, slope=0.01, physical=False, days=3, chd=95.0)
+    if wrap:
+        for fn in ('hru.geojson', 'edge.geojson'):
+            g = json.load(open(os.path.join(d, fn)))
+            for f in g['features']:
+                ring = f['geometry']['coordinates'][0]
+                if min(p[0] for p in ring) >= 180 - 1e-12:
+                    f['geometry']['coordinates'][0] = [[p[0] - 360, p[1]] for p in ring]
+            json.dump(g, open(os.path.join(d, fn), 'w'))
+        t = open(os.path.join(d, 'm.rvh')).read()
+        t = re.sub(r'(?m)^(  \d+, [^,]+, [^,]+, [^,]+, )([-\d.]+)', lambda m: m.group(1) + '%.6f' % (float(m.group(2)) - 360 if float(m.group(2)) > 180 else float(m.group(2))), t)
+        open(os.path.join(d, 'm.rvh'), 'w').write(t)
+    os.makedirs(os.path.join(d, 'out'), exist_ok=True)
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=600)
+    out = r.stdout + r.stderr
+    e = os.path.join(d, 'out', 'Raven_errors.txt'); out += open(e, errors='replace').read() if os.path.exists(e) else ''
+    sm = open(os.path.join(d, 'out', 'GWModelSummary.txt')).read() if os.path.exists(os.path.join(d, 'out', 'GWModelSummary.txt')) else ''
+    b = pd.read_csv(os.path.join(d, 'out', 'GWBudget.csv')) if os.path.exists(os.path.join(d, 'out', 'GWBudget.csv')) else None
+    act = re.search(r'active cells\s*:\s*(\d+)', sm)
+    return 'Successful' in out, out, (int(act.group(1)) if act else -1), b
+
+
+a_ok, a_out, a_act, a_b = am_case('a1', 180.0, True)
+r_ok, r_out, r_act, r_b = am_case('a1_ref', 0.0, False)
+dev = max(abs(a_b[k] - r_b[k]).max() / max(abs(r_b[k]).max(), 1.0) for k in ('MF6 recharge [m3/d]', 'storage release [m3/d]', 'CHD [m3/d]')) if (a_b is not None and r_b is not None) else 1.0
+report('AM1 a model across the antimeridian (longitudes within +-180) is the same model as at longitude 0', a_ok and r_ok and a_act == r_act and dev < 1e-6 and 'gives no value' not in a_out,
+       'active cells %d (at longitude 0: %d); largest relative difference of recharge, storage and CHD flows %.1e%s' % (a_act, r_act, dev, '; DEM without values' if 'gives no value' in a_out else ''))
+for k in ('a1', 'a1_ref'):
+    shutil.rmtree(os.path.join(W, k), ignore_errors=True)
 
 print('input checks: ALL PASSED' if fails == 0 else 'input checks: %d FAILED' % fails)
 sys.exit(1 if fails else 0)

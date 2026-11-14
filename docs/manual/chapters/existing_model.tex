@@ -183,7 +183,12 @@ names it: by its type and its place among all rows of that type, named or not (i
 \cmd{OC}, \ldots) is named by its type. These are the names MODFLOW's list file shows, and the names
 \cmd{:RavenTakesOver}, \cmd{:KeepPackages} and \cmd{:StreamPackage} take. Raven writes each such name into its row of
 the working copy, so that removing the rows it takes over does not change the names of the rest, and stops when MODFLOW
-has no package of a name it reads. Period lengths, time-series times and period
+has no package of a name it reads, or reads a package of such a type that Raven did not find in the name file. As for
+MODFLOW, the lines of an \cmd{OPEN/CLOSE} file in a block of the name file or of \cmd{mfsim.nam} (path relative to the
+simulation folder, or absolute) are read in place of the \cmd{OPEN/CLOSE} line, which must be the block's first line
+other than comments (elsewhere the run stops, as MODFLOW~6 refuses it), and the working copy's name file holds the
+package rows themselves, so the rules of this section apply to them. A step that MODFLOW solves (converged) with a balance error above 1~\% of the gross flow gives a warning
+once a run (a package outside Raven's books, or solver tolerances too loose). Period lengths, time-series times and period
 numbers are read as MODFLOW reads them (Fortran list-directed input): \cmd{5}, \cmd{5.0E-1}, \cmd{50.0D-1} (\cmd{D},
 \cmd{d}, \cmd{Q} or \cmd{E} for the exponent, which may be left without digits), \cmd{5.0/} (a slash ends the value),
 \cmd{2*5.0} (a repeat count) and, for a period number, the whole part of such a value. A value that is not a number, or a

@@ -358,6 +358,10 @@ HRU \dots\ is in two \cmd{:SurfaceWater\allowbreak Exchange} groups for the same
 well \dots\ is outside the active groundwater model & move the well or enlarge the coupled area\\
 \cmd{:GWHeads} does not match the groundwater grid & hotstart file from a different grid\\
 the model's \emph{type} package \emph{name} would add recharge or ET beside Raven's & list it in \cmd{:RavenTakesOver} or \cmd{:KeepPackages}\\
+MODFLOW~6 reads the package \emph{name} (\emph{type}) in the model \dots, which Raven did not find in the name file & write the package's row in the \cmd{PACKAGES} block of the name file itself\\
+cannot open the OPEN/CLOSE file \dots\ named in the \emph{block} block of \dots\ / the OPEN/CLOSE file \dots\ names another OPEN/CLOSE file / the \emph{block} block of \dots\ has OPEN/CLOSE after its first line & give the path relative to the simulation folder (or absolute); write the lines in the first file; make OPEN/CLOSE the block's first line\\
+in the step ending \dots\ MODFLOW converged with a balance error of \dots\ \% of the gross flow (warning) & check the model's packages (\cmd{GWModelSummary.txt}) and its solver tolerances\\
+:OverlapWeights row \dots: the cell number \dots\ is not between 1 and the number of cells per layer / the ID \dots\ is out of range & correct the cell number\\
 the model name file \dots\ has a \emph{type} package named \emph{name}, a name Raven reserves for the packages it adds (\cmd{RCH\_RAVEN}, \cmd{DRN\_RAVEN}, \cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}, \cmd{SZX/SZQ/SZD/SZW\_RAVEN}) & rename the package, or remove its line if Raven added it to a model it wrote; a recharge or ET package may instead be listed in \cmd{:RavenTakesOver}\\
 \cmd{:MF6StartDate} \dots / the model ends before Raven's run & correct the dates or \cmd{:Duration}\\
 stress period \dots\ is not a whole number of Raven time steps & choose a Raven time step that divides the periods\\

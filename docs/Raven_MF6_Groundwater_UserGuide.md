@@ -231,7 +231,7 @@ scale and offset (`GDAL_METADATA`) are applied, as GDAL's `-unscale` and GIS pro
 several bands, palette or colour images, other bit depths, FillOrder 2, units other than metres or degrees (units keys),
 a projected code in feet without its units key (e.g. EPSG:2227), a prime meridian other than Greenwich (also given only by
 its longitude, as GDAL writes a user-defined system such as `+pm=paris`, or by the datum), a vertical coordinate system
-in feet, a band unit in feet or another length unit than metres (an unknown band unit gives a warning),
+in feet, a band unit whose first unit is feet or another length unit than metres (an unknown band unit gives a warning),
 rotated or south-up rasters, files without georeferencing,
 corrupt or truncated files and files over 1 GB or 50 million pixels stop the run with the reason; convert with
 `gdal_translate -b 1 -co COMPRESS=DEFLATE`. The GeoTIFF's EPSG code is checked: a geographic code needs no `:InputCRS`, a

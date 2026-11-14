@@ -6,8 +6,10 @@
   ensemble   the same set-up as a two-member Monte Carlo ensemble with a fixed parameter: each member must equal the
              single run in GWBudget.csv, GWHeads.csv, Hydrographs.csv, ReservoirStages.csv and GWHRUState.csv (every
              value, relative difference below 1e-12; Raven restores the initial state of routing and reservoirs before
-             each member), and keep every account exact. WatershedStorage.csv is not compared: base Raven's channel and
-             rivulet storage differ in ensemble mode, also without groundwater.
+             each member), and keep every account exact; the channel storage of WatershedStorage.csv and the
+             :ChannelStorage of each subbasin in solution.rvc equal the single run's (Raven restores the channel storage
+             with the routing memory). The rest of WatershedStorage.csv is not compared: base Raven's rivulet storage
+             (and the total) is offset by a constant in ensemble mode, also without groundwater.
 
 Usage: python3 behaviour_check.py      (needs RAVEN_MF6_LIB)
 Quick mode (RAVEN_TEST_QUICK=1): 120 days; full mode: two years (731 days).
@@ -112,6 +114,19 @@ for m in (1, 2):
     ok_all &= ok
     print('  member %d against the single run (%s): largest relative difference %.1e%s  %s' % (
         m, ', '.join(compared), worst, (' (%s)' % where) if worst > 0 else '', 'ok' if ok else 'FAIL'))
+    # the channel storage (WatershedStorage.csv, and :ChannelStorage of solution.rvc) equals the single run's; the rivulet
+    # storage, and the total with it, is offset by a constant (base Raven adds it again at every initialization)
+    a, c = pd.read_csv(os.path.join(d, 'out', 'WatershedStorage.csv')), pd.read_csv(os.path.join(e, 'ens_%d' % m, 'WatershedStorage.csv'))
+    k = [x for x in a.columns if x.strip().startswith('Channel Storage')][0]
+    vc = tc.max_diff(a[k], c[k], a[k].abs().max() + 1e-9)
+    def chs(p):
+        t = open(p).read().split(':ChannelStorage')[1:]
+        return [float(x.split()[1]) for x in t]
+    ra, rc = chs(os.path.join(d, 'out', 'solution.rvc')), chs(os.path.join(e, 'ens_%d' % m, 'solution.rvc'))
+    vr = max([abs(x - y) / max(abs(x), 1.0) for x, y in zip(ra, rc)] + [0.0]) if len(ra) == len(rc) and ra else 1.0
+    ok = vc < 1e-12 and vr < 1e-12; ok_all &= ok
+    print('  member %d: channel storage against the single run (WatershedStorage.csv %.1e, :ChannelStorage of %d subbasins %.1e)  %s' % (
+        m, vc, len(rc), vr, 'ok' if ok else 'FAIL'))
     Am = tc.audit.audit(os.path.join(e, 'ens_%d' % m))
     for name, v, lim in (('recharge identity', abs(Am['recharge: (Raven - MF6 - dStore - toCHD)/Raven']), 1e-9),
                          ('MODFLOW cumulative residual', abs(Am['MF6 cumulative residual / gross flow']), 1e-8),
