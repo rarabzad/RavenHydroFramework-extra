@@ -73,9 +73,15 @@ int main(){
     while (std::getline(C,line)){
       std::istringstream is(line); std::string name,file,kind,idf; is>>name>>file>>kind>>idf; if (idf=="-"){idf="";}
       bool ok; err="";
-      if (kind=="poly"){std::map<long long,std::vector<gw_ring> > sh; ok=GWGeom::ReadGeoJSONPolygons(file,idf,sh,err);}
+      if (kind=="poly"){ //(read: the IDs read and the IDs left out for having no area, with why)
+        std::map<long long,std::vector<gw_ring> > sh; std::map<long long,std::string> na; ok=GWGeom::ReadGeoJSONPolygons(file,idf,sh,err,NULL,NULL,NULL,&na);
+        if (ok){
+          err="ids="; for (std::map<long long,std::vector<gw_ring> >::iterator it=sh.begin();it!=sh.end();it++){err+=std::to_string(it->first)+"("+std::to_string(it->second.size())+")";}
+          err+=" noarea="; for (std::map<long long,std::string>::iterator it=na.begin();it!=na.end();it++){err+=std::to_string(it->first)+": "+it->second+";";}
+        }
+      }
       else {std::vector<gw_ring> L; std::vector<long long> id; ok=GWGeom::ReadGeoJSONLines(file,idf,L,id,err);}
-      fprintf(g,"%s %d %s\n",name.c_str(),ok?1:0,ok?"":err.c_str());
+      fprintf(g,"%s %d %s\n",name.c_str(),ok?1:0,err.c_str());
     }
     fclose(g); }
   //conic projections (conic_cases.txt, written by geomtest_check.py: the parameters, then lon lat): forward and inverse

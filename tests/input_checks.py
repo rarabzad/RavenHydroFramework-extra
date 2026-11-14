@@ -41,6 +41,11 @@ Boundary polygons (the 4-HRU strip of sz_models with :SpecifiedHeadBoundary EDGE
 Numbers of the .rvp aquifer tables (each stops, naming the table, the row and the token):
   N20 :AquiferClasses K_HORIZ "1O" (letter O), N21 SPEC_YIELD "O.2", N22 an :AquiferProfiles thickness "3m", N23 an
       :AquiferProfileParameters value "2.O".
+HRU polygons without area (the 2-HRU strip of sz_models, CONCEPTUAL, 1 day):
+  N27 unused features with an empty Polygon (HRU_ID 98) and a ring of one point (HRU_ID 99): the run completes (the IDs
+      are left out; the model does not use them);
+  N28 HRU 1's Polygon empty: the run stops, "HRU 1 has an AQUIFER_PROFILE but no polygon in hru.geojson (GeoJSON file
+      hru.geojson, feature 1 (HRU_ID 1): it has no polygon (its coordinates are empty))".
 Units of the series (the subbasin-52 grid model with its 5,000 m3/d pumping well, testconfig.grid_base):
   U1 the rates given as m3/s (-0.0578704) and U2 as L/s (-57.8704): GWBudget.csv "wells specified" is -5,000 m3/d, as with
      m3/d (U0);
@@ -57,13 +62,30 @@ Time discretization of an existing model, read as MODFLOW 6 reads it (the existi
   E3 NPER 25 with 24 rows stops: "gives NPER 25 but 24 stress periods in PERIODDATA";
   E4 the forms mf6 6.8.1 also reads (checked against the mf6 program): a repeat count "2*1.0" (1 d), a slash "31.0/"
      and an exponent letter without digits "30.0e": the run completes with the periods 1 d and DAYS - 1 d;
-  E5 period numbers "BEGIN period 2.0" and "BEGIN period 3/" in the well package, Raven starting a day after the
-     model's time zero (period 1 dropped): the run completes and the working copy's well package starts with period 2's
-     rates (-3000) as its period 1;
+  E5 period numbers "BEGIN period 0.2D1" and "BEGIN period 3/" in the well package (2 and 3 for MODFLOW 6), Raven
+     starting a day after the model's time zero (period 1 dropped): the run completes and the working copy's well package
+     starts with period 2's rates (-3000) as its period 1;
   E6 the river package's AUXILIARY line with a comment after the name ("auxiliary SUBBASIN # id": three auxiliary
      variables for MODFLOW, which reads every word of that line) and two more values on every river row: the run
      completes with GWBudget.csv and Hydrographs.csv identical to the unmodified model's (the subbasin ID is read with
-     MODFLOW's stride of three values).
+     MODFLOW's stride of three values), and no file fort.* is left in the folder Raven runs in (every query to MODFLOW's
+     memory is made while the model is initialised);
+  E7 the name-file rows "WEL6 w0.wel W0" (one well at rate 0) and then "WEL6 gwf_liard.wel" without a name: MODFLOW 6
+     names the second WEL-2 (its place among the WEL rows, named or not), and so does Raven: GWModelSummary.txt lists
+     WEL-2 among the packages in balance, the working copy's row names it WEL-2, and GWBudget.csv's MF6 balance error stays
+     below 1 m3/d (the 8000 m3/d of pumping booked);
+  E8 two recharge rows without a name, "RCH6 gwf_liard.rcha" (RCH-1, :RavenTakesOver) and "RCH6 r2.rcha" (RCH-2,
+     :KeepPackages): the working copy's row of the kept package names it RCH-2 (the removed row would otherwise make it
+     MODFLOW's RCH-1), RCH-2 is in the balance, and the MF6 balance error stays below 1 m3/d;
+  E9 the river package's OPTIONS with "auxiliary SUBBASIN" and then "auxiliary ZONE": MODFLOW 6 keeps the first line, and
+     so does Raven (the names from MODFLOW's memory): the run completes with a warning on the second line, GWBudget.csv and
+     Hydrographs.csv identical to the unmodified model's, and no fort.* file;
+  E10 "auxiliary ZONE" and then "auxiliary SUBBASIN", with a ZONE value 7 before the subbasin ID on every row: SUBBASIN is
+     no auxiliary variable for MODFLOW 6, so the run stops ("has no auxiliary variable SUBBASIN (MODFLOW 6 reads the
+     auxiliary variables ZONE, from the first AUXILIARY line)") instead of mapping every river cell to subbasin 7;
+  E11 a period length of -5 stops: "a stress period cannot be shorter than 0";
+  E12 the model name file with CRLF line ends (RCH_MODEL and EVT_MODEL taken over): the run completes (the rows Raven
+      comments out keep their line end, so MODFLOW finds no isolated carriage return).
 Reserved package names (the existing-model example):
   RN1 a model package named DRN_RAVEN (the GHB package renamed) stops with Raven's message ("a name Raven reserves for
      the packages it adds"), not MODFLOW's "Package name already exists";
@@ -278,6 +300,28 @@ for name, old, new, want in (('N20 :AquiferClasses K_HORIZ 1O stops', r'(\n  SAN
     ok, msg = rvp_case(name.split()[0].lower(), old, new, want)
     report(name, ok, msg)
 
+# ---- HRU polygons without area ----
+def hru_poly_case(name, change):
+    d = os.path.join(W, name); shutil.rmtree(d, ignore_errors=True)
+    sz_models.make_case(d, nhru=2, days=1, physical=False, top=3.0)
+    p = os.path.join(d, 'hru.geojson'); g = json.load(open(p)); change(g['features']); json.dump(g, open(p, 'w'))
+    r = subprocess.run([tc.RAVEN, 'm', '-o', 'out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=600)
+    e = os.path.join(d, 'out', 'Raven_errors.txt'); out = r.stdout + r.stderr + (open(e, errors='replace').read() if os.path.exists(e) else '')
+    shutil.rmtree(d, ignore_errors=True)
+    return ('Successful Simulation' in out), out
+
+
+def extra_feats(f):
+    sq = f[0]['geometry']['coordinates'][0]
+    f.append({"type": "Feature", "properties": {"HRU_ID": 98}, "geometry": {"type": "Polygon", "coordinates": []}})
+    f.append({"type": "Feature", "properties": {"HRU_ID": 99}, "geometry": {"type": "Polygon", "coordinates": [[sq[0], sq[0], sq[0]]]}})
+ok, out = hru_poly_case('n27', extra_feats)
+report('N27 unused features without area (an empty Polygon, a ring of one point) are left out', ok, '' if ok else out.strip().split('\n')[-1][:150])
+ok, out = hru_poly_case('n28', lambda f: f[0]['geometry'].update(coordinates=[]))
+want = 'HRU 1 has an AQUIFER_PROFILE but no polygon in hru.geojson (GeoJSON file hru.geojson, feature 1 (HRU_ID 1): it has no polygon'
+line = (re.findall(r'.*' + re.escape(want) + r'.*', out) or [''])[0].strip()
+report('N28 an HRU whose only polygon is empty stops, naming the feature', (not ok) and bool(line), line[:170] if line else out.strip().split('\n')[-1][:150])
+
 # ---- units of :WellFlowRate and :BoundaryHead ----
 B = tc.grid_base()
 
@@ -402,13 +446,13 @@ report('E4 period lengths 2*1.0, 31.0/ and 30.0e are read as MODFLOW reads them'
        'working-copy periods %s' % pl if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e5'))
-edit(d, 'model/gwf_liard.wel', 'BEGIN period  2\n', 'BEGIN period  2.0\n')
+edit(d, 'model/gwf_liard.wel', 'BEGIN period  2\n', 'BEGIN period  0.2D1\n')
 edit(d, 'model/gwf_liard.wel', 'BEGIN period  3\n', 'BEGIN period  3/\n')
 edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-10-02')
 ok, out = run(d, DAYS)
 p = os.path.join(d, 'out', 'mf6', 'gwf_liard.wel'); wl = open(p).read() if os.path.exists(p) else ''
 m = re.search(r'BEGIN PERIOD 1[^\n]*\n(.*?)END PERIOD', wl, re.S)
-report('E5 period numbers 2.0 and 3/ are read as MODFLOW reads them (start a day after time zero)', ok and m is not None and '-3.00000000E+03' in m.group(1),
+report('E5 period numbers 0.2D1 and 3/ are read as MODFLOW reads them (start a day after time zero)', ok and m is not None and '-3.00000000E+03' in m.group(1),
        ('new period 1: %s' % ' | '.join(m.group(1).split('\n')[:2]) if m else 'no renumbered period 1') if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 
@@ -421,12 +465,84 @@ for k in ('e6_ref', 'e6'):
         tt = re.sub(r'(?m)^(  \d+ \d+ \d+ \S+ \S+ \S+ \S+)$', r'\1  0  0', tt)
         open(p, 'w').write(tt)
     res[k] = (run(d, DAYS), d)
-okb = all(v[0][0] for v in res.values()) and all(
-    open(os.path.join(res['e6_ref'][1], 'out', f), 'rb').read() == open(os.path.join(res['e6'][1], 'out', f), 'rb').read() for f in ('GWBudget.csv', 'Hydrographs.csv'))
+def same(a, b):
+    return all(open(os.path.join(a, 'out', f), 'rb').read() == open(os.path.join(b, 'out', f), 'rb').read() for f in ('GWBudget.csv', 'Hydrographs.csv'))
+
+
+def strays(d):   # (files a query to a finalised MODFLOW library leaves in the folder Raven runs in)
+    return [f for f in os.listdir(d) if f.startswith('fort.')] + [f for f in os.listdir(os.path.join(d, 'out')) if f.startswith('fort.')]
+
+
+okb = all(v[0][0] for v in res.values()) and same(res['e6_ref'][1], res['e6'][1]) and not strays(res['e6'][1])
 report('E6 AUXILIARY SUBBASIN # id (three auxiliary variables, as MODFLOW reads them) maps the rivers as without the comment', okb,
-       '' if all(v[0][0] for v in res.values()) else res['e6'][0][1].strip().split('\n')[-1][:150])
-for v in res.values():
-    shutil.rmtree(v[1], ignore_errors=True)
+       ('stray files %s' % strays(res['e6'][1]) if strays(res['e6'][1]) else '') if all(v[0][0] for v in res.values()) else res['e6'][0][1].strip().split('\n')[-1][:150])
+shutil.rmtree(res['e6'][1], ignore_errors=True)
+
+
+def budget_err(d):
+    p = os.path.join(d, 'out', 'GWBudget.csv')
+    if not os.path.exists(p): return None
+    b = pd.read_csv(p); c = [k for k in b.columns if k.startswith('MF6 balance error [m3/d]')][0]
+    return float(b[c].abs().max())
+
+
+def in_balance(d):
+    p = os.path.join(d, 'out', 'GWModelSummary.txt')
+    m = re.search(r'packages in balance\s*:(.*)', open(p).read()) if os.path.exists(p) else None
+    return m.group(1).split() if m else []
+
+
+def mf6_row(d, fname):
+    p = os.path.join(d, 'out', 'mf6', 'gwf_liard.nam')
+    return [l.split() for l in open(p) if len(l.split()) >= 2 and l.split()[1] == fname and not l.lstrip().startswith('#')] if os.path.exists(p) else []
+
+
+# ---- unnamed packages: named as MODFLOW 6 names them ----
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e7'))
+edit(d, 'model/gwf_liard.nam', 'WEL6  gwf_liard.wel  wel_pumps', 'WEL6  w0.wel  W0\n  WEL6  gwf_liard.wel')
+open(os.path.join(d, 'model', 'w0.wel'), 'w').write('BEGIN options\nEND options\n\nBEGIN dimensions\n  MAXBOUND  1\nEND dimensions\n\n'
+                                                  'BEGIN period  1\n  3 63 76 0.0\nEND period  1\n')
+ok, out = run(d, DAYS)
+e, bal, row = budget_err(d), in_balance(d), mf6_row(d, 'gwf_liard.wel')
+report('E7 an unnamed WEL row after a named one is WEL-2, as for MODFLOW, and in the balance', ok and 'WEL-2' in bal and e is not None and e < 1.0
+       and bool(row) and row[0][2:3] == ['WEL-2'], ('in balance: %s; max |MF6 balance error| %s m3/d; working-copy row %s' % (' '.join(bal), e, row)) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e8'))
+edit(d, 'model/gwf_liard.nam', 'RCH6  gwf_liard.rcha  rch_model', 'RCH6  gwf_liard.rcha\n  RCH6  r2.rcha')
+shutil.copy(os.path.join(d, 'model', 'gwf_liard.rcha'), os.path.join(d, 'model', 'r2.rcha'))
+edit(d, 'model/r2.rcha', 'CONSTANT  4.00000000E-04', 'CONSTANT  1.00000000E-04')
+edit(d, 'Liard.rvg', ':RavenTakesOver    RCH_MODEL EVT_MODEL', ':RavenTakesOver    RCH-1 EVT_MODEL\n:KeepPackages      RCH-2')
+ok, out = run(d, DAYS)
+e, bal, row = budget_err(d), in_balance(d), mf6_row(d, 'r2.rcha')
+report('E8 a kept unnamed RCH after a taken-over one stays RCH-2 in the working copy, in the balance', ok and 'RCH-2' in bal and e is not None and e < 1.0
+       and bool(row) and row[0][2:3] == ['RCH-2'], ('in balance: %s; max |MF6 balance error| %s m3/d; working-copy row %s' % (' '.join(bal), e, row)) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+
+# ---- two AUXILIARY lines in the stream package: MODFLOW 6 keeps the first ----
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e9'))
+edit(d, 'model/gwf_liard.riv', '  auxiliary  SUBBASIN\n', '  auxiliary  SUBBASIN\n  auxiliary  ZONE\n')
+ok, out = run(d, DAYS)
+warned = 'has 2 AUXILIARY lines' in out or 'has 2 AUXILIARY lines' in (open(os.path.join(d, 'out', 'Raven_errors.txt')).read() if os.path.exists(os.path.join(d, 'out', 'Raven_errors.txt')) else '')
+report('E9 AUXILIARY SUBBASIN, then AUXILIARY ZONE: the first line is used, as by MODFLOW, with a warning', ok and warned and same(res['e6_ref'][1], d) and not strays(d),
+       ('warning %s, stray files %s' % (warned, strays(d))) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e10'))
+p = os.path.join(d, 'model', 'gwf_liard.riv'); tt = open(p).read()
+tt = tt.replace('  auxiliary  SUBBASIN\n', '  auxiliary  ZONE\n  auxiliary  SUBBASIN\n')
+tt = re.sub(r'(?m)^(  \d+ \d+ \d+ \S+ \S+ \S+) (\S+)$', r'\1 7 \2', tt)
+open(p, 'w').write(tt)
+stops('E10 AUXILIARY ZONE, then AUXILIARY SUBBASIN stops (SUBBASIN is no auxiliary variable for MODFLOW)', d,
+      'has no auxiliary variable SUBBASIN (MODFLOW 6 reads the auxiliary variables ZONE, from the first AUXILIARY line)')
+shutil.rmtree(d, ignore_errors=True)
+shutil.rmtree(res['e6_ref'][1], ignore_errors=True)
+d = tdis_case('e11', lambda r: ['      -5.0  1       1.00000000'] + r[1:])
+stops('E11 a negative period length stops', d, 'a stress period cannot be shorter than 0')
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e12'))
+p = os.path.join(d, 'model', 'gwf_liard.nam'); b = open(p, 'rb').read(); open(p, 'wb').write(b.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+ok, out = run(d, DAYS)
+report('E12 a name file with CRLF line ends and packages Raven takes over runs', ok, '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
 
 print('input checks: ALL PASSED' if fails == 0 else 'input checks: %d FAILED' % fails)
 sys.exit(1 if fails else 0)

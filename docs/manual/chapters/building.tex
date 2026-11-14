@@ -206,11 +206,16 @@ follows), while \cmd{feet above sea level} is not; feet fused with a qualifier, 
 \cmd{fath}, \cmd{link} and \cmd{in} (also \cmd{us-in}, \cmd{us-ch}) stop only as the first word and without a metre word, so
 \cmd{Elevation in m (CH1903+)} is metres; a word that ends in \cmd{feet} or \cmd{foot}, and words written together in camel
 case (\cmd{SurveyFeet}, \cmd{InternationalFeet}, \cmd{USSurveyFoot}), are split and matched in the same way, so these stop
-as feet, as do \cmd{fasl}, \cmd{fmsl}, the EPSG unit codes of feet (\cmd{EPSG:9002}, \cmd{9003}) and \cmd{pies},
-\cmd{pieds}, \cmd{Fu\ss} and \cmd{voet}, and \cmd{mASL} is metres; a unit without letters (\cmd{'}, \cmd{?}), a metre word glued to a
-digit or a non-ASCII letter (\cmd{$\mu$m}) or after a number (\cmd{0.1 m}, \cmd{[0.1 m]}, \cmd{1,5 m}, \cmd{1:1000 m}: a
-scaled unit) is a unit Raven does not know, while a word with letters other than an exponent is no number (\cmd{CH1903 m}
-and \cmd{NAVD88 m} are metres)\\
+as feet, as do \cmd{fasl}, \cmd{fmsl}, \cmd{pies}, \cmd{pieds}, \cmd{Fu\ss}, \cmd{Fuss}, \cmd{piedi}, \cmd{p\'es},
+\cmd{fot}, \cmd{fod} and \cmd{voet}; the EPSG unit codes of lengths other than the metre (\cmd{EPSG:9002} to \cmd{9099},
+among them the feet 9002 and 9003, the kilometre 9036 and the mile 9093; 9300 to 9302; the millimetre 1025 and the
+centimetre 1033), a prefix written as a word before the metre word (\cmd{kiloMeters}, \cmd{Kilo Meter}) and parts of a
+metre (\cmd{tenths of metres}) stop as other units, and \cmd{mASL} and \cmd{EPSG:9001} are metres (so is \cmd{nano DEM
+m}: the prefix is not on the unit); a unit without letters (\cmd{'}, \cmd{?}), a metre word glued to a digit or a
+non-ASCII letter (\cmd{$\mu$m}), after a number (\cmd{0.1 m}, \cmd{[0.1 m]}, \cmd{1,5 m}, \cmd{1:1000 m}) or before a
+scale (a number after a factor sign or word, or a fraction: \cmd{m*0.1}, \cmd{metres x 0.1}, \cmd{m (scaled by 0.1)})
+is a unit Raven does not know, while a word with letters other than an exponent is no number (\cmd{CH1903 m} and
+\cmd{NAVD88 m} are metres), nor is a whole number after the metre word a scale (\cmd{m NAVD 88}, \cmd{m CGVD 2013})\\
 scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
 \cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
 applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and

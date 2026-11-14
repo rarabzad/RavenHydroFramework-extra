@@ -177,7 +177,13 @@ MODFLOW~6 reads them: a line whose first character other than a blank, comma or 
 begins with \cmd{//}, is a comment; blanks, commas and tabs separate the words, and a quoted word may hold them. Where
 MODFLOW reads a fixed number of words (a period row, a time-series row), text after them is ignored; where it reads
 every word of a line, such text is data, as for MODFLOW: an \cmd{AUXILIARY} line names one auxiliary variable per word,
-and the third word of a name-file \cmd{PACKAGES} row names the package. Period lengths, time-series times and period
+and the third word of a name-file \cmd{PACKAGES} row names the package. A row without a third word is named as MODFLOW
+names it: by its type and its place among all rows of that type, named or not (in \cmd{WEL6 a.wel WELA} followed by
+\cmd{WEL6 b.wel}, the second is \cmd{WEL-2}); a type a model holds only once (\cmd{DIS}, \cmd{NPF}, \cmd{STO}, \cmd{IC},
+\cmd{OC}, \ldots) is named by its type. These are the names MODFLOW's list file shows, and the names
+\cmd{:RavenTakesOver}, \cmd{:KeepPackages} and \cmd{:StreamPackage} take. Raven writes each such name into its row of
+the working copy, so that removing the rows it takes over does not change the names of the rest, and stops when MODFLOW
+has no package of a name it reads. Period lengths, time-series times and period
 numbers are read as MODFLOW reads them (Fortran list-directed input): \cmd{5}, \cmd{5.0E-1}, \cmd{50.0D-1} (\cmd{D},
 \cmd{d}, \cmd{Q} or \cmd{E} for the exponent, which may be left without digits), \cmd{5.0/} (a slash ends the value),
 \cmd{2*5.0} (a repeat count) and, for a period number, the whole part of such a value. A value that is not a number, or a
@@ -194,7 +200,7 @@ are always in metres and days.
 \begin{tabularx}{\linewidth}{P{0.24\linewidth}Y}\toprule\hdr
 Package & Treatment\\\midrule
 Recharge, evapotranspiration, UZF & must be named in \cmd{:RavenTakesOver} (removed; Raven supplies recharge) or in \cmd{:KeepPackages} (they stay). An undeclared one stops the run, so recharge is never counted twice\\
-Stream package (\cmd{:StreamPackage}) & a RIV, DRN or GHB package whose flows go to Raven's reaches: to the subbasin in an auxiliary variable (\cmd{AUX} name, default \cmd{SUBBASIN}), or to the subbasin of the dominant HRU of the cell (\cmd{DOMINANT\_HRU}). Losing reaches take the water from the channel; a loss that cannot be supplied is carried to the next step\\
+Stream package (\cmd{:StreamPackage}) & a RIV, DRN or GHB package whose flows go to Raven's reaches: to the subbasin in an auxiliary variable (\cmd{AUX} name, default \cmd{SUBBASIN}; the auxiliary variables are those MODFLOW read, from its memory: MODFLOW keeps the first \cmd{AUXILIARY} line of the package's options, and Raven warns of a second one), or to the subbasin of the dominant HRU of the cell (\cmd{DOMINANT\_HRU}). Losing reaches take the water from the channel; a loss that cannot be supplied is carried to the next step\\
 \cmd{DRN\_RAVEN} (\cmd{:SeepageToRaven ON}) & added at the top of the top active cell of coupled columns; the discharge returns to Raven (Section~\ref{ch:seepage})\\
 Water-table evaporation (\cmd{EXTINCTION\_DEPTH} $>0$ in an aquifer profile) & \cmd{EVT\_RAVEN} (\cmd{raven.evt}) is added at the top active cell of the profile's coupled columns; its surface is the top of that cell (with \cmd{:SoilZone PHYSICAL} the ground: that top plus the column's overlap-weighted soil-zone thickness) and its rate Raven's unmet evaporative demand (Section~\ref{ch:et}), in the model's units. In a model without \cmd{NEWTON} MODFLOW moves the entry of a top cell that dried to the highest active cell below it and takes the evaporation there; Raven reads the flow back at that cell. The model's own ET must then be taken over: an \cmd{EXTINCTION\_DEPTH} with a kept EVT or UZF package stops the run (evaporation from the water table would be counted twice)\\
 \cmd{:SurfaceWaterExchange} & \cmd{SWX\_RAVEN} (\cmd{raven.swx}), a river-type boundary at the top active cell of every column holding HRUs of the group, with its bed at the top of that cell (with \cmd{:SoilZone PHYSICAL} at the ground of the group's HRUs, above their soil zone); stage and supply-limited conductance are set every step as for a generated model (Section~\ref{ch:stores}), converted to the model's units\\
@@ -216,8 +222,10 @@ Every one of these stops the run with a message that names the problem and the f
 \item several groundwater models in the simulation and no \cmd{:MF6Model};
 \item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot
       follow (Section~\ref{sec:existingtime}: array or advanced packages with several period entries before the start, \cmd{TVK6}/\cmd{TVS6},
-      \cmd{TAS6}, time series in a simulation of several models, a \cmd{TS6} file that reads its rows from another file); a stress period that is not a whole number of Raven steps; a Raven run longer than
-      the model;
+      \cmd{TAS6}, time series in a simulation of several models, a \cmd{TS6} file that reads its rows from another file); a stress period that is not a whole number of Raven steps,
+      or shorter than 0; a Raven run longer than the model;
+\item a package Raven reads by name (the stream package, the packages in the balance check) that MODFLOW does not
+      have under that name;
 \item a cell file whose polygons are not the model's cells (count, numbering or area);
 \item a stream cell whose subbasin does not exist or is disabled;
 \item options of the generated mode left in the \cmd{.rvg} file (grid options, \cmd{:GridCellSize}, \cmd{:LandSurface},

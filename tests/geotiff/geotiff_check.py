@@ -27,9 +27,16 @@ Reader checks (unit driver):
     that ends in a digit does not ("CH1903 m", "CH1903 metres", "NAVD88 m", "EGM96 m" are metres); feet written in
     camel case or as one word ("SurveyFeet", "InternationalFeet", "USSurveyFoot", "esriSRUnit_SurveyFoot",
     "decimalfeet", "fasl") stop, as do "fmsl", the EPSG feet codes (EPSG:9002, EPSG:9003; EPSG:9001 is metres) and
-    "pies", "pieds", "Fu\u00df", "voet"; "mASL" is metres and "Micrometer" another unit; a number with punctuation or a
-    factor sign before the metre word ("[0.1 m]", "(0.1 m)", "1,5 m", "1/1000 m", "x0.1 m", "1:1000 m") gives the
-    unknown-unit warning;
+    "pies", "pieds", "Fu\u00df", "voet", "Fuss", "FUSS", "piedi", "p\u00e9s", "P\u00c9S", "fot", "Fod"; "mASL" is metres
+    and "Micrometer" another unit; a number with punctuation or a factor sign before the metre word ("[0.1 m]", "(0.1 m)",
+    "1,5 m", "1/1000 m", "x0.1 m", "1:1000 m") gives the unknown-unit warning, and so does a number after it that is a
+    scale: after a factor sign or word, or a fraction ("m*0.1", "metres x 0.1", "m (scaled by 0.1)", "m \u00d70.1",
+    "m / 10"), while datum years, versions and other whole numbers after it are not ("m NAVD 88", "m (NAVD 1988)",
+    "m CGVD 2013", "m (RH 2000)", "metres NN 2016", "m \u00fc. NHN 2016", "m, EGM 2008", "height m 2020", "m above datum
+    1", "Elevation, m, version 2", "m (2 m grid)", "m, 1 m resolution": metres); the EPSG codes of other lengths
+    (EPSG:9036 km, 1033 cm, 1025 mm, 9030 nautical mile, 9093 mile, 9301 British chain), a prefix written as a word and
+    attached to the metre word ("kiloMeters", "Kilo Meter") and "tenths of metres" stop, a prefix word elsewhere does not
+    ("nano DEM m", "m kilo": metres); "pesos" (no unit word) gives the unknown-unit warning;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -305,7 +312,19 @@ for text, want, part in (('m (Admiralty datum)', 'OK', ''), ('metres above Hydro
                          ('1/1000 m', 'OK', "has the band unit '1/1000 m'"), ('x0.1 m', 'OK', "has the band unit 'x0.1 m'"), ('1:1000 m', 'OK', "has the band unit '1:1000 m'"),
                          ('EPSG:9002', 'ERROR', 'elevations are in EPSG:9002'), ('EPSG:9003', 'ERROR', 'elevations are in EPSG:9003'), ('EPSG:9001', 'OK', ''),
                          ('fmsl', 'ERROR', 'elevations are in fmsl'), ('pies', 'ERROR', 'elevations are in pies'), ('pieds', 'ERROR', 'elevations are in pieds'),
-                         ('Fu\u00df', 'ERROR', 'elevations are in Fu\u00df'), ('voet', 'ERROR', 'elevations are in voet')):
+                         ('Fu\u00df', 'ERROR', 'elevations are in Fu\u00df'), ('voet', 'ERROR', 'elevations are in voet'),
+                         ('Fuss', 'ERROR', 'elevations are in Fuss'), ('FUSS', 'ERROR', 'elevations are in FUSS'), ('piedi', 'ERROR', 'elevations are in piedi'),
+                         ('p\u00e9s', 'ERROR', 'elevations are in p\u00e9s'), ('P\u00c9S', 'ERROR', 'elevations are in P\u00c9S'), ('fot', 'ERROR', 'elevations are in fot'),
+                         ('Fod', 'ERROR', 'elevations are in Fod'), ('EPSG:9036', 'ERROR', 'elevations are in EPSG:9036'), ('EPSG:1033', 'ERROR', 'elevations are in EPSG:1033'),
+                         ('EPSG:1025', 'ERROR', 'elevations are in EPSG:1025'), ('EPSG:9030', 'ERROR', 'elevations are in EPSG:9030'), ('EPSG:9093', 'ERROR', 'elevations are in EPSG:9093'),
+                         ('kiloMeters', 'ERROR', 'elevations are in kiloMeters'), ('Kilo Meter', 'ERROR', 'elevations are in Kilo Meter'),
+                         ('tenths of metres', 'ERROR', 'elevations are in tenths of metres'), ('m*0.1', 'OK', "has the band unit 'm*0.1'"),
+                         ('metres x 0.1', 'OK', "has the band unit 'metres x 0.1'"), ('m (scaled by 0.1)', 'OK', "has the band unit 'm (scaled by 0.1)'"),
+                         ('pesos', 'OK', "has the band unit 'pesos'"), ('EPSG:9301', 'ERROR', 'elevations are in EPSG:9301'),
+                         ('m NAVD 88', 'OK', ''), ('m (NAVD 1988)', 'OK', ''), ('m CGVD 2013', 'OK', ''), ('m (RH 2000)', 'OK', ''), ('metres NN 2016', 'OK', ''),
+                         ('m \u00fc. NHN 2016', 'OK', ''), ('m, EGM 2008', 'OK', ''), ('height m 2020', 'OK', ''), ('m above datum 1', 'OK', ''),
+                         ('Elevation, m, version 2', 'OK', ''), ('m (2 m grid)', 'OK', ''), ('m, 1 m resolution', 'OK', ''), ('nano DEM m', 'OK', ''),
+                         ('m kilo', 'OK', ''), ('m \u00d70.1', 'OK', "has the band unit 'm \u00d70.1'"), ('m / 10', 'OK', "has the band unit 'm / 10'")):
     o = unit('raster', with_unit(text, 'unit_%s.tif' % re.sub(r'\W', '_', text)), 'NONE').strip()
     good = o.startswith(want) and part in o and (part != '' or o == 'OK')
     report('band unit "%s": %s' % (text, {'OK': 'read as metres' if not part else 'read as metres, with a note', 'ERROR': 'stops'}[want]), good, o[:160])
