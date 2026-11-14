@@ -176,14 +176,14 @@ specified heads; seepage to Raven 135.1 against 134.8~m$^3$/d without the sliver
 \subsection{Geometry against standard libraries}
 The geometry functions are compiled into a stand-alone test and compared with widely used libraries
 (Table~\ref{tab:geom}); the readers of the spatial inputs are checked against the same libraries and against files
-that must be refused (Tables~\ref{tab:readers} and~\ref{tab:rasters}).
+that must be refused (Tables~\ref{tab:readers}, \ref{tab:geojson} and~\ref{tab:rasters}).
 \begin{table}[!htbp]\centering
 \caption{Geometry functions against independent libraries.}\label{tab:geom}
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Function & Reference & Largest difference\\\midrule
 Polygon clipping and area (400 random, mostly concave polygons) & shapely & $4.6\times10^{-12}$ (relative)\\
 Equal-area projection (300 points over the Liard region) & pyproj (same sphere) & $6.7\times10^{-7}$ m\\
-Albers and Lambert conformal conic projections (ten cases, also with the origin at either pole and with false eastings) & pyproj (PROJ) & $4.7\times10^{-7}$ m\\
+Albers and Lambert conformal conic projections (13 cases, also with the origin at either pole, with false eastings, and at points more than 180\textdegree{} and exactly 180\textdegree{} of longitude from the central meridian) & pyproj (PROJ) & $4.8\times10^{-7}$ m\\
 Projection round trip & -- & exact\\
 Bilinear raster sampling of a plane, which bilinear sampling reproduces exactly (200 points); the no-data margin of half a cell beyond the edge & the plane & $3.6\times10^{-15}$; a value 0.4 cell beyond the edge, none 0.6 cell beyond\\
 \cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
@@ -195,11 +195,17 @@ Bilinear raster sampling of a plane, which bilinear sampling reproduces exactly 
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Input & Reference & Result\\\midrule
 GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre headers, \dots) & shapely, reference values & read correctly\\
-GeoJSON numbers: coordinates that are strings, \cmd{null}, \cmd{true} or too large; \cmd{NaN}, \cmd{Infinity}, hexadecimal numbers and leading zeros; features with and without \cmd{"properties"} & the JSON standard & the invalid ones refused, naming the feature, ring and vertex or the line and column; a feature without \cmd{"properties"} refused only where an ID is read\\
-GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"7.5"} and \cmd{""}; IDs \cmd{"7"}, \cmd{"\ 7\ "}, \cmd{"7.0"} and 7.0; features of other geometry types with a \cmd{null} ID; a Polygon nested one level too shallow, a vertex \cmd{[1]} (polygon and line), a LineString whose coordinates are a number; \cmd{NaN} and \cmd{Infinity} attributes; field names written with \cmd{\textbackslash u} escapes; text after the root object; a truncated file & the JSON standard & the first six IDs refused, naming the file, the feature and the value, the next four read; features of other types skipped before their ID; each malformed structure refused, naming the vertex or member; the attributes and the escaped names read; the trailing text and the truncated file refused (\cmd{geomtest\_check.py})\\
 \cmd{:InputCRS}: projected \cmd{"crs"} member without \cmd{:InputCRS}, another projection, lon/lat file with \cmd{:InputCRS}, projected coordinates or raster without \cmd{:InputCRS} & -- & refused\\
 \cmd{"crs"} members: EPSG:4326, 4269, 4617, 6318, 4979, 4267, a versioned URN (\cmd{EPSG:6.6:4326}), an \cmd{opengis.net} URL (4269), OGC CRS83; a versioned URN of UTM 10N; EPSG:3157 and 4647 (projections, not built in) & EPSG registry (pyproj) & geographic ones read as lon/lat (refused with \cmd{:InputCRS}); the URN read by its code; 3157 and 4647 ask for their parameters, which are then accepted\\
 \cmd{"crs"} EPSG:2227 (US survey feet); a file with a UTF-8 byte-order mark; \cmd{:InputCRS} with letters or units in a parameter (\cmd{-ll7}, \cmd{O.9996}, \cmd{500km}), surplus or missing values, an unknown ellipsoid, \cmd{EPSG:32610x} & -- & 2227 refused; the file read; each specification refused, naming the parameter or value (\cmd{geomtest\_check.py})\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{The GeoJSON reader: numbers, IDs and structure.}\label{tab:geojson}
+\begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
+Input & Reference & Result\\\midrule
+GeoJSON numbers: coordinates that are strings, \cmd{null}, \cmd{true} or too large; \cmd{NaN}, \cmd{Infinity}, hexadecimal numbers and leading zeros; features with and without \cmd{"properties"} & the JSON standard & the invalid ones refused, naming the feature, ring and vertex or the line and column; a feature without \cmd{"properties"} refused only where an ID is read\\
+GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"7.5"} and \cmd{""}; IDs \cmd{"7"}, \cmd{"\ 7\ "}, \cmd{"7.0"} and 7.0; features of other geometry types with a \cmd{null} ID; a Polygon nested one level too shallow, a vertex \cmd{[1]} (polygon and line), a LineString whose coordinates are a number; \cmd{NaN} and \cmd{Infinity} attributes; field names written with \cmd{\textbackslash u} escapes; text after the root object; a truncated file; whole-number IDs beyond $9\times10^{15}$; a missing ID field where the feature has an \cmd{"id"} member (GDAL's \cmd{ID\_FIELD}); polygons without area (an empty Polygon, an outline of fewer than 3 distinct vertices, such a part of a MultiPolygon) & the JSON standard & the first six IDs refused, naming the file, the feature and the value, the next four read; IDs beyond $9\times10^{15}$ refused with the advice to write them as strings, the missing field with the \cmd{ID\_FIELD} hint; a polygon without area dropped with its holes and its ID left out with the reason (a stop only where the model uses that ID), a MultiPolygon's other parts read; features of other types skipped before their ID; each malformed structure refused, naming the vertex or member; the attributes and the escaped names read; the trailing text and the truncated file refused (\cmd{geomtest\_check.py})\\\bottomrule
 \end{tabularx}
 \end{table}
 \begin{table}[!htbp]\centering
@@ -208,6 +214,7 @@ GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"
 Input & Reference & Result\\\midrule
 GeoTIFF reader: 228 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes; GDAL's band scale and offset, and role-less items of those names) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
 ESRI ASCII grids: GDAL's \cmd{dx}/\cmd{dy} header (with corner or centre), \cmd{NODATA\_value nan}; more values than \cmd{ncols}$\times$\cmd{nrows}, a wrapped grid, fewer values, an unknown key, a value or header value that is not a number & the GeoTIFF with the same pixels; the $-9999$ twin & the same samples bit for bit; each malformed grid refused with its reason\\
+Band units (\cmd{UNITTYPE}): feet in other languages (\cmd{Fuss}, \cmd{piedi}, \cmd{pés}, \cmd{fot}, \cmd{Fod}), EPSG length-unit codes other than metres (9002--9099, 9300--9302, 1025, 1033), \cmd{kiloMeters}, \cmd{tenths of metres}; a scale after the metre word (\cmd{m*0.1}, \cmd{metres x 0.1}, \cmd{m / 10}); datum years and versions after it (\cmd{m NAVD 88}, \cmd{m CGVD 2013}, \cmd{Elevation, m, version 2}) & -- & the units of other lengths refused; the scaled ones read with a warning; the datum texts read as metres (\cmd{geotiff\_check.py})\\
 GeoTIFF reader: 34 unsupported or damaged files (also a prime meridian given only by its longitude or by the datum, a projected code in feet without its units key, a band unit in feet), an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
 \end{tabularx}
 \end{table}
@@ -308,6 +315,7 @@ renumbering, the original model untouched). All 53 behave as required.
 \begin{tabularx}{\linewidth}{Y P{0.4\linewidth}}\toprule\hdr
 Input & Response\\\midrule
 Missing HRU file or ID field; unknown profile or class; malformed class row & stops; names the file, field, profile or row\\
+HRU polygons without area: unused features with an empty Polygon or a one-point ring (N27); HRU 1's Polygon empty (N28) & N27 runs; N28 stops, naming the HRU, the file and the feature\\
 Aquiclude as top layer; zero layer thickness; value out of range ($K\le0$, $S_y>1$, negative delay, \dots) & stops; names the parameter\\
 Process draining \cmd{GROUNDWATER} in a coupled HRU; no process feeding it & stops; names the process and HRU\\
 Wrong library path; missing raster; well outside the model & stops; names the path, file or well\\
@@ -330,7 +338,8 @@ An HRU mesh of 4 HRUs of 5~$\times$~5~km with 500~m cells and one short refineme
 Boundary polygons that overlap: two features, the same feature twice, a MultiPolygon of two overlapping parts (N19) & each selects the cells of the union (as the larger polygon alone)\\
 Malformed numbers in the \cmd{.rvp} aquifer tables: \cmd{K\_HORIZ 1O}, \cmd{SPEC\_YIELD O.2}, a thickness \cmd{3m}, a profile parameter \cmd{2.O} (N20--N23) & stops; names the table, the row and the token\\
 River lines of \cmd{:RiverGeometry} whose subbasin ID is not in the model: one of two lines (N25), the only line (N26) & N25 runs with the other line's cells and a warning naming the line left out; N26 stops (no line of the file has a subbasin of the model)\\
-An existing model's TDIS and package text in forms MODFLOW~6 reads: period lengths \cmd{10.0D-1}, \cmd{0.31d2}, \cmd{2*1.0}, \cmd{31.0/} and \cmd{30.0e}, \cmd{//} and \cmd{!} comment rows, commas between values; period numbers such as \cmd{2.0} and \cmd{3/}; an \cmd{AUXILIARY} line with a comment after the name; and a period length \cmd{1.0x}, \cmd{NPER} 25 with 24 rows (E1--E6) & read as MODFLOW~6 reads them (checked against the \cmd{mf6} program); the runs complete; \cmd{1.0x} and the \cmd{NPER} mismatch stop, naming the period or both counts\\
+An existing model's TDIS and package text in forms MODFLOW~6 reads: period lengths \cmd{10.0D-1}, \cmd{0.31d2}, \cmd{2*1.0}, \cmd{31.0/} and \cmd{30.0e}, \cmd{//} and \cmd{!} comment rows, commas between values; period numbers \cmd{0.2D1} and \cmd{3/}; an \cmd{AUXILIARY} line with a comment after the name; and a period length \cmd{1.0x}, \cmd{NPER} 25 with 24 rows (E1--E6) & read as MODFLOW~6 reads them (checked against the \cmd{mf6} program); the runs complete; \cmd{1.0x} and the \cmd{NPER} mismatch stop, naming the period or both counts\\
+An existing model's name file: an unnamed package after a named one of its type (E7), two unnamed recharge packages, the first taken over and the second kept (E8); two \cmd{AUXILIARY} lines in the river package, \cmd{SUBBASIN} first (E9) or second (E10); a negative period length (E11); CRLF line ends with packages taken over (E12) & unnamed packages named by their place among the rows of their type, as MODFLOW~6 names them, and kept in the balance (MODFLOW balance error below 1~m$^3$/d); E9 runs with a warning and outputs equal to the unmodified model's, E10 stops (MODFLOW keeps the first line's names, read from its memory); E11 stops (a period cannot be shorter than 0); E12 runs; no \cmd{fort.*} file left (E6, E9)\\
 Malformed numbers in the \cmd{.rvc}: \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5} or \cmd{0x62}, \cmd{:InitialGWHeads FROM\_PROFILE 0}, a \cmd{:GWHeads} value \cmd{98.5x} & stops; names the command and the token (\cmd{test\_inputs.py} I22)\\
 \cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
 A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule

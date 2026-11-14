@@ -111,9 +111,20 @@ trouble-box diff 46 lines → 0; W5 "Files ... Creek.rve ... differ" → only `O
   build; their tools are unchanged). `make_package.py --self-test`: ALL PASSED.
 - Added lines outside docs/design: no history or audit wording (grep).
 
-## With the phase-22 build (to do)
-- Regenerate the workshops with the phase-22 build (`build_tutorials.py`, `--raven-src` the phase-22 code): the PDFs
-  of W2, W3 and W5 for this phase's text; Workshop 4 for WS9-1 (no stray `fort.1000`) and any warning or value the
-  phase-22 code changes; measured run times. Then `--check --quick` with it.
-- tests/README.md's E5 text ("period numbers `2.0` and `3/`") when phase 22 adds `0.2D1` (MT9-5).
-- `check_manual_pdf.py --write` after the merge; `propose --reviewed` for the new merge commits.
+## After the merge with phase 22 (code 5b49d0a, extra 65c1858)
+- verification.tex: the conic row (13 cases, also more than 180 degrees and exactly 180 degrees from the central
+  meridian; worst 4.75e-7 m from geomtest_check.py on 5b49d0a); the GeoJSON rows (IDs beyond 9e15, GDAL's ID_FIELD
+  case, polygons without area) in a table of their own (`tab:geojson`, the readers table was 104 pt over a page); a
+  band-unit row in `tab:rasters`; E1-E6 with `0.2D1`; rows for E7-E12 and N27-N28 (N27-N28 in `tab:faulty`, as
+  `tab:faultynum` was 17 pt over). tests/README.md: input_checks N1-N28, E1-E12 (E5 `0.2D1`), the geomtest and band-unit
+  cases.
+- Workshops regenerated with wt/rel22_Raven.exe (`--raven-src` the code repository, without OSTRICH, 819 s): only
+  measured run times change (`t1:fullmin` 10 -> 8, also in README.txt and model/start/README.md; t2, t3, t5, t6 seconds)
+  and the PDFs; no Workshop 6 value changed, so the DDS was not rerun. No `fort.*` file in any run folder.
+- Release executable from 5b49d0a with the recipe (sorted link): `wt/rel22_release_glibc.exe`, sha256 938a6301...,
+  GLIBC 2.16 at most, banner date Nov 14 2026. `build_tutorials.py --check` with it: PASS (377 values, 105 excerpts);
+  its 253 CSV, .rvc, .hds, .cbc and .nc outputs of the workshop runs equal rel22's byte for byte (the other files differ
+  in build date, folder paths and timings only). Zips: `wt/ws/zips_final/` with `--source-commit 5b49d0a`.
+- Manual: `check_manual_pdf.py --write` (184 -> 186 pages), then PASS.
+- Commit messages: reviewed entries for code 5b49d0a, extra f4eee97 (its subject repeated 5b49d0a's), 503c4d6 and
+  65c1858; `check` PASS with the repositories (85 + 134).

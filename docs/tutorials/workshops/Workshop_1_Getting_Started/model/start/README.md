@@ -12,7 +12,7 @@ your own model.
 ```
 cp -r $WS/model/start $WS/work_full      # as in the last steps of the workshop
 cd $WS/work_full
-$RAVEN Liard -o out/                      # 20 years, daily; about 10 minutes on one core
+$RAVEN Liard -o out/                      # 20 years, daily; about 8 minutes on one core
 python3 $WS/scripts/tools_audit.py out    # water-balance and consistency audit
 ```
 (`RAVEN=$WS/bin/Raven`, as set in Step 1 of the workshop.)
