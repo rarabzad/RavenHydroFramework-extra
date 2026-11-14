@@ -24,6 +24,11 @@ start storage of the columns in GWModelSummary.txt is required, vz_step1_missing
 K9  the leak check: the K2 storm with KINEMATIC passes, and the same outputs with a column leak of 1e-5 and of 1e-4 m3
     per step put into "unsaturated zone storage [m3]" (on the steps above 5,000 m3, 10 significant digits) fail
     the script's checks.
+K10 the room left in the top cell: one flat HRU of 200 x 200 m, aquifer SPEC_YIELD 0.2 (POROSITY 0.3, b 4, air entry 0.3 m),
+    Kv 0.1 m/d, the water table 1.6 m deep (0.6 m below the soil-zone base, the top cell's top), 90 mm/d for 4 days from a
+    steady column (:SoilZoneVadoseInitialFlux 90): in step 2 the rise meets more mobile water than the room the top cell
+    has left (1,208 m3 against Sy dh 3,592 m3), so the column is held back by that room, with the warning that names it
+    ("than the room left in the top cell above the water table"); all identities.
 RAVEN_TEST_QUICK=1: shorter K7.
 """
 import os, sys, shutil, subprocess, time, datetime, glob
@@ -280,9 +285,21 @@ def k9():
         ok &= caught and n >= 5
     return ok
 
+def k10():
+    print('K10 a water table rising fast into a nearly full top cell: KINEMATIC held back by the room left in it, with a warning')
+    q = 90.0
+    d = run('k10', extra_rvg=KW + ':SoilZoneVadoseInitialFlux %g\n' % q, nhru=1, slope=0.0, Sy=0.2, aq_b=4.0, aq_psia=0.3, aq_thick=30.0,
+            init_depth=1.6, rain=[q] * 4, perc=1000.0, phi0=(0.0, 0.0), days=4, Kh=1.0, Kv=0.1)
+    if not d:
+        return False
+    e = open(os.path.join(d, 'out', 'Raven_errors.txt'), errors='replace').read()
+    warned = 'than the room left in the top cell above the water table' in e
+    print('  room-limit warning: %s' % ('written (ok)' if warned else 'MISSING: FAIL'))
+    return warned
+
 def main():
     res = {}
-    for k, f in (('K1', k1), ('K2', k2), ('K3', k3), ('K4', k4), ('K5', k5), ('K6', k6), ('K7', k7), ('K8', k8), ('K9', k9)):
+    for k, f in (('K1', k1), ('K2', k2), ('K3', k3), ('K4', k4), ('K5', k5), ('K6', k6), ('K7', k7), ('K8', k8), ('K9', k9), ('K10', k10)):
         try:
             res[k] = bool(f())
         except Exception as e:   # (a crash of one test is that test's failure)

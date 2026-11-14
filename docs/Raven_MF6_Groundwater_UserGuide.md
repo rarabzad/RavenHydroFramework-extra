@@ -159,9 +159,9 @@ order where profiles meet.
 | --- | --- | --- |
 | `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat or `:InputCRS`) |
 | `:RiverGeometry file {subbasin field}` | none | river lines; without a field, each piece belongs to the subbasin of the dominant HRU in its cell |
-| `:LandSurface file` | HRU ELEVATION | DEM, ESRI ASCII grid or GeoTIFF (`.tif`, `.tiff`) in lon/lat or `:InputCRS`; averaged over each cell |
+| `:LandSurface file [METRES]` | HRU ELEVATION | DEM, ESRI ASCII grid or GeoTIFF (`.tif`, `.tiff`) in lon/lat or `:InputCRS`; averaged over each cell; `METRES` confirms elevations in metres whatever a GeoTIFF's band unit text |
 | `:InputCRS EPSG:code` or `TMERC\|ALBERS\|LCC ...` | lon/lat | projection of every geometry and raster input file (grammar of `:MF6CRS`); wells may then be given by X, Y |
-| `:BedrockSurface file` | DEFAULT_BEDROCK_DEPTH | bedrock elevation raster, same formats |
+| `:BedrockSurface file [METRES]` | DEFAULT_BEDROCK_DEPTH | bedrock elevation raster, same formats; `METRES` as for `:LandSurface` |
 | `:GridCellSize m` | 1000 | base cell size [m] of the grid |
 | `:MinCellCoverage f` | 0.25 | fraction of a cell covered by coupled HRUs needed to activate it |
 | `:MF6Library path` | RAVEN_MF6_LIB | MODFLOW 6 shared library |
@@ -227,11 +227,15 @@ of 8-64 bit integers or 32/64-bit floats; north-up georeferencing (`ModelPixelSc
 `ModelTransformation` without rotation); `PixelIsPoint` (the tie point is a pixel centre, so the corner is half a pixel up
 and left, as GDAL reads it); `GDAL_NODATA` and a GDAL internal mask as no-data (NaN is always no-data). Without either,
 every value is an elevation, as GDAL reads it; Raven warns when such a file holds -9999 or a type's extreme value. GDAL's band
-scale and offset (`GDAL_METADATA`) are applied, as GDAL's `-unscale` and GIS programs show the values. Other compressions (JPEG, ZSTD, LERC, ...),
+scale and offset (`GDAL_METADATA`, and GDAL's side file `<raster>.aux.xml`, read first as GDAL reads it) are applied, as GDAL's `-unscale` and GIS programs show the values. Other compressions (JPEG, ZSTD, LERC, ...),
 several bands, palette or colour images, other bit depths, FillOrder 2, units other than metres or degrees (units keys),
 a projected code in feet without its units key (e.g. EPSG:2227), a prime meridian other than Greenwich (also given only by
 its longitude, as GDAL writes a user-defined system such as `+pm=paris`, or by the datum), a vertical coordinate system
-in feet, a band unit whose first unit is feet or another length unit than metres (an unknown band unit gives a warning),
+in feet, a band unit that is not a metre form (the whole text, normalised, must be one of the forms of the manual's
+band-unit table: `m`, `metres`, `EPSG:9001`, a metre form with a listed vertical datum such as `m MSL`, `m (NAVD88)` or
+`mAHD`, or a quantity such as `elevation (m)`; no unit at all is read as metres; write `METRES` (or `METERS`) after the
+file name, `:LandSurface dem.tif METRES`, to confirm metres for any other text, except one that names another length unit
+or gives a scale such as `0.1 m` or `m (in thousands)`),
 rotated or south-up rasters, files without georeferencing,
 corrupt or truncated files and files over 1 GB or 50 million pixels stop the run with the reason; convert with
 `gdal_translate -b 1 -co COMPRESS=DEFLATE`. The GeoTIFF's EPSG code is checked: a geographic code needs no `:InputCRS`, a
@@ -557,7 +561,9 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 | "GeoTIFF file ...: its n tiles of ... pixels cover more than 200 million pixels" | export the file again |
 | "GeoTIFF file ...: its prime meridian lies at longitude ... from Greenwich" / "its geodetic datum EPSG:n ... counts longitudes from the prime meridian of ..." | reproject the raster to EPSG:4326 |
 | "... is in EPSG:n, a projection whose coordinates are in ..." | reproject the GeoTIFF or GeoJSON file to a projection in metres |
-| "GeoTIFF file ...: its elevations are in ... (the band unit, UNITTYPE in GDAL_METADATA)" / "its band SCALE ... is 0" / warning "... has the band unit '...', which Raven does not know" | convert the values to metres and set the unit (`gdal_edit.py -units m`); save unscaled elevations (`gdal_translate -unscale`) |
+| "GeoTIFF file ...: its band unit is '...' (UNITTYPE in GDAL_METADATA / UnitType in ....aux.xml), which is not one of the metre forms" | if the elevations are in metres, write `METRES` after the file name; otherwise convert the values to metres and set the unit (`gdal_edit.py -units m`) |
+| "GeoTIFF file ...: its band unit is '...' (...), a metre with a number or a part (a scale, factor or exponent)" | write the elevations unscaled in metres, or give the scale as the band's scale and offset (`gdal_edit.py -scale 0.1 -units m`) |
+| "GeoTIFF file ...: its elevations are in ... (the band unit, ...)" / "its band SCALE ... is 0" / "its GDAL side file ....aux.xml cannot be read (...)" | convert the values to metres and set the unit (`gdal_edit.py -units m`); save unscaled elevations (`gdal_translate -unscale`); correct or remove the side file |
 | "raster ...: unknown header key" / "... is not a number" / "has ... values, fewer than ncols*nrows" / "has more values than ncols*nrows" (ESRI ASCII) | correct the grid's header or values |
 | warning "raster ... has a vertical coordinate system (...) whose unit Raven does not know" | check that the elevations are in metres |
 | warning "raster ...: its chain of image directories is damaged after the raster ..." | the raster is read without its internal mask; export the file again if it has one |

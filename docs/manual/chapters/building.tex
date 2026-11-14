@@ -202,12 +202,18 @@ a GeoTIFF and an ESRI ASCII grid with the same values give the same model.
 file & classic TIFF and BigTIFF, little- and big-endian; the first image of the file (overviews are ignored); at most 1~GB\\
 units & coordinates in metres (projections) or degrees from Greenwich, elevations in metres: units keys, a projected code
 in other units, a prime meridian (by code, by its longitude or by the datum), a vertical coordinate system in feet or a
-band unit of another length (Table~\ref{tab:bandunits}) stop the run; a vertical system or band unit Raven does not know
+band unit that is not a metre form (Table~\ref{tab:bandunits}) stop the run; a vertical system Raven does not know
 gives a warning (read as metres)\\
 scale and offset & GDAL's band \cmd{SCALE} and \cmd{OFFSET} (tag \cmd{GDAL\_METADATA}, items with GDAL's role
 \cmd{scale}, \cmd{offset}, \cmd{unittype}; items of the same name without it are ordinary metadata, as for GDAL) are
 applied, value $\times$ scale $+$ offset, as GDAL's \cmd{-unscale} and GIS programs show the values; no-data pixels, and
 values beyond the range of a double, are no-data; a \cmd{GDAL\_METADATA} tag over 16~MB stops the run\\
+side file & GDAL's side file \cmd{<raster>.aux.xml} (written for example with \cmd{-co PROFILE=GeoTIFF} or
+\cmd{BASELINE}, or when metadata are set on a file opened read-only) is read as GDAL reads it, before the file's own
+metadata: in its \cmd{PAMRasterBand band="1"}, a \cmd{Scale} or an \cmd{Offset} replaces both of the file's (the other
+is then 1 or 0), a \cmd{UnitType} that is not empty replaces the band unit, and a \cmd{NoDataValue} replaces
+\cmd{GDAL\_NODATA}; a side file that is not a PAM dataset, a value that is not a number or a side file over 16~MB stops the
+run. Georeferencing kept only in the side file (\cmd{BASELINE}) is not read: such a file stops as having no georeferencing\\
 layout & strips or tiles\\
 compression & none, LZW, DEFLATE (codes 8 and 32946) and PackBits\\
 predictor & none, horizontal differencing (2) and floating-point (3), with LZW and DEFLATE\\
@@ -233,64 +239,80 @@ than degrees, a geographic code or key with a prime meridian other than Greenwic
 when the prime meridian is given only by its longitude (\cmd{GeogPrimeMeridianLongGeoKey}, as GDAL writes a user-defined
 longitude/latitude system such as \cmd{+pm=paris}) or by the datum (\cmd{GeogGeodeticDatumGeoKey}, for example 6801), a
 projected code whose coordinates are in feet or other units when the file has no \cmd{ProjLinearUnitsGeoKey} (for example
-EPSG:2227, California zone 3 in US survey feet), a band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}) in feet or another
-length unit than metres, a band \cmd{SCALE} of 0, a
+EPSG:2227, California zone 3 in US survey feet), a band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}, or
+\cmd{UnitType} in the side file) that is not a metre form, a band \cmd{SCALE} of 0, a
 vertical coordinate system in feet (for example EPSG:4269+6360, NAVD88 in US survey feet), an internal mask Raven cannot
 read, a truncated or corrupt file or a decompression error, and a file over 1~GB, 50 million pixels, or strips or tiles
 covering more than 200 million pixels. Raven is stricter than GDAL in a few rare cases: a negative pixel height
 (\cmd{ModelPixelScale}, which GDAL reads north-up by default) is refused, a \cmd{ModelTiepoint} tag of more than 4\,096
 values is taken as no georeferencing, and a \cmd{GDAL\_NODATA} text longer than 256 characters is ignored.
 
-\paragraph{Band unit.} GDAL's band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}, set with \cmd{gdal\_edit.py -units}) is
-free text. Raven takes the unit from the first unit expression of the text, matched against one table of length units
-(Table~\ref{tab:bandunits}): a metre reads the raster as metres, another length unit stops the run, and any other text
-gives the unknown-unit warning (the elevations are read as metres). Full-width letters and digits are read as ASCII.
-The text is split into words: runs of letters (any alphabet), also split where a lower-case letter is followed by a
-capital (\cmd{SurveyFeet}, \cmd{mASL}, \cmd{m\"uNN}); words are
-compared whole and in lower case, and a word directly followed by a digit is part of a name (\cmd{CH1903}, \cmd{NAVD88},
-\cmd{LN02}) and no unit. So \cmd{Elevation (m), converted from feet}, \cmd{Elevation in metres (EPSG:9057)} (a
-coordinate-system code, no unit code), \cmd{m (Admiralty datum)}, \cmd{H\"ohe in Metern} and \cmd{in metres} are metres;
-\cmd{Feet (converted to metres)}, \cmd{US survey foot}, \cmd{ftUS}, \cmd{tenths of a metre}, \cmd{thousands of metres},
-\cmd{m (thousands)}, \cmd{Zentimeter}, \cmd{cent\'imetros}, \cmd{kiloMeters}, \cmd{$\mu$m} and \cmd{EPSG:9002} stop; and
-\cmd{hydraulic head}, \cmd{CH1903+ LN02}, a metre after a number (\cmd{0.1 m}, \cmd{[0.1 m]}, \cmd{1:1000 m}, \cmd{10m},
-also with \cmd{x}, \cmd{*} or \cmd{of a} between: \cmd{10 x m}, \cmd{10*m}, \cmd{0.1 of a metre}) or before a scale (a
-number after a factor sign or word, also past punctuation, or a fraction: \cmd{m*0.1}, \cmd{metres x 0.1}, \cmd{m (scaled
-by 0.1)}, \cmd{Elevation (m) x 0.1}, \cmd{m, 1/10}, \cmd{m 0.1}) give the warning, while datum years and versions after the metre word are no scale (\cmd{m NAVD 88},
-\cmd{m (version 2.1)}: metres). Only the first unit counts: \cmd{m (stored as cm)} is read as metres.
+\paragraph{Band unit.} GDAL's band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}, or \cmd{UnitType} in the side file;
+set with \cmd{gdal\_edit.py -units}) is free text, so Raven's rule is closed: the raster is read as metres only when the
+whole text, normalised, is a metre form of Table~\ref{tab:bandunits}: a metre word, symbol or abbreviation, alone or followed
+by one listed vertical datum (\cmd{m MSL}, \cmd{m, AHD}, \cmd{m (NAVD88)}, \cmd{meters (EGM2008 geoid)}, \cmd{m above sea
+level}, fused \cmd{mAHD}, \cmd{msnm}, \cmd{m.s.n.m.}), a metre form in brackets after a metre word (\cmd{meter (m)},
+\cmd{metre (EPSG:9001)}), or a metre form after a quantity, in brackets or after \cmd{in} (\cmd{elevation (m)},
+\cmd{Elevation [m]}, \cmd{height in metres}, \cmd{height above ellipsoid (m)}). Normalising reads full-width characters as
+ASCII and no-break and ideographic spaces as blanks, trims the blanks and reads a run of them as one, lowers the case (ASCII,
+Latin-1, Latin Extended-A, Greek, whose accents are also removed, and Cyrillic) and removes surrounding brackets: \cmd{m},
+\cmd{m.}, \cmd{(m)}, \cmd{[metres]}, \cmd{Meters}, \cmd{MASL}, \cmd{m a.s.l.}, \cmd{m\"uNN}, \cmd{Meter \"uber NN},
+\cmd{$\mu\acute{\epsilon}\tau\rho\alpha$}, the same in capitals without accents, a full-width \cmd{m}, \cmd{EPSG:9001} are
+metres. A raster without a band unit is read as metres (empty brackets, \cmd{()} or \cmd{[]}, are a text). Any other text
+stops the run with a message that names the text (bytes that are not UTF-8 shown as \cmd{\textbackslash xNN}), of one of
+three kinds:
+\begin{itemize}
+\item a text with another length unit and no metre (the second row of the table: \cmd{ft}, \cmd{US survey foot},
+\cmd{Zentimeter}, \cmd{km}, \cmd{EPSG:9002}): ``its elevations are in \dots''; convert the values to metres and set the unit
+(\cmd{gdal\_calc.py}, then \cmd{gdal\_edit.py -units m});
+\item a scaled metre: a part or multiple (\cmd{m (in thousands)}, \cmd{tenths of a metre}, \cmd{m (in 1000s)}), a number with a
+factor sign or word (\cmd{m*0.1}, \cmd{Meter (x0.1)}, \cmd{m (scaled by 0.1)}, \cmd{0.1 of a metre}, \cmd{m\^{}2}), or a number
+and a metre form as the whole text (\cmd{0.1 m}, \cmd{1000 m}): the values are not plain metres; write them unscaled, or give
+the scale as the band's scale and offset (\cmd{gdal\_edit.py -scale 0.1 -units m});
+\item any other text (\cmd{m (Admiralty datum)}, \cmd{hydraulic head}, \cmd{m/s}, \cmd{5 km grid, elevation in m}, \cmd{m
+(NAVD 1988)}): if the elevations are in metres (after the band scale and offset), confirm it by writing \cmd{METRES} (or
+\cmd{METERS}) after the file name, otherwise convert as above:
+\begin{verbatim}
+:LandSurface   dem.tif   METRES
+\end{verbatim}
+(\cmd{:BedrockSurface} likewise); the raster is then read as metres whatever its band unit text, and nothing else changes.
+\cmd{METRES} does not lift the first two kinds.
+\end{itemize}
 \begin{table}[!htbp]\centering
-\caption{Length units of the band unit; the first one in the text decides.}\label{tab:bandunits}\small
+\caption{Band units: the metre forms read as metres (with their datums and quantities), and the other lengths named in the stop message.}\label{tab:bandunits}\small
 \begin{tabularx}{\linewidth}{P{0.2\linewidth}Y}\toprule\hdr
-Class & Words and codes\\\midrule
-metre (read as metres) & \cmd{m}, \cmd{metre}, \cmd{metres}, \cmd{meter}, \cmd{meters}, \cmd{metern}, \cmd{m\`etre(s)},
-\cmd{m\'eter}, \cmd{m\'eterben}, \cmd{metro(s)}, \cmd{metri}, \cmd{metr}, \cmd{metra}, \cmd{metry}, \cmd{metr\'ow}, \cmd{metrach},
-\cmd{metrami}, \cmd{metrze}, \cmd{metrem}, \cmd{metrech}, \cmd{metru}, \cmd{metrin}, \cmd{metrit}, and the metre in
-Cyrillic (with its endings), Greek, Chinese, Japanese and Korean; \cmd{masl}, \cmd{mamsl}, \cmd{moh}, \cmd{m\"oh}, \cmd{m\"u} (\cmd{m\"uNN});
-\cmd{EPSG:9001}\\
-another length (the run stops) & feet, inches, yards, miles, fathoms, chains and furlongs: \cmd{ft}, \cmd{foot},
-\cmd{feet}, \cmd{fasl}, \cmd{fmsl}, \cmd{inch(es)}, \cmd{yard(s)}, \cmd{yd(s)}, \cmd{mile(s)}, \cmd{kmi}, \cmd{nmi},
-\cmd{fathom(s)}, \cmd{chain(s)}, \cmd{furlong(s)}; in other languages \cmd{pie(s)}, \cmd{pied(s)}, \cmd{piede},
-\cmd{piedi}, \cmd{p\'e(s)}, \cmd{voet}, \cmd{voeten}, \cmd{Fu\ss}, \cmd{Fuss}, \cmd{fot}, \cmd{fod}, \cmd{stopa},
-\cmd{stopy}, \cmd{st\'op}, \cmd{jalka(a)}, \cmd{l\'ab}, \cmd{Zoll}, \cmd{pouce(s)}, \cmd{pulgada(s)}, \cmd{pollice},
-\cmd{pollici}, \cmd{duim}, \cmd{yarda(s)}, \cmd{milla(s)}, \cmd{Meile(n)}, \cmd{mijl}, \cmd{miglio}, \cmd{miglia}, and
-these units in Cyrillic, Greek, Chinese, Japanese and Korean; feet fused with a qualifier (\cmd{ftUS}, \cmd{usft},
-\cmd{sft}, \cmd{USfeet}, \cmd{foot\_us}) and any word that ends in \cmd{feet} or \cmd{foot}
-(\cmd{SurveyFeet}, \cmd{decimalfeet})\\
-& the metre's multiples and parts as symbols: \cmd{km}, \cmd{cm}, \cmd{mm}, \cmd{dm}, \cmd{nm}, \cmd{$\mu$m},
-\cmd{kms}, \cmd{cms}, \cmd{mms} (also in Cyrillic; \cmd{NM}, and \cmd{nm} before \cmd{state plane}, are New Mexico); SI prefixes written out, joined to a metre word, right before one or
-as the whole text: \cmd{kilo}, \cmd{quilo}, \cmd{quil\^o}, \cmd{chilo}, \cmd{hecto}, \cmd{hekto}, \cmd{hect\'o}, \cmd{deca}, \cmd{deka}, \cmd{d\'eca}, \cmd{deci}, \cmd{dezi},
-\cmd{decy}, \cmd{centi}, \cmd{cent\'i}, \cmd{centy}, \cmd{zenti}, \cmd{milli}, \cmd{mili}, \cmd{mil\'i}, \cmd{micro},
-\cmd{mikro}, \cmd{nano}, \cmd{mega}, \cmd{giga} (also in Cyrillic): \cmd{kilometres}, \cmd{Kilo Meter},
-\cmd{milli-metres}, \cmd{Dezimeter}\\
-& parts and multiples: \cmd{tenth(s)}, \cmd{hundredth(s)}, \cmd{thousandth(s)}, \cmd{tens}, \cmd{hundreds},
-\cmd{thousands} before a unit word (with \cmd{of} and one of \cmd{a}, \cmd{an}, \cmd{the}, \cmd{one} between), right after
-a metre word (\cmd{m (thousands)}, also \cmd{m (in 1000s)}) or as the whole text\\
-& EPSG unit codes of length: 9002--9099 and 9300--9302 where they are units (the feet 9002, 9003 and 9005, the fathom
-9014, the nautical mile 9030, the kilometre 9036, the mile 9093, the chains, links and yards; codes in these ranges that
-name coordinate systems, such as 9057, are no unit), the millimetre 1025 and the centimetre 1033 (\cmd{EPSG:9002},
-\cmd{urn:ogc:def:uom:EPSG::9002})\\
-short ids (stop only as the first word, or after \cmd{us}, \cmd{ind}, \cmd{int} or \cmd{intl}, of a text with no other
-unit) & \cmd{in}, \cmd{ch}, \cmd{mi}, \cmd{fath}, \cmd{link(s)}, \cmd{dam}, \cmd{hm}: \cmd{in} and \cmd{us-in} stop,
-\cmd{in metres} and \cmd{Elevation in m (CH1903+)} are metres\\\bottomrule
+Class & Forms (the whole text, normalised)\\\midrule
+metre (read as metres) & the metre written out: \cmd{metre}, \cmd{metres}, \cmd{meter}, \cmd{meters}, \cmd{metern},
+\cmd{m\`etre(s)}, \cmd{m\'eter}, \cmd{m\'eterben}, \cmd{metro(s)}, \cmd{metri}, \cmd{metr}, \cmd{metra}, \cmd{metry},
+\cmd{metr\'ow}, \cmd{metrach}, \cmd{metrami}, \cmd{metrze}, \cmd{metrem}, \cmd{metr\r{u}}, \cmd{metrech}, \cmd{metru},
+\cmd{metrin}, \cmd{metri\"a}, \cmd{metrit}, the metre in Cyrillic (with its endings), Greek, Chinese,
+Japanese and Korean; the symbol \cmd{m} (also its Cyrillic letter); \cmd{masl}, \cmd{m asl},
+\cmd{m a.s.l.}, \cmd{m.a.s.l.}, \cmd{mamsl}, \cmd{m amsl}, \cmd{m a.m.s.l.}, \cmd{moh}, \cmd{m.o.h.}, \cmd{m\"oh},
+\cmd{m \"o.h.}, \cmd{m\"u}, \cmd{m\"uNN}, \cmd{m \"u. NN}, \cmd{m \"u.NN}, \cmd{m \"u. M.}, \cmd{m \"u.M.}, \cmd{m.}, and the Cyrillic metre of the
+Baltic system (m BS, written together or apart); \cmd{EPSG:9001}, \cmd{EPSG::9001}, \cmd{EPSG 9001}, \cmd{urn:ogc:def:uom:EPSG::9001}\\
+vertical datums (after a metre form, also with a comma, in brackets, or fused to \cmd{m} or \cmd{m.}) & \cmd{MSL}, \cmd{AMSL},
+\cmd{ASL}, \cmd{a.s.l.}, \cmd{a.m.s.l.}, \cmd{above sea level}, \cmd{above mean sea level}, \cmd{AHD}, \cmd{AOD}, \cmd{ODN},
+\cmd{NAP}, \cmd{+NAP}, \cmd{TAW}, \cmd{NN}, \cmd{NHN}, \cmd{\"u. NN}, \cmd{\"u.NN}, \cmd{\"uber NN}, \cmd{\"u. NHN},
+\cmd{\"u.NHN}, \cmd{\"uber NHN}, \cmd{\"u. M.}, \cmd{NN2000}, \cmd{RH2000}, \cmd{DVR90}, \cmd{NAVD88}, \cmd{NAVD 88},
+\cmd{NGVD29}, \cmd{NGVD 29}, \cmd{CGVD2013}, \cmd{CGVD28}, \cmd{EGM96}, \cmd{EGM2008}, \cmd{s.l.m.}, \cmd{slm},
+\cmd{n.p.m.}, \cmd{npm}, \cmd{s.n.m.}, \cmd{snm}, \cmd{n. m.}, \cmd{n.m.}, \cmd{ellipsoidal}, \cmd{above (the) ellipsoid};
+each may end in \cmd{geoid}\\
+quantities (before a metre form in brackets or after \cmd{in}) & \cmd{elevation(s)}, \cmd{height(s)}, \cmd{altitude},
+\cmd{elevation / height above (mean) sea level}, \cmd{height above ellipsoid}, \cmd{ellipsoidal height}, \cmd{orthometric
+height}\\
+another length (named in the message; \cmd{METRES} does not apply) & a text with one of these and no metre form among its
+words: feet, inches, yards, miles, fathoms, chains and furlongs in English and other languages and case forms (\cmd{ft},
+\cmd{foot}, \cmd{feet}, \cmd{fasl}, \cmd{inch(es)}, \cmd{yard(s)}, \cmd{mile(s)}, \cmd{pie(s)}, \cmd{pied(s)}, \cmd{voet},
+\cmd{Fu\ss}, \cmd{F\"u\ss e}, \cmd{stopa}, \cmd{stopach}, \cmd{st\'op}, \cmd{jalka}, \cmd{l\'ab}, \cmd{l\'abban}, \cmd{Zoll},
+\cmd{pulgada(s)}, \cmd{Meile(n)}, and in Cyrillic, Greek, Chinese, Japanese and Korean); feet fused with a qualifier
+(\cmd{ftUS}, \cmd{usft}, \cmd{SurveyFeet}); the metre's multiples and parts as symbols (\cmd{km}, \cmd{cm}, \cmd{mm},
+\cmd{dm}, \cmd{nm}, \cmd{$\mu$m}, also Cyrillic) or with an SI prefix joined to a metre word or right before one
+(\cmd{kilometres}, \cmd{Kilo Meter}, \cmd{Zentimeter}, \cmd{dec\'imetros}, \cmd{quil\'ometros}, \cmd{milli-metres}, and
+the prefixed metres of Chinese, Japanese and Korean, also with a blank between the prefix and the metre);
+\cmd{in}, \cmd{ch}, \cmd{mi}, \cmd{fath}, \cmd{link(s)}, \cmd{dam}, \cmd{hm} as the whole text (or after \cmd{us},
+\cmd{ind}, \cmd{int}, \cmd{intl}); EPSG length codes other than 9001 as the whole text (\cmd{EPSG:9002},
+\cmd{urn:ogc:def:uom:EPSG::9036}; as part of a longer text such codes, several of which also name coordinate systems,
+are not read as units)\\\bottomrule
 \end{tabularx}
 \end{table}
 

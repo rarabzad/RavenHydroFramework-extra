@@ -68,13 +68,14 @@ int main(){
     }
   }
   fclose(st);
-  //GeoJSON coordinates and members (json_cases.txt, written by geomtest_check.py: name, file, poly or line, ID field or -)
+  //GeoJSON coordinates and members (json_cases.txt, written by geomtest_check.py: name, file, poly, poly@<:InputCRS> or line, ID field or -)
   { std::ifstream C("json_cases.txt"); std::string line; FILE *g=fopen("json_status.txt","w");
     while (std::getline(C,line)){
       std::istringstream is(line); std::string name,file,kind,idf; is>>name>>file>>kind>>idf; if (idf=="-"){idf="";}
       bool ok; err="";
-      if (kind=="poly"){ //(read: the IDs read and the IDs left out for having no area, with why)
-        std::map<long long,std::vector<gw_ring> > sh; std::map<long long,std::string> na; ok=GWGeom::ReadGeoJSONPolygons(file,idf,sh,err,NULL,NULL,NULL,&na);
+      if (kind.compare(0,4,"poly")==0){ //(read: the IDs read and the IDs left out for having no area, with why; poly@<crs>: with :InputCRS <crs>)
+        CGWCRS K; const CGWCRS *pk=NULL; if (kind.size()>5){K.Parse(kind.substr(5),err); pk=&K; err="";}
+        std::map<long long,std::vector<gw_ring> > sh; std::map<long long,std::string> na; ok=GWGeom::ReadGeoJSONPolygons(file,idf,sh,err,pk,NULL,NULL,&na);
         if (ok){
           err="ids="; for (std::map<long long,std::vector<gw_ring> >::iterator it=sh.begin();it!=sh.end();it++){err+=std::to_string(it->first)+"("+std::to_string(it->second.size())+")";}
           err+=" noarea="; for (std::map<long long,std::string>::iterator it=na.begin();it!=na.end();it++){err+=std::to_string(it->first)+": "+it->second+";";}

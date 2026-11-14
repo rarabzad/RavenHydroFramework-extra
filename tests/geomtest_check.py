@@ -51,7 +51,10 @@ runs geomtest, then compares:
     area (an outline of fewer than 3 distinct vertices, alone or with a hole; an outline of 3 vertices on one line; a
     square traced out and back; a figure eight of equal lobes; an empty Polygon) is left out and reported with the feature and why ("has no area",
     "has no polygon"), the other IDs are read; a MultiPolygon with such a part (fewer than 3 distinct vertices, or on
-    one line) beside a proper one is read.
+    one line) beside a proper one is read. The area is tested in the file's own coordinates, against 1e-9 of the square
+    of the ring's extent: three vertices on one meridian but for one ulp of a longitude (-119.99999999999999) have no
+    area, nor have three vertices on one line in a UTM file (EPSG:32617, which in longitude/latitude would be a lens of
+    0.08 m2), while a UTM sliver 100 m long and 1 mm wide is read.
 """
 import os, subprocess, sys, json
 import numpy as np
@@ -183,6 +186,12 @@ gjp('degen_part', '{"ID": 7}', '[[[[-123.0, 49.0], [-123.0, 49.0]], %s], %s]' % 
 gjp('col', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.0], [-79.98, 45.0], [-80.0, 45.0]]]')
 gjp('retrace', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.0], [-79.99, 45.01], [-80.0, 45.01], [-79.99, 45.01], [-79.99, 45.0], [-80.0, 45.0]]]')
 gjp('eight', '{"ID": 7}', '[[[-80.0, 45.0], [-79.99, 45.01], [-79.99, 45.0], [-80.0, 45.01], [-80.0, 45.0]]]')
+gjp('col_ulp', '{"ID": 7}', '[[[-120.0, 45.0], [-119.99999999999999, 45.001], [-120.0, 45.002], [-120.0, 45.0]]]')   # (on one meridian but for one ulp)
+UTM_CRS = '"crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::32617"}}, '
+for n, ring in (('col_utm', '[[500000.0, 5000000.0], [500100.0, 5000000.0], [500200.0, 5000000.0], [500000.0, 5000000.0]]'),     # (on one line in the file)
+                ('thin_utm', '[[500000.0, 5000000.0], [500100.0, 5000000.0], [500100.0, 5000000.001], [500000.0, 5000000.0]]')):  # (1 mm wide)
+    open('test_json_%s.geojson' % n, 'w').write('{"type": "FeatureCollection", %s"features": [{"type": "Feature", "properties": {"ID": 7}, '
+                                                '"geometry": {"type": "Polygon", "coordinates": [%s]}}]}' % (UTM_CRS, ring))
 gjp('col_part', '{"ID": 7}', '[[[[-80.0, 45.0], [-79.99, 45.0], [-79.98, 45.0], [-80.0, 45.0]]], %s]' % (SQ % '-122.9'), 'MultiPolygon')
 gjp('id_bigexp', '{"ID": 1e+16}')
 open('test_json_empty.geojson', 'w').write('{"type": "FeatureCollection", "features": [{"type": "Feature", "properties": {"ID": 1}, "geometry": {"type": "Polygon", '
@@ -229,6 +238,9 @@ JSON_CASES = [  # (name, file, reader, ID field, accepted, part of the message)
     ('json_col', 'col', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_col.geojson, feature 1 (ID 7): its polygon has no area (its outline has fewer than 3 distinct vertices, lies on one line or encloses no net area);'),
     ('json_retrace', 'retrace', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_retrace.geojson, feature 1 (ID 7): its polygon has no area'),
     ('json_eight', 'eight', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_eight.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_col_ulp', 'col_ulp', 'poly', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_col_ulp.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_col_utm', 'col_utm', 'poly@EPSG:32617', 'ID', 1, 'ids= noarea=7: GeoJSON file test_json_col_utm.geojson, feature 1 (ID 7): its polygon has no area'),
+    ('json_thin_utm', 'thin_utm', 'poly@EPSG:32617', 'ID', 1, 'ids=7(1) noarea='),
     ('json_col_part', 'col_part', 'poly', 'ID', 1, 'ids=7(1) noarea='),
     ('json_degen_part', 'degen_part', 'poly', 'ID', 1, 'ids=7(1) noarea='),
     ('json_empty', 'empty', 'poly', 'ID', 1, 'ids=1(1) noarea=2: GeoJSON file test_json_empty.geojson, feature 2 (ID 2): it has no polygon (its coordinates are empty);')]

@@ -91,7 +91,7 @@ Command & Meaning (default)\\\midrule\endfirsthead
 Command & Meaning (default)\\\midrule\endhead
 \cmd{:HRUGeometry file \{ID field\}} & HRU polygons, GeoJSON in lon/lat (or \cmd{:InputCRS}); ID field (\cmd{HRU\_ID}). \textbf{Required.}\\
 \cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically; lines whose ID is no subbasin of the model are left out with a warning (the run stops when no line is left)\\
-\cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU \cmd{ELEVATION})\\
+\cmd{:LandSurface file [METRES]} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU \cmd{ELEVATION}); \cmd{METRES}: Section~\ref{sec:geotiff}\\
 \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file; wells may then be given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
 \cmd{:BedrockSurface file} & bedrock elevation, same formats (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
 \cmd{:GridCellSize m} & cell size (1000 m)\\

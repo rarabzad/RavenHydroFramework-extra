@@ -107,9 +107,9 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvp} & \cmd{:AquiferProfile\allowbreak Parameters} \dots & per-profile parameters (Section~\ref{app:profile})\\
 \cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat or \cmd{:InputCRS} (\cmd{HRU\_ID}); required\\
 \cmd{.rvg} & \cmd{:RiverGeometry file \{field\}} & river lines; subbasin field optional\\
-\cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU elevations)\\
+\cmd{.rvg} & \cmd{:LandSurface file [METRES]} (also \cmd{METERS}) & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU elevations); \cmd{METRES} confirms elevations in metres whatever a GeoTIFF's band unit text (Section~\ref{sec:geotiff})\\
 \cmd{.rvg} & \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file and of wells given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
-\cmd{.rvg} & \cmd{:BedrockSurface file} & bedrock elevation, ESRI ASCII grid or GeoTIFF (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
+\cmd{.rvg} & \cmd{:BedrockSurface file [METRES]} & bedrock elevation, ESRI ASCII grid or GeoTIFF (\cmd{DEFAULT\_BEDROCK\_DEPTH}); \cmd{METRES} as for \cmd{:LandSurface}\\
 \cmd{.rvg} & \cmd{:GridCellSize m} & cell size, $>0$ (1000)\\
 \cmd{.rvg} & \cmd{:MinCellCoverage f} & coverage for an active column, $(0,1]$ (0.25)\\
 \cmd{.rvg} & \cmd{:GridType REGULAR|QUADTREE|HRU\_MESH|FILE} & kind of grid (\cmd{REGULAR})\\
@@ -337,7 +337,7 @@ aquifer class/profile \dots\ must be positive / may not be negative / between 0 
 top layer cannot be an AQUICLUDE; layer thickness must be positive & correct the profile\\
 \cmd{:MinCellCoverage}, \cmd{:GridCellSize}, \cmd{:SolverHead\allowbreak Tolerance}, \cmd{:SolverMax\allowbreak OuterIterations}, \cmd{:HeadSaveFrequency} out of range & correct the value (Section~\ref{app:commands})\\
 improper format of command \dots & correct the command syntax\\
-command \dots\ in \dots: '\emph{token}' is not a number / is not a whole number / is not a whole-number ID & give a plain number, in the units of the manual, without units or thousands separators\\
+command \dots\ in \dots: '\emph{token}' is not a number / is not a whole number / the ID '\emph{token}' is not a whole number & give a plain number, in the units of the manual, without units or thousands separators\\
 command \dots\ has the surplus value '\emph{token}' & remove it; a comma separates values (2000.0, not 2,000.0)\\
 \cmd{:AquiferClasses} / \cmd{:AquiferProfiles} / \cmd{:AquiferProfileParameters}, row \dots: \dots\ '\emph{token}' is not a number (\cmd{.rvp}) & give a plain number in the units of the manual (10, not 1O; 3, not 3m)\\
 :InputCRS / :MF6CRS - TMERC / ALBERS / LCC parameter \dots: '\emph{token}' is not a number / takes \dots\ and an optional ellipsoid / surplus value after EPSG:\emph{n} / is not EPSG: followed by a whole-number code & give the projection's parameters as plain numbers, exactly as many as it takes (Section~\ref{sec:inputcrs})\\
@@ -360,8 +360,11 @@ well \dots\ is outside the active groundwater model & move the well or enlarge t
 the model's \emph{type} package \emph{name} would add recharge or ET beside Raven's & list it in \cmd{:RavenTakesOver} or \cmd{:KeepPackages}\\
 MODFLOW~6 reads the package \emph{name} (\emph{type}) in the model \dots, which Raven did not find in the name file & write the package's row in the \cmd{PACKAGES} block of the name file itself\\
 cannot open the OPEN/CLOSE file \dots\ named in the \emph{block} block of \dots\ / the OPEN/CLOSE file \dots\ names another OPEN/CLOSE file / the \emph{block} block of \dots\ has OPEN/CLOSE after its first line & give the path relative to the simulation folder (or absolute); write the lines in the first file; make OPEN/CLOSE the block's first line\\
+the OPEN/CLOSE file \dots\ of the \emph{block} block of \dots\ is binary & write the rows as text\\
+MODFLOW~6 reads the time unit of the model as \dots, Raven read \dots\ from the TDIS file \dots & write \cmd{TIME\_UNITS} in the TDIS file's \cmd{OPTIONS} block\\
+cannot read the CSUB package \dots\ / the storage flows (\dots) of the CSUB package \dots\ from MODFLOW~6 memory & use MODFLOW~6.8.1 (the version Raven is built with)\\
 in the step ending \dots\ MODFLOW converged with a balance error of \dots\ \% of the gross flow (warning) & check the model's packages (\cmd{GWModelSummary.txt}) and its solver tolerances\\
-:OverlapWeights row \dots: the cell number \dots\ is not between 1 and the number of cells per layer / the ID \dots\ is out of range & correct the cell number\\
+:OverlapWeights row \dots: the cell number \dots\ is not between 1 and the number of cells per layer / the cell number / the HRU ID '\dots' is out of range / is not a whole number & correct the cell number or the HRU ID\\
 the model name file \dots\ has a \emph{type} package named \emph{name}, a name Raven reserves for the packages it adds (\cmd{RCH\_RAVEN}, \cmd{DRN\_RAVEN}, \cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}, \cmd{SZX/SZQ/SZD/SZW\_RAVEN}) & rename the package, or remove its line if Raven added it to a model it wrote; a recharge or ET package may instead be listed in \cmd{:RavenTakesOver}\\
 \cmd{:MF6StartDate} \dots / the model ends before Raven's run & correct the dates or \cmd{:Duration}\\
 stress period \dots\ is not a whole number of Raven time steps & choose a Raven time step that divides the periods\\
@@ -399,8 +402,11 @@ GeoTIFF file \dots: the linear units of its projection / of its geographic coord
 GeoTIFF file / GeoJSON file \dots\ is in EPSG:\emph{n}, whose longitudes count from the prime meridian of \dots\ / whose angles are in \dots; its prime meridian (GeogPrimeMeridianGeoKey) is not Greenwich & reproject the file to EPSG:4326\\
 GeoTIFF file \dots: its prime meridian lies at longitude \dots\ from Greenwich (GeogPrimeMeridianLongGeoKey) / its geodetic datum EPSG:\emph{n} (GeogGeodeticDatumGeoKey) counts longitudes from the prime meridian of \dots & reproject the raster to EPSG:4326 (\cmd{gdalwarp -t\_srs EPSG:4326})\\
 GeoTIFF file / GeoJSON file \dots\ is in EPSG:\emph{n}, a projection whose coordinates are in \dots & reproject the file to a projection in metres\\
-GeoTIFF file \dots: its elevations are in \dots\ (the band unit, UNITTYPE in GDAL\_METADATA) / its band SCALE / OFFSET in GDAL\_METADATA is not a number / is 0 / its GDAL\_METADATA tag holds \dots\ MB, more than the 16 MB Raven reads & convert the values to metres and set the unit (\cmd{gdal\_edit.py -units m}); save the elevations unscaled (\cmd{gdal\_translate -unscale})\\
-raster \dots\ has the band unit '\dots' (UNITTYPE in GDAL\_METADATA), which Raven does not know (warning) & check that the elevations are in metres\\
+GeoTIFF file \dots: its band unit is '\dots' (UNITTYPE in GDAL\_METADATA / UnitType in \dots.aux.xml), which is not one of the metre forms Raven reads as metres & if the elevations are in metres, write \cmd{METRES} after the file name (\cmd{:LandSurface dem.tif METRES}); otherwise convert the values to metres and set the unit (\cmd{gdal\_calc.py}, \cmd{gdal\_edit.py -units m}); Table~\ref{tab:bandunits}\\
+GeoTIFF file \dots: its band unit is '\dots' (\dots), a metre with a number or a part (a scale, factor or exponent), so the values are not plain metres (also: METRES after the file name does not apply to a scaled unit) & write the elevations unscaled in metres, or give the scale as the band's scale and offset (\cmd{gdal\_edit.py -scale 0.1 -units m})\\
+GeoTIFF file \dots: its elevations are in \dots\ (the band unit, UNITTYPE in GDAL\_METADATA / UnitType in \dots.aux.xml) (also: METRES after the file name does not apply to a unit of another length) & convert the values to metres and set the unit (\cmd{gdal\_calc.py}, \cmd{gdal\_edit.py -units m})\\
+GeoTIFF file \dots: its band SCALE / OFFSET in GDAL\_METADATA, its band Scale / Offset in \dots.aux.xml, its NoDataValue in \dots.aux.xml is not a number / its band SCALE is 0 / its GDAL\_METADATA tag holds \dots\ MB, more than the 16 MB Raven reads / its GDAL side file \dots.aux.xml is larger than the 16 MB Raven reads / cannot be read (it is not XML; it has no closing </PAMDataset>; a PAMRasterBand element is not closed; it starts with a UTF-8 byte-order mark, with which GDAL does not read it) & save the elevations unscaled (\cmd{gdal\_translate -unscale}); correct or remove the side file (\cmd{<raster>.aux.xml})\\
+command :LandSurface / :BedrockSurface in \dots: '\dots' after the file name is not METRES (or METERS) & write \cmd{METRES} (or \cmd{METERS}), or nothing, after the file name\\
 raster \dots: unknown header key / the value of the header key \dots\ is not a number / the value '\dots' (row, column) is not a number / has \dots\ values, fewer than / has more values than ncols*nrows / the header lacks \dots\ / needs a positive cellsize, or positive dx and dy / the header gives the key \dots\ twice / gives xllcorner and xllcenter (ESRI ASCII) & correct the grid's header or values (Section~\ref{sec:rasters})\\
 GeoTIFF file \dots: its \emph{n} tiles / strips of \dots\ pixels cover more than 200 million pixels (corrupt file) & export the file again\\
 raster \dots\ has a vertical coordinate system (\dots) whose unit Raven does not know; its elevations are read as metres (warning) & check that the elevations are in metres\\

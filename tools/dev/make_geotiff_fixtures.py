@@ -39,7 +39,8 @@ Fixtures (37 x 29 pixels of 1/1024 degree around the synthetic test models of te
              GDAL_METADATA
   scaled_*   GDAL's band scale and offset (GDAL_METADATA, decimetres stored as 16-bit integers, NODATA -9999): the twin
              holds the scaled values (NODATA where the raster has it)
-  unit_*     a band unit Raven does not know (GDAL_METADATA UNITTYPE "height"): read as metres, with a warning
+  unit_*     a band unit that is not a metre form (GDAL_METADATA UNITTYPE "height"): refused, read with METRES
+  aux_*      band scale, offset and unit in GDAL's side file .aux.xml (PROFILE=GeoTIFF, BASELINE, or written by hand)
   scale_norole_* band metadata items named SCALE, OFFSET and UNITTYPE (ft) without GDAL's role attribute: GDAL takes them
              as ordinary metadata, so the twin holds the stored values
 Each fixture that Raven reads has an ESRI ASCII twin holding the same values (written as the shortest decimal that reads
@@ -437,8 +438,32 @@ dm = (np.round(Z * 10.0) - 500).astype('int16'); dm[0:2, 0:4] = -9999   # decime
 sc = dm.astype('float64') * 0.1 + 50.0; sc[dm == -9999] = -9999.0
 add(gdal_meta('scaled_int16_dm.tif', dm, 0.1, 50.0, 'm', nodata=-9999), 'scaled', write_asc('twin_scaled_int16.asc', sc))
 stop(gdal_meta('stop_unit_ft_meta.tif', DATA['int16'], unit='ft'), 'elevations are in ft (the band unit, UNITTYPE in GDAL_METADATA)')
-add(gdal_meta('unit_height_meta.tif', DATA['float32'], unit='height'), 'unitnote', TWIN['float32'],
-    expect="has the band unit 'height' (UNITTYPE in GDAL_METADATA), which Raven does not know; its elevations are read as metres")
+add(gdal_meta('unit_height_meta.tif', DATA['float32'], unit='height'), 'unitconfirm', TWIN['float32'],
+    expect="its band unit is 'height' (UNITTYPE in GDAL_METADATA), which is not one of the metre forms")
+# GDAL's side file <raster>.aux.xml (PAM): the band scale, offset and unit of a GeoTIFF written with PROFILE=GeoTIFF or
+# BASELINE, or set by hand, which GDAL reads before the file's own metadata
+def gdal_profile(name, a, profile, scale=None, offset=None, unit=None, nodata=None):
+    with rasterio.open(os.path.join(OUT, name), 'w', driver='GTiff', width=a.shape[1], height=a.shape[0], count=1, dtype=a.dtype,
+                       transform=from_origin(XLL, YTOP, CS, CS), crs=CRS.from_epsg(4326), compress='deflate', nodata=nodata, PROFILE=profile) as d:
+        d.write(a, 1)
+        if scale is not None: d.scales = (scale,)
+        if offset is not None: d.offsets = (offset,)
+        if unit is not None: d.units = (unit,)
+    assert os.path.exists(os.path.join(OUT, name + '.aux.xml')), name
+    with rasterio.open(os.path.join(OUT, name)) as d:
+        assert d.scales == (scale,) and d.offsets == (offset,) and d.units == (unit,), name
+    return name
+add(gdal_profile('aux_geotiff_dm.tif', dm, 'GeoTIFF', 0.1, 50.0, 'm', nodata=-9999), 'scaled', 'twin_scaled_int16.asc', side='aux.xml')
+stop(gdal_profile('aux_geotiff_ft.tif', dm, 'GeoTIFF', 0.1, 50.0, 'ft', nodata=-9999), 'elevations are in ft (the band unit, UnitType in ')
+stop(gdal_profile('aux_baseline_dm.tif', dm, 'BASELINE', 0.1, 50.0, 'm', nodata=-9999), 'no georeferencing')
+# a side file set by hand over a file's own metadata (scale 0.1, offset 50, unit ft): its Scale alone replaces both (offset
+# 0) and its UnitType replaces the unit, as GDAL reads them
+p = gdal_meta('aux_over_dm.tif', dm, 0.1, 50.0, 'ft', nodata=-9999)
+open(os.path.join(OUT, p + '.aux.xml'), 'w').write('<PAMDataset>\n  <PAMRasterBand band="1">\n    <UnitType>m</UnitType>\n    <Scale>0.2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n')
+with rasterio.open(os.path.join(OUT, p)) as d:
+    assert d.scales == (0.2,) and d.offsets == (0.0,) and d.units == ('m',), (d.scales, d.offsets, d.units)
+s2 = dm.astype('float64') * 0.2; s2[dm == -9999] = -9999.0
+add(p, 'scaled', write_asc('twin_aux_over.asc', s2), side='aux.xml')
 # band metadata items named SCALE, OFFSET and UNITTYPE without GDAL's role: ordinary metadata, the values stay as stored
 p = gdal_meta('scale_norole_int16.tif', DATA['int16'])
 with rasterio.open(os.path.join(OUT, p), 'r+') as d:

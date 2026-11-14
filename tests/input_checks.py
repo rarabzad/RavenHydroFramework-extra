@@ -103,6 +103,31 @@ Time discretization of an existing model, read as MODFLOW 6 reads it (the existi
       4294967297 is skipped (the run completes);
   E16 loose solver tolerances (OUTER_DVCLOSE and INNER_DVCLOSE 10 m, inner_rclose 1e8): a converged step with an MF6
       balance error above 1 % of the gross flow gives a warning (once a run).
+Every reader of the model's text files reads an OPEN/CLOSE file as MODFLOW 6 does (as the first line of any block but
+GRIDDATA, its rows in place of the line):
+  E24 the TDIS OPTIONS (TIME_UNITS seconds) of the example converted to feet and seconds (soilzone/mf6_to_feet.py) in an
+      OPEN/CLOSE file: GWBudget.csv and Hydrographs.csv identical to the same model with the options inline, and
+      GWModelSummary.txt gives feet and seconds;
+  E25 a water mover whose PACKAGES block is an OPEN/CLOSE file naming the stream package RIV_STREAMS (a provider, to a
+      one-well MAW package) stops ("sends water through the model's water mover") instead of running with the moved
+      water counted twice;
+  E25b a water mover with CRLF line ends whose PACKAGES block is an OPEN/CLOSE file (CRLF too) listing WEL_PUMPS, MAW_1 and
+      RCH_MODEL, which Raven takes over: the run completes, and the working copy has RCH_MODEL commented out and no carriage
+      return left inside a line;
+  E26 a TS6 FILEIN line in the well package's OPTIONS read through OPEN/CLOSE and E27 the TIMESERIES rows of the TS6 file
+      read through OPEN/CLOSE (the first well's rate in period 2 a time series; Raven starts a day after the model's time
+      zero): the series is shifted to Raven's start ("TS6 files shifted" in GWModelSummary.txt), results identical to the
+      same model with both inline;
+  E28 the stream package's OPTIONS (AUXILIARY SUBBASIN, then AUXILIARY ZONE) in an OPEN/CLOSE file: the first line used
+      with the warning on the second, results identical to the unmodified model's;
+  E29 a one-period model (NPER 1) whose STO PERIOD block (STEADY-STATE) is an OPEN/CLOSE file: steady state, its period
+      stretched over Raven's run (GWModelSummary.txt), instead of a stop on a model shorter than the run.
+CSUB:
+  E30 the example with a CSUB6 package (NINTERBEDS 0, HEAD_BASED, CG_SKE_CR 5e-4; STO SS 0): CSUB's storage flows (up to
+      2e5 m3/d in MODFLOW's list file) are booked as storage, so GWBudget.csv's MF6 balance error stays below 0.001 % and
+      no balance warning is written; GWModelSummary.txt lists CSUB under "storage in balance".
+  E30b the same with the CSUB row named subsid in the name file (MODFLOW 6 keeps the package as CSUB whatever its name):
+      booked the same way.
 A model across the antimeridian:
   AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
      longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
@@ -637,6 +662,130 @@ ok, out = run(d, DAYS)
 e = budget_err(d); warned = 'MODFLOW converged with a balance error of' in out
 report('E16 a converged step with an MF6 balance error above 1 % of the gross flow gives a warning (loose solver tolerances)', ok and warned,
        'max |MF6 balance error| %s m3/d; warning %s' % (e, warned) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# ---- every reader of the model's text files reads OPEN/CLOSE as MODFLOW 6 does (the first line of any block but GRIDDATA)
+def oc_file(d, fn, block, name):
+    """the rows of the block of model/fn (block: a regular expression for its name) moved into model/name, read through
+    OPEN/CLOSE in their place"""
+    p = os.path.join(d, 'model', fn); tt = open(p).read()
+    m = re.search(r'(?is)(BEGIN\s+%s[^\n]*\n)(.*?)(END\s+%s)' % (block, block), tt)
+    assert m, (fn, block)
+    open(os.path.join(d, 'model', name), 'w').write(m.group(2))
+    open(p, 'w').write(tt[:m.start()] + m.group(1) + '  OPEN/CLOSE  %s\n' % name + tt[m.start(3):])
+
+
+def summary(d):
+    p = os.path.join(d, 'out', 'GWModelSummary.txt')
+    return open(p).read() if os.path.exists(p) else ''
+
+
+def ft_case(name):   # (the example in feet and seconds, without its recharge and ET: tests/soilzone/mf6_to_feet.py)
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name)); M = os.path.join(d, 'model')
+    edit(d, 'model/gwf_liard.nam', '  RCH6  gwf_liard.rcha  rch_model\n', '')
+    edit(d, 'model/gwf_liard.nam', '  EVT6  gwf_liard.evta  evt_model\n', '')
+    edit(d, 'Liard.rvg', ':RavenTakesOver    RCH_MODEL EVT_MODEL', '')
+    r = subprocess.run([sys.executable, os.path.join(HERE, 'soilzone', 'mf6_to_feet.py'), M, M + '_ft'], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    shutil.rmtree(M); os.rename(M + '_ft', M)
+    return d
+a, b = ft_case('e24_ref'), ft_case('e24')
+oc_file(b, 'ext.tdis', 'options', 'tdisopt.txt')
+(oka, outa), (okb, outb) = run(a, DAYS), run(b, DAYS)
+unit_b = re.findall(r'existing model .*; (\w+), (\w+)\)', summary(b))
+report('E24 TDIS OPTIONS (TIME_UNITS seconds) through OPEN/CLOSE: read as MODFLOW reads them, results as written inline', oka and okb and same(a, b)
+       and unit_b == [('feet', 'seconds')], ('units %s' % unit_b) if oka and okb else (outa if not oka else outb).strip().split('\n')[-1][:150])
+shutil.rmtree(a, ignore_errors=True); shutil.rmtree(b, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e25'))
+open(os.path.join(d, 'model', 'gwf_liard.maw'), 'w').write(
+    'BEGIN options\n  MOVER\nEND options\nBEGIN dimensions\n  NMAWWELLS 1\nEND dimensions\nBEGIN packagedata\n  1 0.1 1160.0 1222.31 THIEM 1\nEND packagedata\n'
+    'BEGIN connectiondata\n  1 1 3 63 76 1195.31 1160.0 0.0 0.0\nEND connectiondata\nBEGIN period 1\n  1 RATE 0.0\nEND period 1\n')
+open(os.path.join(d, 'model', 'gwf_liard.mvr'), 'w').write('BEGIN options\nEND options\nBEGIN dimensions\n  MAXMVR 1\n  MAXPACKAGES 2\nEND dimensions\n'
+    'BEGIN packages\n  OPEN/CLOSE mvrpk.txt\nEND packages\nBEGIN period 1\n  RIV_STREAMS 170 MAW_1 1 FACTOR 0.5\nEND period 1\n')
+open(os.path.join(d, 'model', 'mvrpk.txt'), 'w').write('  RIV_STREAMS\n  MAW_1\n')
+edit(d, 'model/gwf_liard.riv', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  MOVER\n')
+edit(d, 'model/gwf_liard.nam', '  OC6  gwf_liard.oc  oc\n', '  OC6  gwf_liard.oc  oc\n  MAW6  gwf_liard.maw  maw_1\n  MVR6  gwf_liard.mvr  mvr\n')
+stops('E25 a water mover whose PACKAGES block (the stream package RIV_STREAMS a provider) is an OPEN/CLOSE file stops', d,
+      'the stream package RIV_STREAMS sends water through the model\'s water mover')
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e25b'))   # (CRLF line ends in the mover and its OPEN/CLOSE file; a package Raven takes over listed)
+open(os.path.join(d, 'model', 'gwf_liard.maw'), 'w').write(
+    'BEGIN options\n  MOVER\nEND options\nBEGIN dimensions\n  NMAWWELLS 1\nEND dimensions\nBEGIN packagedata\n  1 0.1 1160.0 1222.31 THIEM 1\nEND packagedata\n'
+    'BEGIN connectiondata\n  1 1 3 63 76 1195.31 1160.0 0.0 0.0\nEND connectiondata\nBEGIN period 1\n  1 RATE 0.0\nEND period 1\n')
+open(os.path.join(d, 'model', 'gwf_liard.mvr'), 'wb').write(('BEGIN options\nEND options\nBEGIN dimensions\n  MAXMVR 1\n  MAXPACKAGES 3\nEND dimensions\n'
+    'BEGIN packages\n  OPEN/CLOSE mvrpk.txt\nEND packages\nBEGIN period 1\n  WEL_PUMPS 1 MAW_1 1 FACTOR 0.5\nEND period 1\n').replace('\n', '\r\n').encode())
+open(os.path.join(d, 'model', 'mvrpk.txt'), 'wb').write(b'  WEL_PUMPS\r\n  MAW_1\r\n  RCH_MODEL\r\n')
+edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  MOVER\n')
+edit(d, 'model/gwf_liard.nam', '  OC6  gwf_liard.oc  oc\n', '  OC6  gwf_liard.oc  oc\n  MAW6  gwf_liard.maw  maw_1\n  MVR6  gwf_liard.mvr  mvr\n')
+ok, out = run(d, DAYS)
+p = os.path.join(d, 'out', 'mf6', 'gwf_liard.mvr'); mv = open(p, 'rb').read() if os.path.exists(p) else b''
+inner_cr = re.search(rb'\r(?!\n)', mv) is not None
+report('E25b a water mover with CRLF line ends whose PACKAGES OPEN/CLOSE file lists a package Raven takes over runs (no carriage return left inside a line)',
+       ok and bool(mv) and not inner_cr and re.search(rb'(?m)^#\s+RCH_MODEL\s+# taken over by Raven', mv) is not None,
+       ('carriage return inside a line: %s' % inner_cr) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+TS = 'BEGIN attributes\n  NAMES  q1\n  METHODS  linear\nEND attributes\n\nBEGIN timeseries\n  0.0  -1000.0\n  2.0  -9000.0\n  1000.0  -9000.0\nEND timeseries\n'
+def ts_case(name, opt_oc, rows_oc):   # (the first well's rate in period 2 a time series; Raven starts a day after the model's time zero)
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  wel.ts\n')
+    edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
+    open(os.path.join(d, 'model', 'wel.ts'), 'w').write(TS)
+    edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-10-02')
+    if opt_oc: oc_file(d, 'gwf_liard.wel', 'options', 'welopt.txt')
+    if rows_oc: oc_file(d, 'wel.ts', 'timeseries', 'welts.txt')
+    return d
+ts = {k: ts_case('e26_' + k, k == 'opt', k == 'rows') for k in ('ref', 'opt', 'rows')}
+tr = {k: run(v, DAYS) for k, v in ts.items()}
+for k, lab in (('opt', 'E26 a TS6 FILEIN in package OPTIONS read through OPEN/CLOSE is shifted to Raven\'s later start'),
+               ('rows', 'E27 the TIMESERIES rows of a TS6 file read through OPEN/CLOSE are shifted to Raven\'s later start')):
+    ok = tr['ref'][0] and tr[k][0]
+    report(lab, ok and same(ts['ref'], ts[k]) and 'TS6 files shifted' in summary(ts[k]),
+           ('shifted: %s' % ('TS6 files shifted' in summary(ts[k]))) if ok else (tr[k][1] if not tr[k][0] else tr['ref'][1]).strip().split('\n')[-1][:150])
+for v in ts.values():
+    shutil.rmtree(v, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e28'))
+edit(d, 'model/gwf_liard.riv', '  auxiliary  SUBBASIN\n', '  auxiliary  SUBBASIN\n  auxiliary  ZONE\n')
+oc_file(d, 'gwf_liard.riv', 'options', 'rivopt.txt')
+ok, out = run(d, DAYS)
+warned = 'has 2 AUXILIARY lines' in out
+report('E28 the stream package\'s OPTIONS through OPEN/CLOSE are read (two AUXILIARY lines: the first used, with a warning)', ok and warned and same(res['e6_ref'][1], d),
+       ('warning %s' % warned) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e29'))
+p = os.path.join(d, 'model', 'ext.tdis'); tt = open(p).read()
+tt = re.sub(r'NPER\s+25', 'NPER  1', tt); i = tt.index('BEGIN perioddata\n') + len('BEGIN perioddata\n'); j = tt.index('END perioddata')
+open(p, 'w').write(tt[:i] + '       1.0  1  1.0\n' + tt[j:])
+p = os.path.join(d, 'model', 'gwf_liard.sto'); tt = open(p).read()
+open(p, 'w').write(re.sub(r'BEGIN period  2\n.*?END period  2\n', '', tt, flags=re.S))
+oc_file(d, 'gwf_liard.sto', r'period\s+1', 'sto1.txt')
+ok, out = run(d, DAYS)
+report('E29 a one-period model whose STO PERIOD block (STEADY-STATE) is an OPEN/CLOSE file is steady state, stretched over Raven\'s run', ok and
+       'steady-state model with one stress period' in summary(d), '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# ---- CSUB storage booked as MODFLOW books it
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e30'))
+open(os.path.join(d, 'model', 'gwf_liard.csub'), 'w').write('BEGIN OPTIONS\n  SAVE_FLOWS\n  HEAD_BASED\nEND OPTIONS\nBEGIN DIMENSIONS\n  NINTERBEDS 0\nEND DIMENSIONS\n'
+                                                            'BEGIN GRIDDATA\n  CG_SKE_CR\n    CONSTANT 5e-4\n  CG_THETA\n    CONSTANT 0.25\nEND GRIDDATA\n')
+edit(d, 'model/gwf_liard.sto', 'CONSTANT  1.00000000E-05', 'CONSTANT  0.0')
+edit(d, 'model/gwf_liard.nam', '  IC6  gwf_liard.ic  ic\n', '  IC6  gwf_liard.ic  ic\n  CSUB6  gwf_liard.csub  csub\n')
+ok, out = run(d, DAYS)
+p = os.path.join(d, 'out', 'GWBudget.csv')
+pc = float(pd.read_csv(p)['MF6 balance error [%]'].abs().max()) if os.path.exists(p) else None
+lst = open(os.path.join(d, 'out', 'mf6', 'gwf_liard.lst')).read() if os.path.exists(os.path.join(d, 'out', 'mf6', 'gwf_liard.lst')) else ''
+cs = [abs(float(x)) for x in re.findall(r'CSUB-CGELASTIC =\s+([0-9.Ee+-]+)', lst)]
+report('E30 CSUB storage (a CSUB6 package, STO SS 0) is booked as storage: MF6 balance error below 0.001 %, no balance warning', ok and pc is not None and pc < 1e-3
+       and max(cs + [0]) > 1e4 and 'balance error of' not in out and re.search(r'storage in balance\s*:.*CSUB', summary(d)) is not None,
+       ('max |MF6 balance error| %s %%; CSUB storage in the list file up to %.4g m3/d' % (pc, max(cs + [0]))) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e30b'))   # (the same CSUB package named subsid in the name file; MODFLOW keeps it as CSUB)
+open(os.path.join(d, 'model', 'gwf_liard.csub'), 'w').write('BEGIN OPTIONS\n  SAVE_FLOWS\n  HEAD_BASED\nEND OPTIONS\nBEGIN DIMENSIONS\n  NINTERBEDS 0\nEND DIMENSIONS\n'
+                                                            'BEGIN GRIDDATA\n  CG_SKE_CR\n    CONSTANT 5e-4\n  CG_THETA\n    CONSTANT 0.25\nEND GRIDDATA\n')
+edit(d, 'model/gwf_liard.sto', 'CONSTANT  1.00000000E-05', 'CONSTANT  0.0')
+edit(d, 'model/gwf_liard.nam', '  IC6  gwf_liard.ic  ic\n', '  IC6  gwf_liard.ic  ic\n  CSUB6  gwf_liard.csub  subsid\n')
+ok, out = run(d, DAYS)
+p = os.path.join(d, 'out', 'GWBudget.csv')
+pc = float(pd.read_csv(p)['MF6 balance error [%]'].abs().max()) if os.path.exists(p) else None
+report('E30b the same CSUB package named subsid in the name file (MODFLOW keeps it as CSUB): booked as storage, error below 0.001 %', ok and pc is not None and pc < 1e-3
+       and re.search(r'storage in balance\s*:.*SUBSID', summary(d)) is not None, ('max |MF6 balance error| %s %%' % pc) if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 shutil.rmtree(res['e6_ref'][1], ignore_errors=True)
 d = tdis_case('e11', lambda r: ['      -5.0  1       1.00000000'] + r[1:])

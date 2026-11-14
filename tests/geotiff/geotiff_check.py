@@ -14,11 +14,13 @@ Reader checks (unit driver):
     8 bit) give no data at the masked pixels; tiles of 2048 x 2048 on a small raster; the EPSG code and its kind as written;
   - GDAL's band scale and offset (GDAL_METADATA) are applied (16-bit decimetres against a twin of the scaled values,
     NODATA pixels no data); items named SCALE, OFFSET and UNITTYPE without GDAL's role are ordinary metadata (values as
-    stored); band units (UNITTYPE): every text of the table band_units.tsv gets its class (read as metres, read with
-    the unknown-unit warning, or the run stops): the first unit expression of the text decides (a metre text that names
-    feet or a coordinate-system code later is metres; parts and multiples of the metre, SI prefixes written out or as
-    symbols, feet, inches, yards and miles in other languages and scripts, and EPSG length-unit codes other than 9001
-    stop; no unit, a scaled metre, a coordinate-system code or a short id that is not the first word give the warning);
+    stored); band units (UnitType): every text of the table band_units.tsv gets its class, without and with METRES after
+    the file name (the rule is closed: metres only when the whole text is a metre form, with a listed vertical datum or
+    after a quantity; no unit reads as metres; another length, a scaled metre and any other text stop, and METRES reads
+    only the last as metres); a unit that is not UTF-8 is named with \\xNN; GDAL's side file .aux.xml (fixtures written
+    with PROFILE=GeoTIFF and BASELINE, and side files written here) read with GDAL's precedence: Scale or Offset, UnitType,
+    NoDataValue (also from le_hex_equiv), the last band 1, band = "01", comments, entities and CDATA; a malformed side
+    file (not XML, no closing PAMDataset, an unclosed band, a byte-order mark) refused; another XML document ignored;
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -85,6 +87,11 @@ if r.returncode != 0:
     sys.exit('geotiff_unit does not compile:\n' + r.stdout + r.stderr)
 
 
+def conf(m):
+    """METRES after the file name for a fixture whose band unit text the user confirms as metres"""
+    return ['METRES'] if m['kind'] == 'unitconfirm' else []
+
+
 def unit(*args):
     r = subprocess.run([UNIT] + list(args), capture_output=True, text=True)
     if r.returncode != 0:
@@ -108,7 +115,7 @@ n_ok, bad = 0, []
 for m in M:
     if not m['twin']:
         continue
-    out = unit('dump', fx(m['file'])).split('\n')
+    out = unit('dump', fx(m['file']), *conf(m)).split('\n')
     if not out[0].startswith('OK '):
         bad.append('%s: %s' % (m['file'], out[0][:200])); continue
     f = out[0].split(); fmt = out[1][len('FORMAT '):]
@@ -200,7 +207,7 @@ for m in M:
     crs = 'EPSG:32611' if 'utm11' in m['twin'] else 'NONE'
     if m['file'] == 'crs_2955_f32.tif':
         crs = 'TMERC 0 -117 0.9996 500000 0 GRS80'
-    o = unit('samplecmp', fx(m['file']), fx(m['twin']), crs)
+    o = unit('samplecmp', fx(m['file']), fx(m['twin']), crs, *conf(m))
     g = re.search(r'SAMPLES (\d+) points, (\d+) with values, (\d+) differ', o)
     if g and int(g.group(3)) == 0 and int(g.group(2)) > 1000:
         n_ok += 1
@@ -253,13 +260,16 @@ for f, crs, want, part in CRS_CASES:
 
 # ---- no GDAL_NODATA: values that usually mark missing data are reported, and read as values
 for m in M:
-    if m['kind'] in ('fill', 'vertnote', 'chain', 'unitnote'):
+    if m['kind'] in ('fill', 'vertnote', 'chain'):
         o = unit('raster', fx(m['file']), 'NONE').strip()
         report('warning: %s "%s"' % (m['file'], m['expect'][:60]), o.startswith('OK') and m['expect'] in o, o[:200])
+    if m['kind'] == 'unitconfirm':   # (refused, naming the text and METRES; read with METRES)
+        o = unit('raster', fx(m['file']), 'NONE').strip(); o2 = unit('raster', fx(m['file']), 'NONE', 'METRES').strip()
+        report('band unit not a metre form: %s refused, read with METRES' % m['file'], o.startswith('ERROR') and m['expect'] in o and 'METRES' in o and o2 == 'OK', (o + ' | ' + o2)[:200])
 o = unit('raster', fx('matrix_int16_c8_p2_le_strip_classic.tif') if os.path.exists(fx('matrix_int16_c8_p2_le_strip_classic.tif')) else fx('twin_int16.asc'), 'NONE').strip()
 report('no NODATA tag and no such values: no warning', o == 'OK', o[:120])
 
-# ---- band units (UNITTYPE): the first unit expression decides
+# ---- band units (UnitType): read as metres only when the whole text is a metre form
 def with_unit(text, name):
     """unit_height_meta.tif with another UNITTYPE text (the GDAL_METADATA string rewritten at the end of the file)"""
     import struct
@@ -271,17 +281,83 @@ def with_unit(text, name):
             meta = (bytes(b[v:v + c]).rstrip(b'\0').decode().replace('>height<', '>%s<' % esc)).encode() + b'\0'
             b[e:e + 12] = struct.pack('<HHII', t, ty, len(meta), len(b)); b += meta
     p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
-# the table band_units.tsv: class M (read as metres, no note), W (read as metres with the unknown-unit warning) or F (the
-# run stops: another length unit), a TAB, the text
+# the table band_units.tsv: class M (read as metres), N (no unit: read as metres), S (stops, naming the text and METRES;
+# read with METRES), F (another length: stops, also with METRES), X (a scaled metre: stops, also with METRES), a TAB, the text
 for line in open(os.path.join(HERE, 'band_units.tsv'), encoding='utf-8'):
     line = line.rstrip('\n')
     if not line.strip() or line.startswith('#'):
         continue
     want, text = line.split('\t', 1)
-    o = unit('raster', with_unit(text, 'unit_band.tif'), 'NONE').strip()
-    good = {'M': o == 'OK', 'W': o.startswith('OK') and ("has the band unit '%s'" % text) in o,
-            'F': o.startswith('ERROR') and ('elevations are in %s (the band unit' % text) in o}[want]
-    report('band unit "%s": %s' % (text, {'M': 'read as metres', 'W': 'read as metres, with a note', 'F': 'stops'}[want]), good, o[:160])
+    f = with_unit(text, 'unit_band.tif')
+    o = unit('raster', f, 'NONE').strip(); om = unit('raster', f, 'NONE', 'METRES').strip()
+    shown = text.strip(' \t\r\n')   # (GDAL_METADATA items are read trimmed)
+    good = {'M': o == 'OK' and om == 'OK', 'N': o == 'OK' and om == 'OK',
+            'S': o.startswith('ERROR') and ("its band unit is '%s'" % shown) in o and 'METRES' in o and 'convert the values to metres' in o and om == 'OK',
+            'F': o.startswith('ERROR') and ('elevations are in %s (the band unit' % shown) in o and 'does not apply to a unit of another length' in om,
+            'X': o.startswith('ERROR') and ("its band unit is '%s'" % shown) in o and 'not plain metres' in o and 'does not apply to a scaled unit' in om}[want]
+    report('band unit "%s": %s' % (text, {'M': 'metres', 'N': 'no unit, metres', 'S': 'stops, read with METRES', 'F': 'stops (another length), also with METRES',
+                                          'X': 'stops (scaled), also with METRES'}[want]), good, (o + ' | ' + om)[:200])
+# a band unit that is not UTF-8 is named with its bytes escaped (m, the byte 0xFF, then a control character)
+def with_unit_bytes(raw, name):
+    import struct
+    b = bytearray(open(fx('unit_height_meta.tif'), 'rb').read()); off = struct.unpack('<I', b[4:8])[0]; n = struct.unpack('<H', b[off:off + 2])[0]
+    for i in range(n):
+        e = off + 2 + 12 * i; tg, ty, c, v = struct.unpack('<HHII', b[e:e + 12])
+        if tg == 42112:
+            meta = bytes(b[v:v + c]).rstrip(b'\0').replace(b'>height<', b'>' + raw + b'<') + b'\0'
+            b[e:e + 12] = struct.pack('<HHII', tg, ty, len(meta), len(b)); b += meta
+    p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
+o = unit('raster', with_unit_bytes(b'm\xff\x01', 'unit_bytes.tif'), 'NONE').strip()
+report('band unit with bytes that are not UTF-8: stops, naming them as \\xNN', o.startswith('ERROR') and "its band unit is 'm\\xFF\\x01'" in o, o[:160])
+
+# GDAL's side file .aux.xml written by hand beside a fixture: GDAL's precedence (a Scale or an Offset replaces both, a
+# UnitType that is not empty replaces the file's, a NoDataValue replaces GDAL_NODATA), element names in any case
+SIDE = os.path.join(W, 'side_dm.tif')
+shutil.copy(fx('scaled_int16_dm.tif'), SIDE)
+base = unit('dump', fx('scaled_int16_dm.tif')).split('\n')
+raw = [[(float(x) - 50.0) / 0.1 if x != 'nan' else None for x in l.split()] for l in base[2:] if l.strip()]
+def values_are(out, f):
+    if not out[0].startswith('OK '):
+        return False
+    vals = [[float(x) for x in l.split()] for l in out[2:] if l.strip()]
+    return all(abs(a - f(r)) <= 1e-9 * max(1.0, abs(f(r))) if r is not None else a != a for ra, rr in zip(vals, raw) for a, r in zip(ra, rr))
+def side_raw(text):
+    open(SIDE + '.aux.xml', 'w', encoding='utf-8').write(text)
+    return unit('dump', SIDE).split('\n')
+B1 = '<PAMDataset>\n  <PAMRasterBand band="1">\n%s  </PAMRasterBand>\n</PAMDataset>\n'
+FILE = lambda r: 0.1 * round(r) + 50.0   # (the file's own scale and offset)
+for label, body, f, want in (('Scale 0.2 alone: offset 0', B1 % '    <Scale>0.2</Scale>\n', lambda r: 0.2 * round(r), None),
+                             ('Offset 3 alone: scale 1', B1 % '    <Offset>3</Offset>\n', lambda r: round(r) + 3.0, None),
+                             ('scale and offset in lower case', B1 % '    <scale>2</scale>\n    <offset>1</offset>\n', lambda r: 2.0 * round(r) + 1.0, None),
+                             ('UnitType ft', B1 % '    <UnitType>ft</UnitType>\n', None, 'elevations are in ft (the band unit, UnitType in %s.aux.xml)' % SIDE),
+                             ('UnitType empty: the file\'s unit (m)', B1 % '    <UnitType></UnitType>\n', FILE, None),
+                             ('UnitType of blanks: the file\'s unit (m)', B1 % '    <UnitType>   </UnitType>\n', FILE, None),
+                             ('Scale empty: absent', B1 % '    <Scale></Scale>\n', FILE, None),
+                             ('Scale with an attribute and blanks', B1 % '    <Scale units="x"> 2 </Scale>\n', lambda r: 2.0 * round(r), None),
+                             ('a commented-out Scale is not read', B1 % '    <!-- <Scale>2</Scale> -->\n', FILE, None),
+                             ('a Scale MDI inside Metadata is not read', B1 % '    <Metadata>\n      <MDI key="Scale">5</MDI>\n    </Metadata>\n', FILE, None),
+                             ('band = "1" with blanks', '<PAMDataset>\n  <PAMRasterBand band = "1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', lambda r: 2.0 * round(r), None),
+                             ('band="01"', '<PAMDataset>\n  <PAMRasterBand band="01">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', lambda r: 2.0 * round(r), None),
+                             ('two bands 1: the last is read', B1 % '    <Scale>2</Scale>\n  </PAMRasterBand>\n  <PAMRasterBand band="1">\n    <Scale>3</Scale>\n', lambda r: 3.0 * round(r), None),
+                             ('band 2 only: the file\'s values', '<PAMDataset>\n  <PAMRasterBand band="2">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', FILE, None),
+                             ('UnitType &#102;t (a character reference)', B1 % '    <UnitType>&#102;t</UnitType>\n', None, 'elevations are in ft (the band unit'),
+                             ('UnitType in CDATA', B1 % '    <UnitType><![CDATA[ft]]></UnitType>\n', None, 'elevations are in ft (the band unit'),
+                             ('another XML document (no PAMDataset): ignored, as by GDAL', '<?xml version="1.0"?>\n<metadata><idinfo>Scale</idinfo></metadata>\n', FILE, None),
+                             ('Offset not a number', B1 % '    <Offset>abc</Offset>\n', None, 'its band Offset in %s.aux.xml (abc) is not a number' % SIDE),
+                             ('no closing </PAMDataset>', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n', None, 'it has no closing </PAMDataset>'),
+                             ('an unclosed PAMRasterBand', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n</PAMDataset>\n', None, 'a PAMRasterBand element is not closed'),
+                             ('a byte-order mark (GDAL does not read such a file)', '﻿' + B1 % '    <Scale>2</Scale>\n', None, 'byte-order mark'),
+                             ('not XML', 'not a PAM dataset', None, 'it is not XML')):
+    out = side_raw(body)
+    good = (out[0].startswith('ERROR') and want in out[0]) if want else values_are(out, f)
+    report('side file .aux.xml: %s' % label, good, out[0][:160])
+# NoDataValue with le_hex_equiv: GDAL takes the value from its IEEE bits (here -10112, the text says -9999)
+out = side_raw(B1 % '    <NoDataValue le_hex_equiv="0000000000C0C3C0">-9999</NoDataValue>\n')
+nan_base = sum(1 for r in raw for v in r if v is None)
+nan_out = sum(1 for l in out[2:] if l.strip() for x in l.split() if x == 'nan')
+report('side file .aux.xml: NoDataValue from le_hex_equiv (-10112, as GDAL): the -9999 pixels are values', out[0].startswith('OK ') and nan_base > 0 and nan_out == 0,
+       '%s; no-data pixels %d before, %d now' % (out[0][:80], nan_base, nan_out))
+os.remove(SIDE); os.remove(SIDE + '.aux.xml')
 
 # ---- ESRI ASCII grids (CGWRaster): GDAL's rectangular-pixel header, NaN NODATA, and malformed grids
 def asc_write(name, header, rows):
@@ -366,6 +442,8 @@ else:
         sz_models.make_case(d, nhru=2, hru_w=400.0, width=400.0, cell=100.0, physical=False, days=2, z0=z0)
         for f in rasters:
             shutil.copy(fx(f), os.path.join(d, os.path.basename(f)))
+            if os.path.exists(fx(f) + '.aux.xml'):   # (GDAL's side file goes with its raster)
+                shutil.copy(fx(f) + '.aux.xml', os.path.join(d, os.path.basename(f) + '.aux.xml'))
         if hru:   # (its "crs" member names EPSG:32611: dropped under another :InputCRS, so that the raster is what is checked)
             g = json.load(open(fx(hru)))
             if inputcrs != 'EPSG:32611':
@@ -424,11 +502,11 @@ else:
                 twins[key] = model(name, dem=None, bed=tw, rasters=[tw], z0=z0, **kw)
         return twins[key]
 
-    def compare(label, f, tw, role='dem', z0=100.0, skip=(), want_warn=None, **kw):
+    def compare(label, f, tw, role='dem', z0=100.0, skip=(), want_warn=None, confirm=False, **kw):
         dt, okt, et = twin_run(tw, role, z0, **kw)
         name = 'run_' + re.sub(r'\W', '_', label)
         if role == 'dem':
-            d, ok, e = model(name, dem=os.path.basename(f), rasters=[f], z0=z0, **kw)
+            d, ok, e = model(name, dem=os.path.basename(f) + (' METRES' if confirm else ''), rasters=[f], z0=z0, **kw)
         else:
             d, ok, e = model(name, dem=None, bed=os.path.basename(f), rasters=[f], z0=z0, **kw)
         diffs = outputs_differ(d, dt, skip, (os.path.basename(f), os.path.basename(tw))) if ok and okt else ['run failed: ' + (re.findall(r'ERROR[^\n]*', e + et) or ['?'])[0][:200]]
@@ -483,9 +561,19 @@ else:
             shutil.rmtree(d)
     # no NODATA tag, -9999 and float32-lowest pixels (away from the model): the same run as the twin, with a warning
     for m in M:
-        if m['kind'] in ('fill', 'vertnote', 'chain', 'unitnote'):
+        if m['kind'] in ('fill', 'vertnote', 'chain'):
             ok, diffs, d = compare(m['kind'], m['file'], m['twin'], skip=('Raven_errors.txt',), want_warn=m['expect'])
             report('Raven: %s = twin, and warns' % m['file'], ok, ', '.join(diffs))
+            if ok:
+                shutil.rmtree(d)
+        if m['kind'] == 'unitconfirm':   # (refused without METRES; with it, the run of the twin)
+            d, ok, e = model('unit_noconfirm', dem=m['file'], rasters=[m['file']])
+            good = (not ok) and m['expect'] in e and ('(:LandSurface %s METRES)' % m['file']) in e   # (the command and the file as the .rvg writes them)
+            report('Raven stops: %s without METRES, naming :LandSurface %s METRES' % (m['file'], m['file']), good, '' if good else (re.findall(r'ERROR[^\n]*', e) or ['no error'])[0][:200])
+            if good:
+                shutil.rmtree(d)
+            ok, diffs, d = compare('unitconfirm', m['file'], m['twin'], confirm=True)
+            report('Raven: %s with METRES = twin' % m['file'], ok, ', '.join(diffs))
             if ok:
                 shutil.rmtree(d)
     # projected rasters (:InputCRS), the HRUs in the same projection

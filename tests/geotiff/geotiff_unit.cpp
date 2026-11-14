@@ -10,6 +10,7 @@
 //   geotiff_unit fuzz <seed> <n> <files...>   n damaged copies of each file (bytes changed, cut, inserted, random) read from
 //                                             memory, and random input to each decoder; any return is fine, a crash is not
 //   geotiff_unit epsg <codes...>              GWGeom::GeographicEPSG of each code
+// A last argument METRES reads the rasters as METRES after the file name of :LandSurface does (dump, raster, samplecmp).
 #include "GWGeoTIFF.h"
 #include "GWGeometry.h"
 #include <cstdio>
@@ -31,10 +32,11 @@ static uint64_t Rand(){rng_state^=rng_state<<13; rng_state^=rng_state>>7; rng_st
 int main(int argc,char **argv)
 {
   if (argc<2){printf("usage: see the header of geotiff_unit.cpp\n"); return 2;}
+  bool metres=false; if ((argc>2) && !strcmp(argv[argc-1],"METRES")){metres=true; argc--;} //(METRES after the file name of the .rvg)
   std::string mode=argv[1];
   if ((mode=="dump") && (argc>=3)){
     gw_geotiff R; std::string err;
-    if (!GWGeoTIFF::Read(argv[2],R,err)){printf("ERROR %s\n",err.c_str()); return 0;}
+    if (!GWGeoTIFF::Read(argv[2],R,err,metres)){printf("ERROR %s\n",err.c_str()); return 0;}
     printf("OK %d %d %.17g %.17g %.17g %.17g %d %.17g %d %d %d %d\n",R.ncols,R.nrows,R.xll,R.yll,R.dx,R.dy,R.hasNodata?1:0,R.nodata,
            R.epsg,R.geographic?1:0,R.rasterType,R.modelType);
     printf("FORMAT %s\n",R.format.c_str());
@@ -47,7 +49,7 @@ int main(int argc,char **argv)
   if ((mode=="raster") && (argc>=4)){
     CGWCRS K; std::string err; const CGWCRS *pk=NULL;
     if (strcmp(argv[3],"NONE")){if (!K.Parse(argv[3],err)){printf("ERROR (crs) %s\n",err.c_str()); return 0;} pk=&K;}
-    CGWRaster R; R.SetCRS(pk);
+    CGWRaster R; R.SetCRS(pk); R.SetMetres(metres);
     if (!R.Read(argv[2],err)){printf("ERROR %s\n",err.c_str()); return 0;}
     printf("OK %s\n",R.Note().c_str());
     return 0;
@@ -55,7 +57,7 @@ int main(int argc,char **argv)
   if ((mode=="samplecmp") && (argc>=5)){
     CGWCRS K; std::string err; const CGWCRS *pk=NULL;
     if (strcmp(argv[4],"NONE")){if (!K.Parse(argv[4],err)){printf("ERROR (crs) %s\n",err.c_str()); return 0;} pk=&K;}
-    CGWRaster A,B; A.SetCRS(pk); B.SetCRS(pk);
+    CGWRaster A,B; A.SetCRS(pk); B.SetCRS(pk); A.SetMetres(metres); B.SetMetres(metres);
     if (!A.Read(argv[2],err)){printf("ERROR %s\n",err.c_str()); return 0;}
     if (!B.Read(argv[3],err)){printf("ERROR %s\n",err.c_str()); return 0;}
     double e[4]; A.Extent(e);

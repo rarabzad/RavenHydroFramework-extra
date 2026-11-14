@@ -2945,9 +2945,35 @@
 },
 {
 "file": "unit_height_meta.tif",
-"kind": "unitnote",
+"kind": "unitconfirm",
 "twin": "twin_float32.asc",
-"expect": "has the band unit 'height' (UNITTYPE in GDAL_METADATA), which Raven does not know; its elevations are read as metres"
+"expect": "its band unit is 'height' (UNITTYPE in GDAL_METADATA), which is not one of the metre forms"
+},
+{
+"file": "aux_geotiff_dm.tif",
+"kind": "scaled",
+"twin": "twin_scaled_int16.asc",
+"expect": "ok",
+"side": "aux.xml"
+},
+{
+"file": "aux_geotiff_ft.tif",
+"kind": "stop",
+"twin": null,
+"expect": "elevations are in ft (the band unit, UnitType in "
+},
+{
+"file": "aux_baseline_dm.tif",
+"kind": "stop",
+"twin": null,
+"expect": "no georeferencing"
+},
+{
+"file": "aux_over_dm.tif",
+"kind": "scaled",
+"twin": "twin_aux_over.asc",
+"expect": "ok",
+"side": "aux.xml"
 },
 {
 "file": "scale_norole_int16.tif",

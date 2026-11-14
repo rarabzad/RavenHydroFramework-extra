@@ -165,14 +165,12 @@ start. Such a package with several earlier entries, whose settings build on one 
 renumbered); Raven must then start at \cmd{:MF6StartDate}. The times of a time series (\cmd{TS6} files) count from the
 model's own time zero: on a later start, even one inside the first period, Raven shifts every time of each \cmd{TS6} file
 named by a package it keeps by the time elapsed before its start. Entries before the start keep negative times,
-so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}),
-time series in a simulation holding more than one model, and a \cmd{TS6} file whose \cmd{TIMESERIES} block reads its rows
-from another file (\cmd{OPEN/CLOSE} or \cmd{INTERNAL}; Raven can shift only rows listed in the file itself) stop a later
-start. A time of day in Raven's \cmd{:StartDate}
+so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}) and
+time series in a simulation holding more than one model stop a later start; the rows of a \cmd{TS6} file read through
+\cmd{OPEN/CLOSE} are shifted and written into the working copy's \cmd{TS6} file. A time of day in Raven's \cmd{:StartDate}
 counts in the offset, so restarts work with sub-daily time steps too (the start must fall on a Raven step of its stress
 period); the working copy's \cmd{START\_DATE\_TIME} is set to Raven's start, with the time of day when there is one.
-The TDIS period data may be listed in the TDIS file or in an \cmd{OPEN/CLOSE} text file (path relative to the simulation
-folder); Raven writes the rewritten periods into the working copy's TDIS file. Raven reads the model's text files as
+Raven writes the rewritten periods, and the TDIS options, into the working copy's TDIS file. Raven reads the model's text files as
 MODFLOW~6 reads them: a line whose first character other than a blank, comma or tab is \cmd{\#} or \cmd{!}, or that
 begins with \cmd{//}, is a comment; blanks, commas and tabs separate the words, and a quoted word may hold them. Where
 MODFLOW reads a fixed number of words (a period row, a time-series row), text after them is ignored; where it reads
@@ -184,10 +182,17 @@ names it: by its type and its place among all rows of that type, named or not (i
 \cmd{:RavenTakesOver}, \cmd{:KeepPackages} and \cmd{:StreamPackage} take. Raven writes each such name into its row of
 the working copy, so that removing the rows it takes over does not change the names of the rest, and stops when MODFLOW
 has no package of a name it reads, or reads a package of such a type that Raven did not find in the name file. As for
-MODFLOW, the lines of an \cmd{OPEN/CLOSE} file in a block of the name file or of \cmd{mfsim.nam} (path relative to the
-simulation folder, or absolute) are read in place of the \cmd{OPEN/CLOSE} line, which must be the block's first line
-other than comments (elsewhere the run stops, as MODFLOW~6 refuses it), and the working copy's name file holds the
-package rows themselves, so the rules of this section apply to them. A step that MODFLOW solves (converged) with a balance error above 1~\% of the gross flow gives a warning
+MODFLOW, the lines of an \cmd{OPEN/CLOSE} file in a block (any block but \cmd{GRIDDATA}; path relative to the simulation
+folder, or absolute) are read in place of the \cmd{OPEN/CLOSE} line, which must be the block's first line other than
+comments (elsewhere the run stops, as MODFLOW~6 refuses it). Every file Raven reads is read so: \cmd{mfsim.nam} and the
+model name file, the TDIS file (its options, such as \cmd{TIME\_UNITS}, \cmd{START\_DATE\_TIME} and \cmd{ATS6}, and its
+period data), the water mover (its \cmd{PACKAGES} and \cmd{PERIOD} blocks), the options of every package kept (\cmd{TS6},
+\cmd{TAS6}, \cmd{TVK6}, \cmd{TVS6}, \cmd{READASARRAYS}, \cmd{AUXILIARY}), the \cmd{PERIOD} blocks of the storage package and
+\cmd{TS6} files. An \cmd{OPEN/CLOSE} file marked binary stops the run there (Raven reads text). Where Raven writes a
+working copy of a file (the name file, the TDIS file, the water mover, a \cmd{TS6} file), the rows of such a file are
+written in place of the line, which is kept as a comment, so the rules of this section apply to them. As a second
+guard, the time unit Raven read is compared with the one MODFLOW holds after it initialises the model, and a difference
+(or adaptive time stepping) stops the run. A step that MODFLOW solves (converged) with a balance error above 1~\% of the gross flow gives a warning
 once a run (a package outside Raven's books, or solver tolerances too loose). Period lengths, time-series times and period
 numbers are read as MODFLOW reads them (Fortran list-directed input): \cmd{5}, \cmd{5.0E-1}, \cmd{50.0D-1} (\cmd{D},
 \cmd{d}, \cmd{Q} or \cmd{E} for the exponent, which may be left without digits), \cmd{5.0/} (a slash ends the value),
@@ -212,6 +217,7 @@ Water-table evaporation (\cmd{EXTINCTION\_DEPTH} $>0$ in an aquifer profile) & \
 \cmd{:ReservoirExchange} & \cmd{RES\_RAVEN} (\cmd{raven.res}), a well package at the top active cells under each coupled reservoir's lake HRU, carrying the reservoir's seepage (Section~\ref{ch:reservoirs}). Cells that cannot take it in the step (specified heads, and inactive cells of a model without \cmd{NEWTON}) get none, and only the share of the lake's bed over its other cells exchanges water (its seepage constant scaled by that share); a lake with no such cell left exchanges nothing in that step. Seepage MODFLOW still does not take is returned to the reservoir's subbasin in the same step (\cmd{GWBudget.csv}: \emph{reservoir seepage not delivered by MODFLOW}, a warning and a run total). If the model has its own lake or streamflow-routing packages (LAK, SFR), Raven warns: the lakes and wetlands it exchanges with must not also be in them\\
 \cmd{RCH\_RAVEN} & added at the top active cell of every coupled column. MODFLOW ignores recharge on specified-head cells, so columns whose top cell is specified-head (read from the model each step, as the stress periods may change them) take none: each HRU's recharge is spread over its other cells, and recharge of an HRU lying only on such cells is reported in \cmd{GWBudget.csv} (\emph{recharge onto CHD cells})\\
 Water mover (MVR) & kept; movers from or to a package Raven takes over are removed from the working copy (MODFLOW would stop on a package that is no longer there), and \cmd{GWModelSummary.txt} reports how many. A stream package that sends water through the mover is refused, because Raven would take the same water from the aquifer a second time\\
+Skeletal storage and compaction (CSUB) & kept unchanged; its storage flows (coarse-grained, interbed elastic and inelastic, water compressibility: the \cmd{CSUB-} terms of MODFLOW's budget) are booked with the storage package's, in \cmd{GWBudget.csv}'s \emph{storage release}, as MODFLOW books them; \cmd{GWModelSummary.txt} lists it under \emph{storage in balance}\\
 All other packages & kept unchanged: wells, head boundaries, drains, lakes, streamflow routing and so on. Their simulated flows, including the water they pass to the mover, enter the balance check (\cmd{GWBudget.csv}, column \emph{other model packages})\\\bottomrule
 \end{tabularx}
 \end{table}
@@ -222,12 +228,13 @@ Every one of these stops the run with a message that names the problem and the f
 \item a recharge, ET or UZF package not declared taken over or kept; \cmd{:RavenTakesOver} naming another kind of package;
       a stream package that is not RIV, DRN or GHB, or one that sends water through the mover; a package name not in the
       model name file; a mover whose period data are given as \cmd{INTERNAL}, when it names a package Raven takes over (an
-      \cmd{OPEN/CLOSE} file is read and written into the working copy); TDIS period data given as \cmd{INTERNAL};
+      \cmd{OPEN/CLOSE} file is read and written into the working copy); TDIS period data given as \cmd{INTERNAL}; a binary \cmd{OPEN/CLOSE} file in a block
+      Raven reads; a time unit that differs from MODFLOW's;
 \item an \cmd{EXTINCTION\_DEPTH} in an aquifer profile while the model keeps an EVT or UZF package;
 \item several groundwater models in the simulation and no \cmd{:MF6Model};
 \item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot
       follow (Section~\ref{sec:existingtime}: array or advanced packages with several period entries before the start, \cmd{TVK6}/\cmd{TVS6},
-      \cmd{TAS6}, time series in a simulation of several models, a \cmd{TS6} file that reads its rows from another file); a stress period that is not a whole number of Raven steps,
+      \cmd{TAS6}, time series in a simulation of several models); a stress period that is not a whole number of Raven steps,
       or shorter than 0; a Raven run longer than the model;
 \item a package Raven reads by name (the stream package, the packages in the balance check) that MODFLOW does not
       have under that name;
