@@ -341,7 +341,7 @@ cells dry.
 are left to the Raven developers:
 \begin{itemize}
 \item Raven's channel-storage bookkeeping (\cmd{:ChannelStorage} in \cmd{solution.rvc}) can be negative in some subbasins
-(17 subbasins of the Liard model without groundwater).
+(22 of the 65 subbasins of the Liard model without groundwater).
 \item Restart with another \cmd{:TimeStep}: \cmd{CSubBasin::SetQinHist} rescales a reach's inflow history only over the length
 of its lateral-inflow history and, when the step grows, reads past the end of the history in the \cmd{.rvc}, so such a
 restart's balance error is off by what those entries hold (up to 2.2~mm in test WB14's runs without the river, the same

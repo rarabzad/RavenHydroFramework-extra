@@ -389,11 +389,13 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
   curve implies (a warning when they differ by more than a factor two). A rising water table takes from a column at most
   what MODFLOW stores for the rise (Sy dh, and no more than the room left in the top cell); the column keeps the rest for
-  the next steps. This happens when the rise meets more water above equilibrium than Sy dh: water in transit in the
-  column (the `LAG` store, a `RICHARDS` wetting front, a recharge pulse) or a nearly full top cell, and the more readily
-  the smaller `SPEC_YIELD` is against the drainable porosity. A column at rest or under a small steady flux, and a water
-  table raised by a boundary or lateral inflow, do not reach it, whatever `SPEC_YIELD`. Raven warns the first time in a
-  run, and no water is lost. Column water goes back to the soil zone, as
+  the next steps. This happens when the rise meets more water above equilibrium than Sy dh in the band it crosses, so
+  it depends on how much the column holds there: water in transit (the `LAG` store, a `RICHARDS` wetting front, a
+  recharge pulse, the more of it the larger the pulse), the excess of a column under a steady flux (it grows with the
+  height above the water table and is met when a small `SPEC_YIELD` makes the water table rise fast), or a nearly full
+  top cell. It happens the more readily the smaller `SPEC_YIELD` is against the drainable porosity. A column at rest
+  holds no such excess, and a water table raised under it by a boundary or lateral inflow does not reach the limit.
+  Raven warns the first time in a run, and no water is lost. Column water goes back to the soil zone, as
   rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
   column vanishes beyond what MODFLOW stores for the rise (rule (ii)); it is subtracted from the unsaturated-zone inflow,
   which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
@@ -602,7 +604,11 @@ digits, so closed-loop and forecast members continue the aquifer from there.
   time units are taken as metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`.
   Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model, except on cells that
   are the model's specified heads in a step (and, without NEWTON, inactive cells): they move no water there, and the
-  reservoir seepage those cells cannot take is returned to the reservoir's subbasin (section 4.3b). The stream package's
+  reservoir seepage those cells cannot take is returned to the reservoir's subbasin (section 4.3b). In a model without
+  NEWTON a top cell that dries becomes inactive: MODFLOW moves recharge and evapotranspiration to the active cell below,
+  but not Raven's seepage drain or a reservoir's seepage, which stop on that column until the cell rewets (the
+  reservoir's seepage is returned to Raven and booked); the water table in the layer below can then rise above the
+  ground without seeping out. Use NEWTON where top cells dry. The stream package's
   loss the channel cannot supply is carried to the next step (`river loss carried to next step`), for months in Example B.
 - Not available: groundwater transport, particle tracking during the run (offline tracking: `:WriteGWBudgetFile` and
   `tools/make_prt.py`, DIS/DISV grids), demand-driven wells. Frozen ground acts on recharge only through Raven's own
