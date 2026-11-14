@@ -372,7 +372,7 @@ def test_l7():
 
 def test_l8():
     print('L8 the release-cap warning: expected with water in transit (Sy = drainable porosity); Sy named only when it is too small')
-    cap, transit, low = 'releases at most Sy dh per step', 'This is expected while water is in transit in the column (the LAG store)', 'a specific yield below the drainable porosity'
+    cap, transit, low = 'a rising water table met more', 'this is expected while water is in transit in the column (the LAG store)', 'a specific yield below the drainable porosity'
     d = run('l8_consistent', nhru=1, slope=0.0, Sy=0.078, aq_b=4.0, aq_psia=0.3, aq_thick=30.0, init_depth=6.0, rain=[40.0] * 10 + [0.0] * 20,
             perc=40.0, days=30, Kh=1.0, Kv=0.1, extra_rvg=':SoilZoneVadose LAG\n')
     if not d:

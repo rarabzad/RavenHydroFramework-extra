@@ -14,13 +14,19 @@ Reader checks (unit driver):
     8 bit) give no data at the masked pixels; tiles of 2048 x 2048 on a small raster; the EPSG code and its kind as written;
   - GDAL's band scale and offset (GDAL_METADATA) are applied (16-bit decimetres against a twin of the scaled values,
     NODATA pixels no data); items named SCALE, OFFSET and UNITTYPE without GDAL's role are ordinary metadata (values as
-    stored); band units (UnitType): every text of the table band_units.tsv gets its class, without and with METRES after
-    the file name (the rule is closed: metres only when the whole text is a metre form, with a listed vertical datum or
-    after a quantity; no unit reads as metres; another length, a scaled metre and any other text stop, and METRES reads
-    only the last as metres); a unit that is not UTF-8 is named with \\xNN; GDAL's side file .aux.xml (fixtures written
-    with PROFILE=GeoTIFF and BASELINE, and side files written here) read with GDAL's precedence: Scale or Offset, UnitType,
-    NoDataValue (also from le_hex_equiv), the last band 1, band = "01", comments, entities and CDATA; a malformed side
-    file (not XML, no closing PAMDataset, an unclosed band, a byte-order mark) refused; another XML document ignored;
+    stored); band units (UnitType): every text of the table band_units.tsv gets its class without METRES after the file name
+    (the rule is closed: metres only when the whole text is a metre form, with a listed vertical datum or after a quantity;
+    no unit reads as metres; another length, a scaled metre and any other text stop), and with METRES (the user's statement
+    that the values are metres) every text reads as metres with a warning naming the file's own unit; a unit that is not
+    UTF-8 is named with \\xNN (METRES applies to texts of the third kind only: another length or a scaled metre stops also
+    with it); GDAL's metadata read only in the form GDAL writes it (CPLSerializeXMLTree: layout, double
+    quotes, GDAL's escapes, a value of GDAL_METADATA escaped twice): GDAL_METADATA and side files .aux.xml (fixtures written
+    with PROFILE=GeoTIFF and BASELINE, and side files written here) read with GDAL's precedence (Scale or Offset, UnitType,
+    NoDataValue, also from le_hex_equiv); a file in any other form (quoting, blanks, case, comments, entities, CDATA, a
+    declaration, a byte-order mark, CRLF line ends, two bands 1, unclosed elements) stops when it names a band or a band
+    value, and is ignored when it names none; a value that starts with a line end is read; a side file with georeferencing
+    (GeoTransform, SRS, GCPs) stops; ESRI ASCII grids read their side file by the same code (Scale, Offset and UnitType; the
+    header's NODATA_value kept, as by GDAL), and without a NODATA_value line every number is a value (as for GDAL);
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -265,7 +271,8 @@ for m in M:
         report('warning: %s "%s"' % (m['file'], m['expect'][:60]), o.startswith('OK') and m['expect'] in o, o[:200])
     if m['kind'] == 'unitconfirm':   # (refused, naming the text and METRES; read with METRES)
         o = unit('raster', fx(m['file']), 'NONE').strip(); o2 = unit('raster', fx(m['file']), 'NONE', 'METRES').strip()
-        report('band unit not a metre form: %s refused, read with METRES' % m['file'], o.startswith('ERROR') and m['expect'] in o and 'METRES' in o and o2 == 'OK', (o + ' | ' + o2)[:200])
+        report('band unit not a metre form: %s refused, read with METRES (with a warning naming its unit)' % m['file'], o.startswith('ERROR') and m['expect'] in o and 'METRES' in o
+               and o2.startswith('OK') and 'read as metres because METRES follows the file name' in o2 and "the file's own band unit is '" in o2, (o + ' | ' + o2)[:200])
 o = unit('raster', fx('matrix_int16_c8_p2_le_strip_classic.tif') if os.path.exists(fx('matrix_int16_c8_p2_le_strip_classic.tif')) else fx('twin_int16.asc'), 'NONE').strip()
 report('no NODATA tag and no such values: no warning', o == 'OK', o[:120])
 
@@ -276,13 +283,15 @@ def with_unit(text, name):
     b = bytearray(open(fx('unit_height_meta.tif'), 'rb').read()); off = struct.unpack('<I', b[4:8])[0]; n = struct.unpack('<H', b[off:off + 2])[0]
     for i in range(n):
         e = off + 2 + 12 * i; t, ty, c, v = struct.unpack('<HHII', b[e:e + 12])
-        if t == 42112:
-            esc = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        if t == 42112:   # (escaped twice, as GDAL writes an item's value: CPLES_XML, then the XML text escapes)
+            esc = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+            esc = esc.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             meta = (bytes(b[v:v + c]).rstrip(b'\0').decode().replace('>height<', '>%s<' % esc)).encode() + b'\0'
             b[e:e + 12] = struct.pack('<HHII', t, ty, len(meta), len(b)); b += meta
     p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
-# the table band_units.tsv: class M (read as metres), N (no unit: read as metres), S (stops, naming the text and METRES;
-# read with METRES), F (another length: stops, also with METRES), X (a scaled metre: stops, also with METRES), a TAB, the text
+# the table band_units.tsv: class M (read as metres), N (no unit: read as metres), S (stops, naming the text and METRES),
+# F (another length: stops), X (a scaled metre: stops), a TAB, the text. With METRES after the file name (the user's
+# statement that the values are metres) every text is read as metres, with a warning that names the file's own unit
 for line in open(os.path.join(HERE, 'band_units.tsv'), encoding='utf-8'):
     line = line.rstrip('\n')
     if not line.strip() or line.startswith('#'):
@@ -290,12 +299,14 @@ for line in open(os.path.join(HERE, 'band_units.tsv'), encoding='utf-8'):
     want, text = line.split('\t', 1)
     f = with_unit(text, 'unit_band.tif')
     o = unit('raster', f, 'NONE').strip(); om = unit('raster', f, 'NONE', 'METRES').strip()
-    shown = text.strip(' \t\r\n')   # (GDAL_METADATA items are read trimmed)
-    good = {'M': o == 'OK' and om == 'OK', 'N': o == 'OK' and om == 'OK',
-            'S': o.startswith('ERROR') and ("its band unit is '%s'" % shown) in o and 'METRES' in o and 'convert the values to metres' in o and om == 'OK',
+    shown = text   # (a GDAL_METADATA item's value as written)
+    noted = om.startswith('OK') and 'read as metres because METRES follows the file name' in om and \
+        (('the file gives no band unit' in om) if want == 'N' else ("the file's own band unit is '%s'" % shown) in om)
+    good = {'M': o == 'OK' and noted, 'N': o == 'OK' and noted,
+            'S': o.startswith('ERROR') and ("its band unit is '%s'" % shown) in o and 'METRES' in o and 'convert the values to metres' in o and noted,
             'F': o.startswith('ERROR') and ('elevations are in %s (the band unit' % shown) in o and 'does not apply to a unit of another length' in om,
             'X': o.startswith('ERROR') and ("its band unit is '%s'" % shown) in o and 'not plain metres' in o and 'does not apply to a scaled unit' in om}[want]
-    report('band unit "%s": %s' % (text, {'M': 'metres', 'N': 'no unit, metres', 'S': 'stops, read with METRES', 'F': 'stops (another length), also with METRES',
+    report('band unit "%s": %s' % (text, {'M': 'metres', 'N': 'no unit, metres', 'S': 'stops; METRES reads it, naming the unit', 'F': 'stops (another length), also with METRES',
                                           'X': 'stops (scaled), also with METRES'}[want]), good, (o + ' | ' + om)[:200])
 # a band unit that is not UTF-8 is named with its bytes escaped (m, the byte 0xFF, then a control character)
 def with_unit_bytes(raw, name):
@@ -307,8 +318,34 @@ def with_unit_bytes(raw, name):
             meta = bytes(b[v:v + c]).rstrip(b'\0').replace(b'>height<', b'>' + raw + b'<') + b'\0'
             b[e:e + 12] = struct.pack('<HHII', tg, ty, len(meta), len(b)); b += meta
     p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
-o = unit('raster', with_unit_bytes(b'm\xff\x01', 'unit_bytes.tif'), 'NONE').strip()
-report('band unit with bytes that are not UTF-8: stops, naming them as \\xNN', o.startswith('ERROR') and "its band unit is 'm\\xFF\\x01'" in o, o[:160])
+o = unit('raster', with_unit_bytes(b'm\xff', 'unit_bytes.tif'), 'NONE').strip()
+report('band unit with bytes that are not UTF-8: stops, naming them as \\xNN', o.startswith('ERROR') and "its band unit is 'm\\xFF'" in o, o[:160])
+o = unit('raster', with_unit_bytes(b'm\x01', 'unit_ctrl.tif'), 'NONE').strip()   # (GDAL leaves control characters out of what it writes)
+report('band unit with a control character: not in the form GDAL writes, stops', o.startswith('ERROR') and 'its GDAL_METADATA tag is not in the form GDAL writes' in o
+       and 'rewrite it with GDAL' in o, o[:160])
+# GDAL_METADATA in another form than GDAL writes: stops when it names a band scale, offset or unit (GDAL may read it
+# otherwise), is ignored when it names none (GDAL takes none from it)
+def with_meta(meta, name):
+    import struct
+    b = bytearray(open(fx('unit_height_meta.tif'), 'rb').read()); off = struct.unpack('<I', b[4:8])[0]; n = struct.unpack('<H', b[off:off + 2])[0]
+    for i in range(n):
+        e = off + 2 + 12 * i; tg, ty, c, v = struct.unpack('<HHII', b[e:e + 12])
+        if tg == 42112:
+            m = meta.encode() + b'\0'; b[e:e + 12] = struct.pack('<HHII', tg, ty, len(m), len(b)); b += m
+    p = os.path.join(W, name); open(p, 'wb').write(bytes(b)); return p
+GM = '<GDALMetadata>\n%s</GDALMetadata>'
+for label, meta, want in (("single quotes (role='unittype')", GM % "  <Item name='UNITTYPE' sample='0' role='unittype'>ft</Item>\n", 'stop'),
+                          ('a character reference (&#102;t)', GM % '  <Item name="UNITTYPE" sample="0" role="unittype">&#102;t</Item>\n', 'stop'),
+                          ('sample="00"', GM % '  <Item name="SCALE" sample="00" role="scale">0.01</Item>\n', 'stop'),
+                          ('role="SCALE" in upper case', GM % '  <Item name="SCALE" sample="0" role="SCALE">0.01</Item>\n', 'stop'),
+                          ('an XML declaration first', '<?xml version="1.0"?>\n' + GM % '  <Item name="UNITTYPE" sample="0" role="unittype">ft</Item>\n', 'stop'),
+                          ('one line, no band items (ignored)', '<GDALMetadata><Item name="AREA_OR_POINT">Area</Item></GDALMetadata>', 'ok'),
+                          ('an item whose value starts with a line end (as GDAL writes it) and a scale', GM % '  <Item name="NOTE" sample="0">\nline2</Item>\n  <Item name="SCALE" sample="0" role="scale">0.01</Item>\n', 'ok'),
+                          ('a value escaped twice, as GDAL writes it (f&amp;amp;t: the unit f&t)', GM % '  <Item name="UNITTYPE" sample="0" role="unittype">f&amp;amp;t</Item>\n', "its band unit is 'f&t'")):
+    o = unit('raster', with_meta(meta, 'meta_form.tif'), 'NONE').strip()
+    good = (o.startswith('ERROR') and 'its GDAL_METADATA tag is not in the form GDAL writes' in o and 'rewrite it with GDAL' in o) if want == 'stop' else \
+        (o.startswith('OK') if want == 'ok' else (o.startswith('ERROR') and want in o))
+    report('GDAL_METADATA: %s %s' % (label, {'stop': 'stops', 'ok': 'read'}.get(want, 'read')), good, o[:170])
 
 # GDAL's side file .aux.xml written by hand beside a fixture: GDAL's precedence (a Scale or an Offset replaces both, a
 # UnitType that is not empty replaces the file's, a NoDataValue replaces GDAL_NODATA), element names in any case
@@ -326,30 +363,34 @@ def side_raw(text):
     return unit('dump', SIDE).split('\n')
 B1 = '<PAMDataset>\n  <PAMRasterBand band="1">\n%s  </PAMRasterBand>\n</PAMDataset>\n'
 FILE = lambda r: 0.1 * round(r) + 50.0   # (the file's own scale and offset)
+NOTFORM = 'is not in the form GDAL writes'   # (and names a band or a band value: rewrite it with GDAL)
 for label, body, f, want in (('Scale 0.2 alone: offset 0', B1 % '    <Scale>0.2</Scale>\n', lambda r: 0.2 * round(r), None),
                              ('Offset 3 alone: scale 1', B1 % '    <Offset>3</Offset>\n', lambda r: round(r) + 3.0, None),
-                             ('scale and offset in lower case', B1 % '    <scale>2</scale>\n    <offset>1</offset>\n', lambda r: 2.0 * round(r) + 1.0, None),
                              ('UnitType ft', B1 % '    <UnitType>ft</UnitType>\n', None, 'elevations are in ft (the band unit, UnitType in %s.aux.xml)' % SIDE),
-                             ('UnitType empty: the file\'s unit (m)', B1 % '    <UnitType></UnitType>\n', FILE, None),
-                             ('UnitType of blanks: the file\'s unit (m)', B1 % '    <UnitType>   </UnitType>\n', FILE, None),
-                             ('Scale empty: absent', B1 % '    <Scale></Scale>\n', FILE, None),
-                             ('Scale with an attribute and blanks', B1 % '    <Scale units="x"> 2 </Scale>\n', lambda r: 2.0 * round(r), None),
-                             ('a commented-out Scale is not read', B1 % '    <!-- <Scale>2</Scale> -->\n', FILE, None),
+                             ('UnitType of blanks: no unit', B1 % '    <UnitType>   </UnitType>\n', FILE, None),
                              ('a Scale MDI inside Metadata is not read', B1 % '    <Metadata>\n      <MDI key="Scale">5</MDI>\n    </Metadata>\n', FILE, None),
-                             ('band = "1" with blanks', '<PAMDataset>\n  <PAMRasterBand band = "1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', lambda r: 2.0 * round(r), None),
-                             ('band="01"', '<PAMDataset>\n  <PAMRasterBand band="01">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', lambda r: 2.0 * round(r), None),
-                             ('two bands 1: the last is read', B1 % '    <Scale>2</Scale>\n  </PAMRasterBand>\n  <PAMRasterBand band="1">\n    <Scale>3</Scale>\n', lambda r: 3.0 * round(r), None),
                              ('band 2 only: the file\'s values', '<PAMDataset>\n  <PAMRasterBand band="2">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', FILE, None),
-                             ('UnitType &#102;t (a character reference)', B1 % '    <UnitType>&#102;t</UnitType>\n', None, 'elevations are in ft (the band unit'),
-                             ('UnitType in CDATA', B1 % '    <UnitType><![CDATA[ft]]></UnitType>\n', None, 'elevations are in ft (the band unit'),
-                             ('another XML document (no PAMDataset): ignored, as by GDAL', '<?xml version="1.0"?>\n<metadata><idinfo>Scale</idinfo></metadata>\n', FILE, None),
                              ('Offset not a number', B1 % '    <Offset>abc</Offset>\n', None, 'its band Offset in %s.aux.xml (abc) is not a number' % SIDE),
-                             ('no closing </PAMDataset>', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n', None, 'it has no closing </PAMDataset>'),
-                             ('an unclosed PAMRasterBand', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n</PAMDataset>\n', None, 'a PAMRasterBand element is not closed'),
-                             ('a byte-order mark (GDAL does not read such a file)', '﻿' + B1 % '    <Scale>2</Scale>\n', None, 'byte-order mark'),
-                             ('not XML', 'not a PAM dataset', None, 'it is not XML')):
+                             ('scale and offset in lower case', B1 % '    <scale>2</scale>\n    <offset>1</offset>\n', None, NOTFORM),
+                             ('UnitType empty', B1 % '    <UnitType></UnitType>\n', None, NOTFORM),
+                             ('Scale with an attribute and blanks', B1 % '    <Scale units="x"> 2 </Scale>\n', None, NOTFORM),
+                             ('a commented-out Scale', B1 % '    <!-- <Scale>2</Scale> -->\n', None, NOTFORM),
+                             ('band = "1" with blanks', '<PAMDataset>\n  <PAMRasterBand band = "1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', None, NOTFORM),
+                             ("band='1' in single quotes", "<PAMDataset>\n  <PAMRasterBand band='1'>\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n", None, NOTFORM),
+                             ('band="01"', '<PAMDataset>\n  <PAMRasterBand band="01">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', None, NOTFORM),
+                             ('two bands 1', B1 % '    <UnitType>ft</UnitType>\n  </PAMRasterBand>\n  <PAMRasterBand band="1">\n    <Scale>3</Scale>\n', None, NOTFORM),
+                             ('UnitType &#102;t (a character reference)', B1 % '    <UnitType>&#102;t</UnitType>\n', None, NOTFORM),
+                             ('UnitType in CDATA', B1 % '    <UnitType><![CDATA[ft]]></UnitType>\n', None, NOTFORM),
+                             ('an XML declaration first', '<?xml version="1.0"?>\n' + B1 % '    <Scale>2</Scale>\n', None, NOTFORM),
+                             ('one line', '<PAMDataset><PAMRasterBand band="1"><Scale>2</Scale></PAMRasterBand></PAMDataset>', None, NOTFORM),
+                             ('another XML document naming a scale', '<?xml version="1.0"?>\n<metadata><idinfo>Scale</idinfo></metadata>\n', None, NOTFORM),
+                             ('another XML document naming no band value: ignored', '<?xml version="1.0"?>\n<metadata><idinfo>Title</idinfo></metadata>\n', FILE, None),
+                             ('no closing </PAMDataset>', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n', None, NOTFORM),
+                             ('an unclosed PAMRasterBand', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n</PAMDataset>\n', None, NOTFORM),
+                             ('a byte-order mark', '\ufeff' + B1 % '    <Scale>2</Scale>\n', None, NOTFORM),
+                             ('not XML, naming no band value: ignored', 'not a PAM dataset', FILE, None)):
     out = side_raw(body)
-    good = (out[0].startswith('ERROR') and want in out[0]) if want else values_are(out, f)
+    good = (out[0].startswith('ERROR') and want in out[0] and (want != NOTFORM or 'rewrite it with GDAL' in out[0])) if want else values_are(out, f)
     report('side file .aux.xml: %s' % label, good, out[0][:160])
 # NoDataValue with le_hex_equiv: GDAL takes the value from its IEEE bits (here -10112, the text says -9999)
 out = side_raw(B1 % '    <NoDataValue le_hex_equiv="0000000000C0C3C0">-9999</NoDataValue>\n')
@@ -358,6 +399,54 @@ nan_out = sum(1 for l in out[2:] if l.strip() for x in l.split() if x == 'nan')
 report('side file .aux.xml: NoDataValue from le_hex_equiv (-10112, as GDAL): the -9999 pixels are values', out[0].startswith('OK ') and nan_base > 0 and nan_out == 0,
        '%s; no-data pixels %d before, %d now' % (out[0][:80], nan_base, nan_out))
 os.remove(SIDE); os.remove(SIDE + '.aux.xml')
+
+# GDAL's side file beside an ESRI ASCII grid, read by the same code as for a GeoTIFF (GDAL's ESRI ASCII driver takes its
+# Scale, Offset and UnitType, and keeps the header's NODATA_value): a twin grid and the same grid scaled by hand
+ASC = os.path.join(W, 'side.asc'); shutil.copy(fx('twin_int16.asc'), ASC)
+L = open(ASC).read().split('\n'); hdr = L[:6]; vals = [l.split() for l in L[6:] if l.strip()]
+ndv = [l.split()[1] for l in hdr if l.lower().startswith('nodata_value')][0]
+SCALED = os.path.join(W, 'side_scaled.asc')
+open(SCALED, 'w').write('\n'.join(hdr) + '\n' + '\n'.join(' '.join(v if v == ndv else repr(0.5 * float(v) + 1.0) for v in r) for r in vals) + '\n')
+def asc_side(text):
+    if text is None:
+        if os.path.exists(ASC + '.aux.xml'): os.remove(ASC + '.aux.xml')
+    else:
+        open(ASC + '.aux.xml', 'w', encoding='utf-8').write(text)
+GDALASC = '<PAMDataset>\n  <PAMRasterBand band="1">\n    <UnitType>%s</UnitType>\n    <Offset>1</Offset>\n    <Scale>0.5</Scale>\n    <ColorInterp>Gray</ColorInterp>\n  </PAMRasterBand>\n</PAMDataset>\n'
+asc_side(GDALASC % 'm')
+o = unit('samplecmp', ASC, SCALED, 'NONE'); g = re.search(r'(\d+) with values, (\d+) differ', o)
+report('ESRI ASCII with a side file (Scale 0.5, Offset 1, unit m, as GDAL writes it): samples as the grid scaled by hand', bool(g) and g.group(2) == '0' and int(g.group(1)) > 1000, o.strip()[:150])
+asc_side(GDALASC % 'ft'); o = unit('raster', ASC, 'NONE').strip(); om = unit('raster', ASC, 'NONE', 'METRES').strip()
+report('ESRI ASCII with a side file of unit ft: stops ("elevations are in ft"), also with METRES', o.startswith('ERROR') and 'elevations are in ft (the band unit, UnitType in %s.aux.xml)' % ASC in o
+       and om.startswith('ERROR') and 'does not apply to a unit of another length' in om, (o + ' | ' + om)[:200])
+asc_side(GDALASC % 'hydraulic head'); o = unit('raster', ASC, 'NONE').strip(); om = unit('raster', ASC, 'NONE', 'METRES').strip()
+report('ESRI ASCII with a side file of unit "hydraulic head": stops; with METRES read, naming it', o.startswith('ERROR') and "its band unit is 'hydraulic head'" in o
+       and om.startswith('OK') and "the file's own band unit is 'hydraulic head'" in om, (o + ' | ' + om)[:200])
+asc_side(GDALASC.replace('<UnitType>%s</UnitType>', '<UnitType>m</UnitType>').replace('\n', '\r\n')); o = unit('raster', ASC, 'NONE').strip()
+report('ESRI ASCII with a GDAL side file in CRLF line ends: stops, naming them', o.startswith('ERROR') and 'CRLF line ends' in o, o[:200])
+asc_side(B1.replace('  </PAMRasterBand>\n', '  </PAMRasterBand>\n  <GeoTransform>  6.0e+05,  5.0e+01,  0.0e+00,  4.6e+06,  0.0e+00, -5.0e+01</GeoTransform>\n') % '')
+o = unit('raster', ASC, 'NONE').strip()
+report('a side file with georeferencing (GeoTransform): stops ("rewrite it with gdal_translate")', o.startswith('ERROR') and 'holds georeferencing' in o and 'gdal_translate' in o, o[:200])
+asc_side(B1 % '    <NoDataValue>%s</NoDataValue>\n' % vals[0][0]); o = unit('samplecmp', ASC, fx('twin_int16.asc'), 'NONE'); g = re.search(r'(\d+) differ', o)
+report('ESRI ASCII with a side file NoDataValue: the header\'s NODATA_value is kept, as by GDAL', bool(g) and g.group(1) == '0', o.strip()[:150])
+asc_side('<PAMDataset><PAMRasterBand band="1"><Scale>2</Scale></PAMRasterBand></PAMDataset>'); o = unit('raster', ASC, 'NONE').strip()
+report('ESRI ASCII with a side file not in the form GDAL writes: stops', o.startswith('ERROR') and NOTFORM in o and 'rewrite it with GDAL' in o, o[:160])
+asc_side(None); o = unit('raster', ASC, 'NONE', 'METRES').strip()
+report('ESRI ASCII without a side file, with METRES: read, with a warning that the file gives no unit', o.startswith('OK') and 'the file gives no band unit' in o, o[:160])
+# no NODATA_value line: every number is a value, as GDAL reads the grid (-9999 cells reported); with it, no data
+NOND = os.path.join(W, 'nond.asc')
+tw = [m['twin'] for m in M if m['twin'] and m['kind'] == 'nodata' and '-9999' in open(fx(m['twin'])).read().split('\n', 6)[6]][0]
+L2 = open(fx(tw)).read().split('\n'); h2 = L2[:6]; v2 = [l.split() for l in L2[6:] if l.strip()]   # (tw: a twin with -9999 cells)
+ndv = [l.split()[1] for l in h2 if l.lower().startswith('nodata_value')][0]
+open(NOND, 'w').write('\n'.join(l for l in h2 if not l.lower().startswith('nodata_value')) + '\n' + '\n'.join(' '.join(r) for r in v2) + '\n')
+o = unit('raster', NOND, 'NONE').strip(); nnd = sum(1 for r in v2 for v in r if v == ndv)
+s1 = unit('sample', NOND, '4000'); s2 = unit('sample', fx(tw), '4000')
+found = lambda s: sum(1 for l in s.split('\n') if l.split()[2:3] == ['1'])
+report('ESRI ASCII without NODATA_value: -9999 cells are values, as for GDAL, with a warning naming their count', ndv == '-9999' and nnd > 0 and o.startswith('OK')
+       and ('holds %d cells of -9999' % nnd) in o and found(s1) > found(s2), '%s; samples with values %d (with NODATA_value: %d)' % (o[:150], found(s1), found(s2)))
+os.remove(NOND)
+for f in (ASC, SCALED):
+    os.remove(f)
 
 # ---- ESRI ASCII grids (CGWRaster): GDAL's rectangular-pixel header, NaN NODATA, and malformed grids
 def asc_write(name, header, rows):
@@ -572,8 +661,9 @@ else:
             report('Raven stops: %s without METRES, naming :LandSurface %s METRES' % (m['file'], m['file']), good, '' if good else (re.findall(r'ERROR[^\n]*', e) or ['no error'])[0][:200])
             if good:
                 shutil.rmtree(d)
-            ok, diffs, d = compare('unitconfirm', m['file'], m['twin'], confirm=True)
-            report('Raven: %s with METRES = twin' % m['file'], ok, ', '.join(diffs))
+            ok, diffs, d = compare('unitconfirm', m['file'], m['twin'], confirm=True, skip=('Raven_errors.txt',),
+                                   want_warn="read as metres because METRES follows the file name (:LandSurface %s METRES); the file's own band unit is '" % m['file'])
+            report('Raven: %s with METRES = twin, with the warning naming its unit' % m['file'], ok, ', '.join(diffs))
             if ok:
                 shutil.rmtree(d)
     # projected rasters (:InputCRS), the HRUs in the same projection

@@ -231,10 +231,17 @@ Every one of these stops the run with a message that names the problem and the f
       \cmd{OPEN/CLOSE} file is read and written into the working copy); TDIS period data given as \cmd{INTERNAL}; a binary \cmd{OPEN/CLOSE} file in a block
       Raven reads; a time unit that differs from MODFLOW's;
 \item an \cmd{EXTINCTION\_DEPTH} in an aquifer profile while the model keeps an EVT or UZF package;
-\item several groundwater models in the simulation and no \cmd{:MF6Model};
+\item a simulation with more than one model, or with exchanges: Raven couples one MODFLOW~6 groundwater-flow model and books
+      only its water, so the flow across an exchange (and another model's movers and time series) would be outside its books;
+\item a TDIS file or model name file named outside the simulation folder, or a package file the name file names that does
+      not exist, or that lies in a folder holding Raven's output folder (left out of the working copy); a package file named
+      by an absolute path inside the simulation folder is named there relative to it, and one named outside the folder, by
+      an absolute or \cmd{../} path, is copied into the working copy and read, checked and rewritten there as the others
+      (MODFLOW reads the same text); a file that several packages name, in any spelling, is renumbered once, and so is a
+      time-series file shifted once;
 \item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot
       follow (Section~\ref{sec:existingtime}: array or advanced packages with several period entries before the start, \cmd{TVK6}/\cmd{TVS6},
-      \cmd{TAS6}, time series in a simulation of several models); a stress period that is not a whole number of Raven steps,
+      \cmd{TAS6}, a \cmd{TS6} file named outside the simulation folder); a stress period that is not a whole number of Raven steps,
       or shorter than 0; a Raven run longer than the model;
 \item a package Raven reads by name (the stream package, the packages in the balance check) that MODFLOW does not
       have under that name;
@@ -281,7 +288,13 @@ control: for MODFLOW's budget file (for example for particle tracking, Section~\
 \cmd{BUDGET FILEOUT} line and \cmd{SAVE BUDGET} in its OC file; \cmd{RCH\_RAVEN}, \cmd{DRN\_RAVEN}, \cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN} and \cmd{RES\_RAVEN} save their flows to it.
 Restarts store the heads in the model's layout (\cmd{:GWHeads} \emph{nlay nrow ncol} for DIS, \emph{nlay} \cmd{1} \emph{ncells}
 for DISV); on a restart Raven writes them as the initial heads of the working copy (\cmd{raven.ic}) and renumbers the stress
-periods as described above. A restarted run reproduces a continuous one (Section~\ref{sec:vexisting}).
+periods as described above. A restart carries only the heads, so a restarted run reproduces a continuous one when the model
+keeps no package with a state of its own (Section~\ref{sec:vexisting}). In MODFLOW~6.8.1 those are LAK (lake stages), MAW
+(well heads), UZF (unsaturated-zone water content), CSUB (stresses and preconsolidation stresses) and SFR with the
+\cmd{STORAGE} option (reach stages and flows); they would start again from their own input, so a restart (\cmd{:GWHeads})
+of a model that keeps any of them stops, naming it (also a start at \cmd{:MF6StartDate} with \cmd{:GWHeads}): remove
+\cmd{:GWHeads} from the \cmd{.rvc} file, so that every package starts from its input, or, to continue an earlier run,
+simulate the whole period in one run.
 
 \section{Worked example}
 \cmd{examples/Liard\_existing\_model/} holds a MODFLOW 6 model of the Liard coupled area built independently of Raven: a
@@ -303,7 +316,7 @@ a model with more stops the run (``the existing model has \dots\ cells per layer
 \item The stream package keeps the model's own stage and conductance: there is no conductance (supply) limit as for generated
 river cells, so a losing reach can take more than the channel holds; the part the channel cannot supply is carried to the
 next step (exactly accounted).
-\item Later starts and restarts refuse time-array series (\cmd{TAS6}), \cmd{TVK6}/\cmd{TVS6}, simulations with several models,
+\item Later starts and restarts refuse time-array series (\cmd{TAS6}), \cmd{TVK6}/\cmd{TVS6},
 array-based or advanced packages with several period entries before Raven's start, and \cmd{TS6} files whose
 \cmd{TIMESERIES} rows come from another file (Section~\ref{sec:existingtime}).
 \item A column whose top cell becomes specified-head in a later stress period keeps its \cmd{EVT\_RAVEN} and \cmd{SWX\_RAVEN}

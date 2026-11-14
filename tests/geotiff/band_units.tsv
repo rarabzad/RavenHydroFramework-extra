@@ -4,10 +4,14 @@
 # sea level"), a metre form in brackets after a metre word ("meter (m)") or after a quantity ("elevation (m)", "height in
 # metres"), or EPSG 9001. Classes:
 #   M read as metres;  N no unit (read as metres);
-#   S the run stops with a message naming the text and the remedy, and METRES after the file name reads it as metres;
-#   F the run stops: another length unit and no metre ("its elevations are in ..."); METRES does not lift it;
+#   S the run stops with a message naming the text and the remedy (METRES after the file name);
+#   F the run stops: another length unit and no metre, or another length named with its metre conversion ("its elevations
+#     are in ..."); METRES does not lift it;
 #   X the run stops: a scaled metre (a part or multiple, a number with a factor sign or word, or a number and a metre as
 #     the whole text); METRES does not lift it.
+# METRES after the file name states that the values are metres for a text of class S (and N and M): such a raster is read as
+# metres, and Raven writes a warning naming the file's own unit; F and X stop also with METRES. A dotted abbreviation may lack
+# its final dot, "above" may precede a datum, and a blank may precede a datum's year ("m a.s.l", "m above MSL", "m (RH 2000)").
 # Normalising: full-width characters as ASCII, no-break and ideographic spaces as blanks, blanks trimmed and runs of them as
 # one, lower case (Greek without its accents), and surrounding brackets removed ("()" and "[]" alone are a text, class S).
 # Read by geotiff_check.py; columns: class, a TAB, the text.
@@ -140,7 +144,7 @@ S	in meters above sea level
 S	hydraulic head
 S	'
 S	?
-S	m above NAVD88
+M	m above NAVD88
 S	Elevation in m (CH1903+)
 S	elevation [m] CH
 S	Höhe in m ü. M. (CH)
@@ -154,11 +158,11 @@ S	NAVD88 m
 S	EGM96 m
 S	pesos
 S	m (NAVD 1988)
-S	m CGVD 2013
-S	m (RH 2000)
+M	m CGVD 2013
+M	m (RH 2000)
 S	metres NN 2016
 S	m ü. NHN 2016
-S	m, EGM 2008
+M	m, EGM 2008
 S	height m 2020
 S	m above datum 1
 S	Elevation, m, version 2
@@ -253,23 +257,23 @@ S	Meter über Meer
 S	metros sobre el nivel del mar
 S	Geländehöhe in m ü. NHN
 S	f.a.s.l.
-S	santimetre
+F	santimetre
 S	mils
 S	mil
 S	micron
 S	microns
 S	um
 S	µ
-S	FtAsl
+F	FtAsl
 S	ELEVFT
 S	DEMft
-S	M (feet)
+F	M (feet)
 S	M FT
 S	hft
-S	feet (0.3048 m)
+F	feet (0.3048 m)
 S	市尺
-S	公厘
-S	EPSG 9036
+F	公厘
+F	EPSG 9036
 S	m²
 S	m/s
 S	kg m-2
@@ -525,3 +529,51 @@ X	m x 0.1
 X	m^2
 X	0,01 m
 X	m**2 s**-2
+# near-twins of the listed forms and datums in wide use
+M	m a.s.l
+M	m.a.s.l
+M	m asl.
+M	m.s.n.m
+M	m s. n. m.
+M	moh.
+M	m above MSL
+M	meters above MSL
+M	m above msl
+M	m RH 2000
+M	m (EGM 96)
+M	m EGM08
+M	mOD
+M	m OD
+M	Elevation, m
+M	height_above_ellipsoid (m)
+M	http://www.opengis.net/def/uom/EPSG/0/9001
+M	m MLLW
+M	m MHW
+M	m HAE
+M	m (orthometric)
+M	m above WGS84 ellipsoid
+M	m NGF
+M	m IGN69
+M	m N2000
+M	m NZVD2016
+M	m (T.P.)
+# other lengths and scaled metres in further forms: an EPSG length code after "epsg" and blanks or a colon, a signed
+# exponent or a leading dot in a number and metre, Greek and other SI-prefixed metres, feet fused with a datum, and another
+# length named with its metre conversion
+F	epsg: 9003
+F	http://www.opengis.net/def/uom/EPSG/0/9002
+X	.1 m
+X	5e-1 m
+F	εκατοστόμετρα
+F	χιλιοστόμετρα
+F	δεκατόμετρα
+F	sentimeter
+F	ettometri
+F	ftasl
+F	feetMSL
+F	US survey foot (0.3048006 m)
+F	EPSG 9002
+X	1e-2 m
+F	χιλιόμετρα
+F	ftMSL
+F	ft (0.3048 m)

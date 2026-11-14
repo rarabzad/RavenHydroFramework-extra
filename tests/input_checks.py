@@ -128,6 +128,25 @@ CSUB:
       no balance warning is written; GWModelSummary.txt lists CSUB under "storage in balance".
   E30b the same with the CSUB row named subsid in the name file (MODFLOW 6 keeps the package as CSUB whatever its name):
       booked the same way.
+One MODFLOW model, files outside the simulation folder, later starts and restarts (the existing-model example):
+  E31 a second GWF model (a one-cell model with a specified head) joined to the coupled model by a GWF6-GWF6 exchange, with
+      :MF6Model naming the coupled one, and E31b the same without the exchange: each stops ("Raven couples one MODFLOW 6
+      groundwater-flow model"), naming the models and the exchange, instead of running with the exchange flow outside the books;
+  E32a the well file named by its absolute path inside the simulation folder (named relative to it in the working copy),
+      E32 by its absolute path outside the folder and E32b by ../shared/gwf_liard.wel (both copied into the working copy), Raven starting 32 days after the model's time zero (periods 1 and 2 dropped): GWBudget.csv and
+      Hydrographs.csv identical to the twin with the file in the folder, the working copy's row naming Raven's copy, and
+      GWModelSummary.txt counting the file copied; E32c a TS6 file named by its absolute path inside the simulation folder
+      is named relative to it in the working copy and shifted (results as the relative twin), E32c2 one outside the folder
+      stops a later start; E32e Raven's output folder inside the folder of a package file stops, naming that cause; E32d a
+      package file that does not exist stops, naming it;
+  E33 TVK6 with a TS6 series and Raven starting a day late, inside the first (32-day) period: stops ("uses time-varying
+      properties (TVK6/TVS6)") instead of running with the series unshifted;
+  E34 a restart from :GWHeads (solution.rvc of a 2-day run, Raven starting on day 3) with a kept LAK6 package and E34b
+      with a kept CSUB6 package stop, naming the package and its state; E34c the same restart of the example runs;
+  E35 :HRUGeometry, E35b :RiverGeometry and E35c :GridFile with a surplus value stop, naming it;
+  E36 two WEL packages naming one file, Raven 32 days late: the file is renumbered once (its period 1 is the old period 3),
+      results as with two copies of the file; E37 one TS6 file named wel.ts by the well package and ./wel.ts by the GHB
+      package, Raven 32 days late: shifted once (its first time 0 becomes -32).
 A model across the antimeridian:
   AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
      longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
@@ -787,6 +806,171 @@ pc = float(pd.read_csv(p)['MF6 balance error [%]'].abs().max()) if os.path.exist
 report('E30b the same CSUB package named subsid in the name file (MODFLOW keeps it as CSUB): booked as storage, error below 0.001 %', ok and pc is not None and pc < 1e-3
        and re.search(r'storage in balance\s*:.*SUBSID', summary(d)) is not None, ('max |MF6 balance error| %s %%' % pc) if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
+# ---- one MODFLOW model: a second model or an exchange stops
+def two_models(name, exchange):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name)); M = os.path.join(d, 'model')
+    edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  gwf6  gwf_liard.nam  gwf_liard\n  gwf6  b.nam  gwf_b\n')
+    if exchange:
+        edit(d, 'model/mfsim.nam', 'BEGIN exchanges\n', 'BEGIN exchanges\n  GWF6-GWF6  ab.exg  gwf_liard  gwf_b\n')
+        open(os.path.join(M, 'ab.exg'), 'w').write('BEGIN options\nEND options\nBEGIN dimensions\n  NEXG 1\nEND dimensions\nBEGIN exchangedata\n'
+                                                   '  4 50 50 1 1 1 0 50.0 50.0 2250000.0\nEND exchangedata\n')
+    edit(d, 'model/mfsim.nam', 'ims6  ext.ims  gwf_liard', 'ims6  ext.ims  gwf_liard  gwf_b')
+    open(os.path.join(M, 'b.nam'), 'w').write('BEGIN options\nEND options\nBEGIN packages\n  DIS6 b.dis\n  NPF6 b.npf\n  IC6 b.ic\n  CHD6 b.chd\nEND packages\n')
+    open(os.path.join(M, 'b.dis'), 'w').write('BEGIN options\n  LENGTH_UNITS meters\nEND options\nBEGIN dimensions\n  NLAY 1\n  NROW 1\n  NCOL 1\nEND dimensions\n'
+                                              'BEGIN griddata\n  delr\n    CONSTANT 1500\n  delc\n    CONSTANT 1500\n  top\n    CONSTANT 2000\n  botm\n    CONSTANT 0\nEND griddata\n')
+    open(os.path.join(M, 'b.npf'), 'w').write('BEGIN options\nEND options\nBEGIN griddata\n  icelltype\n    CONSTANT 0\n  k\n    CONSTANT 1.0\nEND griddata\n')
+    open(os.path.join(M, 'b.ic'), 'w').write('BEGIN griddata\n  strt\n    CONSTANT 1500\nEND griddata\n')
+    open(os.path.join(M, 'b.chd'), 'w').write('BEGIN options\nEND options\nBEGIN dimensions\n  MAXBOUND 1\nEND dimensions\nBEGIN period 1\n  1 1 1 1500.0\nEND period\n')
+    edit(d, 'Liard.rvg', ':MF6StartDate', ':MF6Model          gwf_liard\n:MF6StartDate')
+    return d
+d = two_models('e31', True)
+stops('E31 a second GWF model joined by a GWF6-GWF6 exchange (:MF6Model naming one) stops: Raven couples one model', d,
+      'holds 2 models (gwf_liard (GWF6), gwf_b (GWF6)) and 1 exchange (GWF6-GWF6 ab.exg); Raven couples one MODFLOW 6 groundwater-flow model')
+shutil.rmtree(d, ignore_errors=True)
+d = two_models('e31b', False)
+stops('E31b a second GWF model without an exchange stops too', d, 'holds 2 models (gwf_liard (GWF6), gwf_b (GWF6)); Raven couples one MODFLOW 6 groundwater-flow model')
+shutil.rmtree(d, ignore_errors=True)
+# ---- package files named outside the simulation folder: copied into the working copy and read, checked and rewritten there
+def later(name, row=None, start='1985-11-02'):   # (Raven starts 32 days after the model's time zero: periods 1 and 2 dropped)
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    if row:
+        edit(d, 'model/gwf_liard.nam', '  WEL6  gwf_liard.wel  wel_pumps\n', row(d))
+    edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          ' + start)
+    return d
+def shared(d):   # (the well file moved to a folder beside the simulation folder)
+    os.makedirs(os.path.join(d, 'shared'), exist_ok=True); shutil.move(os.path.join(d, 'model', 'gwf_liard.wel'), os.path.join(d, 'shared', 'gwf_liard.wel'))
+    return '  WEL6  ../shared/gwf_liard.wel  wel_pumps\n'
+lt = {'ref': later('e32_ref'), 'abs': later('e32', lambda d: shared(d).replace('../shared', os.path.join(d, 'shared'))), 'rel': later('e32b', shared),
+      'absin': later('e32a', lambda d: '  WEL6  %s  wel_pumps\n' % os.path.join(d, 'model', 'gwf_liard.wel'))}
+lr = {k: run(v, DAYS) for k, v in lt.items()}
+ok = lr['ref'][0] and lr['absin'][0]
+nam = open(os.path.join(lt['absin'], 'out', 'mf6', 'gwf_liard.nam')).read() if ok else ''
+wel = re.search(r'(?m)^\s*WEL6\s+gwf_liard\.wel\s+WEL_PUMPS\s+#.*named relative to the simulation folder', nam)
+report('E32a a WEL file named by its absolute path inside the simulation folder, Raven 32 days late: named relative to it, results as the twin',
+       ok and same(lt['ref'], lt['absin']) and wel is not None, ('working-copy row %s' % (wel.group(0).strip() if wel else 'not renamed')) if ok else lr['absin'][1].strip().split('\n')[-1][:150])
+for k, lab in (('abs', 'E32 a WEL file named by its absolute path outside the simulation folder, Raven 32 days late: copied, results as the twin'),
+               ('rel', 'E32b a WEL file named ../shared/... (outside the simulation folder), Raven starting late: as the twin')):
+    ok = lr['ref'][0] and lr[k][0]
+    nam = open(os.path.join(lt[k], 'out', 'mf6', 'gwf_liard.nam')).read() if os.path.exists(os.path.join(lt[k], 'out', 'mf6', 'gwf_liard.nam')) else ''
+    wel = re.search(r'(?m)^\s*WEL6\s+(raven_copy_\S+)\s+WEL_PUMPS', nam)
+    good = ok and same(lt['ref'], lt[k]) and wel is not None and 'named outside the simulation folder, copied into the working copy' in summary(lt[k])
+    report(lab, good, ('working-copy row %s' % (wel.group(0).strip() if wel else 'not renamed')) if ok else (lr[k][1] if not lr[k][0] else lr['ref'][1]).strip().split('\n')[-1][:150])
+for v in lt.values():
+    shutil.rmtree(v, ignore_errors=True)
+def ts_named(name, where):   # (a TS6 file named by its absolute path, inside or outside the simulation folder; Raven a day late)
+    d = later(name, start='1985-10-02')
+    tsd = os.path.join(d, 'model') if where == 'in' else os.path.join(d, 'shared')
+    os.makedirs(tsd, exist_ok=True)
+    edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  %s\n' % (os.path.join(tsd, 'wel.ts') if where != 'rel' else 'wel.ts'))
+    edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
+    open(os.path.join(tsd if where != 'rel' else os.path.join(d, 'model'), 'wel.ts'), 'w').write(TS)
+    return d
+tn = {k: ts_named('e32c_' + k, k) for k in ('rel', 'in')}
+tr = {k: run(v, DAYS) for k, v in tn.items()}
+ok = tr['rel'][0] and tr['in'][0]
+wl = open(os.path.join(tn['in'], 'out', 'mf6', 'gwf_liard.wel')).read() if ok else ''
+report('E32c a TS6 file named by its absolute path inside the simulation folder: named relative to it, shifted, results as the relative twin', ok and same(tn['rel'], tn['in'])
+       and re.search(r'(?m)^\s*TS6\s+FILEIN\s+wel\.ts\s', wl) is not None, '' if ok else (tr['in'][1] if not tr['in'][0] else tr['rel'][1]).strip().split('\n')[-1][:150])
+for v in tn.values():
+    shutil.rmtree(v, ignore_errors=True)
+d = ts_named('e32c_out', 'out')
+stops('E32c2 a TS6 file named by its absolute path outside the simulation folder stops a later start', d,
+      'names the time-series file %s outside the simulation folder' % os.path.join(d, 'shared', 'wel.ts'))
+shutil.rmtree(d, ignore_errors=True)
+# Raven's output folder inside a package subfolder of the simulation: that folder is left out of the working copy
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e32e')); os.makedirs(os.path.join(d, 'model', 'pk'))
+shutil.move(os.path.join(d, 'model', 'gwf_liard.wel'), os.path.join(d, 'model', 'pk', 'gwf_liard.wel'))
+edit(d, 'model/gwf_liard.nam', '  WEL6  gwf_liard.wel  wel_pumps\n', '  WEL6  pk/gwf_liard.wel  wel_pumps\n')
+os.makedirs(os.path.join(d, 'model', 'pk', 'out'))
+r = subprocess.run([tc.RAVEN, 'Liard', '-o', 'model/pk/out/'], cwd=d, capture_output=True, text=True, env=tc.ENV, timeout=300)
+eo = r.stdout + r.stderr + (open(os.path.join(d, 'model', 'pk', 'out', 'Raven_errors.txt')).read() if os.path.exists(os.path.join(d, 'model', 'pk', 'out', 'Raven_errors.txt')) else '')
+line = (re.findall(r'.*holds Raven.s output folder.*', eo) or [''])[0].strip()
+report('E32e Raven\'s output folder inside the folder of a package file stops, naming that cause', 'Successful' not in eo and 'pk/gwf_liard.wel' in line, line[:150] or eo.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# two packages of one file, and one time-series file named in two ways: each file rewritten (renumbered, shifted) once
+def two(name, rows, ts=False):
+    d = later(name, lambda d: rows)
+    if ts:
+        edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  wel.ts\n')
+        edit(d, 'model/gwf_liard.ghb', 'BEGIN options\n', 'BEGIN options\n  TS6  FILEIN  ./wel.ts\n') if 'BEGIN options\n' in open(os.path.join(d, 'model', 'gwf_liard.ghb')).read() else \
+            edit(d, 'model/gwf_liard.ghb', 'BEGIN OPTIONS\n', 'BEGIN OPTIONS\n  TS6  FILEIN  ./wel.ts\n')
+        edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
+        open(os.path.join(d, 'model', 'wel.ts'), 'w').write(TS.replace('2.0  -9000.0', '40.0  -9000.0'))
+    return d
+lt = {'one': two('e36_one', '  WEL6  gwf_liard.wel  wel_a\n  WEL6  gwf_liard.wel  wel_b\n'), 'two': two('e36_two', '  WEL6  gwf_liard.wel  wel_a\n  WEL6  w_b.wel  wel_b\n')}
+for v in lt.values():   # (period 5 made distinct, so that a second renumbering would show: its rates in the new period 1)
+    p5 = os.path.join(v, 'model', 'gwf_liard.wel'); w5 = open(p5).read()
+    w5 = re.sub(r'(BEGIN period\s+5\n)(.*?)(END period)', lambda m: m.group(1) + re.sub(r'-\S+E\+\d+', '-1.1111E+04', m.group(2)) + m.group(3), w5, count=1, flags=re.S)
+    open(p5, 'w').write(w5)
+shutil.copy(os.path.join(lt['two'], 'model', 'gwf_liard.wel'), os.path.join(lt['two'], 'model', 'w_b.wel'))
+lr = {k: run(v, DAYS) for k, v in lt.items()}
+ok = lr['one'][0] and lr['two'][0]
+wl = open(os.path.join(lt['one'], 'out', 'mf6', 'gwf_liard.wel')).read() if ok else ''
+m = re.search(r'BEGIN PERIOD 1[^\n]*\n(.*?)END PERIOD', wl, re.S)
+report('E36 two WEL packages of one file, Raven 32 days late: the file renumbered once (period 1 = old period 3), results as two files', ok and same(lt['one'], lt['two'])
+       and m is not None and '-3.00000000E+03' in m.group(1), ('new period 1: %s' % (m.group(1).split('\n')[0] if m else 'none')) if ok else (lr['one'][1] if not lr['one'][0] else lr['two'][1]).strip().split('\n')[-1][:150])
+for v in lt.values():
+    shutil.rmtree(v, ignore_errors=True)
+d = two('e37', '  WEL6  gwf_liard.wel  wel_pumps\n', ts=True); ok, out = run(d, DAYS)
+tsw = open(os.path.join(d, 'out', 'mf6', 'wel.ts')).read() if ok else ''
+first = re.search(r'BEGIN timeseries\n\s*(\S+)', tsw)
+report('E37 one TS6 file named wel.ts and ./wel.ts, Raven 32 days late: shifted once (first time -32)', ok and tsw.count('times shifted by Raven') == 1 and first is not None
+       and float(first.group(1)) == -32.0, ('first time %s' % (first.group(1) if first else '?')) if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+d = later('e32d', lambda d: '  WEL6  ../nowhere/gwf_liard.wel  wel_pumps\n', start='1985-10-01')
+stops('E32d a package file named in the name file that does not exist stops, naming it', d, 'nowhere/gwf_liard.wel (WEL_PUMPS), which does not exist')
+shutil.rmtree(d, ignore_errors=True)
+# ---- TVK6/TVS6: any later start stops (their period data and series count from the model's time zero)
+d = later('e33', start='1985-10-02')
+p = os.path.join(d, 'model', 'ext.tdis'); tt = open(p).read()
+tt = tt.replace('NPER  25', 'NPER  24'); tt = re.sub(r'\n\s+1\.00000000\s+1\s+1\.00000000\n\s+31\.00000000\s+31\s+1\.00000000\n', '\n  32.0 32 1.0\n', tt, count=1)
+open(p, 'w').write(tt)
+edit(d, 'model/gwf_liard.sto', 'BEGIN period  1\n  STEADY-STATE\nEND period  1', 'BEGIN period  1\n  TRANSIENT\nEND period  1')
+edit(d, 'model/gwf_liard.npf', 'BEGIN options\n', 'BEGIN options\n  TVK6 FILEIN tvk.txt\n')
+open(os.path.join(d, 'model', 'tvk.txt'), 'w').write('BEGIN OPTIONS\n  TS6 FILEIN k.ts\nEND OPTIONS\nBEGIN PERIOD 1\n  1 50 50 K kser\nEND PERIOD\n')
+open(os.path.join(d, 'model', 'k.ts'), 'w').write('BEGIN ATTRIBUTES\n  NAME kser\n  METHOD STEPWISE\nEND ATTRIBUTES\nBEGIN TIMESERIES\n  0.0 1.0\n  2.0 100.0\n  400.0 100.0\nEND TIMESERIES\n')
+stops('E33 TVK6 (with a TS6 series) and Raven starting a day late, inside the first period: stops', d, 'uses time-varying properties (TVK6/TVS6)')
+shutil.rmtree(d, ignore_errors=True)
+# ---- a restart carries only the heads: a kept package with its own state stops it; a model without one restarts
+d0 = tc.copy_case(tc.EXISTING, os.path.join(W, 'e34_first')); ok0, out0 = run(d0, 2)
+def restart(name, extra):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, name))
+    shutil.copy(os.path.join(d0, 'out', 'solution.rvc'), os.path.join(d, 'Liard.rvc'))
+    edit(d, 'Liard.rvi', ':StartDate          1985-10-01', ':StartDate          1985-10-03')
+    extra(d); return d
+def lak(d):
+    edit(d, 'model/gwf_liard.nam', '  OC6  gwf_liard.oc  oc\n', '  LAK6  l.lak  LAKE1\n  OC6  gwf_liard.oc  oc\n')
+    open(os.path.join(d, 'model', 'l.lak'), 'w').write('BEGIN OPTIONS\nEND OPTIONS\nBEGIN DIMENSIONS\n  NLAKES 1\n  NOUTLETS 0\nEND DIMENSIONS\nBEGIN PACKAGEDATA\n  1 1300.0 1\n'
+                                                       'END PACKAGEDATA\nBEGIN CONNECTIONDATA\n  1 1 1 50 50 VERTICAL 0.01 0.0 0.0 0.0 0.0\nEND CONNECTIONDATA\nBEGIN PERIOD 1\n  1 STATUS ACTIVE\nEND PERIOD\n')
+def csub(d):
+    open(os.path.join(d, 'model', 'gwf_liard.csub'), 'w').write('BEGIN OPTIONS\n  HEAD_BASED\nEND OPTIONS\nBEGIN DIMENSIONS\n  NINTERBEDS 0\nEND DIMENSIONS\n'
+                                                                'BEGIN GRIDDATA\n  CG_SKE_CR\n    CONSTANT 5e-4\n  CG_THETA\n    CONSTANT 0.25\nEND GRIDDATA\n')
+    edit(d, 'model/gwf_liard.nam', '  IC6  gwf_liard.ic  ic\n', '  IC6  gwf_liard.ic  ic\n  CSUB6  gwf_liard.csub  csub\n')
+if ok0 and 'GWHeads' in open(os.path.join(d0, 'out', 'solution.rvc')).read():
+    d = restart('e34', lak)
+    stops('E34 a restart from :GWHeads with a kept LAK6 package (lake stages) stops', d, 'the model keeps the LAK6 package LAKE1 (lake stages), which carries its own state')
+    stops('E34 (its remedy: remove :GWHeads, or simulate the whole period in one run)', d, 'Remove :GWHeads from the .rvc file (every package then starts from its input)')
+    shutil.rmtree(d, ignore_errors=True)
+    d = restart('e34b', csub)
+    stops('E34b a restart from :GWHeads with a kept CSUB6 package stops', d, 'the model keeps the CSUB6 package CSUB (stresses and preconsolidation stresses)')
+    shutil.rmtree(d, ignore_errors=True)
+    d = restart('e34c', lambda d: None); ok, out = run(d, DAYS)
+    report('E34c a restart from :GWHeads of the example (no package with its own state) runs', ok, '' if ok else out.strip().split('\n')[-1][:150])
+    shutil.rmtree(d, ignore_errors=True)
+else:
+    report('E34 restarts (first run with :GWHeads in solution.rvc)', False, out0.strip().split('\n')[-1][:150])
+shutil.rmtree(d0, ignore_errors=True)
+# ---- surplus values after :HRUGeometry, :RiverGeometry and :GridFile stop
+for lab, cmd in (('E35 :HRUGeometry with a surplus value stops', 'hru'), ('E35b :RiverGeometry with a surplus value stops', 'riv'), ('E35c :GridFile with a surplus value stops', 'grid')):
+    if cmd == 'hru':
+        d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e35')); edit(d, 'Liard.rvg', 'Liard_HRUs_standin.geojson  HRU_ID', 'Liard_HRUs_standin.geojson  HRU_ID  2')
+    elif cmd == 'riv':
+        d = liard('e35b'); edit(d, 'Liard.rvg', ':RiverGeometry      Liard_rivers.geojson', ':RiverGeometry      Liard_rivers.geojson SUBBASIN 2')
+    else:
+        d = liard('e35c'); open(os.path.join(d, 'Liard.rvg'), 'a').write('\n:GridFile cells.geojson CELL_ID 2\n')
+    ok, out = run(d, 1); line = (re.findall(r'.*surplus value.*', out) or [''])[0].strip()
+    report(lab + ", naming it", not ok and (':%s' % {'hru': 'HRUGeometry', 'riv': 'RiverGeometry', 'grid': 'GridFile'}[cmd]) in line and "has the surplus value '2'" in line, line[:150])
+    shutil.rmtree(d, ignore_errors=True)
 shutil.rmtree(res['e6_ref'][1], ignore_errors=True)
 d = tdis_case('e11', lambda r: ['      -5.0  1       1.00000000'] + r[1:])
 stops('E11 a negative period length stops', d, 'a stress period cannot be shorter than 0')
