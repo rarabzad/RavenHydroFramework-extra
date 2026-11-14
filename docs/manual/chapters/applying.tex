@@ -359,7 +359,7 @@ Message or symptom & Cause and remedy\\\midrule
 ``MODFLOW 6 stopped the run during \dots'' & MODFLOW found an input error inside its library; the message (also in \cmd{Raven\_errors.txt}) quotes the error report of \cmd{<output>/mf6/mfsim.lst}\\
 ``GeoJSON file \dots\ is in EPSG:\emph{n}'' / ``\dots\ outside the longitude/latitude range'' & a projected input file: give \cmd{:InputCRS} (Section~\ref{sec:inputcrs})\\
 ``layer \dots\ starts dry'' (warning) & the initial heads leave a whole layer dry; start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or \cmd{:InitialGWHeads}\\
-``HRU \dots\ has an AQUIFER\_PROFILE but no polygon'' & HRU IDs in the GeoJSON do not match the \cmd{.rvh}; check the ID field name\\
+``HRU \dots\ has an AQUIFER\_PROFILE but no polygon'' & HRU IDs in the GeoJSON do not match the \cmd{.rvh}; check the ID field name. When a reason is given (the polygon has no area), fix the HRU's outline\\
 ``does not overlap any active groundwater cell'' & the HRU is too small for the grid or sits where bedrock is at the surface; reduce \cmd{:GridCellSize} or \cmd{:MinCellCoverage}, or check the bedrock map\\
 ``polygon area \dots\ differs from .rvh AREA'' & information only; volumes are always consistent\\
 ``process \dots\ removes water from GROUNDWATER'' & a Raven process drains \cmd{GROUNDWATER} in a coupled HRU; restrict it with \cmd{:-->Conditional}\\

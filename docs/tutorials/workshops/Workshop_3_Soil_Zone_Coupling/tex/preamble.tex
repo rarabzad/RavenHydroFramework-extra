@@ -66,6 +66,9 @@
 % ---- code
 \newcommand{\ubreak}{\textunderscore}
 \DeclareRobustCommand{\cmd}[1]{\begingroup\ttfamily\let\_\ubreak #1\endgroup}
+% \msg: a message Raven prints; its spaces stretch at most by half, so that a justified line keeps its look
+\DeclareRobustCommand{\msg}[1]{\begingroup\ttfamily\spaceskip=\fontdimen2\font plus 0.5\fontdimen2\font\relax
+  \xspaceskip=\spaceskip #1\endgroup}
 \lstdefinestyle{base}{basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,breaklines=true,
   breakatwhitespace=false,postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},upquote=true,showstringspaces=false,
   aboveskip=4pt,belowskip=4pt,xleftmargin=6pt,xrightmargin=6pt,framexleftmargin=4pt,framexrightmargin=4pt}

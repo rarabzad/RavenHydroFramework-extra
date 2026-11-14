@@ -28,9 +28,11 @@ profile (what \emph{unsaturated zone storage} counts from) is $\theta_r$, not th
 start of the run, or when a falling water table re-forms one) starts at $\theta_r$; a falling water table opens its new
 nodes at $\theta_r$ and nothing is exchanged with the aquifer (there is no air-dry clip); a rising water table releases
 the mobile water $\theta-\theta_r$ below it to the aquifer, which with $\theta\le\theta_s$ is never more than
-$\int S_y\,\mathrm{d}z$ over the rise: what MODFLOW stores for it. The start-up warning that compares $S_y$ with the
-drainable porosity of the retention curve, and the warning of a rising water table held back by $S_y\Delta h$, are
-meaningless for this reference and are not issued.
+$\int S_y\,\mathrm{d}z$ over the rise: what MODFLOW stores for it. The release in one step is also at most the room the
+top cell has left above the water table (Section~\ref{sec:szvadose}); when a nearly full top cell holds part of it back,
+the column keeps that water and releases it in the next steps, and Raven warns the first time in a run. The start-up
+warning that compares $S_y$ with the drainable porosity of the retention curve is meaningless for this reference and is
+not issued, and the limit $S_y\Delta h$ never binds.
 
 \paragraph{Discretization.} The column's finite volumes (top down, at most $N$, at least 3; the grid of
 Section~\ref{sec:szvadose}) are advanced by backward Euler with first-order upwind fluxes, node by node from the top:

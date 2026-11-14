@@ -11,13 +11,13 @@ $ cp -r $WS/model/start $WS/work
 $ cd $WS/work
 \end{shell}
 \term{t5_run_full.txt}
-\see \cmd{Exiting Gracefully: Successful Simulation}.
+\see \msg{Exiting Gracefully: Successful Simulation}.
 
 \step{Run part 1: the first two years}
 Change the duration in \cmd{Creek.rvi} to two years and run into \cmd{out\_part1}:
 \diff{t5_part1.diff}
 \term{t5_run_part1.txt}
-\see \cmd{Exiting Gracefully: Successful Simulation}.
+\see \msg{Exiting Gracefully: Successful Simulation}.
 
 \step{Look at the saved state}
 \term{t5_rvc_blocks.txt}
@@ -40,7 +40,7 @@ Change \cmd{Creek.rvi} in \cmd{work\_part2} to start on 1 January 2012 and to ru
 \diff{t5_part2.diff}
 \term{t5_run_part2.txt}
 \term{t5_part2_advisory.txt}
-\see \cmd{Exiting Gracefully: Successful Simulation}, and a note that the groundwater heads come from the hotstart.
+\see \msg{Exiting Gracefully: Successful Simulation}, and a note that the groundwater heads come from the hotstart.
 \why the line \cmd{:GWInitialization STEADY\_STATE} of the \cmd{.rvg} is skipped: the heads come from the hotstart file.
 
 \step{Compare with the continuous run}

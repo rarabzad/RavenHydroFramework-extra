@@ -17,7 +17,7 @@ Add one line at the end of \cmd{Creek.rvg}:
 \diff{t3_richards.diff}
 \term{t3_run_richards.txt}
 \term{t3_summary_rich.txt}
-\see \cmd{Exiting Gracefully: Successful Simulation}. The run takes about \V{t3:secrichards}~seconds. There is no new
+\see \msg{Exiting Gracefully: Successful Simulation}. The run takes about \V{t3:secrichards}~seconds. There is no new
 warning: \cmd{out\_richards/Raven\_errors.txt} holds the \V{t3:nwarnRich} warnings of Step~\ref{st:physrun}. The files of
 this step are in \cmd{\$WS/model/step\_10}.
 
@@ -27,7 +27,7 @@ Change one word in \cmd{Creek.rvg} and run into \cmd{out\_kinematic}:
 \begin{shell}
 $ $RAVEN Creek -o out_kinematic/
 \end{shell}
-\see \cmd{Exiting Gracefully: Successful Simulation}.
+\see \msg{Exiting Gracefully: Successful Simulation}.
 
 \step{Try LAG}
 Change the same word again and run into \cmd{out\_lag}:
@@ -35,7 +35,7 @@ Change the same word again and run into \cmd{out\_lag}:
 \begin{shell}
 $ $RAVEN Creek -o out_lag/
 \end{shell}
-\see \cmd{Exiting Gracefully: Successful Simulation}. The run wrote \V{t3:nwarnLag} warnings into
+\see \msg{Exiting Gracefully: Successful Simulation}. The run wrote \V{t3:nwarnLag} warnings into
 \cmd{out\_lag/Raven\_errors.txt}: the \V{t3:nwarnRich} of Step~\ref{st:physrun} and one more:
 \term{t3_warn_lag.txt}
 \why it is not the warning of Step~\ref{st:aquifer}, and the specific yields are not its cause. In a step where the
@@ -53,6 +53,6 @@ points. Put \cmd{RICHARDS} back and add the line:
 \begin{shell}
 $ $RAVEN Creek -o out_classes/
 \end{shell}
-\see \cmd{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds.
+\see \msg{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds.
 \cmd{out\_classes/Raven\_errors.txt} holds \V{t3:nwarnClasses} warnings: those of the LAG run, with \cmd{RICHARDS} in the
 last one, for the same reason. \cmd{Creek.rvg} is now as in \cmd{\$WS/model/finished}.

@@ -157,7 +157,7 @@ order where profiles meet.
 
 | Command | Default | Meaning |
 | --- | --- | --- |
-| `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat or `:InputCRS`) |
+| `:HRUGeometry file {id field}` | required; field `HRU_ID` | HRU polygons (GeoJSON, lon/lat or `:InputCRS`); a feature without area (an empty outline, fewer than 3 distinct vertices, on one line or enclosing no net area) is left out, which stops the run only for an HRU the model couples |
 | `:RiverGeometry file {subbasin field}` | none | river lines; without a field, each piece belongs to the subbasin of the dominant HRU in its cell |
 | `:LandSurface file [METRES]` | HRU ELEVATION | DEM, ESRI ASCII grid or GeoTIFF (`.tif`, `.tiff`) in lon/lat or `:InputCRS`; averaged over each cell; `METRES` confirms elevations in metres whatever a GeoTIFF's band unit text |
 | `:InputCRS EPSG:code` or `TMERC\|ALBERS\|LCC ...` | lon/lat | projection of every geometry and raster input file (grammar of `:MF6CRS`); wells may then be given by X, Y |
@@ -393,13 +393,14 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   `POROSITY`, `CLAPP_B` and `AIR_ENTRY_PRESSURE`, and an `SPEC_YIELD` close to the drainable porosity their retention
   curve implies (a warning when they differ by more than a factor two). A rising water table takes from a column at most
   what MODFLOW stores for the rise (Sy dh, and no more than the room left in the top cell); the column keeps the rest for
-  the next steps. This happens when the rise meets more water above equilibrium than Sy dh in the band it crosses, so
-  it depends on how much the column holds there: water in transit (the `LAG` store, a `RICHARDS` wetting front, a
+  the next steps. This happens when the rise meets more water above equilibrium in the band it crosses than the
+  smaller of Sy dh and the room left in the top cell, so it depends on how much the column holds there: water in transit (the `LAG` store, a `RICHARDS` wetting front, a
   recharge pulse, the more of it the larger the pulse), the excess of a column under a steady flux (it grows with the
   height above the water table and is met when a small `SPEC_YIELD` makes the water table rise fast), or a nearly full
   top cell. It happens the more readily the smaller `SPEC_YIELD` is against the drainable porosity. A column at rest
   holds no such excess, and a water table raised under it by a boundary or lateral inflow does not reach the limit.
-  Raven warns the first time in a run, and no water is lost. Column water goes back to the soil zone, as
+  Raven warns the first time in a run, and no water is lost. With `KINEMATIC` the water a rise releases is never more
+  than Sy dh, so only the room left in the top cell can hold it back, and its warning names that room. Column water goes back to the soil zone, as
   rejected recharge, where the water table rises during a step onto ground unsaturated at its start (rule (i)) and when a
   column vanishes beyond what MODFLOW stores for the rise (rule (ii)); it is subtracted from the unsaturated-zone inflow,
   which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
@@ -532,7 +533,9 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 | --- | --- |
 | "cannot load MODFLOW 6 library" | run `python tools/get_mf6.py` in RavenHydroFramework-extra, or set `:MF6Library` or `RAVEN_MF6_LIB` to the full path of libmf6; the message lists the places searched |
 | "MODFLOW 6 stopped the run during ..." | MODFLOW found an input error inside its library; the message quotes the error report of `<output>/mf6/mfsim.lst` |
-| "HRU ... has an AQUIFER_PROFILE but no polygon" | HRU IDs in the GeoJSON do not match the `.rvh`; check the ID field name |
+| "HRU ... has an AQUIFER_PROFILE but no polygon" | HRU IDs in the GeoJSON do not match the `.rvh`; check the ID field name. When the message gives a reason (the polygon has no area), fix the HRU's outline |
+| "grid cell ... has no area" | a cell of the `:GridFile` has an empty, degenerate or zero-area outline; fix it |
+| "command ... the ... '...' is out of range" | an ID or cell number of `:OverlapWeights`, `:Wells` or `:MonitoringWells` is beyond the integer range; correct it |
 | "does not overlap any active groundwater cell" | reduce `:GridCellSize` or `:MinCellCoverage`, or check bedrock depth |
 | Warnings "polygon area ... differs from .rvh AREA" | informational; fluxes are mapped mass-conservatively regardless |
 | "MODFLOW 6 did not converge" | start from `:GWInitialization STEADY_STATE` or realistic `:InitialGWHeads`; raise `:SolverMaxOuterIterations`; increase `SEEPAGE_SMOOTHING_DEPTH`. Raven continues with MODFLOW's flows; on such a step only MODFLOW's negative residual is withheld from the discharge to Raven ("... m3 of discharge to Raven withheld for MODFLOW's negative residual", first ten per run; run total "discharge withheld" in `GWModelSummary.txt`) |
