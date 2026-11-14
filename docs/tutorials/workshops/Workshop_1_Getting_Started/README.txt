@@ -33,15 +33,10 @@ About 30 minutes, plus about 8 minutes for the optional 20-year run.
 
 How to start
 ------------
-    cd ~
-    unzip -q Workshop_1_Getting_Started.zip
-    cd Workshop_1_Getting_Started
-    export WS=$PWD
-    export RAVEN=$WS/bin/Raven
-    cp -r $WS/model/start $WS/work
-    cd $WS/work
-Then follow the PDF from Step 1 (it repeats these commands and explains them). In every new terminal, type
-the two export lines again.
+Open Workshop_1_Getting_Started.pdf and follow it from Step 1. Step 1 unpacks this zip in your home folder
+and sets the variables WS and RAVEN; a later step copies model/start to the folder work, where you run the
+model. If you have already unpacked the zip in your home folder, skip the unzip line of Step 1 (typed again,
+unzip asks whether to replace each file). In every new terminal, type the two export lines of Step 1 again.
 
 Folder map
 ----------

@@ -39,15 +39,11 @@ About 30 minutes of work, plus about 28 minutes of computing for the calibration
 
 How to start
 ------------
-    cd ~
-    unzip -q Workshop_6_Calibration_With_Ostrich.zip
-    cd Workshop_6_Calibration_With_Ostrich
-    export WS=$PWD
-    export RAVEN=$WS/bin/Raven
-    cp -r $WS/model/start $WS/work
-    cd $WS/work
-Then follow the PDF from Step 1 (it repeats these commands and explains them). In every new terminal, type
-the two export lines again.
+Open Workshop_6_Calibration_With_Ostrich.pdf and follow it from Step 1. Step 1 unpacks this zip in your home
+folder and sets the variables WS and RAVEN; a later step copies model/start to the folder work, where you
+run the model. If you have already unpacked the zip in your home folder, skip the unzip line of Step 1
+(typed again, unzip asks whether to replace each file). In every new terminal, type the two export lines of
+Step 1 again.
 
 Folder map
 ----------

@@ -9,7 +9,7 @@ Two examples, both built on the Liard River Raven model (northern British Columb
 
 The commands below are for **Windows (Command Prompt)**. Linux and macOS commands follow each step where they differ.
 
-**With the Linux release package** (`Raven_MF6_linux`): Raven and the MODFLOW 6 library are ready in the package's
+**With the Linux release package** (the folder made by `tools/make_package.py`, with `bin/`, `examples/` and `README.md`): Raven and the MODFLOW 6 library are ready in the package's
 `bin/`, so skip Part 1 and set `RAVEN=<package>/bin/Raven`; the example folders are the package's `examples/`, the manual
 is `Raven_MF6_Manual.pdf` beside them, and the repository files named below (the user guide in `docs/`, `tools/`) are in
 `source/raven_extra_docs_tests.tar.gz` (it unpacks as `raven-mf6-extra/`). The package's `README.md` has the commands.

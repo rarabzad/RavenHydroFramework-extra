@@ -486,14 +486,16 @@ water table.) A node that the move leaves above its porosity, or drier than air-
 exchanged with the aquifer. A rising water table releases at most what MODFLOW stores for that rise, $S_y\Delta h$ per
 unit area (integrated over the layers the rise crosses), in one step, and no more than the room the top cell has left
 above the water table ($S_y$ integrated from the head up to the cell's top or the column's base, whichever is lower); the column's bottom then follows more slowly and releases the rest in the next steps. The
-limit binds when a rising water table meets more water above equilibrium than $S_y\Delta h$ in the band it crosses:
-where the column carries water in transit (the LAG store, a \cmd{RICHARDS} wetting front, a recharge pulse) or the
-top cell is nearly full. Without the limit the release would then grow from step to step (a feedback with gain
-$(\theta-\theta_{\mathrm{eq}})/S_y>1$). The smaller $S_y$ is against the drainable porosity, the more readily this
-happens; with $S_y$ well below it, every recharge pulse that reaches the water table binds the limit, and Raven warns
-at start-up when $S_y$ and $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2. A column at
-rest or under a small steady flux, and a water table raised from below or from the side (a boundary, lateral inflow),
-hold no such excess, and the limit does not bind, whatever $S_y$. Where it binds, the column keeps that water and
+limit binds when a rising water table meets more water above equilibrium than $S_y\Delta h$ in the band it crosses.
+Without the limit the release would then grow from step to step (a feedback with gain
+$(\theta-\theta_{\mathrm{eq}})/S_y>1$). Whether it binds depends on how much water the column holds above equilibrium
+in that band: water in transit (the LAG store, a \cmd{RICHARDS} wetting front, a recharge pulse, the more of it the
+larger the pulse), the excess of a column under a steady flux, which grows with the height above the water table and
+is met when a small $S_y$ makes the water table rise fast, or a nearly full top cell. The smaller $S_y$ is against the
+drainable porosity, the more readily it binds, and Raven warns at start-up when $S_y$ and
+$\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2. A column at rest (at equilibrium) holds
+no such excess, and a water table raised under it from below or from the side (a boundary, lateral inflow) does not
+bind the limit. Where it binds, the column keeps that water and
 releases it in the next steps, and no water is lost. Raven writes a warning the first time the limit binds in a run (not with
 \cmd{KINEMATIC}, whose reference profile is $\theta_s-S_y$).
 When the water table rises to within $L_{\min}$ of the base the column disappears (rule (ii) below) and the

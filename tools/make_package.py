@@ -36,9 +36,11 @@ Checks (exit code 0 only when all pass):
     libstdc++) fails this check; bin/libmf6.so needs at most GLIBC_2.34, the floor the README names;
   - every workshop zip holds the package's bin/Raven and bin/libmf6.so, byte for byte, and names the code revision;
   - the README names only files the package holds, and has no wording about the making of the package: none of the
-    words of PROCESS below (audit, phase, round, draft, WIP, TODO, review, revision, rebuilt, regenerated, recovered,
-    reconstructed, previously, no longer, not yet, pending, placeholder, final, status at, by your order, corrected,
-    fixed in, earlier version, a version or finding ID, and the like; "git history" and "Raven history" are allowed);
+    words of PROCESS below, which is the commit-message wording rule of tools/process_wording.py (audit, phase, round,
+    draft, WIP, review, revision, rebuilt, regenerated, recovered, reconstructed, previously, no longer, pending,
+    placeholder, merged build, brought up to, a version or finding ID, and the like) and a few more for a README (TODO,
+    FIXME, not yet, final, status at, by your order, corrected, fixed in, earlier version, ...); "git history" and
+    "Raven history" are allowed;
   - the extra checkout is clean and at the extra revision (tools/, docs/tutorials/).
 
 --self-test checks the two checks above that need no package: each process phrase injected into the README template
@@ -50,22 +52,22 @@ import os, sys, re, io, shutil, subprocess, tempfile, tarfile, zipfile, hashlib,
 HERE = os.path.dirname(os.path.abspath(__file__))
 MF6_VERSION = '6.8.1'
 RAVEN_GLIBC, MF6_GLIBC = (2, 28), (2, 34)   # the highest GLIBC_ versions bin/Raven and bin/libmf6.so may need
-PROCESS = re.compile(   # wording about the making of the package (the commit-message wording rule, and more)
-    r'(?<!tools_)audit|\bphases?\b|\brounds?\b|\bround-\d|replay|\bfindings?\b|'
-    r'(?<![A-Za-z0-9])v[1-9][0-9]?[a-z]?\b|_v[1-9]|\bt[0-9]{3}\b|'
-    r'\b(?:CB|SZ|VZ|IB|MT|BR|RS|WS|SV)-?\d+(?:-\d+)?\b|\bA[1-9]\b|\bD[1-9](?:-D[1-9])?\b|\bR1[0-9]?-\d\b|'
-    r'\bWIP\b|\bTODO\b|\bFIXME\b|coordinator|usage-limit|work in progress|\brb-[a-z0-9]+|\binteg\b|'
-    r'\bstill to come\b|\bcompleted\b|\bnot yet\b|\bdraft\b|\bpending\b|placeholder|honest|'
-    r'\brebuil|\brecover|\breconstruct|(?<!git )(?<!Raven )\bhistory\b|first full version|\bfinal\b|'
-    r'\bno longer\b|\bpreviously\b|\bregenerat|\bup to date\b|\brevis(?:ed|ions?)\b|\breview(?:ed|er|s)?\b|'
-    r'\btaken out\b|\bto be filled\b|\bleft to fill\b|\bfirst[- ]release\b|'
-    r'\bstatus at\b|\bby your order\b|\bas you (?:asked|ordered|requested)\b|\bcorrect(?:ed|ions?)\b|\bfixed in\b|'
-    r'\bearlier (?:version|package|release|build)s?\b|\bnew in this (?:version|package|release)\b', re.I)
+sys.path.insert(0, HERE)
+from process_wording import RULE_SOURCE   # the commit-message wording rule: the one list of process words
+# wording about the making of the package: the commit-message rule's words, and more for a README; "git history" and
+# "Raven history" are allowed (the README's restore section and package_sources.py's text)
+README_EXTRA = (
+    r'\bphases?\b|\brounds?\b|\bfindings?\b|\bTODO\b|\bFIXME\b|\bnot yet\b|\bfinal\b|\bstatus at\b|\bby your order\b|'
+    r'\bas you (?:asked|ordered|requested)\b|\bcorrect(?:ed|ions?)\b|\bfixed in\b|'
+    r'\bearlier (?:version|package|release|build)s?\b|\bnew in this (?:version|package|release)\b')
+PROCESS = re.compile(RULE_SOURCE + '|' + README_EXTRA, re.I)
+ALLOWED = re.compile(r'(?:\bgit|\bRaven) $', re.I)   # before "history"
 
 
 def readme_problems(text):
     # the wording of the README about the making of the package
-    return ['README.md: wording "%s"' % m.group(0) for m in PROCESS.finditer(text)]
+    return ['README.md: wording "%s"' % m.group(0) for m in PROCESS.finditer(text)
+            if not (m.group(0).lower() == 'history' and ALLOWED.search(text[max(0, m.start() - 6):m.start()]))]
 
 
 def elf_needs(path):
@@ -190,10 +192,16 @@ def self_test():
                'the earlier version of the package', 'checked in the audit', 'made in phase 3', 'a draft of the manual',
                'as previously', 'no longer needed', 'regenerated with the new build', 'the revised text', 'WIP', 'TODO',
                'the history of the work', 'reviewed by the team', 'recovered files', 'pending a check',
-               'new in this release', 'the v2 tools', 'see SZ-12', 'as you asked'):
+               'new in this release', 'the v2 tools', 'see SZ-12', 'as you asked', 'the merged build',
+               'Raven built (2026-11-13)', 'brought up to the current code', 'merge3 sources',
+               'conflicts in x were resolved', 'the v3build binary'):
         check('the README with "%s" fails' % ph, bool(readme_problems(readme + '\n' + ph + '\n')))
-    for ok_text in ('Restore the git history', 'their complete git history as bundles', 'fixed heads', 'the tools_audit.py check'):
+    for ok_text in ('Restore the git history', 'their complete git history as bundles', 'the Raven history bundle',
+                    'fixed heads', 'the tools_audit.py check'):
         check('"%s" is allowed' % ok_text, not readme_problems(ok_text))
+    import process_wording
+    check('PROCESS is built from the commit-message rule (process_wording.RULE_SOURCE)',
+          PROCESS.pattern.startswith(process_wording.RULE.pattern + '|'))
     tmp = tempfile.mkdtemp(prefix='mkpkg_test_')
     try:
         cases = [('release build: libc GLIBC_2.16, libdl', ['libc.so.6', 'libdl.so.2'], {'libc.so.6': ['GLIBC_2.2.5', 'GLIBC_2.16'], 'libdl.so.2': ['GLIBC_2.2.5']}, 0),

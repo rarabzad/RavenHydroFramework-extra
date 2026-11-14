@@ -37,12 +37,15 @@ Raven takes the model name and an output folder. \cmd{Liard} is the model name: 
 \item At the end, between two lines of \cmd{=} signs, Raven prints \cmd{Exiting Gracefully: Successful
 Simulation}.
 \item Raven printed \cmd{Initializing groundwater model (MODFLOW 6)}.
-\item Warnings are listed in \cmd{out/Raven\_errors.txt}: \V{t1:nwarn} in this run. \V{t1:nwarnpoly} of them say that
+\item Warnings are listed in \cmd{out/Raven\_errors.txt}, one per line: \V{t1:nwarn} lines in this run, as
+  \cmd{grep -c WARNING out/Raven\_errors.txt} counts them. \V{t1:nwarnpoly} of them say that
   an HRU polygon does not match the HRU area of \cmd{Liard.rvh}. This is expected: the polygons are stand-ins, and
   \cmd{README.md} of the example explains why. Raven still passes all the recharge and seepage between the two models;
-  only how it is spread over the cells is distorted. The other warnings come from the original Liard model
+  only how it is spread over the cells is distorted. The other lines come from the original Liard model
   (\V{t1:nwarnchan} about channel cross-sections) and from gauges without observations in this one-year period
-  (\V{t1:nwarndiag}). They are expected too.
+  (\V{t1:nwarndiag} lines naming a fit statistic that cannot be calculated without observations, and \V{t1:nwarnrep}
+  lines saying that the warning before them was repeated, which Raven writes instead of the repeats). They are expected
+  too.
 \end{itemize}
 \end{tocheck}
 \begin{trouble}

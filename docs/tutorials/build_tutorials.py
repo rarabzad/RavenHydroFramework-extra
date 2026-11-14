@@ -2195,13 +2195,20 @@ def tut1():
     ex1, dt, _ = raven(lg, 'out', 't1_run.txt', ucwd=uw, model='Liard')
     G.val('t1:runsec', '%d' % max(1, round(dt)), volatile=True)
     out = os.path.join(lg, 'out')
-    wl = [l for l in open(os.path.join(out, 'Raven_errors.txt'), errors='ignore') if l.startswith('WARNING')]
+    # the text counts as grep -c WARNING does: the lines with WARNING, among them Raven's lines saying that the warning
+    # before them was repeated (Raven writes a repeated warning once, then that line)
+    el = open(os.path.join(out, 'Raven_errors.txt'), errors='ignore').read().splitlines()
+    wl = [l for l in el if 'WARNING' in l]
+    rl = [i for i, l in enumerate(el) if 'PREVIOUS WARNING REPEATED' in l]
     G.val('t1:nwarn', '%d' % len(wl))
     G.val('t1:nwarnpoly', '%d' % sum(1 for l in wl if 'polygon area' in l))
     G.val('t1:nwarnchan', '%d' % sum(1 for l in wl if 'CheckReferenceFlow' in l))
     G.val('t1:nwarndiag', '%d' % sum(1 for l in wl if 'not calculated' in l))
-    if sum(int(G.values['t1:nwarn' + k]) for k in ('poly', 'chan', 'diag')) != len(wl):
+    G.val('t1:nwarnrep', '%d' % len(rl))
+    if sum(int(G.values['t1:nwarn' + k]) for k in ('poly', 'chan', 'diag', 'rep')) != len(wl):
         raise RuntimeError('workshop 1: warnings of another kind in Raven_errors.txt; the text names three kinds')
+    if any(i == 0 or 'not calculated' not in el[i - 1] for i in rl):
+        raise RuntimeError('workshop 1: a repeated warning that is not about a missing metric; the text says they all are')
     G.text('t1_ls_out.txt', '$ ls out\n' + '  '.join(sorted(os.listdir(out))) + '\n$ ls out/mf6\n' + '  '.join(sorted(os.listdir(os.path.join(out, 'mf6')))))
     s = summary_text(out)
     G.text('t1_summary.txt', '$ grep -v "computed in" out/GWModelSummary.txt | head -n 17\n' + sanitize(excerpt(s, first=17, drop=r'computed in'), lg, uw))

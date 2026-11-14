@@ -305,8 +305,9 @@ writes: FloPy reads every model; cells are valid and do not overlap; the grid or
 (1\textdegree); no vertical connection passes through an aquiclude; drains lie inside the top cell; boundary polygons
 select the right cells. All 127 checks pass.
 
-\paragraph{Faulty and unusual input.} Thirty-nine faulty or unusual set-ups of the Liard model check the messages
-(Tables~\ref{tab:faulty} and~\ref{tab:faultynum}): every error stops the run with a message that names the problem --- no crash --- and every
+\paragraph{Faulty and unusual input.} The input checks of \cmd{tests/input\_checks.py} (N1--N28, U0--U4, RN1--RN2,
+E1--E12), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
+check the messages (Tables~\ref{tab:faulty} and~\ref{tab:faultynum}): every error stops the run with a message that names the problem --- no crash --- and every
 tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
 MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
 renumbering, the original model untouched). All 53 behave as required.
