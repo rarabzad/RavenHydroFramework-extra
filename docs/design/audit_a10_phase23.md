@@ -81,6 +81,17 @@ wt/rel22_Raven.exe: PASS (36 values, 12 excerpts; tex compiles, 10 pages, no war
   PASSED (`patches/mt10_4_selftest.log`).
 - Added lines outside docs/design: no history or audit wording (grep).
 
-## After the merge with phase 24
-To do: regenerate the workshops with the phase-24 build, rebuild main.pdf (`check_manual_pdf.py --write`), and add the
-proposal entries for the merged commits.
+## After the merge with phase 24 (code 981da06, extra 1d7c7b3)
+- Workshops regenerated with wt/rel24_Raven.exe (`--raven-src` the code worktree at 981da06, without OSTRICH, 854 s):
+  only measured run times change (t1:runsec, t2:refsec, t3 seconds, t6:runsec) and the PDFs of workshops 1, 2, 3 and
+  6; Workshop 1's warning counts are 137 and 4, as committed; no Workshop 6 value other than its run time changed, so
+  the DDS was not rerun. No `fort.*` file in any run folder.
+- Release executable from 981da06 with build_release_raven.sh: `wt/rel24_release_glibc.exe`, sha256 e6991ff9...,
+  GLIBC 2.16 at most, banner date Nov 14 2026. A second build under TZ=Asia/Tokyo and LC_ALL=C.UTF-8, each with an empty
+  zig cache of its own: byte-identical. `build_tutorials.py --check --quick` with it: PASS (378 values, 105 excerpts,
+  the six tex/ compile standalone); its 224 CSV, .rvc, .hds, .cbc and .nc outputs equal rel24's byte for byte.
+- Zips: `wt/ws/zips_final/`, `--package` with the release executable and `--source-commit 981da06`; each equals its
+  committed folder apart from bin/ (bin/Raven and bin/libmf6.so by sha256, bin/README.txt naming 981da06).
+- Manual: `check_manual_pdf.py --write` (186 -> 187 pages), then PASS.
+- tools_check.py with rel24: ALL PASSED; `make_package.py --self-test`: ALL PASSED; `neutral_messages.py check` with
+  the repositories: PASS (86 + 138).
