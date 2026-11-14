@@ -106,8 +106,9 @@ largest coupled HRU of subbasin~52, with a pumping well, for two years --- the s
 volume that left the lake the day before (difference 0), all of it is delivered, and MODFLOW's residual is
 $1.7\times10^{-11}$; and the same set-up as a two-member ensemble --- each member identical to the single run in
 \cmd{GWBudget.csv}, \cmd{GWHeads.csv}, \cmd{Hydrographs.csv}, \cmd{ReservoirStages.csv} and \cmd{GWHRUState.csv}
-(difference 0), with exact accounts. (\cmd{WatershedStorage.csv} is not compared: in ensemble mode base Raven reports other
-channel and rivulet storages than in a single run, also without groundwater; Section~\ref{ch:limits}.)
+(difference 0), with exact accounts. The channel storage of \cmd{WatershedStorage.csv} and the \cmd{:ChannelStorage} of
+\cmd{solution.rvc} are compared too (difference 0); the rivulet storage and the total are not: base Raven adds the
+rivulet storage again at every initialization (Section~\ref{ch:limits}).
 
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_pumping.png}
 \caption{Pumping test: drawdown at the monitoring wells (left) and where the pumped water comes from (right).}\label{fig:pumping}\end{figure}
@@ -183,7 +184,7 @@ that must be refused (Tables~\ref{tab:readers}, \ref{tab:geojson} and~\ref{tab:r
 Function & Reference & Largest difference\\\midrule
 Polygon clipping and area (400 random, mostly concave polygons) & shapely & $4.6\times10^{-12}$ (relative)\\
 Equal-area projection (300 points over the Liard region) & pyproj (same sphere) & $6.7\times10^{-7}$ m\\
-Albers and Lambert conformal conic projections (13 cases, also with the origin at either pole, with false eastings, and at points more than 180\textdegree{} and exactly 180\textdegree{} of longitude from the central meridian) & pyproj (PROJ) & $4.8\times10^{-7}$ m\\
+Albers and Lambert conformal conic projections (16 cases, also with the origin at either pole, with false eastings, at points more than 180\textdegree{} and exactly 180\textdegree{} of longitude from the central meridian, at longitudes written beyond $\pm180$\textdegree{}, and at the apex of a southern cone) & pyproj (PROJ) & $4.8\times10^{-7}$ m\\
 Projection round trip & -- & exact\\
 Bilinear raster sampling of a plane, which bilinear sampling reproduces exactly (200 points); the no-data margin of half a cell beyond the edge & the plane & $3.6\times10^{-15}$; a value 0.4 cell beyond the edge, none 0.6 cell beyond\\
 \cmd{:InputCRS}: a UTM raster holding a plane, sampled at 300 lon/lat points & pyproj (PROJ) & $3\times10^{-10}$ (of values $\sim10^3$)\\
@@ -205,7 +206,7 @@ GeoJSON and ASCII-grid variants (3-D coordinates, string IDs, holes, cell-centre
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Input & Reference & Result\\\midrule
 GeoJSON numbers: coordinates that are strings, \cmd{null}, \cmd{true} or too large; \cmd{NaN}, \cmd{Infinity}, hexadecimal numbers and leading zeros; features with and without \cmd{"properties"} & the JSON standard & the invalid ones refused, naming the feature, ring and vertex or the line and column; a feature without \cmd{"properties"} refused only where an ID is read\\
-GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"7.5"} and \cmd{""}; IDs \cmd{"7"}, \cmd{"\ 7\ "}, \cmd{"7.0"} and 7.0; features of other geometry types with a \cmd{null} ID; a Polygon nested one level too shallow, a vertex \cmd{[1]} (polygon and line), a LineString whose coordinates are a number; \cmd{NaN} and \cmd{Infinity} attributes; field names written with \cmd{\textbackslash u} escapes; text after the root object; a truncated file; whole-number IDs beyond $9\times10^{15}$; a missing ID field where the feature has an \cmd{"id"} member (GDAL's \cmd{ID\_FIELD}); polygons without area (an empty Polygon, an outline of fewer than 3 distinct vertices, such a part of a MultiPolygon) & the JSON standard & the first six IDs refused, naming the file, the feature and the value, the next four read; IDs beyond $9\times10^{15}$ refused with the advice to write them as strings, the missing field with the \cmd{ID\_FIELD} hint; a polygon without area dropped with its holes and its ID left out with the reason (a stop only where the model uses that ID), a MultiPolygon's other parts read; features of other types skipped before their ID; each malformed structure refused, naming the vertex or member; the attributes and the escaped names read; the trailing text and the truncated file refused (\cmd{geomtest\_check.py})\\\bottomrule
+GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"7.5"} and \cmd{""}; IDs \cmd{"7"}, \cmd{"\ 7\ "}, \cmd{"7.0"} and 7.0; features of other geometry types with a \cmd{null} ID; a Polygon nested one level too shallow, a vertex \cmd{[1]} (polygon and line), a LineString whose coordinates are a number; \cmd{NaN} and \cmd{Infinity} attributes; field names written with \cmd{\textbackslash u} escapes; text after the root object; a truncated file; whole-number IDs beyond $9\times10^{15}$; a missing ID field where the feature has an \cmd{"id"} member (GDAL's \cmd{ID\_FIELD}); polygons without area (an empty Polygon, an outline of fewer than 3 distinct vertices, an outline of 3 vertices on one line, a square traced out and back, a figure eight of equal lobes, such a part of a MultiPolygon) & the JSON standard & the first six IDs refused, naming the file, the feature and the value, the next four read; IDs beyond $9\times10^{15}$ refused with the advice to write them as strings, the missing field with the \cmd{ID\_FIELD} hint; a polygon without area dropped with its holes and its ID left out with the reason (``has no area'', with ``its outline has fewer than 3 distinct vertices, lies on one line or encloses no net area'' where that applies; a stop only where the model uses that ID), a MultiPolygon's other parts read; features of other types skipped before their ID; each malformed structure refused, naming the vertex or member; the attributes and the escaped names read; the trailing text and the truncated file refused (\cmd{geomtest\_check.py})\\\bottomrule
 \end{tabularx}
 \end{table}
 \begin{table}[!htbp]\centering
@@ -306,8 +307,8 @@ writes: FloPy reads every model; cells are valid and do not overlap; the grid or
 select the right cells. All 127 checks pass.
 
 \paragraph{Faulty and unusual input.} The input checks of \cmd{tests/input\_checks.py} (N1--N28, U0--U4, RN1--RN2,
-E1--E12), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
-check the messages (Tables~\ref{tab:faulty} and~\ref{tab:faultynum}): every error stops the run with a message that names the problem --- no crash --- and every
+E1--E23, AM1), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
+check the messages (Tables~\ref{tab:faulty}, \ref{tab:faultynum} and~\ref{tab:faultyext}): every error stops the run with a message that names the problem --- no crash --- and every
 tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
 MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
 renumbering, the original model untouched). All 53 behave as required.
@@ -344,6 +345,16 @@ An existing model's name file: an unnamed package after a named one of its type 
 Malformed numbers in the \cmd{.rvc}: \cmd{:InitialGWHeads ELEVATION 98,5}, \cmd{H98.5} or \cmd{0x62}, \cmd{:InitialGWHeads FROM\_PROFILE 0}, a \cmd{:GWHeads} value \cmd{98.5x} & stops; names the command and the token (\cmd{test\_inputs.py} I22)\\
 \cmd{:WellFlowRate} in \cmd{m3/s} or \cmd{L/s}; other units of a well or head series & converted to m$^3$/d (5\,000 m$^3$/d either way); stops\\
 A package of an existing model named like one of Raven's (\cmd{DRN\_RAVEN}); a recharge package so named and taken over & stops with Raven's message; runs\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{Response to OPEN/CLOSE in an existing model's name files, a large MF6 balance error, \cmd{:OverlapWeights} limits and a model across the antimeridian.}\label{tab:faultyext}
+\begin{tabularx}{\linewidth}{Y P{0.4\linewidth}}\toprule\hdr
+Input & Response\\\midrule
+An existing model's name files through OPEN/CLOSE: the recharge and ET rows of the \cmd{PACKAGES} block in an OPEN/CLOSE file, taken over (E13) and without \cmd{:RavenTakesOver} (E14); the \cmd{MODELS} and \cmd{SOLUTIONGROUP} blocks of mfsim.nam (E15); the \cmd{OPTIONS} blocks of the name file (with \cmd{NEWTON}) and of mfsim.nam (E19); OPEN/CLOSE as a later row of a block (E20); an absolute OPEN/CLOSE path (E21) & read in place, as MODFLOW~6 reads them: E13, E15, E19 and E21 give results identical to the unmodified model's (E13: the working copy holds the taken-over rows commented out; E19: \cmd{NEWTON} found); E14 stops (the model's recharge would run beside Raven's, outside its books); E20 stops with MODFLOW's rule\\
+Loose solver tolerances: a converged step with an MF6 balance error above 1~\% of the gross flow (E16) & one warning a run\\
+\cmd{:OverlapWeights} cell numbers of $2^{32}+1$ (which a cut to int reads as cell 1; E17), of 20 digits (E18) and of $-20$ digits (E22); a row of weight 0 with cell number $2^{32}+1$ (E23) & E17, E18 and E22 stop, naming the number; E23 is skipped and the run completes\\
+A model across the antimeridian: two HRUs whose shared edge lies on longitude 180, a DEM in longitude/latitude across 180 (AM1) & the same active cells and the same recharge, storage and specified-head flows (relative $10^{-6}$) as the same model at longitude 0; no DEM column without a value\\\bottomrule
 \end{tabularx}
 \end{table}
 

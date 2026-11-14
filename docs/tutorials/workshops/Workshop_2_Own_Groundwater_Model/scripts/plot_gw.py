@@ -83,7 +83,7 @@ def main():
     title = (a.title + ': ') if a.title else ''
 
     # --- budget
-    terms = [('MF6 recharge [m3/d]', 'recharge from Raven', 1), ('seepage to Raven [m3/d]', 'seepage to Raven', -1),
+    terms = [('MF6 recharge [m3/d]', 'recharge received by MODFLOW', 1), ('seepage to Raven [m3/d]', 'seepage to Raven', -1),
              ('aquifer discharge to rivers [m3/d]', 'aquifer to rivers', -1), ('river leakage to aquifer [m3/d]', 'rivers to aquifer', 1),
              ('storage release [m3/d]', 'storage release', 1)]
     fig, ax = plt.subplots(figsize=(8, 3.6))

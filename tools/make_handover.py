@@ -21,9 +21,9 @@ Writes into --out (a new or empty folder):
 
 The -extra repository is published with its whole history, docs/design (the developer records) included: every earlier
 commit holds them, so leaving them out of the tip would not take them out of the public repository. Give the
-repositories exactly as they are to be published: when their commit messages are edited before publishing, edit them in
-new clones (each commit keeping its tree, author and dates) and give those clones here, with the branch names; the
-bundles then carry those commits. The commit IDs that docs/design cites are those of the development repositories, as
+repositories exactly as they are to be published: when their commit messages, or the files of older commits, are edited
+before publishing, edit them in new clones (each commit keeping its author and dates, the tip keeping its tree) and give
+those clones here, with the branch names; the bundles then carry those commits. The commit IDs that docs/design cites are those of the development repositories, as
 each record that cites one says. The release package's source archive (written by
 package_sources.py) leaves docs/design out.
 

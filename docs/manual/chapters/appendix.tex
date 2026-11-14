@@ -105,7 +105,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvp} & \cmd{:AquiferClasses} \dots\ \cmd{:EndAquiferClasses} & material table (Section~\ref{app:class})\\
 \cmd{.rvp} & \cmd{:AquiferProfiles} \dots\ \cmd{:EndAquiferProfiles} & name, number of layers, \{class, thickness or \cmd{TO\_BEDROCK}, type\}\\
 \cmd{.rvp} & \cmd{:AquiferProfile\allowbreak Parameters} \dots & per-profile parameters (Section~\ref{app:profile})\\
-\cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat or \cmd{:InputCRS} (\cmd{HRU\_ID}); required\\
+\cmd{.rvg} & \cmd{:HRUGeometry file \{field\}} & HRU polygons, GeoJSON FeatureCollection, lon/lat or \cmd{:InputCRS} (\cmd{HRU\_ID}); required. A feature without area (an empty outline, fewer than 3 distinct vertices, on one line or enclosing no net area) is left out; this stops the run only for an HRU the model couples\\
 \cmd{.rvg} & \cmd{:RiverGeometry file \{field\}} & river lines; subbasin field optional\\
 \cmd{.rvg} & \cmd{:LandSurface file} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU elevations)\\
 \cmd{.rvg} & \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file and of wells given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
@@ -327,7 +327,8 @@ Message & Remedy\\\midrule\endfirsthead
 Message & Remedy\\\midrule\endhead
 \cmd{:HRUGeometry is required in the .rvg file} & add the HRU polygon file\\
 cannot open GeoJSON / raster file; missing ID field & check paths and the ID field name\\
-HRU \dots\ has an AQUIFER\_PROFILE but no polygon & polygon IDs must match \cmd{.rvh} IDs\\
+HRU \dots\ has an AQUIFER\_PROFILE but no polygon & polygon IDs must match \cmd{.rvh} IDs, or the polygon has no area (the reason is given): fix its outline\\
+grid cell \dots\ of \dots\ has no area: \dots & fix the cell's outline in the \cmd{:GridFile}\\
 HRU \dots\ references unknown AQUIFER\_PROFILE & define the profile in the \cmd{.rvp}\\
 HRU \dots\ does not overlap any active groundwater cell & smaller \cmd{:GridCellSize} or \cmd{:MinCellCoverage}; check bedrock\\
 no HRU has an AQUIFER\_PROFILE; coupled model requires \cmd{:AquiferProfiles} & fill the \cmd{.rvh} column; define profiles\\
@@ -361,7 +362,8 @@ the model's \emph{type} package \emph{name} would add recharge or ET beside Rave
 MODFLOW~6 reads the package \emph{name} (\emph{type}) in the model \dots, which Raven did not find in the name file & write the package's row in the \cmd{PACKAGES} block of the name file itself\\
 cannot open the OPEN/CLOSE file \dots\ named in the \emph{block} block of \dots\ / the OPEN/CLOSE file \dots\ names another OPEN/CLOSE file / the \emph{block} block of \dots\ has OPEN/CLOSE after its first line & give the path relative to the simulation folder (or absolute); write the lines in the first file; make OPEN/CLOSE the block's first line\\
 in the step ending \dots\ MODFLOW converged with a balance error of \dots\ \% of the gross flow (warning) & check the model's packages (\cmd{GWModelSummary.txt}) and its solver tolerances\\
-:OverlapWeights row \dots: the cell number \dots\ is not between 1 and the number of cells per layer / the ID \dots\ is out of range & correct the cell number\\
+:OverlapWeights row \dots: the cell number \dots\ is not between 1 and the number of cells per layer & correct the cell number\\
+command \dots\ in \dots: the \dots\ `\dots' is out of range (beyond \dots) & an ID or cell number of \cmd{:OverlapWeights}, \cmd{:Wells} or \cmd{:MonitoringWells} is beyond the integer range: correct it\\
 the model name file \dots\ has a \emph{type} package named \emph{name}, a name Raven reserves for the packages it adds (\cmd{RCH\_RAVEN}, \cmd{DRN\_RAVEN}, \cmd{EVT\_RAVEN}, \cmd{SWX\_RAVEN}, \cmd{RES\_RAVEN}, \cmd{SZX/SZQ/SZD/SZW\_RAVEN}) & rename the package, or remove its line if Raven added it to a model it wrote; a recharge or ET package may instead be listed in \cmd{:RavenTakesOver}\\
 \cmd{:MF6StartDate} \dots / the model ends before Raven's run & correct the dates or \cmd{:Duration}\\
 stress period \dots\ is not a whole number of Raven time steps & choose a Raven time step that divides the periods\\

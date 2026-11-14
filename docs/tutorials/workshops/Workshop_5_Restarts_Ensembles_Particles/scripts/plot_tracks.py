@@ -19,6 +19,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.dont_write_bytecode = True   # (no __pycache__ beside the workshop's scripts)
 from plot_gw import read_grb   # noqa: E402
 
 

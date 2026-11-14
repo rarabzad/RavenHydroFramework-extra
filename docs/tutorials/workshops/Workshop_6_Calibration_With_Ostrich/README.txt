@@ -43,7 +43,7 @@ Open Workshop_6_Calibration_With_Ostrich.pdf and follow it from Step 1. Step 1 u
 folder and sets the variables WS and RAVEN; a later step copies model/start to the folder work, where you
 run the model. If you have already unpacked the zip in your home folder, skip the unzip line of Step 1
 (typed again, unzip asks whether to replace each file). In every new terminal, type the two export lines of
-Step 1 again.
+Step 1 and the OSTRICH export line of Step 2 again.
 
 Folder map
 ----------
@@ -62,7 +62,7 @@ tex/                the LaTeX source of the PDF:
     sections/         one file per section, in order (01_..., 02_..., ...)
     generated/        the numbers (values.tex), program outputs and file changes quoted in the text
     figures/          the figures
-work/ and the out*/ folders inside it are made by you during the workshop.
+work/ (with best/, model/output/ and validation/) is made by you during the workshop.
 
 How to rebuild the PDF
 ----------------------
