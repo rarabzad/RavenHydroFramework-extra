@@ -19,8 +19,8 @@ Raven prints \cmd{Exiting Gracefully: Successful Simulation}. The command
   :GeneralHeadBoundary or :SpecifiedHeadBoundary''}: the ID or the name differs between the \cmd{.rvt} and the
   \cmd{.rvg} file.
 \item A missing \cmd{:InputCRS} line: see Step~\ref{st:nocrs}.
-\item Compare your files with the finished ones: \cmd{diff \$WS/model/finished/Creek.rvg Creek.rvg} prints the lines that
-  differ (nothing if the files are the same).
+\item Compare your files with the finished ones: \cmd{diff -wB \$WS/model/finished/Creek.rvg Creek.rvg} prints the lines that
+  differ, leaving spacing and empty lines aside (nothing if the files are the same).
 \end{itemize}
 \end{trouble}
 

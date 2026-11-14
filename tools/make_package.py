@@ -5,6 +5,7 @@
     python3 make_package.py <package folder> --code <code repo> --code-rev <rev> --raven <Raven> --mf6 <libmf6.so>
                             [--extra <extra checkout>] [--extra-rev HEAD] [--code-branch mf6-coupling]
                             [--extra-branch main] [--no-manual-check]
+    python3 make_package.py --self-test
 
 <package folder> must be new or empty. --code is the RavenHydroFramework repository and --code-rev its revision (the
 tip of mf6-coupling that is published); --raven is the Raven executable built from that revision with
@@ -29,15 +30,192 @@ Checks (exit code 0 only when all pass):
     build of the manual's chapters (unless --no-manual-check) and the package's copy is that PDF;
   - the install check (bin/RavenMF6InstallCheck.py bin 6.8.1) passes;
   - Raven's banner date is the committer date (UTC) of the code revision, as build_release_raven.sh makes it;
+  - bin/Raven is a release build, as build_release_raven.sh makes it and the README's requirements assume: read from its
+    ELF dynamic section, the highest GLIBC_ symbol version it needs is at most 2.28 and it does not load libstdc++ or
+    libgcc_s (it contains its C++ runtime); a normal build of the same commit (glibc of the build machine, the system's
+    libstdc++) fails this check; bin/libmf6.so needs at most GLIBC_2.34, the floor the README names;
   - every workshop zip holds the package's bin/Raven and bin/libmf6.so, byte for byte, and names the code revision;
-  - the README names only files the package holds, and has no wording about the making of the package;
+  - the README names only files the package holds, and has no wording about the making of the package: none of the
+    words of PROCESS below (audit, phase, round, draft, WIP, TODO, review, revision, rebuilt, regenerated, recovered,
+    reconstructed, previously, no longer, not yet, pending, placeholder, final, status at, by your order, corrected,
+    fixed in, earlier version, a version or finding ID, and the like; "git history" and "Raven history" are allowed);
   - the extra checkout is clean and at the extra revision (tools/, docs/tutorials/).
+
+--self-test checks the two checks above that need no package: each process phrase injected into the README template
+is found, and the template with the restore section package_sources.py writes passes; synthetic ELF files with GLIBC_2.38, with libstdc++ or libgcc_s NEEDED, or
+with no dynamic section fail, one with GLIBC_2.16 and libc only passes. It prints 'make_package self-test: ALL PASSED'.
 """
 import os, sys, re, io, shutil, subprocess, tempfile, tarfile, zipfile, hashlib, argparse, datetime, calendar
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MF6_VERSION = '6.8.1'
-PROCESS = re.compile(r'(?<!tools_)audit|\bphase\b|\bround\b|\bnot yet\b|\bdraft\b|\bWIP\b|\bTODO\b|\bpreviously\b|\bno longer\b', re.I)
+RAVEN_GLIBC, MF6_GLIBC = (2, 28), (2, 34)   # the highest GLIBC_ versions bin/Raven and bin/libmf6.so may need
+PROCESS = re.compile(   # wording about the making of the package (the commit-message wording rule, and more)
+    r'(?<!tools_)audit|\bphases?\b|\brounds?\b|\bround-\d|replay|\bfindings?\b|'
+    r'(?<![A-Za-z0-9])v[1-9][0-9]?[a-z]?\b|_v[1-9]|\bt[0-9]{3}\b|'
+    r'\b(?:CB|SZ|VZ|IB|MT|BR|RS|WS|SV)-?\d+(?:-\d+)?\b|\bA[1-9]\b|\bD[1-9](?:-D[1-9])?\b|\bR1[0-9]?-\d\b|'
+    r'\bWIP\b|\bTODO\b|\bFIXME\b|coordinator|usage-limit|work in progress|\brb-[a-z0-9]+|\binteg\b|'
+    r'\bstill to come\b|\bcompleted\b|\bnot yet\b|\bdraft\b|\bpending\b|placeholder|honest|'
+    r'\brebuil|\brecover|\breconstruct|(?<!git )(?<!Raven )\bhistory\b|first full version|\bfinal\b|'
+    r'\bno longer\b|\bpreviously\b|\bregenerat|\bup to date\b|\brevis(?:ed|ions?)\b|\breview(?:ed|er|s)?\b|'
+    r'\btaken out\b|\bto be filled\b|\bleft to fill\b|\bfirst[- ]release\b|'
+    r'\bstatus at\b|\bby your order\b|\bas you (?:asked|ordered|requested)\b|\bcorrect(?:ed|ions?)\b|\bfixed in\b|'
+    r'\bearlier (?:version|package|release|build)s?\b|\bnew in this (?:version|package|release)\b', re.I)
+
+
+def readme_problems(text):
+    # the wording of the README about the making of the package
+    return ['README.md: wording "%s"' % m.group(0) for m in PROCESS.finditer(text)]
+
+
+def elf_needs(path):
+    # (NEEDED libraries, {library: [versions]}) of an ELF64 little-endian file, read from its dynamic section as the
+    # dynamic loader reads it (program headers, DT_NEEDED, DT_VERNEED); None when it is not such a file
+    import struct
+    with open(path, 'rb') as f:
+        d = f.read()
+    if d[:4] != b'\x7fELF' or d[4] != 2 or d[5] != 1:
+        return None
+    phoff, = struct.unpack_from('<Q', d, 0x20); phentsize, phnum = struct.unpack_from('<HH', d, 0x36)
+    loads, dyn = [], None
+    for i in range(phnum):
+        ptype, _, off, vaddr, _, filesz, _, _ = struct.unpack_from('<IIQQQQQQ', d, phoff + i * phentsize)
+        if ptype == 1:
+            loads.append((vaddr, off, filesz))
+        elif ptype == 2:
+            dyn = (off, filesz)
+    if dyn is None:
+        return None
+
+    def at(v):   # file offset of a virtual address
+        for vaddr, off, filesz in loads:
+            if vaddr <= v < vaddr + filesz:
+                return v - vaddr + off
+        raise ValueError('address %#x outside the loaded segments' % v)
+    tags, needed = {}, []
+    for i in range(dyn[1] // 16):
+        tag, val = struct.unpack_from('<qQ', d, dyn[0] + 16 * i)
+        if tag == 0:
+            break
+        if tag == 1:
+            needed.append(val)
+        else:
+            tags[tag] = val
+    if 5 not in tags:
+        return None
+    strtab = at(tags[5])
+
+    def cstr(o):
+        return d[strtab + o:d.index(b'\0', strtab + o)].decode()
+    versions = {}
+    if 0x6ffffffe in tags:   # DT_VERNEED, DT_VERNEEDNUM entries
+        o = at(tags[0x6ffffffe])
+        for _ in range(tags.get(0x6fffffff, 0)):
+            _, cnt, vfile, aux, nxt = struct.unpack_from('<HHIII', d, o)
+            a, names = o + aux, []
+            for _ in range(cnt):
+                _, _, _, vname, anext = struct.unpack_from('<IHHII', d, a)
+                names.append(cstr(vname)); a += anext
+            versions[cstr(vfile)] = names
+            if not nxt:
+                break
+            o += nxt
+    return [cstr(n) for n in needed], versions
+
+
+def binary_problems(path, what, max_glibc, own_runtime):
+    # why path is not a program as the release needs it: a GLIBC_ version above max_glibc, a dynamic C++ runtime
+    try:
+        r = elf_needs(path)
+    except (OSError, ValueError, IndexError, UnicodeDecodeError) as e:
+        return ['%s: not readable as an ELF file (%s)' % (what, e)]
+    if r is None:
+        return ['%s is not a dynamically linked x86_64 ELF file' % what]
+    needed, versions = r
+    out, top = [], None
+    for v in (v for vs in versions.values() for v in vs if v.startswith('GLIBC_')):
+        m = re.match(r'GLIBC_(\d+)\.(\d+)', v)
+        if not m:
+            out.append('%s needs %s' % (what, v)); continue
+        t = (int(m.group(1)), int(m.group(2)))
+        top = max(top, t) if top else t
+    if top and top > max_glibc:
+        out.append('%s needs GLIBC_%d.%d, more than %d.%d' % ((what,) + top + max_glibc))
+    if own_runtime:
+        for n in needed:
+            if n.startswith(('libstdc++', 'libgcc_s')):
+                out.append('%s loads %s: it is not the release build, which contains its C++ runtime' % (what, n))
+    return out
+
+
+def make_elf(path, needed, versions):
+    # a minimal ELF64 file with a dynamic section (for the self-test): NEEDED libraries and {library: [versions]}
+    import struct
+    strs = b'\0'
+    def add(t):
+        nonlocal strs
+        o = len(strs); strs += t.encode() + b'\0'; return o
+    nd = [add(n) for n in needed]
+    vn = b''
+    libs = list(versions.items())
+    for i, (lib, vs) in enumerate(libs):
+        fo = add(lib)
+        aux = b''.join(struct.pack('<IHHII', 0, 0, 2 + j, add(v), 16 if j < len(vs) - 1 else 0) for j, v in enumerate(vs))
+        vn += struct.pack('<HHIII', 1, len(vs), fo, 16, 16 + len(aux) if i < len(libs) - 1 else 0) + aux
+    hdr, ph = 64, 56 * 2
+    o_str = hdr + ph; o_vn = o_str + len(strs); o_dyn = o_vn + len(vn)
+    ent = [(1, n) for n in nd] + [(5, o_str), (10, len(strs))] + ([(0x6ffffffe, o_vn), (0x6fffffff, len(libs))] if libs else []) + [(0, 0)]
+    dyn = b''.join(struct.pack('<qQ', t, v) for t, v in ent)
+    size = o_dyn + len(dyn)
+    eh = b'\x7fELF' + bytes([2, 1, 1]) + bytes(9) + struct.pack('<HHIQQQIHHHHHH', 3, 62, 1, 0, hdr, 0, 0, hdr, 56, 2, 64, 0, 0)
+    ph1 = struct.pack('<IIQQQQQQ', 1, 4, 0, 0, 0, size, size, 0x1000)
+    ph2 = struct.pack('<IIQQQQQQ', 2, 4, o_dyn, o_dyn, o_dyn, len(dyn), len(dyn), 8)
+    with open(path, 'wb') as f:
+        f.write(eh + ph1 + ph2 + strs + vn + dyn)
+
+
+def self_test():
+    fails = []
+    def check(name, ok, detail=''):
+        print('%-72s %s%s' % (name, 'ok' if ok else 'FAIL', ('  (' + detail + ')') if detail else ''))
+        if not ok:
+            fails.append(name)
+    sys.path.insert(0, HERE)
+    import package_sources as ps
+    readme = open(os.path.join(HERE, 'package_README.md')).read()
+    readme += '\n' + ps.restore_text({'code': 'mf6-coupling', 'extra': 'main'}, {'code': ('0' * 40, 865), 'extra': ('1' * 40, 131)})
+    check('the README template and its restore section have no process wording', not readme_problems(readme), '; '.join(readme_problems(readme)))
+    for ph in ('This is the final package.', 'Status at packaging: all tests pass', 'Not yet done (by your order)',
+               'built from the round-10 code', 'rebuilt after the review', 'the corrected binary', 'fixed in this release',
+               'the earlier version of the package', 'checked in the audit', 'made in phase 3', 'a draft of the manual',
+               'as previously', 'no longer needed', 'regenerated with the new build', 'the revised text', 'WIP', 'TODO',
+               'the history of the work', 'reviewed by the team', 'recovered files', 'pending a check',
+               'new in this release', 'the v2 tools', 'see SZ-12', 'as you asked'):
+        check('the README with "%s" fails' % ph, bool(readme_problems(readme + '\n' + ph + '\n')))
+    for ok_text in ('Restore the git history', 'their complete git history as bundles', 'fixed heads', 'the tools_audit.py check'):
+        check('"%s" is allowed' % ok_text, not readme_problems(ok_text))
+    tmp = tempfile.mkdtemp(prefix='mkpkg_test_')
+    try:
+        cases = [('release build: libc GLIBC_2.16, libdl', ['libc.so.6', 'libdl.so.2'], {'libc.so.6': ['GLIBC_2.2.5', 'GLIBC_2.16'], 'libdl.so.2': ['GLIBC_2.2.5']}, 0),
+                 ('GLIBC_2.28 exactly', ['libc.so.6'], {'libc.so.6': ['GLIBC_2.28', 'GLIBC_2.3']}, 0),
+                 ('a normal build: GLIBC_2.38', ['libc.so.6'], {'libc.so.6': ['GLIBC_2.2.5', 'GLIBC_2.38']}, 1),
+                 ('GLIBC_2.29 in libm', ['libm.so.6', 'libc.so.6'], {'libm.so.6': ['GLIBC_2.29'], 'libc.so.6': ['GLIBC_2.2.5']}, 1),
+                 ('libstdc++ NEEDED', ['libstdc++.so.6', 'libc.so.6'], {'libc.so.6': ['GLIBC_2.2.5']}, 1),
+                 ('libgcc_s NEEDED', ['libgcc_s.so.1', 'libc.so.6'], {'libc.so.6': ['GLIBC_2.2.5']}, 1),
+                 ('GLIBC_PRIVATE', ['libc.so.6'], {'libc.so.6': ['GLIBC_PRIVATE']}, 1)]
+        for name, needed, versions, bad in cases:
+            p = os.path.join(tmp, 'elf'); make_elf(p, needed, versions)
+            pr = binary_problems(p, 'bin/Raven', RAVEN_GLIBC, True)
+            got = elf_needs(p)
+            check('ELF %s: %s' % (name, 'fails' if bad else 'passes'), bool(pr) == bool(bad) and got == (needed, versions), '; '.join(pr))
+        p = os.path.join(tmp, 'libmf6'); make_elf(p, ['libc.so.6'], {'libc.so.6': ['GLIBC_2.34']})
+        check('ELF libmf6.so with GLIBC_2.34 passes', not binary_problems(p, 'bin/libmf6.so', MF6_GLIBC, False))
+        p = os.path.join(tmp, 'text'); open(p, 'w').write('#!/bin/sh\n')
+        check('a script instead of an ELF file fails', bool(binary_problems(p, 'bin/Raven', RAVEN_GLIBC, True)))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    print('make_package self-test: %s' % ('ALL PASSED' if not fails else '%d FAILED' % len(fails)))
+    return 1 if fails else 0
 
 
 def git(args, cwd, binary=False):
@@ -63,6 +241,8 @@ def sha256(p):
 
 
 def main():
+    if sys.argv[1:] == ['--self-test']:
+        return self_test()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('pkg')
     ap.add_argument('--code', required=True); ap.add_argument('--code-rev', required=True)
@@ -102,6 +282,11 @@ def main():
         if bd != cdate:
             fails.append('bin/Raven was built on %s, not with the date of the code revision (%s): build it with '
                          'docs/tutorials/build_release_raven.sh from %s' % (bd, cdate, cshort))
+        rel = binary_problems(os.path.join(b, 'Raven'), 'bin/Raven', RAVEN_GLIBC, True)
+        fails += [f + ' (build it with docs/tutorials/build_release_raven.sh)' for f in rel]
+        fails += binary_problems(os.path.join(b, 'libmf6.so'), 'bin/libmf6.so', MF6_GLIBC, False)
+        print('bin/Raven and bin/libmf6.so: %s' % ('release builds (GLIBC_%d.%d and %d.%d at most, no libstdc++ or libgcc_s)'
+                                                  % (RAVEN_GLIBC + MF6_GLIBC) if not rel else 'FAIL (below)'))
         with open(os.path.join(b, 'VERSIONS.txt'), 'w') as f:
             f.write('Raven       %s, build date %s, source commit %s of RavenHydroFramework (branch %s)\n'
                     '            sha256 %s\n'
@@ -153,8 +338,7 @@ def main():
         for p in sorted(set(re.findall(r'`((?:bin|source|examples|workshops)/[^`<>* ]*|Raven_MF6_Manual\.pdf|SHA256SUMS\.txt)`', text))):
             if p != 'SHA256SUMS.txt' and not os.path.exists(os.path.join(pkg, p.split(' ')[0])):
                 fails.append('README.md names %s, which the package does not hold' % p)
-        for m in PROCESS.finditer(text):
-            fails.append('README.md: wording "%s"' % m.group(0))
+        fails += readme_problems(text)
         # the checkout the zips and the README template come from is the extra revision
         if git(['rev-parse', 'HEAD'], extra) != xtip:
             fails.append('the extra checkout is not at %s: the workshops and README come from the checkout' % xtip[:12])

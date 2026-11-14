@@ -5,12 +5,13 @@
 \cmd{\$WS/model/finished} holds every file as it is at the end of this workshop (without the three changes of the last
 section). Compare:
 \begin{shell}
-$ diff -rq $WS/model/finished $WS/work
+$ diff -rqwB $WS/model/finished $WS/work
 \end{shell}
 \see only lines \cmd{Only in /home/user/Workshop\_2\_Own\_Groundwater\_Model/work: out} (and \cmd{out\_nogw},
 \cmd{out\_ascii}, \cmd{out\_refined} and the other output folders, and \cmd{hydrograph.png}, the picture that
-\cmd{plot\_hydrograph.py} drew). A line \cmd{Files \dots differ} names a file that is
-not as in the finished state: \cmd{diff} without \cmd{-rq} shows the lines.
+\cmd{plot\_hydrograph.py} drew). \cmd{-wB} leaves spacing and empty lines aside, so a
+file you typed or copied from this text is not named for those. A line \cmd{Files \dots differ} names a file that is
+not as in the finished state: \cmd{diff -wB} without \cmd{-rq} shows the lines.
 
 \section{Do the same for your own model}
 \begin{enumerate}

@@ -4,9 +4,11 @@
 one-year \cmd{Creek.rvi} and the budget-file lines in \cmd{Creek.rvg}) and \cmd{work\_part2} (with the hotstart file as
 \cmd{Creek.rvc}). Compare your folders with them:
 \begin{shell}
-$ diff -rq $WS/model/finished/work $WS/work
-$ diff -rq $WS/model/finished/work_part2 $WS/work_part2
+$ diff -rqwB $WS/model/finished/work $WS/work
+$ diff -rqwB $WS/model/finished/work_part2 $WS/work_part2
 \end{shell}
 \see only lines that start with \cmd{Only in} and name your output folders (\cmd{out}, \cmd{out\_part1}, \cmd{out\_ens},
 \cmd{out\_prt}) and \cmd{ensemble.png}, the picture that
-\cmd{plot\_ensemble.py} drew.
+\cmd{plot\_ensemble.py} drew (\cmd{-wB} leaves spacing and empty lines aside, so the \cmd{Creek.rve} you typed
+is not named for those). A line \cmd{Files \dots differ} names a file that is not as in the finished state:
+\cmd{diff -wB} without \cmd{-rq} shows the lines.

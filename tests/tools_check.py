@@ -32,6 +32,10 @@ TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the publi
 TC9 tools/check_manual_pdf.py on a two-chapter stand-in of docs/manual (a copy in the work folder): a main.pdf built
    from its chapters passes; after a chapter is changed it fails (the changed line shown), --write replaces the PDF, and
    then it passes again.
+TC10 tools/make_package.py --self-test: the README wording check finds each process phrase injected into the package
+   README template ("This is the final package.", "rebuilt after the review", "the corrected binary", ...) and passes the
+   template with its restore section; the release-binary check fails synthetic ELF files that need GLIBC_2.38 or 2.29, a
+   GLIBC_PRIVATE version, libstdc++ or libgcc_s, and a script, and passes GLIBC_2.16 and 2.28 with libc only.
 Without the MODFLOW 6 library TC1, TC2, TC6 and TC8 print SKIP; without pdflatex and pdftotext TC9 prints SKIP.
 """
 import os, sys, re, shutil, subprocess
@@ -245,6 +249,14 @@ def t9():
     shutil.rmtree(rep)
 
 
+def t10():
+    tool = os.path.join(os.path.dirname(HERE), 'tools', 'make_package.py')
+    r = subprocess.run([sys.executable, tool, '--self-test'], capture_output=True, text=True)
+    bad = [l for l in r.stdout.split('\n') if l.rstrip().endswith('FAIL') or ' FAIL  (' in l]
+    report('TC10 make_package --self-test (README wording, release-binary check)', r.returncode == 0 and 'ALL PASSED' in r.stdout,
+           '; '.join(bad)[:150] or (r.stdout + r.stderr).strip().split('\n')[-1][:150])
+
+
 def main():
     if tc.MF6LIB and os.path.exists(tc.MF6LIB) and os.path.exists(tc.RAVEN):
         t1_t2()
@@ -253,6 +265,7 @@ def main():
     t3_t5()
     t7()
     t9()
+    t10()
     print('tool checks: %s' % ('ALL PASSED' if fails == 0 else '%d FAILED' % fails))
     return fails == 0
 
