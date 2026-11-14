@@ -10,7 +10,9 @@ depth under the north slope of the lower subbasin (HRU~7), and streamflow at the
 \why the table shows three effects.
 \begin{itemize}
 \item \textbf{From CONCEPTUAL to PHYSICAL.} In the conceptual run, \V{t3:conceptual:leaves}~m\textsuperscript{3}/d leave
-  the subsoil and all of it reaches MODFLOW; \V{t3:conceptual:seep}~m\textsuperscript{3}/d seep back out. With the soil
+  the subsoil and all of it reaches the aquifer: \V{t3:conceptual:reaches}~m\textsuperscript{3}/d the water table, the rest
+  the pond's specified-head cells, which pass it straight to the pond (Workshop~2, Step~13);
+  \V{t3:conceptual:seep}~m\textsuperscript{3}/d seep back out. With the soil
   zone, \V{t3:physical:leaves}~m\textsuperscript{3}/d leave the subsoil, because on the valley floor the soil now drains
   into an aquifer whose water table is in the soil. But \V{t3:physical:rejected}~m\textsuperscript{3}/d of it is
   rejected, and \V{t3:physical:aqsoil}~m\textsuperscript{3}/d rise back from the aquifer into the soil. A two-way exchange

@@ -60,7 +60,8 @@ R20 sibling columns: one HRU over 8 cells, BASEFLOW_COEFF 0.5, a 2 m aquifer fro
 R21 rule (ii) hand-back in a step with negative recharge: one HRU of 400 x 200 m whose wet unsaturated columns (initial
    flux 30 mm/d, column 0.4 m) vanish under a water table raised by a specified head 0.3 m below the ground, while
    PERC_GR4JEXCH takes water out of GROUNDWATER (GR4J_X2 1e-4 mm/d, and 60 mm/d in the full mode); RICHARDS (and
-   KINEMATIC in the full mode): the water of the vanished columns beyond S_y dh goes back to the soil zone as the link's
+   KINEMATIC in the full mode): the water of the vanished columns beyond the smaller of S_y dh and the room left in the
+   top cell goes back to the soil zone as the link's
    rejected recharge, so the recharge identity holds at round-off (0.31 m3 per vanishing step otherwise missing).
 R22 the top-cell limit of a negative recharge with depth classes: one HRU of 200 x 200 m with +-0.5 m hummocks, a
    0.6 m top cell (S_y 0.05) and the water table 1.2 m deep, so the hollow classes have no column; PERC_GR4JEXCH with

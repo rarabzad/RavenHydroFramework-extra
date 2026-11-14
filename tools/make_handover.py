@@ -44,10 +44,14 @@ Checks (the exit code is 0 only when all pass):
     that conflicts (4-keep stops; 4-keep-push and 4-merge then stop and push nothing, 4-keep-push also after
     git cherry-pick --abort; 4-keep run again stops, and the commands it prints delete branch release, after which it
     starts again; 4-merge run again inside its unfinished merge, and 4-keep there); two kept commits whose first conflict
-    is finished with git commit (4-keep-push stops while the cherry-pick sequence holds the second). Nothing is pushed
-    to GitHub;
+    is finished with git commit (4-keep-push stops while the cherry-pick sequence holds the second); and with a public
+    commit the kit does not hold, 1A-replace-local (the kit published, no backup branch on the stand-in, the old branch in
+    the bundle in the working folder; run again: nothing to replace; an existing bundle that does not hold the branch:
+    stops, nothing pushed) and 1A-replace (the old branch kept as the backup branch). Nothing is pushed to GitHub;
   - unless --no-public-check: the public branch mf6-coupling is read (git ls-remote; nothing is pushed) and, when it can
-    be fetched, whether it is an ancestor of the bundle's tip (a plain fast-forward) is written into HANDOVER.md.
+    be fetched, whether it is an ancestor of the bundle's tip (a plain fast-forward) is written into HANDOVER.md, with
+    the commits it holds that the kit does not, and what those listed in KNOWN_PUBLIC contain: they are already public,
+    and HANDOVER.md says which routes keep them on GitHub and which one (1A-replace-local) keeps them only locally.
 """
 import os, re, sys, argparse, subprocess, tempfile, shutil, hashlib, tarfile
 
@@ -56,6 +60,12 @@ sys.path.insert(0, HERE)
 import package_sources as ps   # noqa: E402  (publish_repo, bundle, git)
 
 PUBLIC = {'code': 'https://github.com/rarabzad/RavenHydroFramework', 'extra': 'https://github.com/rarabzad/RavenHydroFramework-extra'}
+# commits already public on the code branch that the kit replaces, and what they hold (HANDOVER.md says so when the public
+# branch holds them): an earlier single-commit upload of the coupling
+KNOWN_PUBLIC = {'e03243d': 'the earlier upload of the coupling (2026-09-30, "Raven-MODFLOW 6 groundwater coupling"). It holds '
+                           'a report in docs/ of the checks made before that upload, organised by the stages of the work; comments '
+                           'in src/GroundwaterModel.h that name those stages; and a README.md line that points to the report. None of '
+                           'this is in the kit'}
 NAME = {'code': 'RavenHydroFramework', 'extra': 'RavenHydroFramework-extra'}
 ENV = dict(os.environ, GIT_TERMINAL_PROMPT='0', GIT_ASKPASS='true')   # (never ask for a password)
 
@@ -118,7 +128,7 @@ def run_blocks(text, out, rec, pubs, tmp):
     (git's url.insteadOf maps the GitHub addresses to them): the code stand-in's branch is an ancestor of the kit's tip
     with another tree, the -extra stand-in is empty. Returns a list of problems."""
     B = blocks(text)
-    need = ['0-checksums', '1A-check', '1A-push', '1A-replace', '1B-bundle', '1B-archive', '2-extra', '2-extra-files',
+    need = ['0-checksums', '1A-check', '1A-push', '1A-replace', '1A-replace-local', '1B-bundle', '1B-archive', '2-extra', '2-extra-files',
             '3-verify', '3-build', '4-show', '4-keep', '4-keep-push', '4-merge']
     bad = ['HANDOVER.md has no block %s' % b for b in need if b not in B]
     for tag, s in B.items():
@@ -259,8 +269,38 @@ def run_blocks(text, out, rec, pubs, tmp):
     rc2, o2 = blk('4-keep-push'); now = head(code_gh, 'refs/heads/' + cb)
     step('4-keep-push', rc1 != 0 and rc2 != 0 and 'cherry-pick sequence is not finished' in o2 and now == two,
          'two kept commits, the first finished with git commit: stops, nothing pushed' if rc2 != 0 and now == two else 'pushed: ' + (o1 + o2)[-300:])
+    # GitHub's branch holds a commit the kit does not: 1A-replace-local saves it into a bundle in the working folder and
+    # replaces the branch, leaving no backup branch on GitHub; 1A-replace keeps it on GitHub as the backup branch
+    bf = os.path.join(work, '%s_%s-before-release.bundle' % (NAME['code'], cb))
+    reset_public(keep)
+    rc, o = blk('1A-replace-local'); now = head(code_gh, 'refs/heads/' + cb)
+    nobak = g(['rev-parse', '-q', '--verify', 'refs/heads/' + cb + '-before-release'], code_gh)[0] != 0
+    inb = os.path.exists(bf) and keep in run(['git', 'bundle', 'list-heads', bf], work)[1]
+    step('1A-replace-local', rc == 0 and now == rec['code']['tip'] and nobak and inb,
+         'kit published, no backup branch on GitHub, the old branch in %s' % os.path.basename(bf) if rc == 0 and inb else o[-300:])
+    rc, o = blk('1A-replace-local'); now = head(code_gh, 'refs/heads/' + cb)
+    step('1A-replace-local', rc == 0 and now == rec['code']['tip'] and 'ancestor of the kit' in o,
+         'run again: nothing to replace' if rc == 0 else o[-300:])
+    reset_public(conf)
+    rc, o = blk('1A-replace-local'); now = head(code_gh, 'refs/heads/' + cb)
+    step('1A-replace-local', rc != 0 and 'STOP' in o and now == conf,
+         'an existing bundle that does not hold the branch: stops, nothing pushed' if rc != 0 and now == conf else o[-300:])
+    os.remove(bf); reset_public(keep)
+    rc, o = blk('1A-replace'); now, bak = head(code_gh, 'refs/heads/' + cb), head(code_gh, 'refs/heads/' + cb + '-before-release')
+    step('1A-replace', rc == 0 and now == rec['code']['tip'] and bak == keep,
+         'kit published, the old branch kept on GitHub as %s-before-release' % cb if rc == 0 and bak == keep else o[-300:])
     print('\n'.join(steps), flush=True)
     return bad
+
+
+def known_note(found):
+    """HANDOVER.md's words on the public commits the kit replaces whose content is known (KNOWN_PUBLIC)"""
+    out = []
+    for sha, subj in found:
+        for k, v in KNOWN_PUBLIC.items():
+            if sha.startswith(k):
+                out.append('`%s` is %s.' % (sha[:7], v))
+    return (' ' + ' '.join(out)) if out else ''
 
 
 def found_note(found):
@@ -294,7 +334,7 @@ def public_state(pub_code, rec, tmp):
                 found = [tuple(l.split(' ', 1)) for l in run(['git', 'log', '--format=%H %s', '%s..%s' % (rec['code']['tip'], sha)], pub_code)[1].split('\n') if l.strip()]
             lines.append('%s branch %s: at %s, %s' % (PUBLIC['code'], br, sha,
                          'an ancestor of the bundle\'s tip: publishing it is a fast-forward (block 1A-push)' if anc else
-                         'not an ancestor of the bundle\'s tip: it holds %s commit(s) the bundle does not (block 1A-replace, or step 4)' % extra))
+                         'not an ancestor of the bundle\'s tip: it holds %s commit(s) the bundle does not (block 1A-replace-local or 1A-replace, or step 4)' % extra))
     rc, out = run(['git', 'ls-remote', PUBLIC['extra']], tmp, timeout=120)
     if rc != 0:
         lines.append('%s: not readable now (it does not exist yet, is private, or the computer is offline): create it in step 2' % PUBLIC['extra'])
@@ -329,8 +369,10 @@ was made:
   working folder. A block that would push checks first and pushes nothing when a check fails.
 - On GitHub, nothing here deletes a branch, and nothing changes a branch other than `{cb}` of RavenHydroFramework
   (and `{cb}-before-release`, created only where it does not exist) and `{xb}` of the new RavenHydroFramework-extra.
-  Step 4 creates the local branches `release` (4-keep) and `release-merge` (4-merge) in your clone
-  `RavenHydroFramework/`; the advice for running 4-keep again deletes the local `release`.
+  Block 1A-replace-local creates the local branch `{cb}-before-release` in your clone `RavenHydroFramework/` and the
+  bundle `RavenHydroFramework_{cb}-before-release.bundle` in the working folder. Step 4 creates the local branches
+  `release` (4-keep) and `release-merge` (4-merge) in your clone; the advice for running 4-keep again deletes the local
+  `release`.
 
 Check the kit's files first:
 
@@ -370,7 +412,8 @@ the kit's branch from the bundle; it changes nothing on GitHub:
   else
     echo "it holds commits the kit does not:"
     git log --oneline "handover/{cb}..$CUR"
-    echo "publish with block 1A-replace (they stay on GitHub as {cb}-before-release), or read step 4 to keep them"
+    echo "publish with block 1A-replace-local (they are kept only in a bundle in your working folder) or 1A-replace"
+    echo "(they stay on GitHub as {cb}-before-release), or read step 4 to keep them"
   fi
 )
 ```
@@ -390,10 +433,44 @@ fast-forward:
 )
 ```
 
-When GitHub's branch holds commits the kit does not and you do not need them on `{cb}`{found}, keep a copy of
-the branch as `{cb}-before-release` and replace it. The copy is made only when it does not exist yet, and the block
-stops if an existing copy does not hold GitHub's branch. `--force-with-lease` makes the push fail, rather than discard
-anything, if someone pushes to the branch after the block has read it:
+When GitHub's branch holds commits the kit does not, those commits are already public{found}.{known} Every route that
+keeps them on GitHub keeps their files public: the backup branch of block 1A-replace, route 1B (one new commit on top of
+them) and step 4. Block 1A-replace-local keeps them only in a bundle in your working folder and replaces the branch, so
+no branch on GitHub holds them afterwards (GitHub may still serve such a commit to anyone who has its full ID until it
+removes unreferenced commits; GitHub support can be asked to remove them). Which route to take is your decision when you
+publish. Both blocks stop, rather than discard anything, if someone pushes to the branch after the block has read it
+(`--force-with-lease`).
+
+```
+# [1A-replace-local] run in: the working folder (the one that holds handover/)
+( set -eu
+  test -d handover || {{ echo "STOP: run this in the folder that holds handover/"; exit 1; }}
+  [ -d RavenHydroFramework/.git ] || git clone -q {cu}.git RavenHydroFramework
+  cd RavenHydroFramework
+  git fetch -q ../handover/{cbundle} "+refs/heads/{cb}:refs/remotes/handover/{cb}"
+  test "$(git rev-parse handover/{cb})" = {ct} || {{ echo "STOP: the kit's branch is not at {ct}"; exit 1; }}
+  git fetch -q --prune origin
+  CUR=$(git rev-parse -q --verify refs/remotes/origin/{cb}) || {{ echo "STOP: GitHub has no branch {cb}: use block 1A-push"; exit 1; }}
+  if git merge-base --is-ancestor "$CUR" handover/{cb}; then
+    echo "GitHub's {cb} is an ancestor of the kit: nothing to replace, a plain push"
+    git push origin "refs/remotes/handover/{cb}:refs/heads/{cb}"; exit 0
+  fi
+  BF=../RavenHydroFramework_{cb}-before-release.bundle
+  if [ -e "$BF" ]; then
+    git bundle list-heads "$BF" | grep -q "^$CUR " || {{ echo "STOP: $BF exists and does not hold $CUR"; exit 1; }}
+    echo "$BF exists and holds $CUR: kept as it is"
+  else
+    git branch -f {cb}-before-release "$CUR"
+    git bundle create -q "$BF" refs/heads/{cb}-before-release
+    git bundle verify -q "$BF"
+    echo "GitHub's {cb} ($CUR) saved in $BF"
+  fi
+  git push --force-with-lease="refs/heads/{cb}:$CUR" origin "refs/remotes/handover/{cb}:refs/heads/{cb}"
+)
+```
+
+To keep a copy on GitHub instead, block 1A-replace keeps the branch as `{cb}-before-release` there and replaces it. The copy is made only when it does not exist yet, and the block
+stops if an existing copy does not hold GitHub's branch:
 
 ```
 # [1A-replace] run in: the working folder (the one that holds handover/)
@@ -594,7 +671,8 @@ Block 1A-check lists them. The blocks below find them again by themselves: on `{
 Then choose:
 
 - **They are not needed** (for example an earlier upload that the kit's history replaces): publish with block
-  1A-replace; `{cb}-before-release` keeps them on GitHub.
+  1A-replace-local (a bundle in your working folder keeps them; no branch on GitHub does) or 1A-replace
+  (`{cb}-before-release` keeps them on GitHub, public).
 - **They hold work to keep**: put them on top of the kit's branch in a local branch `release` (block 4-keep), check the
   result (build, `run_all.py --quick`), and publish it (block 4-keep-push). If a commit does not apply cleanly, git stops
   and names the files: resolve them inside `RavenHydroFramework/`, run `git cherry-pick --continue` there until it
@@ -681,7 +759,7 @@ Then choose:
   )
   ```
 
-  The published tip is a merge commit with `{ct}` as one parent. (If block 1A-replace has run, GitHub's `{cb}` is the
+  The published tip is a merge commit with `{ct}` as one parent. (If block 1A-replace or 1A-replace-local has run, GitHub's `{cb}` is the
   kit's tip and this push is a fast-forward too.)
 
 ## 5. Afterwards
@@ -730,7 +808,8 @@ def main():
         text = HANDOVER.format(cu=PUBLIC['code'], xu=PUBLIC['extra'], cb=br['code'], xb=br['extra'], ct=c['tip'], xt=x['tip'],
                                cn=c['n'], xn=x['n'], ctree=c['tree'], xtree=x['tree'], cbundle=files['code']['bundle'],
                                xbundle=files['extra']['bundle'], ctar=files['code']['tar'], xtar=files['extra']['tar'],
-                               date=max(c['date'], x['date']), public='\n'.join('- ' + l for l in public), found=found_note(found))
+                               date=max(c['date'], x['date']), public='\n'.join('- ' + l for l in public), found=found_note(found),
+                               known=known_note(found))
         open(os.path.join(out, 'HANDOVER.md'), 'w').write(text)
         with open(os.path.join(out, 'KIT.txt'), 'w') as f:
             for k in ('code', 'extra'):

@@ -374,7 +374,6 @@ cells of the grid file differ from the model's cell area & wrong projection, len
 give one of \cmd{:MF6CRS}, \cmd{:MF6GridFile} or \cmd{:OverlapWeights} & link HRUs in exactly one way\\
 the period data of \emph{package} cannot be renumbered safely & start Raven at \cmd{:MF6StartDate}\\
 \emph{package} uses time-array series (TAS6) / time series, \dots\ and the simulation holds several models & start Raven at \cmd{:MF6StartDate}\\
-the time-series file \emph{file} reads its rows from another file; list them in the file itself & on a later start, list the rows of the \cmd{TS6} file's \cmd{TIMESERIES} block in the file (no \cmd{OPEN/CLOSE} or \cmd{INTERNAL}), or start Raven at \cmd{:MF6StartDate}\\
 TDIS period data given as INTERNAL / the water mover \dots\ gives its period data as INTERNAL & list the rows in the file itself or in an \cmd{OPEN/CLOSE} file\\
 the length of stress period \emph{n} / the time of a row in \dots\ (line \emph{k}) is '\dots', which is not a number / \dots\ gives NPER \emph{n} but \emph{m} stress periods in PERIODDATA & write the value as MODFLOW~6 reads it (5.0, 5.0E-1, 50.0D-1); give as many period rows as NPER\\
 an aquifer profile has EXTINCTION\_DEPTH $>0$ \dots\ and the model keeps its EVT/UZF package & list that package in \cmd{:RavenTakesOver}, or set \cmd{EXTINCTION\_DEPTH} 0\\
