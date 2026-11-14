@@ -1,7 +1,7 @@
 $ python3 $WS/scripts/plot_gw.py out --title "Liard"
 365 days, 1985-10-02 to 1986-10-01
 mean groundwater budget [m3/d]:
-  recharge from Raven                   5838714
+  recharge received by MODFLOW          5838714
   seepage to Raven                      8079177
   aquifer to rivers                     2680164
   rivers to aquifer                     1186725

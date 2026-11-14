@@ -139,6 +139,34 @@ The steps were: clone the two repositories, apply the messages (PASS), then run 
   docs/design path) and the audit tool. These are outside the scope of option (c) and are listed in
   `patches/neutral_trees_rule_residual.txt`.
 
+## After the merge with Phase 26 (code f8c3d0f, extra fc8dd6b)
+- **verification.tex:**
+  - the input-check list reads "E1--E30, E25b, E30b, AM1";
+  - tab:faultyext has new rows for:
+    - OPEN/CLOSE in the other readers (E24-E29, with E25b's CRLF mover);
+    - the second guard on the time unit. With the released reader no input reaches it, so the row says it was tested on
+      Phase 26's mutant;
+    - CSUB (E30, E30b);
+  - tab:rasters:
+    - the band-unit row covers band_units.tsv, 509 texts in five classes (M 115, N 3, F 165, X 70, S 156), each read
+      without and with METRES;
+    - a new row covers GDAL's side file;
+  - tab:geojson adds col_ulp, col_utm and thin_utm, and states the area test in the file's own coordinates.
+- **K10:** verification_soilzone.tex now lists K1--K10, and sz_vadose_kinematic.tex describes K10.
+- **Manual layout:** tab:rasters became too tall for a page, so the band-unit and side-file rows moved to a new table,
+  tab:rasterunits. Phase 26's rows made tab:extpkgs (existing_model.tex) a float taller than a page ("Float too large",
+  so check_manual_pdf failed on the merged tip); it is now a longtable. main.pdf was rebuilt (192 pages) and
+  check_manual_pdf passes.
+- **Workshops:**
+  - all six were regenerated with rel26. The only changes are the plot label and the measured run times: no number,
+    warning count or band-unit result of any workshop changed;
+  - a sentence in W3 Step 13 ("The file ...") was reworded so the builder's no-underfull rule holds;
+  - build_tutorials.py --check now compares model/start/README.md with the committed t1:fullmin, as it already did for
+    README.txt. Before, it wrote the measured minutes of the check's own 20-year run (9 against 8 with the release
+    binary), so a full --check failed on timing alone.
+- Every row was checked against tests/README.md, the docstrings of input_checks.py, geotiff_check.py, geomtest_check.py
+  and test_vz_kinematic.py, building.tex (tab:bandunits, the side-file row) and existing_model.tex (the guard).
+
 ## Tests
 - The manual builds cleanly in a scratch copy (`tools/check_manual_pdf.py`: no LaTeX warning, no overfull box, no
   undefined reference). main.pdf is to be rebuilt once Phase 26's chapters are merged.

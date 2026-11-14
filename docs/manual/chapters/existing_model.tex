@@ -205,10 +205,11 @@ the time discretization. Heads, flows, rates, conductances and coordinates are c
 are always in metres and days.
 
 \section{Packages}
-\begin{table}[!htbp]\centering
-\caption{How the model's packages are treated.}\label{tab:extpkgs}
-\begin{tabularx}{\linewidth}{P{0.24\linewidth}Y}\toprule\hdr
-Package & Treatment\\\midrule
+\begin{longtable}{P{0.24\linewidth}P{0.70\linewidth}}
+\caption{How the model's packages are treated.}\label{tab:extpkgs}\\
+\toprule\hdr Package & Treatment\\\midrule\endfirsthead
+\caption[]{How the model's packages are treated (continued).}\\
+\toprule\hdr Package & Treatment\\\midrule\endhead
 Recharge, evapotranspiration, UZF & must be named in \cmd{:RavenTakesOver} (removed; Raven supplies recharge) or in \cmd{:KeepPackages} (they stay). An undeclared one stops the run, so recharge is never counted twice\\
 Stream package (\cmd{:StreamPackage}) & a RIV, DRN or GHB package whose flows go to Raven's reaches: to the subbasin in an auxiliary variable (\cmd{AUX} name, default \cmd{SUBBASIN}; the auxiliary variables are those MODFLOW read, from its memory: MODFLOW keeps the first \cmd{AUXILIARY} line of the package's options, and Raven warns of a second one), or to the subbasin of the dominant HRU of the cell (\cmd{DOMINANT\_HRU}). Losing reaches take the water from the channel; a loss that cannot be supplied is carried to the next step\\
 \cmd{DRN\_RAVEN} (\cmd{:SeepageToRaven ON}) & added at the top of the top active cell of coupled columns; the discharge returns to Raven (Section~\ref{ch:seepage})\\
@@ -219,8 +220,7 @@ Water-table evaporation (\cmd{EXTINCTION\_DEPTH} $>0$ in an aquifer profile) & \
 Water mover (MVR) & kept; movers from or to a package Raven takes over are removed from the working copy (MODFLOW would stop on a package that is no longer there), and \cmd{GWModelSummary.txt} reports how many. A stream package that sends water through the mover is refused, because Raven would take the same water from the aquifer a second time\\
 Skeletal storage and compaction (CSUB) & kept unchanged; its storage flows (coarse-grained, interbed elastic and inelastic, water compressibility: the \cmd{CSUB-} terms of MODFLOW's budget) are booked with the storage package's, in \cmd{GWBudget.csv}'s \emph{storage release}, as MODFLOW books them; \cmd{GWModelSummary.txt} lists it under \emph{storage in balance}\\
 All other packages & kept unchanged: wells, head boundaries, drains, lakes, streamflow routing and so on. Their simulated flows, including the water they pass to the mover, enter the balance check (\cmd{GWBudget.csv}, column \emph{other model packages})\\\bottomrule
-\end{tabularx}
-\end{table}
+\end{longtable}
 
 \section{Safeguards}
 Every one of these stops the run with a message that names the problem and the fix:

@@ -2127,13 +2127,14 @@ def fullmin_committed():
 
 
 def liard_readme_minutes(t):
-    """after the 20-year run of a build: model/start/README.md gives the measured t1:fullmin, as the PDF and README.txt"""
+    """after the 20-year run of a build: model/start/README.md gives the measured t1:fullmin, as the PDF and README.txt
+    (with --check the committed value)"""
     p = tutfiles(t, 'start', 'README.md')
     rd = open(p).read()
     m = re.search(r'# 20 years, daily; about (\d+) minutes on one core', rd)
     if not m:
         raise RuntimeError('t1: model/start/README.md does not give the time of the 20-year run')
-    v = G.values.get('t1:fullmin')
+    v = fullmin_committed() if C.check else G.values.get('t1:fullmin')   # (--check: a run time measured again is not compared)
     if v and m.group(1) != v:
         wfile(p, rd[:m.start(1)] + v + rd[m.end(1):])
         log('t1: model/start/README.md: %s minutes (was %s), as the PDF (t1:fullmin)' % (v, m.group(1)))
