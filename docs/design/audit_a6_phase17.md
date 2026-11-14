@@ -88,7 +88,7 @@ says "group in brackets". § "Where things live": "The branch `mf6-coupling` ...
   the development repositories, as each record says.
 - The twelve records in `docs/design` that cite commit IDs (`audit_a1_phase3`, `audit_a2_phase4`, `audit_a2_phase5`,
   `audit_a3_phase10`, `audit_a4_phase13`, `audit_a5_phase15`, `defects_d1_d3`, `doc_phase6`, `mf6_build`,
-  `rebuild_core_v1`, `rebuild_v2`, `rebuild_v3h`) and this one start with a note that the IDs are those of the development
+  `rebuild_core`, `rebuild_columns`, `rebuild_hooks`) and this one start with a note that the IDs are those of the development
   repositories and that base Raven's IDs (e7e2868 and ancestors) and public commits keep theirs. The IDs themselves are
   left as they are (rewriting them in the tree was the alternative; it changes the trees and was not chosen).
 

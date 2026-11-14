@@ -317,8 +317,8 @@ a model with more stops the run (``the existing model has \dots\ cells per layer
 river cells, so a losing reach can take more than the channel holds; the part the channel cannot supply is carried to the
 next step (exactly accounted).
 \item Later starts and restarts refuse time-array series (\cmd{TAS6}), \cmd{TVK6}/\cmd{TVS6},
-array-based or advanced packages with several period entries before Raven's start, and \cmd{TS6} files whose
-\cmd{TIMESERIES} rows come from another file (Section~\ref{sec:existingtime}).
+and array-based or advanced packages with several period entries before Raven's start
+(Section~\ref{sec:existingtime}).
 \item A column whose top cell becomes specified-head in a later stress period keeps its \cmd{EVT\_RAVEN} and \cmd{SWX\_RAVEN}
 entries; MODFLOW books no flow through them there, and Raven reads back what MODFLOW booked. Reservoir seepage is sent only
 to the lake's cells that can take it in the step (Table~\ref{tab:extpkgs}); a gain MODFLOW does not supply is taken back from

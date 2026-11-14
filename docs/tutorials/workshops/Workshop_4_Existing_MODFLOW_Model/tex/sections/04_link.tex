@@ -8,12 +8,14 @@ with an aquifer profile and list them in the group \cmd{AquiferHRUs}:
 In \cmd{Creek.rvi}, switch the coupling on and send the percolation of the coupled HRUs to \cmd{GROUNDWATER} (Raven's store
 for the water that becomes MODFLOW recharge):
 \diff{t4_a_rvi.diff}
+Or copy the two files: \cmd{cp \$WS/model/step\_07/Creek.rvh .} and \cmd{cp \$WS/model/step\_07/Creek.rvi .}
 
 \step{Edit \texttt{Creek.rvp}}
 The \cmd{.rvp} needs no aquifer classes: the layers and their properties come from the MODFLOW model. A profile is written
 as \cmd{name, 0} (zero layers). It only marks the coupled HRUs and carries the exchange settings, here the conductance of
 the \emph{seepage face} [1/d] (the land surface where the water table reaches it and groundwater seeps out):
 \diff{t4_a_rvp.diff}
+Or copy the file: \cmd{cp \$WS/model/step\_07/Creek.rvp .}
 
 \step{Create \texttt{Creek.rvg}}\label{st:rvg}
 Create the coupling file \cmd{Creek.rvg} with this content:

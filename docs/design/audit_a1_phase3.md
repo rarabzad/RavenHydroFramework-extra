@@ -55,7 +55,7 @@ for existing models only, NEWTON, ignored options).
 - Docstrings: test_interface_stiff (PARTIAL header removed: the file is complete), test_vz_initial I1 (KINEMATIC/LAG
   implemented; what is and is not enforced), test_confined_wet W4 (permanent skip; the suite runs in run_all), test_mf6_budget
   B3 (checked in test_confined_wet), test_inputs I2 (count 0) and I5 (only the warning is checked). No test logic changed.
-- docs/design/soil_zone_v3_f2.md, _f3.md, _q1.md written from the code, manual, tests and the spec (marked as
+- docs/design/soil_zone_stiff_interface.md, soil_zone_existing_outputs.md, soil_zone_restart_sy.md written from the code, manual, tests and the spec (marked as
   reconstructions; section numbers match the references in the tests).
 - tests/README.md: soil-zone section (every script and run_all step), cmake checks 15-19, check 2 text, the soil-zone tests
   do not start from the Liard examples.

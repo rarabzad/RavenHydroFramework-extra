@@ -135,7 +135,7 @@ The steps were: clone the two repositories, apply the messages (PASS), then run 
 - **Hand-over kit:** `make_handover.py --no-public-check` from the rewritten clones: PASS (60 s, every block). The
   bundles have 867 and 139 commits, `git log -G` lists no rewritten commit, and none of the old IDs is present.
 - **What remains of the wider process-wording rule:** 23 distinct lines in code and 319 in extra. They are
-  "history", "rebuilt", "findings", test IDs such as V2a, names of design notes (`soil_zone_v2_plan.md`, a real
+  "history", "rebuilt", "findings", test IDs such as V2a, names of design notes (`soil_zone_columns_plan.md`, a real
   docs/design path) and the audit tool. These are outside the scope of option (c) and are listed in
   `patches/neutral_trees_rule_residual.txt`.
 

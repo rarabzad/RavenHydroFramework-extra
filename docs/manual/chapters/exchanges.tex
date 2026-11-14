@@ -497,9 +497,11 @@ drainable porosity, the more readily it binds, and Raven warns at start-up when 
 $\theta_s-\theta(\psi=-1\text{ m})$ of a class differ by more than a factor 2. A column at rest (at equilibrium) holds
 no such excess, and a water table raised under it from below or from the side (a boundary, lateral inflow) does not
 bind the limit. Where it binds, the column keeps that water and
-releases it in the next steps, and no water is lost. Raven writes a warning the first time the limit binds in a run.
-With \cmd{KINEMATIC} the water a rise releases is never more than $S_y\Delta h$, so only the room the top cell has left
-can hold it back, and its warning names that room (Section~\ref{sec:szvadosekw}).
+releases it in the next steps, and no water is lost. Raven writes a warning the first time the limit binds in a run; it
+names the limit that bound, $S_y\Delta h$ or the room left in the top cell.
+With \cmd{KINEMATIC} and one material in the column the water a rise releases is never more than $S_y\Delta h$, so only
+the room the top cell has left can hold it back; where a column crosses aquifer classes of different $S_y$, a node that
+straddles a class boundary can carry more, and $S_y\Delta h$ can bind as well (Section~\ref{sec:szvadosekw}).
 When the water table rises to within $L_{\min}$ of the base the column disappears (rule (ii) below) and the
 soil zone's contact exchange (above) takes over; when it falls again the column reappears at equilibrium. The columns
 are saved in \cmd{solution.rvc} (\cmd{:GWVadoseColumns}; with depth classes \cmd{:GWVadoseClassColumns}).
@@ -516,8 +518,10 @@ back all its outputs. With the interface iteration the share follows the head of
 (Section~\ref{sec:szinterface}); in explicit coupling only the case $F_0=1$ applies. With depth classes the rule applies
 class by class (Section~\ref{sec:vzclasses}).
 \item[Rule (ii): a vanishing column.] A column that disappears because the water table rose to within $L_{\min}$ of its
-base releases to the aquifer at most what MODFLOW stores for the rise (the limit $S_y\Delta h$ above); the rest of its
-water goes back to the soil zone.
+base releases to the aquifer at most the smaller of $S_y\Delta h$ and the room the top cell has left (the limits above).
+The room is at most $S_y L_{\min}$, and none once the head has reached the base or the cell's top, so it usually decides:
+the rest of the column's water, usually nearly all of it, goes back to the soil zone. Raven writes a warning the first
+time this happens in a run, naming the limit that bound.
 \end{description}
 In \cmd{GWBudget.csv} the water handed back is part of \emph{rejected recharge}. It is subtracted from \emph{unsaturated
 zone inflow} (both rules) and from \emph{unsaturated zone to aquifer} (rule (i), whose water was among the column's

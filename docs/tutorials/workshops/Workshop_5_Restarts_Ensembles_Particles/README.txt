@@ -59,7 +59,7 @@ tex/                the LaTeX source of the PDF:
     sections/         one file per section, in order (01_..., 02_..., ...)
     generated/        the numbers (values.tex), program outputs and file changes quoted in the text
     figures/          the figures
-work/ and the out*/ folders inside it are made by you during the workshop.
+work/ and work_part2/, with the out*/ folders inside them, are made by you during the workshop.
 
 How to rebuild the PDF
 ----------------------
