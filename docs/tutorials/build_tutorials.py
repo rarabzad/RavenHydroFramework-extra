@@ -1701,6 +1701,8 @@ def tut3():
         raise RuntimeError('t3: the release-cap warnings name %s and %s, the text LAG and RICHARDS'
                            % (W3['out_lag'][1][0][:80], W3['out_classes'][1][0][:80]))
     G.text('t3_warn_lag.txt', '$ grep "%s" out_lag/Raven_errors.txt\n' % cap + sanitize(W3['out_lag'][1][0] + '\n', w, uw))
+    G.text('t3_warn_classes.txt', '$ grep "%s" out_classes/Raven_errors.txt\n' % cap +
+           sanitize(W3['out_classes'][1][0] + '\n', w, uw))
     m = re.search(r'soil zone\s*:\s*PHYSICAL, SOIL\[0\.\.1\]; (\d+) HRUs with a soil zone, (\d+) without', summary_text(os.path.join(w, 'out_physical')))
     G.val('t3:nszhru', m.group(1)); G.val('t3:nnosz', m.group(2))
     m = re.search(r'on (\d+) links the soil-zone base of the HRU lies up to ([0-9.]+) m', errs)

@@ -1,5 +1,11 @@
 """fig_placing.pdf: the synthetic Liard model's cells in the model's own coordinates and placed on the map.
-Reads the cells of a coupled run (grid_cells.geojson) and the Liard HRUs; needed only to regenerate the figure.
+Reads the cells of a coupled run (grid_cells.geojson) and the Liard HRUs:
+
+    python3 make_plain_figures.py CELLS HRUS RVH
+
+CELLS  grid_cells.geojson of a coupled run of the Liard model placed by its coordinate system (in the run's output mf6/)
+HRUS   the Liard HRUs (Liard_HRUs_standin.geojson)
+RVH    the Liard model's Liard.rvh (its HRUs with AQUIFER_PROFILE)
 The other plain-language figures are drawn in TikZ (tikz_*.tex; tikz_linking.tex from make_tikz_linking.py)."""
 import json, math, re, numpy as np, matplotlib
 matplotlib.use('Agg')
@@ -18,8 +24,7 @@ def coupled_hrus(rvh):
         if p and p[0].isdigit() and len(p)>ia and p[ia]!='[NONE]': ids.add(int(p[0]))
     return ids
 
-def fig_placing(cells='/home/claude/extmodel/case_crs/out/mf6/grid_cells.geojson',hrus='/home/claude/liard_gw2/Liard_HRUs_standin.geojson',
-                rvh='/home/claude/liard_gw2/Liard.rvh',ncol=98,nrow=117,cs=1.5):
+def fig_placing(cells,hrus,rvh,ncol=98,nrow=117,cs=1.5):
     g=json.load(open(cells))['features']; H=json.load(open(hrus))['features']; keep=coupled_hrus(rvh)
     loc=[];geo=[];fc=[]
     for f in g:
@@ -47,4 +52,7 @@ def fig_placing(cells='/home/claude/extmodel/case_crs/out/mf6/grid_cells.geojson
     fig.savefig('fig_placing.pdf'); plt.close(fig)
 
 if __name__=='__main__':
-    fig_placing(); print('fig_placing.pdf written')
+    import sys
+    if len(sys.argv) != 4 or sys.argv[1] in ('-h', '--help'):
+        sys.exit(__doc__)
+    fig_placing(*sys.argv[1:]); print('fig_placing.pdf written')

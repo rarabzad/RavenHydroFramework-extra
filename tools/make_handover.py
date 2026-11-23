@@ -51,7 +51,11 @@ Checks (the exit code is 0 only when all pass):
   - unless --no-public-check: the public branch mf6-coupling is read (git ls-remote; nothing is pushed) and, when it can
     be fetched, whether it is an ancestor of the bundle's tip (a plain fast-forward) is written into HANDOVER.md, with
     the commits it holds that the kit does not, and what those listed in KNOWN_PUBLIC contain: they are already public,
-    and HANDOVER.md says which routes keep them on GitHub and which one (1A-replace-local) keeps them only locally.
+    and HANDOVER.md says which routes keep them on GitHub and which one (1A-replace-local) keeps them only locally. The
+    code repository's pull requests (refs/pull/*/head) are listed too. HANDOVER.md always describes the open pull
+    request #1 on the code branch (KNOWN_PULLS): what its public description shows, that every route updates it, that
+    the user should edit its description or close it after publishing, and that removing its earlier head from GitHub
+    needs GitHub support.
 """
 import os, re, sys, argparse, subprocess, tempfile, shutil, hashlib, tarfile
 
@@ -66,6 +70,13 @@ KNOWN_PUBLIC = {'e03243d': 'the earlier upload of the coupling (2026-09-30, "Rav
                            'a report in docs/ of the checks made before that upload, organised by the stages of the work; comments '
                            'in src/GroundwaterModel.h that name those stages; and a README.md line that points to the report. None of '
                            'this is in the kit'}
+# open pull requests of the code repository whose head is the code branch, and what they show: every route updates such a
+# pull request, and its timeline keeps a link to the commit it showed before
+KNOWN_PULLS = {1: dict(branch='mf6-coupling', head='e03243d', text=(
+    '"Raven-MODFLOW 6 groundwater coupling", from `mf6-coupling` into `main`, opened on 2026-09-30 with the earlier upload '
+    '`e03243d`. Its description was written for that upload and is public: it tells how the coupling was developed and '
+    'checked, names the Raven versions it was built on, and describes a layout the kit does not have (`legacy/mfusg/`, '
+    '`tools/get_mf6.py` and `docs/` in the code repository)'))}
 NAME = {'code': 'RavenHydroFramework', 'extra': 'RavenHydroFramework-extra'}
 ENV = dict(os.environ, GIT_TERMINAL_PROMPT='0', GIT_ASKPASS='true')   # (never ask for a password)
 
@@ -303,6 +314,20 @@ def known_note(found):
     return (' ' + ' '.join(out)) if out else ''
 
 
+def pull_note(branch):
+    """HANDOVER.md's paragraph on the open pull requests whose head is the code branch (KNOWN_PULLS)"""
+    out = []
+    for n, p in sorted(KNOWN_PULLS.items()):
+        if p['branch'] == branch:
+            out.append('**Pull request #%d.** RavenHydroFramework has an open pull request, #%d %s. Its head is branch `%s`, so '
+                       'every route below updates it: its page then shows the commits you publish. After publishing, edit the '
+                       "pull request's description on GitHub so that it describes what you published, or close the pull "
+                       'request. Its timeline keeps a link to `%s` (GitHub records the replaced head), so GitHub keeps that '
+                       'commit even after block 1A-replace-local; removing it from GitHub needs GitHub support.'
+                       % (n, n, p['text'], branch, p['head']))
+    return '\n\n'.join(out) + '\n' if out else ''
+
+
 def found_note(found):
     """the words HANDOVER.md's 1A-replace paragraph adds about the public branch's commits the kit does not hold: only
     the commits the public check found (ID and subject), nothing when it found none or could not read the branch"""
@@ -335,6 +360,13 @@ def public_state(pub_code, rec, tmp):
             lines.append('%s branch %s: at %s, %s' % (PUBLIC['code'], br, sha,
                          'an ancestor of the bundle\'s tip: publishing it is a fast-forward (block 1A-push)' if anc else
                          'not an ancestor of the bundle\'s tip: it holds %s commit(s) the bundle does not (block 1A-replace-local or 1A-replace, or step 4)' % extra))
+    rc, out = run(['git', 'ls-remote', PUBLIC['code'], 'refs/pull/*/head'], tmp, timeout=120)
+    for l in (out.split('\n') if rc == 0 else []):
+        m = re.match(r'([0-9a-f]{40})\s+refs/pull/(\d+)/head$', l.strip())
+        if m:
+            lines.append('%s pull request #%s: its head is at %s%s' % (PUBLIC['code'], m.group(2), m.group(1),
+                         ' (see "Pull request #%s" below)' % m.group(2) if int(m.group(2)) in KNOWN_PULLS else
+                         ' (a pull request the kit does not describe: read it on GitHub before publishing)'))
     rc, out = run(['git', 'ls-remote', PUBLIC['extra']], tmp, timeout=120)
     if rc != 0:
         lines.append('%s: not readable now (it does not exist yet, is private, or the computer is offline): create it in step 2' % PUBLIC['extra'])
@@ -359,6 +391,7 @@ was made:
 
 {public}
 
+{pulls}
 ## How to run the steps
 
 - Use a bash shell: Linux, macOS, or Git Bash on Windows. You need git, and push access to both repositories (a personal
@@ -437,7 +470,8 @@ When GitHub's branch holds commits the kit does not, those commits are already p
 keeps them on GitHub keeps their files public: the backup branch of block 1A-replace, route 1B (one new commit on top of
 them) and step 4. Block 1A-replace-local keeps them only in a bundle in your working folder and replaces the branch, so
 no branch on GitHub holds them afterwards (GitHub may still serve such a commit to anyone who has its full ID until it
-removes unreferenced commits; GitHub support can be asked to remove them). Which route to take is your decision when you
+removes unreferenced commits, and an open pull request on the branch keeps referring to it: see "Pull request #1"
+above; GitHub support can be asked to remove them). Which route to take is your decision when you
 publish. Both blocks stop, rather than discard anything, if someone pushes to the branch after the block has read it
 (`--force-with-lease`).
 
@@ -809,7 +843,7 @@ def main():
                                cn=c['n'], xn=x['n'], ctree=c['tree'], xtree=x['tree'], cbundle=files['code']['bundle'],
                                xbundle=files['extra']['bundle'], ctar=files['code']['tar'], xtar=files['extra']['tar'],
                                date=max(c['date'], x['date']), public='\n'.join('- ' + l for l in public), found=found_note(found),
-                               known=known_note(found))
+                               known=known_note(found), pulls=pull_note(br['code']))
         open(os.path.join(out, 'HANDOVER.md'), 'w').write(text)
         with open(os.path.join(out, 'KIT.txt'), 'w') as f:
             for k in ('code', 'extra'):

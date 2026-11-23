@@ -29,7 +29,7 @@ $ $RAVEN Creek -o out_kinematic/
 \end{shell}
 \see \msg{Exiting Gracefully: Successful Simulation}.
 
-\step{Try LAG}
+\step{Try LAG}\label{st:lag}
 Change the same word again and run into \cmd{out\_lag}:
 \diff{t3_lag.diff}
 \begin{shell}
@@ -54,5 +54,9 @@ points. Put \cmd{RICHARDS} back and add the line:
 $ $RAVEN Creek -o out_classes/
 \end{shell}
 \see \msg{Exiting Gracefully: Successful Simulation}, after about \V{t3:secclasses}~seconds. The file
-\cmd{out\_classes/Raven\_errors.txt} holds \V{t3:nwarnClasses} warnings: those of the LAG run, with \cmd{RICHARDS} in the
-last one, for the same reason. \cmd{Creek.rvg} is now as in \cmd{\$WS/model/finished}.
+\cmd{out\_classes/Raven\_errors.txt} holds \V{t3:nwarnClasses} warnings: the \V{t3:nwarnRich} of
+Step~\ref{st:physrun} and a release warning for \cmd{RICHARDS}:
+\term{t3_warn_classes.txt}
+\why it is not the warning of Step~\ref{st:lag}: it names the other limit. Here the room left in the top cell above the
+water table is less than $S_y\,\Delta h$, so the column releases at most that room per step and the rest in the next
+steps. No water is lost. \cmd{Creek.rvg} is now as in \cmd{\$WS/model/finished}.
