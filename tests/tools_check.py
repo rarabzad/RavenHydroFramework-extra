@@ -28,7 +28,9 @@ TC8 tools_audit on a run without aquifer flow (TC1's two-step output with every 
    3e-9 m3/d): MODFLOW's cumulative residual over the gross flow is below 1e-8 (the gross flow is floored at 1 m3/d, as
    the tool's other ratios are), not 1.
 TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the public branch's commits the kit does not hold
-   only when the public check found them (their IDs and subjects), and says nothing about them otherwise.
+   only when the public check found them (their IDs and subjects), and says nothing about them otherwise;
+   make_handover.pull_note: HANDOVER.md describes the open pull request #1 on the code branch (edit its description or
+   close it; GitHub support for its earlier head), and nothing for another branch.
 TC9 tools/check_manual_pdf.py on a two-chapter stand-in of docs/manual (a copy in the work folder): a main.pdf built
    from its chapters passes; after a chapter is changed it fails (the changed line shown), --write replaces the PDF, and
    then it passes again.
@@ -219,6 +221,10 @@ def t7():
     report('TC7 make_handover: no public commits found, nothing said about them', mh.found_note([]) == '')
     report('TC7 make_handover: the found commit is named by its ID and subject', '`e03243d5` "Upload the coupling"' in one and '1 commit,' in one, one)
     report('TC7 make_handover: five found commits, three named and the count', '5 commits' in many and 'and 2 more' in many, many[:120])
+    pr = mh.pull_note('mf6-coupling')
+    report('TC7 make_handover: the open pull request #1 on the code branch is described, with what to do and GitHub support',
+           'Pull request #1' in pr and 'edit the pull request' in pr and 'or close the pull request' in pr and 'GitHub support' in pr
+           and '`e03243d`' in pr and mh.pull_note('other-branch') == '', pr[:120])
 
 
 def t9():

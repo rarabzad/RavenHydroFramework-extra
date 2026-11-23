@@ -1,9 +1,19 @@
+"""tables/run_checks.tex: the automatic checks (tools_audit.py) of the behaviour-test runs. Each argument is the output
+folder of one run (or the folder holding out/), in the table's order:
+
+    python3 make_tables.py LIARD PUMPING FIXED_HEAD RESTART ENSEMBLE WETLANDS RESERVOIR SOILLESS DRYING
+
+LIARD the 20-year coupled Liard run, PUMPING the pumping test with observations, FIXED_HEAD the fixed-head and recharge-delay
+run, RESTART its restart, ENSEMBLE one member of the ensemble run, WETLANDS, RESERVOIR, SOILLESS (soil-less HRUs) and
+DRYING (the extreme drying run). A folder without GWBudget.csv is left out of the table."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'examples', 'Liard_groundwater'))
 import tools_audit as audit, pandas as pd, numpy as np
-# the behaviour-test runs (Section "Behaviour tests"): set these folders to where the runs are
-runs=[('20-year Liard','/home/claude/liard_gw2/out_final'),('Pumping','/home/claude/p3/R2obs'),('Fixed head, delay','/home/claude/p3/T3'),
-      ('Restart','/home/claude/p3/T3b'),('Ensemble','/home/claude/p3/T5/out/ens_2'),('Wetlands','/home/claude/p3/T7'),('Reservoir','/home/claude/p3/T8'),('Soil-less HRUs','/home/claude/p3/T9'),('Drying (extreme)','/home/claude/liard_dry/out_final')]
+# the behaviour-test runs (Section "Behaviour tests"), given as arguments in the table's order
+NAMES=['20-year Liard','Pumping','Fixed head, delay','Restart','Ensemble','Wetlands','Reservoir','Soil-less HRUs','Drying (extreme)']
+if len(sys.argv) != len(NAMES)+1 or sys.argv[1] in ('-h', '--help'):
+    sys.exit(__doc__)
+runs=list(zip(NAMES, sys.argv[1:]))
 R={}
 for n,p in runs:
     if os.path.exists(p+'/GWBudget.csv') or os.path.exists(p+'/out/GWBudget.csv'):

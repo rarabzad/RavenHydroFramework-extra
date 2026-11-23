@@ -1,9 +1,24 @@
+"""The manual's figures of the coupled Liard model, the pumping test, the drying run and the calibration (fig_*.pdf, written
+into the current folder). They are drawn from the runs they show, given as arguments:
+
+    python3 make_figures.py MODEL BASE PUMP DRY CALIB
+
+MODEL  the coupled Liard model's folder: Liard_HRUs_standin.geojson, Liard_rivers.geojson and the 20-year run's output in
+       out_final/ (MODFLOW's files in out_final/mf6/)
+BASE   the output folder of the same model run without groundwater (its Hydrographs.csv)
+PUMP   the folder of the pumping-test runs R1 and R2 (R1/out/ and R2/out/)
+DRY    the output folder of the drying (extreme) run (its GWConnectivity.csv)
+CALIB  the calibration log (calib_log.txt)"""
+import os, sys
+if len(sys.argv) != 6 or sys.argv[1] in ('-h', '--help'):
+    sys.exit(__doc__)
 import json, re, numpy as np, pandas as pd, matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt, flopy
 from matplotlib.patches import Polygon as MPoly
 from matplotlib.collections import PatchCollection
 plt.rcParams.update({'font.size':9,'figure.dpi':150})
-G='/home/claude/liard_gw2/'; RUN=G+'out_final/'; M=RUN+'mf6/'
+G, BASE, PUMP, DRY = [os.path.join(x, '') for x in sys.argv[1:5]]; CALIB = sys.argv[5]
+RUN=G+'out_final/'; M=RUN+'mf6/'
 dis=open(M+'gwf.dis').read(); lat0,lon0=map(float,re.search(r'lat=([-\d.]+) lon=([-\d.]+)',dis).groups())
 x0=float(re.search(r'XORIGIN (\S+)',dis).group(1)); y0=float(re.search(r'YORIGIN (\S+)',dis).group(1))
 sim=flopy.mf6.MFSimulation.load(sim_ws=M,verbosity_level=0,load_only=['dis']); d=sim.get_model().dis
@@ -45,7 +60,7 @@ ax[0].plot(m.index,m['storage release [m3/d]'],label='storage release',lw=0.8); 
 ax[1].semilogy(b['date'],b['MF6 balance error [%]'].abs().clip(lower=1e-9),lw=0.4); ax[1].set_ylabel('|balance error| [% of gross flow]'); ax[1].axhline(0.1,color='r',lw=0.8,ls='--')
 fig.tight_layout(); fig.savefig('fig_budget.png'); plt.close()
 # ---- Figure: hydrographs subbasin 43 (last 3 years)
-q0=pd.read_csv('/home/claude/liard_test/out_base/Hydrographs.csv'); q1=pd.read_csv(RUN+'Hydrographs.csv')
+q0=pd.read_csv(BASE+'Hydrographs.csv'); q1=pd.read_csv(RUN+'Hydrographs.csv')
 c=[x for x in q1.columns if x.startswith('SUB_43') and 'observed' not in x][0]; o=[x for x in q1.columns if x.startswith('SUB_43') and 'observed' in x]
 t=pd.to_datetime(q1['date']); s=t>='2002-10-01'
 fig,ax=plt.subplots(figsize=(7.2,3))
@@ -53,8 +68,8 @@ if o: ax.plot(t[s],pd.to_numeric(q1[o[0]],errors='coerce')[s],'k.',ms=1.5,label=
 ax.plot(t[s],q0[c][s],lw=0.8,label='Raven (uncoupled)'); ax.plot(t[s],q1[c][s],lw=0.8,label='Raven + MODFLOW 6')
 ax.set_ylabel('outflow SUB_43 [m$^3$/s]'); ax.legend(fontsize=7); fig.tight_layout(); fig.savefig('fig_hydrograph.png'); plt.close()
 # ---- Figure: pumping test (run R1 with the well, R2 without it)
-P='/home/claude/p3/'; h1=pd.read_csv(P+'R1/out/GWHeads.csv').rename(columns=lambda c:c.strip()); h2=pd.read_csv(P+'R2/out/GWHeads.csv').rename(columns=lambda c:c.strip())
-b1=pd.read_csv(P+'R1/out/GWBudget.csv').rename(columns=lambda c:c.strip()).dropna(); b2=pd.read_csv(P+'R2/out/GWBudget.csv').rename(columns=lambda c:c.strip()).dropna()
+h1=pd.read_csv(PUMP+'R1/out/GWHeads.csv').rename(columns=lambda c:c.strip()); h2=pd.read_csv(PUMP+'R2/out/GWHeads.csv').rename(columns=lambda c:c.strip())
+b1=pd.read_csv(PUMP+'R1/out/GWBudget.csv').rename(columns=lambda c:c.strip()).dropna(); b2=pd.read_csv(PUMP+'R2/out/GWBudget.csv').rename(columns=lambda c:c.strip()).dropna()
 tt=pd.to_datetime(h1['date']); fig,ax=plt.subplots(1,2,figsize=(7.4,2.9))
 for cc,lab in zip(h1.columns[2:],['OW_NEAR (pumped cell)','OW_FAR (12 km)']): ax[0].plot(tt,h1[cc]-h2[cc],label=lab)
 ax[0].axvline(pd.Timestamp('1987-01-01'),color='k',ls=':',lw=0.8); ax[0].set_ylabel('drawdown [m]'); ax[0].legend(fontsize=7)
@@ -63,11 +78,11 @@ t2=pd.to_datetime(b2['date']); cap=(net(b1)-net(b2)).rolling(30).mean(); st=(b2[
 ax[1].plot(t2,-b2['wells actual [m3/d]']/1e3,'k',lw=0.8,label='pumping (actual)'); ax[1].plot(t2,cap/1e3,label='captured discharge'); ax[1].plot(t2,st/1e3,label='storage')
 ax[1].set_ylabel('10$^3$ m$^3$/d (30-d mean)'); ax[1].legend(fontsize=7); fig.autofmt_xdate(); fig.tight_layout(); fig.savefig('fig_pumping.png'); plt.close()
 # ---- Figure: connectivity (drying test)
-cn=pd.read_csv('/home/claude/liard_dry/out_final/GWConnectivity.csv').rename(columns=lambda c:c.strip()); tc=pd.to_datetime(cn['date'])
+cn=pd.read_csv(DRY+'GWConnectivity.csv').rename(columns=lambda c:c.strip()); tc=pd.to_datetime(cn['date'])
 fig,ax=plt.subplots(figsize=(7.2,2.8)); ax.plot(tc,cn['connected wet clusters'],'k',lw=0.8); ax.set_ylabel('connected saturated clusters')
 a2=ax.twinx(); a2.plot(tc,cn['wet fraction VALLEY_ALLUVIUM'],color='tab:blue',lw=0.8); a2.set_ylabel('wet fraction (valley)',color='tab:blue'); fig.tight_layout(); fig.savefig('fig_connectivity.png'); plt.close()
 # ---- Figure: calibration convergence
-L=open('/home/claude/calib/calib_log.txt').read().split('\n'); objs=[]; best=[]
+L=open(CALIB).read().split('\n'); objs=[]; best=[]
 for l in L:
     mm=re.match(r'eval (\d+).*obj ([\d.]+)',l)
     if mm: objs.append(float(mm.group(2)))
