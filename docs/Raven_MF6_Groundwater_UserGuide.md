@@ -407,8 +407,8 @@ formulation (Raven stops at start-up otherwise; MODFLOW also needs `LINEAR_ACCEL
   Column water goes back to the soil zone, as rejected recharge, where the water table rises during a step onto ground
   unsaturated at its start (rule (i)) and when a column vanishes (rule (ii)): a vanishing column releases to the aquifer at
   most the smaller of Sy dh and the room left in the top cell (at most Sy times 5 cm, none once the head has reached the
-  base or the cell top), so usually nearly all its water goes back to the soil zone, with a warning the first time in a
-  run; it is subtracted from the unsaturated-zone inflow,
+  base or the cell top), so usually nearly all its water goes back to the soil zone (no warning: it is the expected course
+  where the water table rises into the soil zone); it is subtracted from the unsaturated-zone inflow,
   which is therefore negative on steps where the columns hand back more than they receive (manual, "The unsaturated
   column").
 
@@ -621,7 +621,8 @@ digits, so closed-loop and forecast members continue the aquifer from there.
   only through the aquifer.
 - Existing models (section 4.3b): one GWF model with no exchanges; no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse
   time-array series (TAS6), TVK6/TVS6 and array or advanced packages with several period
-  entries before the start (TS6 series are shifted, also rows read through OPEN/CLOSE); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
+  entries before the start (TS6 series are shifted, also rows read through OPEN/CLOSE); a restart from `:GWHeads`
+  refuses kept packages with a state of their own (LAK, MAW, UZF, CSUB, SFR with STORAGE); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE
   files are read); the stream package keeps the model's stage and has no conductance (supply) limit; undefined length or
   time units are taken as metres and days; monitoring wells and GWHeads.nc need `:MF6CRS` or `:MF6GridFile`.
   Water-table ET, `:SurfaceWaterExchange` and `:ReservoirExchange` work as with a generated model, except on cells that

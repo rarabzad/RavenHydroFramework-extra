@@ -1,2 +1,2 @@
 $ grep "more water above equilibrium" out_lag/Raven_errors.txt
-WARNING  : CGroundwaterModel: :SoilZoneVadose LAG: a rising water table met more water above equilibrium in an unsaturated column than MODFLOW stores for the rise; the column releases at most Sy dh per step (or the room left in the top cell) and the rest in the next steps. This is expected while water is in transit in the column (the LAG store)
+WARNING  : CGroundwaterModel: :SoilZoneVadose LAG: a rising water table met more water above equilibrium in an unsaturated column than MODFLOW stores for the rise (Sy dh); the column releases at most Sy dh per step and the rest in the next steps; this is expected while water is in transit in the column (the LAG store)

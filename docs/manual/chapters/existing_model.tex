@@ -160,13 +160,13 @@ working copy, shortens the period that holds Raven's start, and renumbers the pe
 takes the inputs that were in force on Raven's start date (Figure~\ref{fig:periods}, bottom). This is safe for packages whose period
 entries replace one another (WEL, RIV, GHB, CHD, DRN, list-based RCH and EVT, STO, OC, the water mover MVR), and for
 array-based recharge and ET and the advanced packages (SFR, LAK, MAW, UZF) when at most one period entry comes before Raven's
-start. Such a package with several earlier entries, whose settings build on one another, stops such a run, as do time-varying conductivity or storage
-(\cmd{TVK6}, \cmd{TVS6}) and a simulation holding more than one model (only the coupled model's periods would be
-renumbered); Raven must then start at \cmd{:MF6StartDate}. The times of a time series (\cmd{TS6} files) count from the
+start. Such a package with several earlier entries, whose settings build on one another, stops such a run, as does
+time-varying conductivity or storage (\cmd{TVK6}, \cmd{TVS6}); Raven must then start at \cmd{:MF6StartDate}. (A
+simulation holding more than one model, or exchanges, stops at any start: Raven couples one model.) The times of a time series (\cmd{TS6} files) count from the
 model's own time zero: on a later start, even one inside the first period, Raven shifts every time of each \cmd{TS6} file
 named by a package it keeps by the time elapsed before its start. Entries before the start keep negative times,
-so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}) and
-time series in a simulation holding more than one model stop a later start; the rows of a \cmd{TS6} file read through
+so MODFLOW interpolates across Raven's start exactly as it did on the model's own clock. Time-array series (\cmd{TAS6}) stop
+a later start; the rows of a \cmd{TS6} file read through
 \cmd{OPEN/CLOSE} are shifted and written into the working copy's \cmd{TS6} file. A time of day in Raven's \cmd{:StartDate}
 counts in the offset, so restarts work with sub-daily time steps too (the start must fall on a Raven step of its stress
 period); the working copy's \cmd{START\_DATE\_TIME} is set to Raven's start, with the time of day when there is one.

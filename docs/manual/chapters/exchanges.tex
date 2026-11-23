@@ -520,8 +520,8 @@ class by class (Section~\ref{sec:vzclasses}).
 \item[Rule (ii): a vanishing column.] A column that disappears because the water table rose to within $L_{\min}$ of its
 base releases to the aquifer at most the smaller of $S_y\Delta h$ and the room the top cell has left (the limits above).
 The room is at most $S_y L_{\min}$, and none once the head has reached the base or the cell's top, so it usually decides:
-the rest of the column's water, usually nearly all of it, goes back to the soil zone. Raven writes a warning the first
-time this happens in a run, naming the limit that bound.
+the rest of the column's water, usually nearly all of it, goes back to the soil zone. This is the expected course where
+the water table rises into the soil zone, and Raven writes no warning for it; the water handed back is booked as below.
 \end{description}
 In \cmd{GWBudget.csv} the water handed back is part of \emph{rejected recharge}. It is subtracted from \emph{unsaturated
 zone inflow} (both rules) and from \emph{unsaturated zone to aquifer} (rule (i), whose water was among the column's

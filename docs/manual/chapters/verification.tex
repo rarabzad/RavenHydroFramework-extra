@@ -177,7 +177,7 @@ specified heads; seepage to Raven 135.1 against 134.8~m$^3$/d without the sliver
 \subsection{Geometry against standard libraries}
 The geometry functions are compiled into a stand-alone test and compared with widely used libraries
 (Table~\ref{tab:geom}); the readers of the spatial inputs are checked against the same libraries and against files
-that must be refused (Tables~\ref{tab:readers}, \ref{tab:geojson}, \ref{tab:rasters} and~\ref{tab:rasterunits}).
+that must be refused (Tables~\ref{tab:readers}, \ref{tab:geojson}, \ref{tab:rasters}, \ref{tab:rasterunits} and~\ref{tab:sidefiles}).
 \begin{table}[!htbp]\centering
 \caption{Geometry functions against independent libraries.}\label{tab:geom}
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
@@ -214,16 +214,22 @@ GeoJSON IDs and structure: IDs \cmd{null}, \cmd{true}, \cmd{"7abc"}, 2.6, \cmd{"
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Input & Reference & Result\\\midrule
 GeoTIFF reader: 228 files written by GDAL and tifffile (every compression, predictor, sample type and byte order; strips and tiles, classic and BigTIFF; NODATA; internal masks; PixelIsPoint; EPSG codes; GDAL's band scale and offset, and role-less items of those names) & their ESRI ASCII twins & every value and the corner exact; the same samples bit for bit\\
-ESRI ASCII grids: GDAL's \cmd{dx}/\cmd{dy} header (with corner or centre), \cmd{NODATA\_value nan}; more values than \cmd{ncols}$\times$\cmd{nrows}, a wrapped grid, fewer values, an unknown key, a value or header value that is not a number & the GeoTIFF with the same pixels; the $-9999$ twin & the same samples bit for bit; each malformed grid refused with its reason\\
+ESRI ASCII grids: GDAL's \cmd{dx}/\cmd{dy} header (with corner or centre), \cmd{NODATA\_value nan}, no \cmd{NODATA\_value} line (every number a value, as for GDAL: $-9999$ cells read, with a warning naming their count); a GeoTIFF without a \cmd{GDAL\_NODATA} tag ($-9999$ and float32-lowest pixels stay values, with a warning); more values than \cmd{ncols}$\times$\cmd{nrows}, a wrapped grid, fewer values, an unknown key, a value or header value that is not a number & the GeoTIFF with the same pixels; the $-9999$ twin & the same samples bit for bit; each malformed grid refused with its reason\\
 GeoTIFF reader: 34 unsupported or damaged files (also a prime meridian given only by its longitude or by the datum, a projected code in feet without its units key, a band unit in feet), an oversized file, and damaged copies of every fixture (bytes changed, cut, inserted, random) & -- & each refused with its reason; no crash (also under AddressSanitizer)\\\bottomrule
 \end{tabularx}
 \end{table}
 \begin{table}[!htbp]\centering
-\caption{Band units and GDAL's side file.}\label{tab:rasterunits}
+\caption{Band units.}\label{tab:rasterunits}
 \begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.2\linewidth}}\toprule\hdr
 Input & Reference & Result\\\midrule
-Band units (\cmd{UNITTYPE}): the table \cmd{tests/geotiff/band\_units.tsv} of 509 texts in five classes, each read without and with \cmd{METRES} after the file name: 115 metre forms, with datums and quantities (\cmd{m}, \cmd{m MSL}, \cmd{m (NAVD88)}, \cmd{mAHD}, \cmd{elevation (m)}, \cmd{EPSG:9001}, other languages and scripts); 3 without a unit; 165 other lengths (\cmd{ft}, \cmd{Zentimeter}, \cmd{voeten}, \cmd{EPSG:9002}); 70 scaled metres (\cmd{0.1 m}, \cmd{m (in thousands)}, \cmd{Meter (x0.1)}, \cmd{m*0.1}); 156 other texts (\cmd{m/s}, \cmd{hydraulic head}, \cmd{5 km grid, elevation in m}) & Table~\ref{tab:bandunits} & each text in its class: the first two read as metres; other lengths and scaled metres stop, also with \cmd{METRES}; the other texts stop, naming the text and \cmd{METRES}, and are read as metres with it (\cmd{geotiff\_check.py})\\
-GDAL's side file \cmd{.aux.xml}: fixtures written by GDAL with \cmd{PROFILE=GeoTIFF} (scale 0.1, offset 50 and unit m, against its twin, also in a Raven run; unit ft) and \cmd{BASELINE}; a side file with scale 0.2 and unit m over a file with scale 0.1, offset 50 and unit ft; side files written by hand in the form GDAL writes (a scale or an offset alone, unit ft, a unit of blanks, band 2 only, a no-data value \cmd{le\_hex\_equiv}, a value that is not a number) and in other forms (lower-case names, an empty unit, blanks or single quotes in an attribute, \cmd{band="01"}, comments, character references, CDATA, two bands 1, an XML declaration, one line, a byte-order mark, unclosed elements, another XML document) & GDAL 3.12 (rasterio) & GDAL's form: values as GDAL gives them (a scale or an offset replaces both of the file's); unit ft stops; \cmd{BASELINE} stops (no georeferencing); a value that is not a number stops; other forms stop (``rewrite it with GDAL'') when they name a band or a band value, and a file naming none (another XML document, a text that is not XML) is ignored, as GDAL takes no band value from it\\\bottomrule
+Band units (\cmd{UNITTYPE}): the table \cmd{tests/geotiff/band\_units.tsv} of 553 texts in five classes, each read without and with \cmd{METRES} after the file name: 146 metre forms, with datums and quantities (\cmd{m}, \cmd{m MSL}, \cmd{m (NAVD88)}, \cmd{mAHD}, \cmd{elevation (m)}, \cmd{EPSG:9001}, other languages and scripts); 3 without a unit; 185 other lengths (\cmd{ft}, \cmd{Zentimeter}, \cmd{voeten}, \cmd{EPSG:9002}); 73 scaled metres (\cmd{0.1 m}, \cmd{m (in thousands)}, \cmd{Meter (x0.1)}, \cmd{m*0.1}); 146 other texts (\cmd{m/s}, \cmd{hydraulic head}, \cmd{5 km grid, elevation in m}) & Table~\ref{tab:bandunits} & each text in its class: the first two read as metres; other lengths and scaled metres stop, also with \cmd{METRES}; the other texts stop, naming the text and \cmd{METRES}, and are read as metres with it; with \cmd{METRES} every run writes a warning naming the file's own unit (or that it gives none) (\cmd{geotiff\_check.py})\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{GDAL's side file and metadata forms.}\label{tab:sidefiles}
+\begin{tabularx}{\linewidth}{Y P{0.22\linewidth}P{0.3\linewidth}}\toprule\hdr
+Input & Reference & Result\\\midrule
+GDAL's side file \cmd{.aux.xml}: fixtures written by GDAL with \cmd{PROFILE=GeoTIFF} (scale 0.1, offset 50 and unit m, against its twin, also in a Raven run; unit ft) and \cmd{BASELINE}; a side file with scale 0.2 and unit m over a file with scale 0.1, offset 50 and unit ft; side files written by hand in the form GDAL writes (a scale or an offset alone, unit ft, a unit of blanks, band 2 only, a no-data value \cmd{le\_hex\_equiv}, a value that is not a number) and in other forms (lower-case names, an empty unit, blanks or single quotes in an attribute, \cmd{band="01"}, comments, character references, CDATA, two bands 1, an XML declaration, one line, a byte-order mark, CRLF line ends, unclosed elements, another XML document); a value that starts with a line end; a side file with georeferencing (\cmd{GeoTransform}); ESRI ASCII grids with a side file (scale 0.5, offset 1 and unit m; unit ft; unit \cmd{hydraulic head}; a \cmd{NoDataValue}; CRLF line ends; a form GDAL does not write) and without one under \cmd{METRES} & GDAL 3.12 (rasterio) & GDAL's form: values as GDAL gives them (a scale or an offset replaces both of the file's); unit ft stops; \cmd{BASELINE} stops (no georeferencing); a value that is not a number stops; other forms stop (``rewrite it with GDAL'') when they name a band or a band value, and a file naming none (another XML document, a text that is not XML) is ignored, as GDAL takes no band value from it; a value starting with a line end is read; georeferencing in the side file stops (``rewrite it with gdal\_translate''); an ESRI ASCII grid reads its side file by the same code (scaled as by hand; ft stops, also with \cmd{METRES}; \cmd{hydraulic head} stops, and is read with \cmd{METRES}, naming it; the header's \cmd{NODATA\_value} kept, as by GDAL; CRLF and other forms stop); without a side file \cmd{METRES} warns that the file gives no unit\\\bottomrule
 \end{tabularx}
 \end{table}
 
@@ -314,8 +320,8 @@ writes: FloPy reads every model; cells are valid and do not overlap; the grid or
 select the right cells. All 127 checks pass.
 
 \paragraph{Faulty and unusual input.} The input checks of \cmd{tests/input\_checks.py} (N1--N28, U0--U4, RN1--RN2,
-E1--E30, E25b, E30b, AM1), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
-check the messages (Tables~\ref{tab:faulty}, \ref{tab:faultynum} and~\ref{tab:faultyext}): every error stops the run with a message that names the problem --- no crash --- and every
+E1--E37 with E25b, E30b, E31b, E32a--E32e, E32c2, E34b, E34c, E35b and E35c, AM1), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
+check the messages (Tables~\ref{tab:faulty}, \ref{tab:faultynum}, \ref{tab:faultyext} and~\ref{tab:faultyext2}): every error stops the run with a message that names the problem --- no crash --- and every
 tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
 MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
 renumbering, the original model untouched). All 53 behave as required.
@@ -365,6 +371,19 @@ The example with a \cmd{CSUB6} package (\cmd{NINTERBEDS 0}, \cmd{HEAD\_BASED}; \
 Loose solver tolerances: a converged step with an MF6 balance error above 1~\% of the gross flow (E16) & one warning a run\\
 \cmd{:OverlapWeights} cell numbers of $2^{32}+1$ (which a cut to int reads as cell 1; E17), of 20 digits (E18) and of $-20$ digits (E22); a row of weight 0 with cell number $2^{32}+1$ (E23) & E17, E18 and E22 stop, naming the number; E23 is skipped and the run completes\\
 A model across the antimeridian: two HRUs whose shared edge lies on longitude 180, a DEM in longitude/latitude across 180 (AM1) & the same active cells and the same recharge, storage and specified-head flows (relative $10^{-6}$) as the same model at longitude 0; no DEM column without a value\\\bottomrule
+\end{tabularx}
+\end{table}
+\begin{table}[!htbp]\centering
+\caption{Response to several models, files outside the simulation folder, later starts and restarts of an existing model, and surplus values of the geometry commands.}\label{tab:faultyext2}
+\begin{tabularx}{\linewidth}{Y P{0.4\linewidth}}\toprule\hdr
+Input & Response\\\midrule
+A second GWF model joined to the coupled one by a GWF6-GWF6 exchange, \cmd{:MF6Model} naming the coupled one (E31); the same without the exchange (E31b) & each stops: Raven couples one MODFLOW~6 groundwater-flow model; the message names the models and the exchange\\
+A well file named by its absolute path inside the simulation folder (E32a), by its absolute path outside it (E32) and by \cmd{../shared/\dots} (E32b), Raven starting 32 days after the model's time zero & E32a named relative to the folder; E32 and E32b copied into the working copy; \cmd{GWBudget.csv} and \cmd{Hydrographs.csv} identical to the twin with the file in the folder; \cmd{GWModelSummary.txt} counts the file copied\\
+A TS6 file named by its absolute path inside the simulation folder (E32c) and outside it (E32c2), Raven starting late; Raven's output folder inside the folder of a package file (E32e); a package file that does not exist (E32d) & E32c named relative to the folder and shifted, results as the relative twin; E32c2, E32e and E32d stop, naming the file and the cause\\
+\cmd{TVK6} with a TS6 series and Raven starting a day late, inside the first period (E33) & stops: the model uses time-varying properties (TVK6/TVS6), whose data count from the model's time zero\\
+A restart from \cmd{:GWHeads} with a kept \cmd{LAK6} package (E34) and a kept \cmd{CSUB6} package (E34b); the same restart of the example, which keeps no package with a state of its own (E34c) & E34 and E34b stop, naming the package and its state, with the remedy; E34c runs\\
+\cmd{:HRUGeometry} (E35), \cmd{:RiverGeometry} (E35b) and \cmd{:GridFile} (E35c) with a surplus value & each stops, naming the value\\
+Two WEL packages naming one file (E36); one TS6 file named \cmd{wel.ts} by the well package and \cmd{./wel.ts} by the GHB package (E37); Raven 32 days late & E36: the file renumbered once (its period 1 is the old period 3), results as with two copies; E37: the series shifted once (its first time 0 becomes $-32$)\\\bottomrule
 \end{tabularx}
 \end{table}
 

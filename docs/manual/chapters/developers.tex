@@ -324,10 +324,11 @@ starts dry (Section~\ref{ch:layers}). Start from a steady state or realistic hea
 \cmd{mf6/mfsim.lst} into its message and \cmd{Raven\_errors.txt}.
 \item Between cells, soil water moves only through the aquifer (\cmd{:SoilZone PHYSICAL}); seepage faces smaller than a cell
 need smaller cells.
-\item Existing models (Chapter~\ref{ch:existing}, Section~\ref{sec:extlimits}): no DISU grids; no ATS6, several solutions or
-a non-Gregorian calendar; restarts and later starts refuse time-array series (TAS6), TVK6/TVS6, simulations with several
-models, and array or advanced packages with several period entries before the start (\cmd{TS6} time series are shifted
-to Raven's start, also rows read through \cmd{OPEN/CLOSE}); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\cmd{OPEN/CLOSE} files are read); the stream
+\item Existing models (Chapter~\ref{ch:existing}, Section~\ref{sec:extlimits}): one GWF model with no exchanges; no DISU
+grids; no ATS6, several solutions or a non-Gregorian calendar; restarts and later starts refuse time-array series (TAS6),
+TVK6/TVS6, and array or advanced packages with several period entries before the start (\cmd{TS6} time series are shifted
+to Raven's start, also rows read through \cmd{OPEN/CLOSE}); a restart from \cmd{:GWHeads} refuses kept packages with a state
+of their own (LAK, MAW, UZF, CSUB, SFR with \cmd{STORAGE}); TDIS and water-mover period data given as \cmd{INTERNAL} are refused (\cmd{OPEN/CLOSE} files are read); the stream
 package keeps the model's stage and has no conductance (supply) limit; undefined \cmd{LENGTH\_UNITS}/\cmd{TIME\_UNITS} are
 taken as metres and days (set them in DIS and TDIS); monitoring wells and \cmd{GWHeads.nc} need the cell outlines
 (\cmd{:MF6CRS} or \cmd{:MF6GridFile}, not \cmd{:OverlapWeights}). Water-table ET, \cmd{:SurfaceWaterExchange} and

@@ -143,5 +143,7 @@ through the columns into the soil zone and falling again), L3 (a column across t
 (restart 60 + 60 days against 120 days: $2\times10^{-8}$), L5 (existing-model round trip: $2.4\times10^{-4}$), L6 (a water table rising into a nearly full top cell releases at
 most the room the cell has left), L7 (a column leak of $10^{-5}$ or $10^{-4}$~m$^3$ per step written into a run's
 \cmd{GWBudget.csv} fails the script's checks: every run is checked with the column identity of \cmd{sz\_check} from
-the first step), LS (cost) and LB
+the first step), L8 (the release-cap warning: with $S_y$ equal to the drainable porosity it says that the cap binds while
+water is in transit in the LAG store and names no specific yield; with $S_y$ 0.02 it adds that a specific yield below the
+drainable porosity adds to it), LS (cost) and LB
 (\cmd{NONE}, \cmd{RICHARDS} and \cmd{CONCEPTUAL} runs byte-identical to a reference build, \cmd{RAVEN\_EXE\_REF}).

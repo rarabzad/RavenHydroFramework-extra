@@ -106,7 +106,12 @@ sand over clay with the water table rising through both, a hotstart continuity c
 \cmd{sz\_check} from the first step. K9: the same outputs with a column leak of $10^{-5}$ or $10^{-4}$~m$^3$ per step
 written into \cmd{GWBudget.csv} fail these checks. K10: a water table rising into a nearly full top cell (specific yield
 0.2, the water table 0.6~m below the base, 90~mm/d) holds the column back by the room left in that cell, with the warning
-that names it.
+that names it. K11: a column across two aquifer classes (sand with $S_y$ 0.25 over silt with 0.05, the water table 2.4~m
+deep, 90~mm/d): a node straddling the boundary carries the sand's mobile water below it, so the release meets
+$S_y\Delta h$ (4\,225~m$^3$) before the room (6\,575~m$^3$), and the warning names $S_y\Delta h$. K12: a vanishing column
+($S_y$ 0.2, the water table 1.45~m deep): it releases at most the room the top cell has left (5.6~m$^3$, against
+3\,600~m$^3$ for $S_y\Delta h$), the rest of its water (3\,543~m$^3$) goes back to the soil zone as rejected recharge,
+and no release warning is written. Every run closes all identities.
 
 \paragraph{Cost.} About 3 Newton iterations per node and substep; one 16-node column step costs 7 to 12~$\mu$s against
 25 to 30~$\mu$s for \cmd{RICHARDS} on the same machine (unit test K1, timings machine-dependent).

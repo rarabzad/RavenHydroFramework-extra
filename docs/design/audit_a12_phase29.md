@@ -127,3 +127,44 @@ The workshops are regenerated with the Phase 28 build.
 - "Review:" in verification.tex stays (a product use, in ALLOW).
 Rehearsal with the Phase 29 changes committed on top of the rewritten clones (a stand-in tip): final check 0 lines in
 both repositories, tip trees identical, the tip lines the final check finds: code 0, extra 0.
+
+## After the merge (code 56e385b, extra 0f02576)
+
+- Rule (ii) writes no warning (Phase 28 removed it: it fired in ordinary runs). exchanges.tex and the user guide say so;
+  sz_vadose_kinematic.tex describes K11 and K12 (K12: no release warning); R21 (manual, test docstring) matches the code.
+- Merge resolution checked in appendix.tex, existing_model.tex and the user guide. Also corrected: existing_model.tex's
+  later-start paragraph (a simulation of several models stops at any start, not only a later one; "time series in a
+  simulation holding more than one model" removed); developers.tex's limits list (one GWF model with no exchanges; a
+  restart refuses kept packages with a state of their own); the user guide's limits list (the same restart rule).
+- verification.tex: Table tab:faultyext2 (E31-E37 with E31b, E32a-E32e, E32c2, E34b, E34c, E35b, E35c); the band-unit row
+  (553 texts: 146 metre forms, 3 none, 185 other lengths, 73 scaled, 146 other texts; the METRES warning); a table of its
+  own for the side file (tab:sidefiles: CRLF line ends, a value starting with a line end, georeferencing, ESRI ASCII side
+  files); the ESRI ASCII row (no NODATA_value line; no GDAL_NODATA tag). verification_soilzone.tex: K1-K12, L1-L8;
+  sz_vadose_lag.tex: L8. tests/README.md: E31-E37, K11, K12, the band-unit count and the side-file rule, to match.
+- W4: the copy commands end in a tied dot (no dot alone on a line).
+- Workshops regenerated with rel28 (only W3's LAG warning excerpt changed; run times kept as committed, the build ran
+  beside two compiles); --check on all six; release binary built twice from 56e385b (TZ UTC/LANG C and
+  TZ Asia/Kathmandu/LANG C.UTF-8): identical. (The zips were not made in that pass; see below.)
+
+## Final pass (after the session loss)
+
+- Checked the earlier pass's edits against the code at 56e385b: rule (ii) has no WriteWarning (GWVadoseModel.cpp, the
+  vanishing-column branch); the release warning names the limit that bound (room or Sy dh) as exchanges.tex, appendix.tex
+  and the user guide say; the one-model refusal (GWExternal.cpp: several models or any EXCHANGES row, at any start) and
+  the restart refusal (ExtRestartState: LAK, MAW, UZF, CSUB, SFR with STORAGE) as appendix.tex, existing_model.tex,
+  developers.tex and the user guide say. tab:faultyext2 against input_checks.py E31-E37; K11, K12, L8 against the test
+  docstrings; band_units.tsv: 553 rows, M 146, N 3, F 185, X 73, S 146. No text edits were needed.
+- Workshops: the earlier pass's regeneration with rel28 and its --check on all six (patches/ws_build.log, ws_check.log)
+  stand; nothing in the workshop folders changed since.
+- Release binary: wt/p29/Raven_release.exe (56e385b), sha256 0af36ce4...44c5. Rebuilt in a fresh folder: identical, first
+  with zig's shared cache, then with an empty cache of its own (ZIG_GLOBAL_CACHE_DIR in the fresh folder, TZ
+  America/Los_Angeles): see patches/rel_check.log and rel_cold.log. The fresh folders are deleted.
+- Zips: --package --source-commit 56e385b with the release binary into wt/ws/zips_final (the old zips replaced;
+  patches/zips_old_sha256.txt, zips_new_sha256.txt); bin/Raven in each is the release binary.
+- Manual: check_manual_pdf.py --write and then the check: PASS (195 pages). tools_check.py: ALL PASSED; make_package.py
+  --self-test: ALL PASSED.
+- Rehearsal on fresh clones (wt/p29/hist/r6, deleted): neutral_messages apply PASS (code 90, extra 146 rewritten, trees
+  identical); the extra changes of this worktree committed on top as a stand-in tip (code has none); neutral_trees run:
+  final check 0 lines (names 0, binary files 0) in both, tip trees identical (code ab87522, extra 51f5b35), tip lines
+  the final check finds: 0 and 0. PASS. (The stand-in held this note without this section; docs/design is outside the
+  check.)
