@@ -1,0 +1,2 @@
+$ grep "more water above equilibrium" out_classes/Raven_errors.txt
+WARNING  : CGroundwaterModel: :SoilZoneVadose RICHARDS: a rising water table met more water above equilibrium in an unsaturated column than the room left in the top cell above the water table (less than what MODFLOW stores for the rise, Sy dh); the column releases at most that room per step and the rest in the next steps

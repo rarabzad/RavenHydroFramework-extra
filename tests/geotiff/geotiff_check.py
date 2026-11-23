@@ -22,11 +22,13 @@ Reader checks (unit driver):
     with it); GDAL's metadata read only in the form GDAL writes it (CPLSerializeXMLTree: layout, double
     quotes, GDAL's escapes, a value of GDAL_METADATA escaped twice): GDAL_METADATA and side files .aux.xml (fixtures written
     with PROFILE=GeoTIFF and BASELINE, and side files written here) read with GDAL's precedence (Scale or Offset, UnitType,
-    NoDataValue, also from le_hex_equiv); a file in any other form (quoting, blanks, case, comments, entities, CDATA, a
+    NoDataValue, also from le_hex_equiv); a file in any other form (quoting, blanks, case, comments elsewhere, entities, CDATA, a
     declaration, a byte-order mark, CRLF line ends, two bands 1, unclosed elements) stops when it names a band or a band
-    value, and is ignored when it names none; a value that starts with a line end is read; a side file with georeferencing
-    (GeoTransform, SRS, GCPs) stops; ESRI ASCII grids read their side file by the same code (Scale, Offset and UnitType; the
-    header's NODATA_value kept, as by GDAL), and without a NODATA_value line every number is a value (as for GDAL);
+    value, and is ignored when it names none; a value that starts with a line end is read; comments, a DOCTYPE literal,
+    processing instructions and mixed text in an xml: metadata domain, as GDAL writes them (side files written by GDAL
+    3.12), are read past; a GeoTIFF's side file with georeferencing (GeoTransform, SRS, GCPs) stops; ESRI ASCII grids read
+    their side file by the same code (Scale, Offset and UnitType; the header's NODATA_value kept, and a GeoTransform or SRS
+    there ignored, as by GDAL), and without a NODATA_value line every number is a value (as for GDAL);
   - no GDAL_NODATA tag: -9999 and float32-lowest pixels stay values, with a warning naming their counts; a user-defined
     vertical system is read as metres with a warning (EPSG:4326+5773, in metres, without one); a damaged pointer to the
     next image directory after a good raster gives a warning and the raster without its mask; a mask after 100 pages
@@ -364,6 +366,8 @@ def side_raw(text):
 B1 = '<PAMDataset>\n  <PAMRasterBand band="1">\n%s  </PAMRasterBand>\n</PAMDataset>\n'
 FILE = lambda r: 0.1 * round(r) + 50.0   # (the file's own scale and offset)
 NOTFORM = 'is not in the form GDAL writes'   # (and names a band or a band value: rewrite it with GDAL)
+XMLD = '<PAMDataset>\n%s  <PAMRasterBand band="1">\n    <UnitType>m</UnitType>\n    <Offset>5</Offset>\n    <Scale>0.01</Scale>\n%s  </PAMRasterBand>\n</PAMDataset>\n'
+GDAL15 = lambda r: 0.01 * round(r) + 5.0
 for label, body, f, want in (('Scale 0.2 alone: offset 0', B1 % '    <Scale>0.2</Scale>\n', lambda r: 0.2 * round(r), None),
                              ('Offset 3 alone: scale 1', B1 % '    <Offset>3</Offset>\n', lambda r: round(r) + 3.0, None),
                              ('UnitType ft', B1 % '    <UnitType>ft</UnitType>\n', None, 'elevations are in ft (the band unit, UnitType in %s.aux.xml)' % SIDE),
@@ -374,7 +378,8 @@ for label, body, f, want in (('Scale 0.2 alone: offset 0', B1 % '    <Scale>0.2<
                              ('scale and offset in lower case', B1 % '    <scale>2</scale>\n    <offset>1</offset>\n', None, NOTFORM),
                              ('UnitType empty', B1 % '    <UnitType></UnitType>\n', None, NOTFORM),
                              ('Scale with an attribute and blanks', B1 % '    <Scale units="x"> 2 </Scale>\n', None, NOTFORM),
-                             ('a commented-out Scale', B1 % '    <!-- <Scale>2</Scale> -->\n', None, NOTFORM),
+                             ('a commented-out Scale (a comment as GDAL writes one): the file\'s values', B1 % '    <!-- <Scale>2</Scale> -->\n', FILE, None),
+                             ('a commented-out Scale indented otherwise than GDAL writes', B1 % '  <!-- <Scale>2</Scale> -->\n', None, NOTFORM),
                              ('band = "1" with blanks', '<PAMDataset>\n  <PAMRasterBand band = "1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', None, NOTFORM),
                              ("band='1' in single quotes", "<PAMDataset>\n  <PAMRasterBand band='1'>\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n", None, NOTFORM),
                              ('band="01"', '<PAMDataset>\n  <PAMRasterBand band="01">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n</PAMDataset>\n', None, NOTFORM),
@@ -388,7 +393,24 @@ for label, body, f, want in (('Scale 0.2 alone: offset 0', B1 % '    <Scale>0.2<
                              ('no closing </PAMDataset>', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n  </PAMRasterBand>\n', None, NOTFORM),
                              ('an unclosed PAMRasterBand', '<PAMDataset>\n  <PAMRasterBand band="1">\n    <Scale>2</Scale>\n</PAMDataset>\n', None, NOTFORM),
                              ('a byte-order mark', '\ufeff' + B1 % '    <Scale>2</Scale>\n', None, NOTFORM),
-                             ('not XML, naming no band value: ignored', 'not a PAM dataset', FILE, None)):
+                             ('not XML, naming no band value: ignored', 'not a PAM dataset', FILE, None),
+                             ('a GeoTransform (a GeoTIFF): stops', B1.replace('</PAMDataset>\n', '  <GeoTransform>  6.0e+05,  5.0e+01,  0.0e+00,  4.6e+06,  0.0e+00, -5.0e+01</GeoTransform>\n'
+                              '</PAMDataset>\n') % '    <Scale>2</Scale>\n',
+                              None, 'holds georeferencing (GeoTransform, SRS or GCPs)'),
+                             # (written by GDAL 3.12, GDALSetMetadata of an xml: domain on the dataset or the band)
+                             ('GDAL-written xml: domain with a comment', XMLD % ('  <Metadata domain="xml:test" format="xml">\n    <root>\n      <!-- hi -->\n'
+                              '      <a x="1">t</a>\n    </root>\n  </Metadata>\n', ''), GDAL15, None),
+                             ('GDAL-written xml: domain with processing instructions (XMP)', XMLD % ('  <Metadata domain="xml:test" format="xml">\n'
+                              '    <?xpacket begin="&#xFEFF;" id="W5M0"?>\n    <x:xmpmeta xmlns:x="adobe:ns:meta/">\n      <a />\n    </x:xmpmeta>\n'
+                              '    <?xpacket end="w"?>\n  </Metadata>\n', ''), GDAL15, None),
+                             ('GDAL-written xml: domain with mixed text', XMLD % ('  <Metadata domain="xml:test" format="xml">\n    <root>text\n      <a />\n'
+                              'tail    </root>\n  </Metadata>\n', ''), GDAL15, None),
+                             ('GDAL-written xml: domain with a DOCTYPE', XMLD % ('  <Metadata domain="xml:test" format="xml">\n    <!DOCTYPE root>\n    <root>\n'
+                              '      <a />\n    </root>\n  </Metadata>\n', ''), GDAL15, None),
+                             ('GDAL-written band xml: domain with a comment', XMLD % ('', '    <Metadata domain="xml:test" format="xml">\n      <root>\n'
+                              '        <!-- hi -->\n      </root>\n    </Metadata>\n'), GDAL15, None),
+                             ('a comment not on its own line', XMLD % ('  <Metadata domain="xml:test" format="xml">\n    <root><!-- hi --></root>\n  </Metadata>\n', ''),
+                              None, NOTFORM)):
     out = side_raw(body)
     good = (out[0].startswith('ERROR') and want in out[0] and (want != NOTFORM or 'rewrite it with GDAL' in out[0])) if want else values_are(out, f)
     report('side file .aux.xml: %s' % label, good, out[0][:160])
@@ -424,9 +446,14 @@ report('ESRI ASCII with a side file of unit "hydraulic head": stops; with METRES
        and om.startswith('OK') and "the file's own band unit is 'hydraulic head'" in om, (o + ' | ' + om)[:200])
 asc_side(GDALASC.replace('<UnitType>%s</UnitType>', '<UnitType>m</UnitType>').replace('\n', '\r\n')); o = unit('raster', ASC, 'NONE').strip()
 report('ESRI ASCII with a GDAL side file in CRLF line ends: stops, naming them', o.startswith('ERROR') and 'CRLF line ends' in o, o[:200])
-asc_side(B1.replace('  </PAMRasterBand>\n', '  </PAMRasterBand>\n  <GeoTransform>  6.0e+05,  5.0e+01,  0.0e+00,  4.6e+06,  0.0e+00, -5.0e+01</GeoTransform>\n') % '')
-o = unit('raster', ASC, 'NONE').strip()
-report('a side file with georeferencing (GeoTransform): stops ("rewrite it with gdal_translate")', o.startswith('ERROR') and 'holds georeferencing' in o and 'gdal_translate' in o, o[:200])
+for lab, geo in (('GeoTransform', '  <GeoTransform>  6.0e+05,  5.0e+01,  0.0e+00,  4.6e+06,  0.0e+00, -5.0e+01</GeoTransform>\n'),
+                 ('SRS (as GDALSetProjection writes it)', '  <SRS dataAxisToSRSAxisMapping="1,2">PROJCS["WGS 84 / UTM zone 17N",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID['
+                  '"WGS 84",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433]],PROJECTION["Transverse_Mercator"],UNIT["metre",1],'
+                  'AUTHORITY["EPSG","32617"]]</SRS>\n')):
+    asc_side('<PAMDataset>\n' + geo + '  <PAMRasterBand band="1">\n    <Scale>0.5</Scale>\n    <Offset>1</Offset>\n  </PAMRasterBand>\n</PAMDataset>\n')
+    o = unit('samplecmp', ASC, SCALED, 'NONE'); g = re.search(r'(\d+) with values, (\d+) differ', o)
+    report('ESRI ASCII with a side file holding a %s: ignored, as by GDAL (the header georeferences the grid); Scale and Offset read' % lab,
+           bool(g) and g.group(2) == '0' and int(g.group(1)) > 1000, o.strip()[:150])
 asc_side(B1 % '    <NoDataValue>%s</NoDataValue>\n' % vals[0][0]); o = unit('samplecmp', ASC, fx('twin_int16.asc'), 'NONE'); g = re.search(r'(\d+) differ', o)
 report('ESRI ASCII with a side file NoDataValue: the header\'s NODATA_value is kept, as by GDAL', bool(g) and g.group(1) == '0', o.strip()[:150])
 asc_side('<PAMDataset><PAMRasterBand band="1"><Scale>2</Scale></PAMRasterBand></PAMDataset>'); o = unit('raster', ASC, 'NONE').strip()

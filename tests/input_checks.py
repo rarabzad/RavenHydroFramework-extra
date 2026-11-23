@@ -137,7 +137,7 @@ One MODFLOW model, files outside the simulation folder, later starts and restart
       Hydrographs.csv identical to the twin with the file in the folder, the working copy's row naming Raven's copy, and
       GWModelSummary.txt counting the file copied; E32c a TS6 file named by its absolute path inside the simulation folder
       is named relative to it in the working copy and shifted (results as the relative twin), E32c2 one outside the folder
-      stops a later start; E32e Raven's output folder inside the folder of a package file stops, naming that cause; E32d a
+      is copied into the working copy and shifted (results as the relative twin); E32e Raven's output folder inside the folder of a package file stops, naming that cause; E32d a
       package file that does not exist stops, naming it;
   E33 TVK6 with a TS6 series and Raven starting a day late, inside the first (32-day) period: stops ("uses time-varying
       properties (TVK6/TVS6)") instead of running with the series unshifted;
@@ -147,6 +147,26 @@ One MODFLOW model, files outside the simulation folder, later starts and restart
   E36 two WEL packages naming one file, Raven 32 days late: the file is renumbered once (its period 1 is the old period 3),
       results as with two copies of the file; E37 one TS6 file named wel.ts by the well package and ./wel.ts by the GHB
       package, Raven 32 days late: shifted once (its first time 0 becomes -32).
+  E38 a well package read with READARRAYGRID (rates in periods 1 and 2, an AUXMULTNAME array in period 1 only, which
+      MODFLOW keeps), Raven 32 days late: stops ("its period blocks carry earlier settings forward");
+  E39 HFB6 and CSUB6 packages with a PERIOD 1 block (MODFLOW reuses the last block), Raven 32 days late: runs, each block
+      in effect at the start written as period 1 of the working copy;
+  E40 the wells' period 1 rows by OPEN/CLOSE ../shared/..., a TS6 series and OBS6 observations named ../shared/... and the
+      observations written to ../obs_out.csv, Raven at the model's time zero and 32 days late: GWBudget.csv and
+      Hydrographs.csv identical to the twin with the files inside the folder, the series copied in (and shifted), the
+      observations written in the working copy (raven_out_1_obs_out.csv, named in GWModelSummary.txt) and not beside the
+      user's folder; E40b the same model run by MODFLOW 6 (libmf6 6.8.1) from its own folder ends normally;
+  E41 the OC head file named by its absolute path in the simulation folder (where the user's own file lies) and the budget
+      file by ../budget_out.cbc: both written in the working copy (named in GWModelSummary.txt), the user's file
+      unchanged, nothing written beside the folder, results identical to the example's; E41b and E41c the same two lines
+      in an OPEN/CLOSE file of the OC OPTIONS block, outside the folder (../shared/oc_opts.txt) and inside it: the same,
+      and the user's OPEN/CLOSE file unchanged; E41d a TS6 file that does not exist, Raven 32 days late: stops, naming it;
+  E42 a GWT model beside the flow model stops with Raven's transport message;
+  E43 :MF6StartDate 1985-10-01T12:00:00 with Raven starting at 00:00 that day stops (before the model's time zero), E43b
+      1985-09-30 12:00:00 with daily steps stops (Raven's start not on a time step of the period), E43c 1985-10-01junk
+      stops, E43d 1985-10-01 00:00:00 runs as 1985-10-01;
+  E44 :MF6GridFile, E44b :SoilZone CONCEPTUAL, E44c :MF6Model and E44d :ReservoirExchange with a surplus value stop,
+      naming it.
 A model across the antimeridian:
   AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
      longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
@@ -865,18 +885,19 @@ def ts_named(name, where):   # (a TS6 file named by its absolute path, inside or
     edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
     open(os.path.join(tsd if where != 'rel' else os.path.join(d, 'model'), 'wel.ts'), 'w').write(TS)
     return d
-tn = {k: ts_named('e32c_' + k, k) for k in ('rel', 'in')}
+tn = {k: ts_named('e32c_' + k, k) for k in ('rel', 'in', 'out')}
 tr = {k: run(v, DAYS) for k, v in tn.items()}
 ok = tr['rel'][0] and tr['in'][0]
 wl = open(os.path.join(tn['in'], 'out', 'mf6', 'gwf_liard.wel')).read() if ok else ''
 report('E32c a TS6 file named by its absolute path inside the simulation folder: named relative to it, shifted, results as the relative twin', ok and same(tn['rel'], tn['in'])
        and re.search(r'(?m)^\s*TS6\s+FILEIN\s+wel\.ts\s', wl) is not None, '' if ok else (tr['in'][1] if not tr['in'][0] else tr['rel'][1]).strip().split('\n')[-1][:150])
+ok = tr['rel'][0] and tr['out'][0]
+wl = open(os.path.join(tn['out'], 'out', 'mf6', 'gwf_liard.wel')).read() if ok else ''
+report('E32c2 a TS6 file named by its absolute path outside the simulation folder: copied into the working copy, shifted, results as the relative twin',
+       ok and same(tn['rel'], tn['out']) and re.search(r'(?m)^\s*TS6\s+FILEIN\s+raven_copy_f1_wel\.ts\s*$', wl) is not None,
+       '' if ok else (tr['out'][1] if not tr['out'][0] else tr['rel'][1]).strip().split('\n')[-1][:150])
 for v in tn.values():
     shutil.rmtree(v, ignore_errors=True)
-d = ts_named('e32c_out', 'out')
-stops('E32c2 a TS6 file named by its absolute path outside the simulation folder stops a later start', d,
-      'names the time-series file %s outside the simulation folder' % os.path.join(d, 'shared', 'wel.ts'))
-shutil.rmtree(d, ignore_errors=True)
 # Raven's output folder inside a package subfolder of the simulation: that folder is left out of the working copy
 d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e32e')); os.makedirs(os.path.join(d, 'model', 'pk'))
 shutil.move(os.path.join(d, 'model', 'gwf_liard.wel'), os.path.join(d, 'model', 'pk', 'gwf_liard.wel'))
@@ -981,6 +1002,126 @@ ok, out = run(d, DAYS)
 report('E12 a name file with CRLF line ends and packages Raven takes over runs', ok, '' if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 
+# ---- READARRAYGRID: grid arrays a period block leaves out keep their values, so a later start is refused as for READASARRAYS
+NR, NC = 117, 98
+def grid_arr(name, vals):
+    a = [['3.0E+30'] * NC for _ in range(NR)]
+    for (r, c), v in vals.items(): a[r - 1][c - 1] = v
+    return '  %s  LAYERED\n    CONSTANT 3.0E+30\n    CONSTANT 3.0E+30\n    INTERNAL\n%s\n    CONSTANT 3.0E+30\n' % (name, '\n'.join('      ' + ' '.join(r) for r in a))
+d = later('e38')
+open(os.path.join(d, 'model', 'gwf_liard.wel'), 'w').write(
+    'BEGIN options\n  READARRAYGRID\n  AUXILIARY MULT\n  AUXMULTNAME MULT\n  SAVE_FLOWS\nEND options\n\nBEGIN period 1\n' + grid_arr('q', {(63, 76): '-16000.0', (46, 82): '-8000.0'})
+    + grid_arr('MULT', {(63, 76): '0.5', (46, 82): '0.5'}) + 'END period 1\n\nBEGIN period 2\n' + grid_arr('q', {(63, 76): '-6000.0', (46, 82): '-3000.0'}) + 'END period 2\n')
+stops('E38 a READARRAYGRID well package (MULT given in period 1 only), Raven 32 days late: stops', d, 'its period blocks carry earlier settings forward')
+shutil.rmtree(d, ignore_errors=True)
+# ---- HFB6 and CSUB6 period blocks: MODFLOW reuses the last block, as for list packages, so a later start renumbers them
+d = later('e39')
+open(os.path.join(d, 'model', 'gwf_liard.hfb'), 'w').write('BEGIN options\nEND options\nBEGIN dimensions\n  MAXHFB 1\nEND dimensions\nBEGIN period 1\n  1 50 50 1 50 51 1.0E-6\nEND period 1\n')
+edit(d, 'model/gwf_liard.nam', '  OC6  gwf_liard.oc  oc\n', '  OC6  gwf_liard.oc  oc\n  HFB6  gwf_liard.hfb  hfb\n')
+open(os.path.join(d, 'model', 'gwf_liard.csub'), 'w').write('BEGIN OPTIONS\n  HEAD_BASED\nEND OPTIONS\nBEGIN DIMENSIONS\n  NINTERBEDS 0\n  MAXSIG0 1\nEND DIMENSIONS\n'
+                                                            'BEGIN GRIDDATA\n  CG_SKE_CR\n    CONSTANT 5e-4\n  CG_THETA\n    CONSTANT 0.25\nEND GRIDDATA\nBEGIN PERIOD 1\n  1 50 50 0.0\nEND PERIOD\n')
+edit(d, 'model/gwf_liard.sto', 'CONSTANT  1.00000000E-05', 'CONSTANT  0.0')
+edit(d, 'model/gwf_liard.nam', '  IC6  gwf_liard.ic  ic\n', '  IC6  gwf_liard.ic  ic\n  CSUB6  gwf_liard.csub  csub\n')
+ok, out = run(d, DAYS)
+wc = [open(os.path.join(d, 'out', 'mf6', f)).read() if ok else '' for f in ('gwf_liard.hfb', 'gwf_liard.csub')]
+report('E39 HFB6 and CSUB6 with a PERIOD 1 block, Raven 32 days late: runs, each block in effect at the start written as period 1', ok
+       and re.search(r'BEGIN PERIOD 1[^\n]*\n\s+1 50 50 1 50 51 1\.0E-6\n', wc[0]) is not None and re.search(r'BEGIN PERIOD 1[^\n]*\n\s+1 50 50 0\.0\n', wc[1]) is not None,
+       '' if ok else out.strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True)
+# ---- paths inside the model's files resolve in Raven's working copy as MODFLOW resolves them from the simulation folder
+def outside(d, out=True):   # (period 1 of the wells by OPEN/CLOSE, a TS6 series and observations named from ../shared; the observations
+                            #  written to ../obs_out.csv; with out=False the twin: the same files inside the simulation folder)
+    S, rel = (os.path.join(d, 'shared'), '../shared/') if out else (os.path.join(d, 'model'), '')
+    os.makedirs(S, exist_ok=True)
+    open(os.path.join(S, 'wel_p1.txt'), 'w').write('  3 63 76 -8.00000000E+03\n  3 46 82 -4.00000000E+03\n')
+    edit(d, 'model/gwf_liard.wel', 'BEGIN period  1\n  3 63 76 -8.00000000E+03\n  3 46 82 -4.00000000E+03\n', 'BEGIN period  1\n  OPEN/CLOSE  %swel_p1.txt\n' % rel)
+    edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  %swel.ts\n  OBS6  FILEIN  %swel.obs\n' % (rel, rel))
+    edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
+    open(os.path.join(S, 'wel.ts'), 'w').write(TS)
+    open(os.path.join(S, 'wel.obs'), 'w').write('BEGIN continuous FILEOUT %sobs_out.csv\n  w1 WEL 3 63 76\nEND continuous\n' % ('../' if out else ''))
+    return d
+for lab, start in (('at the model\'s time zero', '1985-10-01'), ('32 days late (periods renumbered, the series shifted)', '1985-11-02')):
+    tw = outside(later('e40_twin', start=start), False); d = outside(later('e40', start=start))
+    ok, out = run(d, DAYS); okt, outt = run(tw, DAYS)
+    wl = open(os.path.join(d, 'out', 'mf6', 'gwf_liard.wel')).read() if ok else ''
+    good = ok and okt and same(tw, d) and (os.path.join(d, 'shared', 'wel_p1.txt') in wl or start != '1985-10-01') and re.search(r'TS6\s+FILEIN\s+raven_copy_f\d+_wel\.ts', wl) is not None \
+        and os.path.exists(os.path.join(d, 'out', 'mf6', 'raven_out_1_obs_out.csv')) and not os.path.exists(os.path.join(d, 'obs_out.csv')) \
+        and 'raven_out_1_obs_out.csv' in summary(d)
+    report('E40 OPEN/CLOSE, TS6 and OBS6 named by ../ paths, %s: runs, results as the twin inside the folder, observations kept in the output folder' % lab, good,
+           '' if (ok and okt) else (out if not ok else outt).strip().split('\n')[-1][:150])
+    shutil.rmtree(tw, ignore_errors=True)
+    if start == '1985-10-01':   # (MODFLOW 6 itself runs the same model from its folder: the first three stress periods)
+        sa = os.path.join(W, 'e40_mf6'); shutil.rmtree(sa, ignore_errors=True); shutil.copytree(os.path.join(d, 'model'), os.path.join(sa, 'model'))
+        shutil.copytree(os.path.join(d, 'shared'), os.path.join(sa, 'shared'))
+        p = os.path.join(sa, 'model', 'ext.tdis'); tt = open(p).read(); rows = re.search(r'(?is)BEGIN perioddata\s*\n(.*?)END perioddata', tt).group(1).strip('\n').split('\n')
+        open(p, 'w').write(re.sub(r'(?is)(BEGIN perioddata\s*\n).*?(END perioddata)', lambda m: m.group(1) + '\n'.join(rows[:3]) + '\n' + m.group(2), tt.replace('NPER  25', 'NPER  3')))
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'existing', 'run_standalone.py'), os.path.join(sa, 'model')], capture_output=True, text=True, env=tc.ENV, timeout=600)
+        lst = open(os.path.join(sa, 'model', 'mfsim.lst')).read() if os.path.exists(os.path.join(sa, 'model', 'mfsim.lst')) else ''
+        report('E40b the same model with its ../ paths run by MODFLOW 6 from its own folder: normal termination, observations in ../obs_out.csv',
+               'Normal termination' in lst and os.path.exists(os.path.join(sa, 'obs_out.csv')), (r.stdout + r.stderr).strip()[-150:])
+        shutil.rmtree(sa, ignore_errors=True)
+    shutil.rmtree(d, ignore_errors=True)
+d = later('e41', start='1985-10-01'); M = os.path.join(d, 'model')
+edit(d, 'model/gwf_liard.oc', '  BUDGET  FILEOUT  gwf_liard.cbc\n  HEAD  FILEOUT  gwf_liard.hds\n', '  BUDGET  FILEOUT  ../budget_out.cbc\n  HEAD  FILEOUT  %s/gwf_liard.hds\n' % M)
+open(os.path.join(M, 'gwf_liard.hds'), 'w').write('the user\'s own head file\n')
+ok, out = run(d, DAYS)
+ref = later('e41_ref', start='1985-10-01'); okr, outr = run(ref, DAYS)
+sm = summary(d)
+report('E41 OC output files by an absolute path into the simulation folder and by ../: written in the working copy, the user\'s files untouched',
+       ok and okr and same(ref, d) and open(os.path.join(M, 'gwf_liard.hds'), 'rb').read() == b'the user\'s own head file\n' and not os.path.exists(os.path.join(d, 'budget_out.cbc'))
+       and os.path.getsize(os.path.join(d, 'out', 'mf6', 'gwf_liard.hds')) > 1000 and os.path.exists(os.path.join(d, 'out', 'mf6', 'raven_out_1_budget_out.cbc'))
+       and 'written as gwf_liard.hds' in sm and 'written as raven_out_1_budget_out.cbc' in sm, '' if (ok and okr) else (out if not ok else outr).strip().split('\n')[-1][:150])
+shutil.rmtree(d, ignore_errors=True); shutil.rmtree(ref, ignore_errors=True)
+# the same output paths given in an OPEN/CLOSE file of the OC OPTIONS block, outside the folder (E41b) and inside it (E41c)
+ref = later('e41_ref', start='1985-10-01'); okr, outr = run(ref, DAYS)
+for lab, where in (('E41b', 'out'), ('E41c', 'in')):
+    d = later('e41' + where, start='1985-10-01'); M = os.path.join(d, 'model')
+    S = os.path.join(d, 'shared') if where == 'out' else M; os.makedirs(S, exist_ok=True)
+    open(os.path.join(S, 'oc_opts.txt'), 'w').write('  BUDGET  FILEOUT  ../budget_out.cbc\n  HEAD  FILEOUT  %s/gwf_liard.hds\n' % M)
+    oc = open(os.path.join(M, 'gwf_liard.oc')).read()
+    oc = re.sub(r'(?is)(BEGIN options\s*\n).*?(END options)', lambda m: m.group(1) + '  OPEN/CLOSE  %soc_opts.txt\n' % ('../shared/' if where == 'out' else '') + m.group(2), oc, count=1)
+    open(os.path.join(M, 'gwf_liard.oc'), 'w').write(oc)
+    open(os.path.join(M, 'gwf_liard.hds'), 'w').write('the user\'s own head file\n')
+    ok, out = run(d, DAYS); sm = summary(d) if ok else ''
+    report('%s OC output files by an absolute path and by ../ in an OPEN/CLOSE file of its OPTIONS (%s the folder): written in the working copy, the user\'s files untouched'
+           % (lab, 'outside' if where == 'out' else 'inside'),
+           ok and okr and same(ref, d) and open(os.path.join(M, 'gwf_liard.hds'), 'rb').read() == b'the user\'s own head file\n'
+           and open(os.path.join(S, 'oc_opts.txt')).read().startswith('  BUDGET  FILEOUT  ../budget_out.cbc') and not os.path.exists(os.path.join(d, 'budget_out.cbc'))
+           and os.path.getsize(os.path.join(d, 'out', 'mf6', 'gwf_liard.hds')) > 1000 and os.path.exists(os.path.join(d, 'out', 'mf6', 'raven_out_1_budget_out.cbc'))
+           and 'written as raven_out_1_budget_out.cbc' in sm, '' if (ok and okr) else (out if not ok else outr).strip().split('\n')[-1][:150])
+    shutil.rmtree(d, ignore_errors=True)
+shutil.rmtree(ref, ignore_errors=True)
+# a TS6 file that does not exist, Raven late: the stop names it (E41d)
+d = later('e41d')
+edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  ../shared/missing.ts\n')
+stops('E41d a TS6 file named by ../shared/missing.ts that does not exist, Raven 32 days late: stops, naming it', d,
+      'names the time-series file %s, which does not exist' % os.path.join(d, 'shared', 'missing.ts'))
+shutil.rmtree(d, ignore_errors=True)
+# ---- a transport model beside the flow model stops with its own message
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e42'))
+edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  gwf6  gwf_liard.nam  gwf_liard\n  gwt6  gwt_liard.nam  gwt_liard\n')
+stops('E42 a GWT model beside the flow model stops: Raven does not solve transport models', d,
+      'holds the model gwt_liard (GWT6) beside its groundwater-flow model; Raven drives one MODFLOW 6 groundwater-flow model')
+shutil.rmtree(d, ignore_errors=True)
+# ---- :MF6StartDate with a time of day: read, or stopped when malformed
+for lab, val, want in (('E43 :MF6StartDate 1985-10-01T12:00:00, Raven starting at 00:00 that day: stops (before the model\'s time zero)', '1985-10-01T12:00:00', 'is before the model\'s time zero'),
+                       ('E43b :MF6StartDate 1985-09-30 12:00:00, Raven half a day later: stops (not on a Raven time step)', '1985-09-30 12:00:00', 'does not fall on a Raven time step'),
+                       ('E43c :MF6StartDate 1985-10-01junk stops', '1985-10-01junk', 'is not a date yyyy-mm-dd')):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e43')); edit(d, 'Liard.rvg', ':MF6StartDate      1985-10-01', ':MF6StartDate      ' + val)
+    stops(lab, d, want); shutil.rmtree(d, ignore_errors=True)
+tz = {k: tc.copy_case(tc.EXISTING, os.path.join(W, 'e43d_' + k)) for k in ('ref', 'time')}
+edit(tz['time'], 'Liard.rvg', ':MF6StartDate      1985-10-01', ':MF6StartDate      1985-10-01 00:00:00')
+tr = {k: run(v, DAYS) for k, v in tz.items()}
+report('E43d :MF6StartDate 1985-10-01 00:00:00 runs as 1985-10-01', tr['ref'][0] and tr['time'][0] and same(tz['ref'], tz['time']), tr['time'][1].strip().split('\n')[-1][:150])
+for v in tz.values():
+    shutil.rmtree(v, ignore_errors=True)
+# ---- every .rvg command stops on a surplus value (one check for all)
+for lab, line in (('E44 :MF6GridFile with a surplus value stops', ':MF6GridFile cells.geojson CELL_ID 2'), ('E44b :SoilZone CONCEPTUAL with a surplus value stops', ':SoilZone CONCEPTUAL SOIL[0]'),
+                  ('E44c :MF6Model with a surplus value stops', ':MF6Model gwf_liard gwf_b'), ('E44d :ReservoirExchange with a value stops', ':ReservoirExchange ON')):
+    d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e44')); open(os.path.join(d, 'Liard.rvg'), 'a').write('\n' + line + '\n')
+    ok, out = run(d, 1); ln = (re.findall(r'.*surplus value.*', out) or [''])[0].strip()
+    report(lab + ', naming it', not ok and line.split()[0] in ln and "surplus value '%s'" % line.split()[-1 if line.split()[0] != ':MF6GridFile' else 3] in ln, ln[:150])
+    shutil.rmtree(d, ignore_errors=True)
 # ---- a model across the antimeridian: the same model as at longitude 0
 sys.path.insert(0, os.path.join(HERE, 'soilzone'))
 import math

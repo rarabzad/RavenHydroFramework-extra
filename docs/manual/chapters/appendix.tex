@@ -114,7 +114,7 @@ File & Command & Meaning (default)\\\midrule\endhead
 \cmd{.rvg} & \cmd{:MinCellCoverage f} & coverage for an active column, $(0,1]$ (0.25)\\
 \cmd{.rvg} & \cmd{:GridType REGULAR|QUADTREE|HRU\_MESH|FILE} & kind of grid (\cmd{REGULAR})\\
 \cmd{.rvg} & \cmd{:MF6Simulation file}, \cmd{:MF6Model name} & existing model; which GWF model\\
-\cmd{.rvg} & \cmd{:MF6StartDate yyyy-mm-dd} & date of the model's time zero (required)\\
+\cmd{.rvg} & \cmd{:MF6StartDate yyyy-mm-dd} [\cmd{hh:mm:ss}] & date of the model's time zero, with its time of day if not midnight (required)\\
 \cmd{.rvg} & \cmd{:MF6CRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of the model's coordinates\\
 \cmd{.rvg} & \cmd{:MF6GridFile file \{ID\}}, \cmd{:OverlapWeights} & cell polygons; or HRU--cell weights\\
 \cmd{.rvg} & \cmd{:RavenTakesOver p \dots}, \cmd{:KeepPackages p \dots} & declared recharge/ET/UZF packages\\
@@ -339,7 +339,7 @@ top layer cannot be an AQUICLUDE; layer thickness must be positive & correct the
 \cmd{:MinCellCoverage}, \cmd{:GridCellSize}, \cmd{:SolverHead\allowbreak Tolerance}, \cmd{:SolverMax\allowbreak OuterIterations}, \cmd{:HeadSaveFrequency} out of range & correct the value (Section~\ref{app:commands})\\
 improper format of command \dots & correct the command syntax\\
 command \dots\ in \dots: '\emph{token}' is not a number / is not a whole number / the ID '\emph{token}' is not a whole number & give a plain number, in the units of the manual, without units or thousands separators\\
-command \dots\ has the surplus value '\emph{token}' & remove it; a comma separates values (2000.0, not 2,000.0)\\
+command \dots\ has the surplus value '\emph{token}' (any \cmd{.rvg} command, after the values it takes) & remove it; a comma separates values (2000.0, not 2,000.0)\\
 \cmd{:AquiferClasses} / \cmd{:AquiferProfiles} / \cmd{:AquiferProfileParameters}, row \dots: \dots\ '\emph{token}' is not a number (\cmd{.rvp}) & give a plain number in the units of the manual (10, not 1O; 3, not 3m)\\
 :InputCRS / :MF6CRS - TMERC / ALBERS / LCC parameter \dots: '\emph{token}' is not a number / takes \dots\ and an optional ellipsoid / surplus value after EPSG:\emph{n} / is not EPSG: followed by a whole-number code & give the projection's parameters as plain numbers, exactly as many as it takes (Section~\ref{sec:inputcrs})\\
 command \cmd{:InitialGWHeads} in \dots: '\emph{token}' is not a number / has the surplus value '\emph{token}' (\cmd{.rvc}) & give the value as a plain decimal number in metres (98.5, not 98,5, H98.5 or 0x62; a comment may follow after \#); \cmd{FROM\_PROFILE} takes no value\\
@@ -372,9 +372,15 @@ the model name file \dots\ has a \emph{type} package named \emph{name}, a name R
 stress period \dots\ is not a whole number of Raven time steps & choose a Raven time step that divides the periods\\
 cells of the grid file differ from the model's cell area & wrong projection, length unit or cell numbering in the file\\
 give one of \cmd{:MF6CRS}, \cmd{:MF6GridFile} or \cmd{:OverlapWeights} & link HRUs in exactly one way\\
-the period data of \emph{package} cannot be renumbered safely & start Raven at \cmd{:MF6StartDate}\\
+the period data of \emph{package} (\emph{type}; its period blocks carry earlier settings forward) cannot be renumbered safely & a package read as arrays (\cmd{READASARRAYS}, \cmd{READARRAYGRID}) or an advanced package with several period blocks before Raven's start: start Raven at \cmd{:MF6StartDate}\\
 \emph{package} uses time-array series (TAS6) / time-varying properties (TVK6/TVS6), whose period data and time series count from the model's time zero & start Raven at \cmd{:MF6StartDate}\\
 the MODFLOW~6 simulation \dots\ holds \emph{n} models (\dots) / and \emph{n} exchanges (\dots); Raven couples one MODFLOW~6 groundwater-flow model and books only that model's water & couple a simulation that holds the one GWF model alone, with no \cmd{EXCHANGES} rows\\
+the MODFLOW~6 simulation \dots\ holds the model \dots\ (GWT6) beside its groundwater-flow model; Raven drives one MODFLOW~6 groundwater-flow model and does not solve transport, energy or particle-tracking models with it & couple the GWF model alone; run transport or particle tracking separately, from the heads and budget files of the Raven run\\
+the MODFLOW~6 simulation \dots\ has \emph{n} solutions in its \cmd{SOLUTIONGROUP} block (\dots) for its one model & name the GWF model in one solution row\\
+\cmd{:MF6StartDate} \dots\ is not a date yyyy-mm-dd, with a time of day hh:mm:ss after it if the model's time zero is not at midnight & write \cmd{1985-10-01}, or \cmd{1985-10-01 12:00:00} or \cmd{1985-10-01T12:00:00}\\
+could not copy \dots\ into the working copy \dots & check that the file named with \cmd{FILEIN} or as a solution file can be read, and that the output folder can be written\\
+the path \dots\ holds both kinds of quote, ' and ", so it cannot be written in a MODFLOW~6 input file of Raven's working copy & rename the file or its folder\\
+\emph{package} names the time-series file \dots, which does not exist & correct the \cmd{TS6 FILEIN} row or restore the file\\
 \dots\ names the TDIS file / the model name file \dots, which is not in the simulation folder \dots & keep the file in the simulation folder and name it there by a relative path\\
 the model name file \dots\ names the \emph{type} file \dots\ (\emph{name}), which is not in the simulation folder / which does not exist & correct the row (a package file named outside the folder by an absolute or \cmd{../} path is copied into Raven's working copy and used there)\\
 \emph{package} names the time-series file \dots\ outside the simulation folder; on a start after the model's time zero Raven shifts the series in its working copy & keep the file in the simulation folder, or start Raven at \cmd{:MF6StartDate}\\
@@ -415,7 +421,7 @@ GeoTIFF file / raster \dots: its elevations are in \dots\ (the band unit, UNITTY
 GeoTIFF file / raster \dots: its band SCALE / OFFSET in GDAL\_METADATA, its band Scale / Offset in \dots.aux.xml, its NoDataValue in \dots.aux.xml is not a number / its band scale in GDAL\_METADATA / in \dots.aux.xml is 0 (every value would be the offset) / its GDAL\_METADATA tag holds \dots\ MB, more than the 16 MB Raven reads / its GDAL side file \dots.aux.xml is larger than the 16 MB Raven reads & save the elevations unscaled (\cmd{gdal\_translate -unscale}); correct or remove the side file (\cmd{<raster>.aux.xml})\\
 GeoTIFF file / raster \dots: its GDAL\_METADATA tag / its GDAL side file \dots.aux.xml is not in the form GDAL writes (\dots) and names a band scale, offset or unit / a band or a band value, which GDAL may read differently & rewrite it with GDAL: copy the raster with \cmd{gdal\_translate}, or set the values with \cmd{gdal\_edit.py} (\cmd{-scale}, \cmd{-offset}, \cmd{-units}, \cmd{-a\_nodata}); or remove the side file\\
 GeoTIFF file / raster \dots: read as metres because METRES follows the file name (\dots); the file's own band unit is '\dots' (\dots) / the file gives no band unit: check that its values are metres (warning, every run with \cmd{METRES}) & \cmd{METRES} states that the values are metres for a unit text Raven cannot place; check them, or convert the values and remove \cmd{METRES}\\
-GeoTIFF file / raster \dots: its GDAL side file \dots.aux.xml holds georeferencing (GeoTransform, SRS or GCPs), which GDAL may take in place of the raster's own & rewrite it with \cmd{gdal\_translate} (which writes the georeferencing into the raster), or remove the side file\\
+GeoTIFF file \dots: its GDAL side file \dots.aux.xml holds georeferencing (GeoTransform, SRS or GCPs), which GDAL may take in place of the raster's own (an ESRI ASCII grid's side file is read without it, as by GDAL) & rewrite it with \cmd{gdal\_translate} (which writes the georeferencing into the raster), or remove the side file\\
 raster \dots\ has no NODATA\_value but holds \emph{k} cells of $-9999$ \dots; they are read as elevations (warning) & if they are no data, add the line \cmd{NODATA\_value -9999} to the grid's header\\
 command :LandSurface / :BedrockSurface in \dots: '\dots' after the file name is not METRES (or METERS) & write \cmd{METRES} (or \cmd{METERS}), or nothing, after the file name\\
 raster \dots: unknown header key / the value of the header key \dots\ is not a number / the value '\dots' (row, column) is not a number / has \dots\ values, fewer than / has more values than ncols*nrows / the header lacks \dots\ / needs a positive cellsize, or positive dx and dy / the header gives the key \dots\ twice / gives xllcorner and xllcenter (ESRI ASCII) & correct the grid's header or values (Section~\ref{sec:rasters})\\

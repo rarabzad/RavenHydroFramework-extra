@@ -1700,7 +1700,14 @@ def tut3():
     if 'LAG' not in W3['out_lag'][1][0] or 'RICHARDS' not in W3['out_classes'][1][0]:
         raise RuntimeError('t3: the release-cap warnings name %s and %s, the text LAG and RICHARDS'
                            % (W3['out_lag'][1][0][:80], W3['out_classes'][1][0][:80]))
+    # (each warning names the limit that bound: the text gives Sy dh, the water in transit, for the LAG run and the room left
+    # in the top cell for the depth-class run; a run that names the other limit makes the text wrong)
+    room, sydh = 'than the room left in the top cell', 'than MODFLOW stores for the rise (Sy dh)'
+    if (sydh not in W3['out_lag'][1][0]) or (room not in W3['out_classes'][1][0]):
+        raise RuntimeError('t3: the text says that the LAG run\'s release-cap warning names Sy dh ("%s") and the depth-class run\'s the room ("%s"); '
+                           'the runs write %s and %s: make them agree' % (sydh, room, W3['out_lag'][1][0][:160], W3['out_classes'][1][0][:160]))
     G.text('t3_warn_lag.txt', '$ grep "%s" out_lag/Raven_errors.txt\n' % cap + sanitize(W3['out_lag'][1][0] + '\n', w, uw))
+    G.text('t3_warn_classes.txt', '$ grep "%s" out_classes/Raven_errors.txt\n' % cap + sanitize(W3['out_classes'][1][0] + '\n', w, uw))
     m = re.search(r'soil zone\s*:\s*PHYSICAL, SOIL\[0\.\.1\]; (\d+) HRUs with a soil zone, (\d+) without', summary_text(os.path.join(w, 'out_physical')))
     G.val('t3:nszhru', m.group(1)); G.val('t3:nnosz', m.group(2))
     m = re.search(r'on (\d+) links the soil-zone base of the HRU lies up to ([0-9.]+) m', errs)

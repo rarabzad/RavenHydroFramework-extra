@@ -228,15 +228,15 @@ of 8-64 bit integers or 32/64-bit floats; north-up georeferencing (`ModelPixelSc
 `ModelTransformation` without rotation); `PixelIsPoint` (the tie point is a pixel centre, so the corner is half a pixel up
 and left, as GDAL reads it); `GDAL_NODATA` and a GDAL internal mask as no-data (NaN is always no-data). Without either,
 every value is an elevation, as GDAL reads it; Raven warns when such a file holds -9999 or a type's extreme value. GDAL's band
-scale and offset (`GDAL_METADATA`, and GDAL's side file `<raster>.aux.xml`, read first as GDAL reads it) are applied, as GDAL's `-unscale` and GIS programs show the values; both are read only in the form GDAL writes them (one in another form that names a band value stops: rewrite it with `gdal_translate` or `gdal_edit.py`), and an ESRI ASCII grid's side file is read the same way. Other compressions (JPEG, ZSTD, LERC, ...),
+scale and offset (`GDAL_METADATA`, and GDAL's side file `<raster>.aux.xml`, read first as GDAL reads it) are applied, as GDAL's `-unscale` and GIS programs show the values; both are read only in the form GDAL writes them (one in another form that names a band value stops: rewrite it with `gdal_translate` or `gdal_edit.py`), and an ESRI ASCII grid's side file is read the same way, except that a `GeoTransform` or `SRS` in it is ignored, as GDAL ignores it for that format (the grid's header and its `.prj` georeference it); the comments, processing instructions and mixed text GDAL writes in an `xml:` metadata domain are read past. Other compressions (JPEG, ZSTD, LERC, ...),
 several bands, palette or colour images, other bit depths, FillOrder 2, units other than metres or degrees (units keys),
 a projected code in feet without its units key (e.g. EPSG:2227), a prime meridian other than Greenwich (also given only by
 its longitude, as GDAL writes a user-defined system such as `+pm=paris`, or by the datum), a vertical coordinate system
 in feet, a band unit that is not a metre form (the whole text, normalised, must be one of the forms of the manual's
-band-unit table: `m`, `metres`, `EPSG:9001`, a metre form with a listed vertical datum such as `m MSL`, `m (NAVD88)` or
-`mAHD`, or a quantity such as `elevation (m)`; no unit at all is read as metres; write `METRES` (or `METERS`) after the
+band-unit table: `m`, `metres`, `EPSG:9001`, a metre form with a listed vertical datum such as `m MSL`, `m (NAVD88)`, `m-NAVD88` or
+`mAHD`, or a quantity such as `elevation (m)` or `Höhe (m)`; no unit at all is read as metres; write `METRES` (or `METERS`) after the
 file name, `:LandSurface dem.tif METRES`, to state that the values are metres for any other text, except one that names
-another length unit (also `ftMSL`, `EPSG 9002`, `ft (0.3048 m)`) or gives a scale such as `0.1 m` or `m (in thousands)`;
+another length unit (also `ftMSL`, `ftNAVD88`, `EPSG 9002`, `ft (0.3048 m)`, `Link_Clarke`) or gives a scale such as `0.1 m`, `m 1e-2` or `m (in thousands)`;
 with `METRES` every run writes a warning naming the file's own unit text),
 rotated or south-up rasters, files without georeferencing,
 corrupt or truncated files and files over 1 GB or 50 million pixels stop the run with the reason; convert with
@@ -284,7 +284,7 @@ needed: write each profile as `name, 0`. A profile then only marks the coupled H
 |---|---|
 | `:MF6Simulation model/mfsim.nam` | the existing simulation (DIS or DISV) |
 | `:MF6Model name` | the GWF model to couple, if the simulation holds several |
-| `:MF6StartDate yyyy-mm-dd` | calendar date of the model's time zero (Raven may start later: restarts) |
+| `:MF6StartDate yyyy-mm-dd [hh:mm:ss]` | calendar date of the model's time zero, with its time of day if not midnight (`1985-10-01 12:00:00` or `1985-10-01T12:00:00`; Raven may start later: restarts) |
 | `:MF6CRS EPSG:32610` | projection of the model's coordinates; Raven reads the cell outlines from the model. Built in: UTM (EPSG 326xx/327xx, NAD83 269xx), 3005, ESRI:102001, 5070, 3978, 3347, or `TMERC`/`ALBERS`/`LCC` parameters |
 | `:MF6GridFile cells.geojson CELL_ID` | alternative: top-layer cell polygons (lon/lat or `:InputCRS`), checked against MODFLOW's cell areas |
 | `:OverlapWeights ... :EndOverlapWeights` | alternative: `[HRU ID] [cell] [A_overlap/A_cell]` rows (MODFLOW-USG coupling format) |
@@ -320,8 +320,15 @@ existing MODFLOW 6 model".
   share F are saved in `solution.rvc` (`:GWReservoirSeepage`). Manual: "Reservoirs".
 - **Later starts and restarts:** stress periods already simulated are dropped and the rest renumbered; TS6 time series are
   shifted to Raven's start (earlier entries keep negative times); TDIS and water-mover period data may sit in OPEN/CLOSE
-  files; sub-daily steps work (the start must fall on a Raven step). TAS6 and TVK6/TVS6 stop a later start
+  files; sub-daily steps work (the start must fall on a Raven step). HFB6 and CSUB6 period blocks are renumbered as list packages;
+  packages read with READASARRAYS or READARRAYGRID follow a later start only with at most one period block before it. TAS6 and TVK6/TVS6 stop a later start
   (a simulation must hold one model with no exchanges at any start); the rows of a TS6 file read through OPEN/CLOSE are shifted like those listed in the file.
+- **Paths inside the model's files:** Raven's working copy resolves them as MODFLOW does from the simulation folder: an
+  OPEN/CLOSE file named outside the folder (`../shared/...`) is read in place by its absolute path, a text FILEIN file (TS6,
+  TAS6, OBS6, TVK6, TVS6, ATS6, HPC6, MVR6, ...) or solution file outside the folder is copied in (a NETCDF FILEIN file is
+  only named by its absolute path), an OPEN/CLOSE file (outside GRIDDATA) that names such paths is read from a rewritten copy, and an output file (FILEOUT, the name file's LIST) named by an absolute
+  or `../` path is written in Raven's output folder instead (named in `GWModelSummary.txt`), so the run never overwrites
+  the user's own files.
 - **Budget file:** the model keeps its own output control; add `BUDGET FILEOUT` and `SAVE BUDGET` to its OC file for
   `gwf.cbc` (RCH_RAVEN, DRN_RAVEN, EVT_RAVEN, SWX_RAVEN and RES_RAVEN save their flows to it). `:WriteGWBudgetFile` is for generated models.
 - Tested on USGS example models (Sagehen Creek with UZF, SFR and mover; a steady-state stream-capture model) with MODFLOW
@@ -550,6 +557,11 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 | "EXTINCTION_DEPTH > 0 ... the model keeps its EVT ... package" | water-table ET from Raven and the model's own ET would both act: list the model's EVT/UZF package in `:RavenTakesOver`, or set EXTINCTION_DEPTH 0 |
 | "uses time-array series (TAS6) ... start Raven at :MF6StartDate" / "uses time-varying properties (TVK6/TVS6)" | a later start cannot shift TAS6 series or TVK6/TVS6 data; start at the model's time zero |
 | "the MODFLOW 6 simulation ... holds n models (...) and n exchanges (...); Raven couples one MODFLOW 6 groundwater-flow model" | couple a simulation that holds the one GWF model alone, with no EXCHANGES rows |
+| "the MODFLOW 6 simulation ... holds the model ... (GWT6) beside its groundwater-flow model" | Raven does not solve transport, energy or particle-tracking models: couple the GWF model alone and run them separately, from the heads and budget files of the Raven run |
+| "the MODFLOW 6 simulation ... has n solutions in its SOLUTIONGROUP block" | name the GWF model in one solution row |
+| ":MF6StartDate ... is not a date yyyy-mm-dd, with a time of day hh:mm:ss after it ..." | write the date as `1985-10-01`, with its time of day as `1985-10-01 12:00:00` or `1985-10-01T12:00:00` |
+| "... names the time-series file ..., which does not exist" | correct the TS6 FILEIN row or restore the file |
+| "the period data of ... (...; its period blocks carry earlier settings forward) cannot be renumbered safely" | a package read as arrays (READASARRAYS, READARRAYGRID) or an advanced package with several period blocks before Raven's start: start Raven at `:MF6StartDate` |
 | "... names the TDIS file / the model name file ..., which is not in the simulation folder" / "the model name file ... names the ... file ..., which does not exist" / "... names the time-series file ... outside the simulation folder" | keep the file in the simulation folder, named by a relative path (a package file named outside it is copied into Raven's working copy; a TS6 file outside it stops a later start) |
 | "the run starts the MODFLOW 6 model from the heads of :GWHeads (a hotstart), which set only the heads, and the model keeps the ... package ..., which carries its own state" | LAK, MAW, UZF, CSUB and SFR with STORAGE keep their own state: remove `:GWHeads` from the `.rvc` file (every package then starts from its input), or, to continue an earlier run, simulate the whole period in one run |
 | warning ":SoilZoneVadose ...: a rising water table met more ... than the room left in the top cell / than MODFLOW stores for the rise (Sy dh)" | the column released at most that limit (the warning names the one that bound) and releases the rest in the next steps |
@@ -578,7 +590,7 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 | "GeoTIFF file / raster ...: its elevations are in ... (the band unit, ...)" (also with `METRES`, which does not apply to another length) / "its band scale ... is 0 (every value would be the offset)" | convert the values to metres and set the unit (`gdal_edit.py -units m`); save unscaled elevations (`gdal_translate -unscale`) |
 | "GeoTIFF file / raster ...: its GDAL_METADATA tag / its GDAL side file ....aux.xml is not in the form GDAL writes (...)" | Raven reads GDAL's metadata only as GDAL writes it; rewrite it with GDAL (`gdal_translate`, or `gdal_edit.py -scale/-offset/-units/-a_nodata`), or remove the side file. An ESRI ASCII grid's side file is read too |
 | warning "... read as metres because METRES follows the file name (...); the file's own band unit is '...'" | written every run with `METRES`, which states that the values are metres for a unit text Raven cannot place: check them |
-| "GeoTIFF file / raster ...: its GDAL side file ....aux.xml holds georeferencing (GeoTransform, SRS or GCPs)" | rewrite the raster with `gdal_translate` (the georeferencing goes into the raster), or remove the side file |
+| "GeoTIFF file / raster ...: its GDAL side file ....aux.xml holds georeferencing (GeoTransform, SRS or GCPs)" | (GeoTIFF only: GDAL ignores both in an ESRI ASCII grid's side file, and so does Raven) rewrite the raster with `gdal_translate` (the georeferencing goes into the raster), or remove the side file |
 | warning "raster ... has no NODATA_value but holds ... cells of -9999" | if they are no data, add `NODATA_value -9999` to the grid's header |
 | "raster ...: unknown header key" / "... is not a number" / "has ... values, fewer than ncols*nrows" / "has more values than ncols*nrows" (ESRI ASCII) | correct the grid's header or values |
 | warning "raster ... has a vertical coordinate system (...) whose unit Raven does not know" | check that the elevations are in metres |
@@ -590,7 +602,7 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 | warning "raster ... has no NODATA value (GDAL_NODATA) but holds k pixels of -9999 ..." | if they are no data, declare it: `gdal_translate -a_nodata -9999 in.tif out.tif` |
 | ":LandSurface raster ... gives no value for any of the n active columns" | the raster does not cover the model (another area, wrong corner or `:InputCRS`, or NODATA only); the message gives both extents |
 | warning ":LandSurface / :BedrockSurface raster ... gives no value for k of the n active columns" | extend the raster or fill its no-data cells; those columns use the HRU ELEVATION / DEFAULT_BEDROCK_DEPTH |
-| "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | give plain numbers in the `.rvg`, and for `:InitialGWHeads` in the `.rvc`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0; 98.5, not 98,5) |
+| "command ... '...' is not a number" / "... has the surplus value ..." / "values ... must come in keyword-value pairs" | every `.rvg` command stops on a value beyond those it takes; give plain numbers in the `.rvg`, and for `:InitialGWHeads` in the `.rvc`, without units or thousands separators (a comma separates values: 2000.0, not 2,000.0; 98.5, not 98,5) |
 | ":GridCellSize ... gives about ... cells per layer" / "the :GridRefinement sizes give a regular grid (or a quadtree grid) of about ..." | more than 5 million cells per layer, before the grid is built (a quadtree's size is estimated from the squares the refinement features touch, and refused before the build only beyond 1.5 times the limit; the build stops at the limit: "... of more than 5e+06 cells per layer (the build stopped there)"): give the sizes in metres as plain numbers; refine locally with QUADTREE or HRU_MESH, or limit the levels with `:QuadtreeMaxLevel` |
 | "not enough memory to build the groundwater model (about ... cells per layer, from ...)" / "... to couple the existing model" | the grid is within the limit but the computer's memory is not enough for it (or for the model's files): larger `:GridCellSize` or `:GridRefinement` sizes; for an existing model, more memory |
 | ":WellFlowRate ...: units ... are not supported" / ":BoundaryHead ...: units ..." | well rates in m3/d, m3/s or L/s; heads in m |
@@ -619,7 +631,7 @@ digits, so closed-loop and forecast members continue the aquifer from there.
 - `:SoilZone PHYSICAL`: recharge comes from SOIL[M-1] by a vertical process; RECHARGE_DELAY is refused (use
   `:SoilZoneVadose LAG`); SOIL_ZONE_DEPTH is not used; the soil zone is at most 20 m thick; between cells soil water moves
   only through the aquifer.
-- Existing models (section 4.3b): one GWF model with no exchanges; no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse
+- Existing models (section 4.3b): one GWF model with no exchanges and no transport, energy or particle-tracking model beside it; no DISU, ATS6, several solutions or non-Gregorian calendars; later starts refuse
   time-array series (TAS6), TVK6/TVS6 and array or advanced packages with several period
   entries before the start (TS6 series are shifted, also rows read through OPEN/CLOSE); a restart from `:GWHeads`
   refuses kept packages with a state of their own (LAK, MAW, UZF, CSUB, SFR with STORAGE); TDIS and mover period data given as INTERNAL are refused (OPEN/CLOSE

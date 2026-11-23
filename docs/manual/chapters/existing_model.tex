@@ -139,7 +139,8 @@ rates stay the same. Raven works in days. Raven keeps the model's stress periods
 Raven days (Figure~\ref{fig:periods}), so the model's own changes --- a well pumping harder in summer, a boundary level
 changing --- still happen on their dates.
 
-\cmd{:MF6StartDate} is the calendar date on which the model's time starts. Each stress period must contain a whole number of
+\cmd{:MF6StartDate} is the calendar date on which the model's time starts, with its time of day when that is not midnight
+(\cmd{1985-10-01 12:00:00} or \cmd{1985-10-01T12:00:00}); any other text after the date stops the run. Each stress period must contain a whole number of
 Raven time steps, and Raven's run may not go past the end of the model; otherwise the run stops with a message. Steady-state
 periods (solved as the long-term balance) stay steady-state.
 
@@ -158,8 +159,9 @@ reported as MODFLOW's error). Because such a model has no time of its own, Raven
 \cmd{solution.rvc}, or begins part-way through the model. Raven then removes the stress periods already simulated from the
 working copy, shortens the period that holds Raven's start, and renumbers the periods of every package; the new first period
 takes the inputs that were in force on Raven's start date (Figure~\ref{fig:periods}, bottom). This is safe for packages whose period
-entries replace one another (WEL, RIV, GHB, CHD, DRN, list-based RCH and EVT, STO, OC, the water mover MVR), and for
-array-based recharge and ET and the advanced packages (SFR, LAK, MAW, UZF) when at most one period entry comes before Raven's
+entries replace one another (WEL, RIV, GHB, CHD, DRN, list-based RCH and EVT, STO, OC, the water mover MVR, the flow barriers HFB,
+and the stress offsets of CSUB), and for array-based recharge and ET, packages read as arrays (\cmd{READASARRAYS}, \cmd{READARRAYGRID}:
+an array a period entry leaves out keeps its earlier values) and the advanced packages (SFR, LAK, MAW, UZF) when at most one period entry comes before Raven's
 start. Such a package with several earlier entries, whose settings build on one another, stops such a run, as does
 time-varying conductivity or storage (\cmd{TVK6}, \cmd{TVS6}); Raven must then start at \cmd{:MF6StartDate}. (A
 simulation holding more than one model, or exchanges, stops at any start: Raven couples one model.) The times of a time series (\cmd{TS6} files) count from the
@@ -188,7 +190,21 @@ comments (elsewhere the run stops, as MODFLOW~6 refuses it). Every file Raven re
 model name file, the TDIS file (its options, such as \cmd{TIME\_UNITS}, \cmd{START\_DATE\_TIME} and \cmd{ATS6}, and its
 period data), the water mover (its \cmd{PACKAGES} and \cmd{PERIOD} blocks), the options of every package kept (\cmd{TS6},
 \cmd{TAS6}, \cmd{TVK6}, \cmd{TVS6}, \cmd{READASARRAYS}, \cmd{AUXILIARY}), the \cmd{PERIOD} blocks of the storage package and
-\cmd{TS6} files. An \cmd{OPEN/CLOSE} file marked binary stops the run there (Raven reads text). Where Raven writes a
+\cmd{TS6} files. An \cmd{OPEN/CLOSE} file marked binary stops the run there (Raven reads text). MODFLOW resolves the
+paths a model's files name from the simulation folder, and Raven's working copy resolves them in the same way: in every file
+MODFLOW reads (the simulation file, the TDIS and model name files, the packages kept, and the solution files and the files
+named with \cmd{FILEIN}, such as \cmd{TS6} and \cmd{OBS6} files, in turn), an \cmd{OPEN/CLOSE} file outside the folder (a
+\cmd{../} path) is named by its absolute path and read in place; a text \cmd{FILEIN} file (\cmd{TS6}, \cmd{TAS6}, \cmd{OBS6},
+\cmd{TVK6}, \cmd{TVS6}, \cmd{ATS6}, \cmd{HPC6}, \cmd{MVR6}, \cmd{GNC6} and the like) or solution file outside the folder is
+copied into the working copy, so that the paths it names are handled too and a time series can be shifted, while another
+\cmd{FILEIN} file (\cmd{NETCDF}) is only named by its absolute path, never read or copied; an \cmd{OPEN/CLOSE} file of any
+block but \cmd{GRIDDATA} is searched as the block's own lines, and when it names such a path, a copy of it in the working copy
+is rewritten and read in its place (the user's file is left as it is); and an output
+file (\cmd{FILEOUT}, the name file's \cmd{LIST}) named by an absolute path or a \cmd{../} path is written in the working
+copy instead --- at its place in the folder when it lies there, else as \cmd{raven\_out\_}\emph{n}\cmd{\_}\emph{name} --- so
+the run writes nothing outside Raven's output folder and never overwrites the user's files. \cmd{GWModelSummary.txt} names
+each output file so placed and counts the files copied or read in place. A path that holds both a single and a double
+quote cannot be written in a MODFLOW input line and stops the run. Where Raven writes a
 working copy of a file (the name file, the TDIS file, the water mover, a \cmd{TS6} file), the rows of such a file are
 written in place of the line, which is kept as a comment, so the rules of this section apply to them. As a second
 guard, the time unit Raven read is compared with the one MODFLOW holds after it initialises the model, and a difference
@@ -238,10 +254,10 @@ Every one of these stops the run with a message that names the problem and the f
       by an absolute path inside the simulation folder is named there relative to it, and one named outside the folder, by
       an absolute or \cmd{../} path, is copied into the working copy and read, checked and rewritten there as the others
       (MODFLOW reads the same text); a file that several packages name, in any spelling, is renumbered once, and so is a
-      time-series file shifted once;
+      time-series file shifted once (the paths inside the files: Section~\ref{sec:existingtime});
 \item a Raven start before the model's time zero (\cmd{:MF6StartDate}); a later start that the model's packages cannot
       follow (Section~\ref{sec:existingtime}: array or advanced packages with several period entries before the start, \cmd{TVK6}/\cmd{TVS6},
-      \cmd{TAS6}, a \cmd{TS6} file named outside the simulation folder); a stress period that is not a whole number of Raven steps,
+      \cmd{TAS6}); a stress period that is not a whole number of Raven steps,
       or shorter than 0; a Raven run longer than the model;
 \item a package Raven reads by name (the stream package, the packages in the balance check) that MODFLOW does not
       have under that name;
@@ -251,8 +267,9 @@ Every one of these stops the run with a message that names the problem and the f
       \cmd{:BedrockSurface}, the solver settings, \cmd{:Wells}, head boundaries, \cmd{:RiverGeometry}, \cmd{:GWInitialization},
       \cmd{:WriteGWBudgetFile}),
       or none or several ways of linking HRUs;
-\item a simulation with more than one solution (for example a transport model with its own IMS): Raven drives one
-      groundwater-flow solution;
+\item a transport, energy or particle-tracking model (\cmd{GWT6}, \cmd{GWE6}, \cmd{PRT6}) in the simulation: Raven drives one
+      groundwater-flow model and does not solve them with it (run them separately, from the heads and budget files of the Raven run);
+\item a simulation with more than one solution (\cmd{SOLUTIONGROUP} rows): Raven drives the one model's solution;
 \item adaptive time stepping (\cmd{ATS6} in the TDIS options): Raven needs fixed time steps;
 \item a Raven calendar other than Gregorian (the dates of the two models are compared day by day);
 \item \cmd{:WriteNetCDFHeads} with \cmd{:OverlapWeights} (a weight table has no coordinates);

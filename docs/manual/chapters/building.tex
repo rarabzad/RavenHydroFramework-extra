@@ -214,12 +214,14 @@ side file & GDAL's side file \cmd{<raster>.aux.xml} (written for example with \c
 metadata: in its \cmd{PAMRasterBand band="1"}, a \cmd{Scale} or an \cmd{Offset} replaces both of the file's (the other
 is then 1 or 0), a \cmd{UnitType} replaces the band unit, and a \cmd{NoDataValue} replaces \cmd{GDAL\_NODATA}. Raven reads
 the side file, and \cmd{GDAL\_METADATA}, only in the form GDAL writes them (its layout, attributes in double quotes, one
-\cmd{PAMRasterBand} per band, GDAL's escapes); one in any other form that names a band or a band value (\cmd{PAMRasterBand},
+\cmd{PAMRasterBand} per band, GDAL's escapes, and the comments, literals such as \cmd{<!DOCTYPE ...>}, processing
+instructions and mixed text GDAL writes in an \cmd{xml:} metadata domain, which are read past); one in any other form that names a band or a band value (\cmd{PAMRasterBand},
 \cmd{Scale}, \cmd{Offset}, \cmd{UnitType}, \cmd{NoDataValue}) stops the run (``rewrite it with GDAL'': \cmd{gdal\_translate}
 or \cmd{gdal\_edit.py}), and one that names none is ignored, as GDAL takes no band value from it; a file with CRLF line ends is not
-in that form (the message says so); a side file that holds georeferencing (\cmd{GeoTransform}, \cmd{SRS} or \cmd{GCPList},
+in that form (the message says so); a GeoTIFF's side file that holds georeferencing (\cmd{GeoTransform}, \cmd{SRS} or \cmd{GCPList},
 which GDAL may take in place of the raster's own), a value that is not a number or a side file over 16~MB stops the run. An ESRI ASCII grid's side file is read the same way (its \cmd{Scale},
-\cmd{Offset} and \cmd{UnitType}; GDAL keeps the grid's \cmd{NODATA\_value}), so a GeoTIFF and the ESRI ASCII grid GDAL makes
+\cmd{Offset} and \cmd{UnitType}; GDAL keeps the grid's \cmd{NODATA\_value}, and ignores a \cmd{GeoTransform} or \cmd{SRS} there, taking
+the grid's header and its \cmd{.prj}, as Raven does), so a GeoTIFF and the ESRI ASCII grid GDAL makes
 of it give the same model. Georeferencing kept only in the side file (\cmd{BASELINE}) is not read: such a file stops as having no georeferencing\\
 layout & strips or tiles\\
 compression & none, LZW, DEFLATE (codes 8 and 32946) and PackBits\\
@@ -257,10 +259,10 @@ values is taken as no georeferencing, and a \cmd{GDAL\_NODATA} text longer than 
 \paragraph{Band unit.} GDAL's band unit (\cmd{UNITTYPE} in \cmd{GDAL\_METADATA}, or \cmd{UnitType} in the side file;
 set with \cmd{gdal\_edit.py -units}) is free text, so Raven's rule is closed: the raster is read as metres only when the
 whole text, normalised, is a metre form of Table~\ref{tab:bandunits}: a metre word, symbol or abbreviation, alone or followed
-by one listed vertical datum (\cmd{m MSL}, \cmd{m, AHD}, \cmd{m (NAVD88)}, \cmd{meters (EGM2008 geoid)}, \cmd{m above sea
-level}, fused \cmd{mAHD}, \cmd{msnm}, \cmd{m.s.n.m.}), a metre form in brackets after a metre word (\cmd{meter (m)},
+by one listed vertical datum (\cmd{m MSL}, \cmd{m, AHD}, \cmd{m (NAVD88)}, \cmd{m(NAVD88)}, \cmd{m-NAVD88},
+\cmd{m NAVD88 GEOID18}, \cmd{meters (EGM2008 geoid)}, \cmd{m above sea level}, fused \cmd{mAHD}, \cmd{msnm}, \cmd{m.s.n.m.}), a metre form in brackets after a metre word (\cmd{meter (m)},
 \cmd{metre (EPSG:9001)}), or a metre form after a quantity, in brackets or after \cmd{in} (\cmd{elevation (m)},
-\cmd{Elevation [m]}, \cmd{height in metres}, \cmd{height above ellipsoid (m)}). Normalising reads full-width characters as
+\cmd{Elevation [m]}, \cmd{height in metres}, \cmd{height above ellipsoid (m)}, \cmd{H\"ohe (m)}, \cmd{Elevation\_m}). Normalising reads full-width characters as
 ASCII and no-break and ideographic spaces as blanks, trims the blanks and reads a run of them as one, lowers the case (ASCII,
 Latin-1, Latin Extended-A, Greek, whose accents are also removed, and Cyrillic) and removes surrounding brackets: \cmd{m},
 \cmd{m.}, \cmd{(m)}, \cmd{[metres]}, \cmd{Meters}, \cmd{MASL}, \cmd{m a.s.l.}, \cmd{m\"uNN}, \cmd{Meter \"uber NN},
@@ -271,11 +273,12 @@ three kinds:
 \begin{itemize}
 \item a text with another length unit and no metre (the second row of the table: \cmd{ft}, \cmd{US survey foot},
 \cmd{Zentimeter}, \cmd{km}, \cmd{EPSG:9002}, also \cmd{EPSG 9002} and \cmd{EPSG: 9003}, feet fused with a datum such as
-\cmd{ftMSL}), or another length named with its metre conversion (\cmd{ft (0.3048 m)}, \cmd{M (feet)}): ``its elevations are
+\cmd{ftMSL}, \cmd{ftNAVD88} or \cmd{usftNGVD29}, the ESRI unit names \cmd{Link\_Clarke} or \cmd{Rod\_US}), or another length named with its metre conversion (\cmd{ft (0.3048 m)}, \cmd{M (feet)}): ``its elevations are
 in \dots''; convert the values to metres and set the unit
 (\cmd{gdal\_calc.py}, then \cmd{gdal\_edit.py -units m});
 \item a scaled metre: a part or multiple (\cmd{m (in thousands)}, \cmd{tenths of a metre}, \cmd{m (in 1000s)}), a number with a
-factor sign or word (\cmd{m*0.1}, \cmd{Meter (x0.1)}, \cmd{m (scaled by 0.1)}, \cmd{0.1 of a metre}, \cmd{m\^{}2}), or a number
+factor sign or word (\cmd{m*0.1}, \cmd{Meter (x0.1)}, \cmd{m (scaled by 0.1)}, \cmd{0.1 of a metre}, \cmd{Meter (Faktor 0,1)},
+\cmd{units of 0.1 m}, \cmd{m\^{}2}), a power of ten or an ordinal (\cmd{m 1e-2}, \cmd{m E-2}, \cmd{100ths of a metre}), or a number
 and a metre form as the whole text (\cmd{0.1 m}, \cmd{1000 m}, \cmd{1e-2 m}, \cmd{.1 m}): the values are not plain metres; write them unscaled, or give
 the scale as the band's scale and offset (\cmd{gdal\_edit.py -scale 0.1 -units m});
 \item any other text (\cmd{m (Admiralty datum)}, \cmd{hydraulic head}, \cmd{m/s}, \cmd{5 km grid, elevation in m}, \cmd{m
@@ -300,27 +303,41 @@ metre (read as metres) & the metre written out: \cmd{metre}, \cmd{metres}, \cmd{
 \cmd{metrin}, \cmd{metri\"a}, \cmd{metrit}, the metre in Cyrillic (with its endings), Greek, Chinese,
 Japanese and Korean; the symbol \cmd{m} (also its Cyrillic letter); \cmd{masl}, \cmd{m asl},
 \cmd{m a.s.l.}, \cmd{m.a.s.l.}, \cmd{mamsl}, \cmd{m amsl}, \cmd{m a.m.s.l.}, \cmd{moh}, \cmd{m.o.h.}, \cmd{m\"oh},
-\cmd{m \"o.h.}, \cmd{m\"u}, \cmd{m\"uNN}, \cmd{m \"u. NN}, \cmd{m \"u.NN}, \cmd{m \"u. M.}, \cmd{m \"u.M.}, \cmd{m.}, and the Cyrillic metre of the
+\cmd{m \"o.h.}, \cmd{m.\"o.h.}, \cmd{m o.h.}, \cmd{mt}, \cmd{mts}, \cmd{mtr}, \cmd{mtrs}, \cmd{m\"u}, \cmd{m\"uNN}, \cmd{m \"u. NN}, \cmd{m \"u.NN}, \cmd{m \"u. M.}, \cmd{m \"u.M.}, \cmd{m.}, and the Cyrillic metre of the
 Baltic system (m BS, written together or apart); \cmd{EPSG:9001}, \cmd{EPSG::9001}, \cmd{EPSG 9001}, \cmd{urn:ogc:def:uom:EPSG::9001}, \cmd{http://www.opengis.net/def/uom/EPSG/0/9001}\\
-vertical datums (after a metre form, also with a comma, in brackets, or fused to \cmd{m} or \cmd{m.}) & \cmd{MSL}, \cmd{AMSL},
+vertical datums (after a metre form, also with a comma, \cmd{;}, \cmd{/}, \cmd{-} or \cmd{\_}, in brackets, or fused to \cmd{m} or \cmd{m.}) & \cmd{MSL}, \cmd{AMSL},
 \cmd{ASL}, \cmd{a.s.l.}, \cmd{a.m.s.l.}, \cmd{above sea level}, \cmd{above mean sea level}, \cmd{AHD}, \cmd{AOD}, \cmd{ODN},
 \cmd{NAP}, \cmd{+NAP}, \cmd{TAW}, \cmd{NN}, \cmd{NHN}, \cmd{\"u. NN}, \cmd{\"u.NN}, \cmd{\"uber NN}, \cmd{\"u. NHN},
 \cmd{\"u.NHN}, \cmd{\"uber NHN}, \cmd{\"u. M.}, \cmd{NN2000}, \cmd{RH2000}, \cmd{DVR90}, \cmd{NAVD88}, \cmd{NAVD 88},
 \cmd{NGVD29}, \cmd{NGVD 29}, \cmd{CGVD2013}, \cmd{CGVD28}, \cmd{EGM96}, \cmd{EGM2008}, \cmd{s.l.m.}, \cmd{slm},
 \cmd{n.p.m.}, \cmd{npm}, \cmd{s.n.m.}, \cmd{snm}, \cmd{n. m.}, \cmd{n.m.}, \cmd{ellipsoidal}, \cmd{above (the) ellipsoid};
 \cmd{s. n. m.}, \cmd{EGM08}, \cmd{OD}, \cmd{MLLW}, \cmd{MLW}, \cmd{MHW}, \cmd{MHHW}, \cmd{LAT}, \cmd{HAE}, \cmd{orthometric},
-\cmd{NGF}, \cmd{IGN69}, \cmd{N2000}, \cmd{NZVD2016}, \cmd{T.P.}, \cmd{(the) WGS84 ellipsoid}; each may end in \cmd{geoid}, follow
-\cmd{above} (\cmd{m above MSL}) and have a blank before its year (\cmd{RH 2000}, \cmd{EGM 96}); a dotted abbreviation of a
+\cmd{NGF}, \cmd{IGN69}, \cmd{N2000}, \cmd{NZVD2016}, \cmd{T.P.}, \cmd{(the) WGS84 ellipsoid}; \cmd{NAVD}, \cmd{NGVD},
+\cmd{EVRF2000}, \cmd{EVRF2007}, \cmd{DHHN92}, \cmd{DHHN2016}, \cmd{NHN2016}, \cmd{\"u. NHN2016}, \cmd{LN02}, \cmd{\"u. A.},
+\cmd{Bpv}, \cmd{n. m. Bpv}, \cmd{NGF-IGN69}, \cmd{t.o.v. NAP}, \cmd{N60}, \cmd{DNN}, \cmd{AHD71}, \cmd{CD}, \cmd{chart datum},
+\cmd{OSGM15}, \cmd{Ordnance Datum}, \cmd{geoid}, \cmd{WGS84}, \cmd{TP}; each may end in \cmd{geoid} or a geoid model
+(\cmd{m NAVD88 GEOID18}, \cmd{m NAVD88 (GEOID12B)}), follow \cmd{above} or \cmd{over} (\cmd{m above MSL}) and have a blank before its year (\cmd{RH 2000}, \cmd{EGM 96}); a dotted abbreviation of a
 metre form or datum may lack its final dot (\cmd{m a.s.l}, \cmd{moh.} with it)\\
 quantities (before a metre form in brackets or after \cmd{in}) & \cmd{elevation(s)}, \cmd{height(s)}, \cmd{altitude},
 \cmd{elevation / height above (mean) sea level}, \cmd{height above ellipsoid}, \cmd{height\_above\_ellipsoid},
-\cmd{ellipsoidal height}, \cmd{orthometric height}; also before a comma (\cmd{Elevation, m})\\
+\cmd{ellipsoidal height}, \cmd{orthometric height}, \cmd{elev}, \cmd{z}, \cmd{DEM}, \cmd{DTM}, \cmd{DSM}, and in the languages
+of the metre words \cmd{H\"ohe}, \cmd{altitud}, \cmd{altura}, \cmd{cota}, \cmd{hauteur}, \cmd{\'el\'evation}, \cmd{quota},
+\cmd{altezza}, \cmd{altitudine}, \cmd{hoogte}, \cmd{wysoko\'s\'c}, \cmd{v\'y\v{s}ka}, \cmd{nadmo\v{r}sk\'a v\'y\v{s}ka},
+\cmd{magass\'ag}, \cmd{korkeus}, \cmd{h\"ojd}, \cmd{h\o{}yde}, \cmd{h\o{}jde}, \cmd{\^in\u{a}l\c{t}ime}, the height in Cyrillic and Greek;
+also before a comma (\cmd{Elevation, m}) or joined by \cmd{\_} (\cmd{Elevation\_m})\\
 another length (named in the message; \cmd{METRES} does not apply) & a text with one of these and no metre form among its
 words: feet, inches, yards, miles, fathoms, chains and furlongs in English and other languages and case forms (\cmd{ft},
 \cmd{foot}, \cmd{feet}, \cmd{fasl}, \cmd{inch(es)}, \cmd{yard(s)}, \cmd{mile(s)}, \cmd{pie(s)}, \cmd{pied(s)}, \cmd{voet},
 \cmd{Fu\ss}, \cmd{F\"u\ss e}, \cmd{stopa}, \cmd{stopach}, \cmd{st\'op}, \cmd{jalka}, \cmd{l\'ab}, \cmd{l\'abban}, \cmd{Zoll},
-\cmd{pulgada(s)}, \cmd{Meile(n)}, and in Cyrillic, Greek, Chinese, Japanese and Korean); feet fused with a qualifier
-(\cmd{ftUS}, \cmd{usft}, \cmd{SurveyFeet}); the metre's multiples and parts as symbols (\cmd{km}, \cmd{cm}, \cmd{mm},
+\cmd{pulgada(s)}, \cmd{Meile(n)}, \cmd{polegada(s)}, \cmd{milha(s)}, \cmd{jarda(s)}, \cmd{cal}, \cmd{cale}, \cmd{mil},
+\cmd{jardy}, \cmd{palce}, \cmd{m\'ile}, \cmd{h\"uvelyk}, \cmd{m\'erf\"old}, \cmd{tuuma}, \cmd{maili}, \cmd{jaardi}, \cmd{tum},
+\cmd{tomme}, \cmd{picior}, \cmd{inci}, \cmd{yarzi}, \cmd{milles}, \cmd{verges}, \cmd{iarde}, \cmd{vara(s)}, the fathom as
+\cmd{braza(s)}, \cmd{bra\c{c}a(s)}, \cmd{brasse(s)}, \cmd{toise(s)}, \cmd{Faden}, \cmd{Klafter}, \cmd{vadem}, \cmd{famn},
+\cmd{favn}, and in Cyrillic, Greek, Chinese, Japanese and Korean, with the verst and arshin and the Chinese and Japanese
+chi, shi chi, cun, zhang, li and ken); \cmd{micron(s)}, \cmd{rod(s)}, \cmd{perch(es)}, \cmd{league(s)},
+\cmd{kft}; the ESRI unit names \cmd{Link\_}\dots, \cmd{Chain\_}\dots, \cmd{Rod\_}\dots; feet fused with a qualifier
+(\cmd{ftUS}, \cmd{usft}, \cmd{SurveyFeet}) or a datum, its year kept (\cmd{ftMSL}, \cmd{ftNAVD88}, \cmd{ftNAVD 88},
+\cmd{usftNGVD29}, also as a word of a longer text: \cmd{elevation (ftNAVD88)}); the metre's multiples and parts as symbols (\cmd{km}, \cmd{cm}, \cmd{mm},
 \cmd{dm}, \cmd{nm}, \cmd{$\mu$m}, also Cyrillic) or with an SI prefix joined to a metre word or right before one
 (\cmd{kilometres}, \cmd{Kilo Meter}, \cmd{Zentimeter}, \cmd{dec\'imetros}, \cmd{quil\'ometros}, \cmd{milli-metres}, and
 the prefixed metres of Chinese, Japanese and Korean, also with a blank between the prefix and the metre);

@@ -131,6 +131,57 @@ M	mètres
 M	mètre
 M	метры
 M	米
+# metre forms with separators, datums and quantity words of other languages
+M	m(NAVD88)
+M	m[NAVD88]
+M	m-NAVD88
+M	m_NAVD88
+M	m / NAVD88
+M	m; NAVD88
+M	m.ö.h.
+M	m o.h.
+M	m above sea-level
+M	m over MSL
+M	metros (msnm)
+M	m NAVD
+M	m NGVD
+M	m NAVD88 GEOID18
+M	m NAVD88 (GEOID12B)
+M	m EVRF2007
+M	m EVRF2000
+M	m DHHN2016
+M	m DHHN92
+M	m ü. NHN2016
+M	m LN02
+M	m ü. A.
+M	m Bpv
+M	m n. m. Bpv
+M	m NGF-IGN69
+M	m t.o.v. NAP
+M	m N60
+M	m DNN
+M	m AHD71
+M	m CD
+M	m chart datum
+M	m OSGM15
+M	m above Ordnance Datum
+M	m (geoid)
+M	m WGS84
+M	m TP
+M	Höhe (m)
+M	altitud (m)
+M	hauteur (m)
+M	quota (m s.l.m.)
+M	hoogte (m NAP)
+M	wysokość (m n.p.m.)
+M	высота (м)
+M	Elev (m)
+M	z (m)
+M	DEM (m)
+M	Elevation_m
+M	mts
+M	mtr
+M	mtrs
 # -- no unit
 N	
 N	   
@@ -161,7 +212,7 @@ S	m (NAVD 1988)
 M	m CGVD 2013
 M	m (RH 2000)
 S	metres NN 2016
-S	m ü. NHN 2016
+M	m ü. NHN 2016
 M	m, EGM 2008
 S	height m 2020
 S	m above datum 1
@@ -189,16 +240,16 @@ S	Altitude in metres (pie chart)
 S	elevation in m; 1 mm = 0.001 m
 S	m, accuracy +/- 0.5 m
 S	m (version 2.1)
-S	Höhe in Metern
+M	Höhe in Metern
 S	altitude en mètres
-S	Altitud (metros)
-S	Altezza (metri)
-S	Wysokość (m n.p.m.)
+M	Altitud (metros)
+M	Altezza (metri)
+M	Wysokość (m n.p.m.)
 S	Wysokość w metrach
 S	Výška v metrech
-S	Magasság (méter)
-S	Высота (м)
-S	ВИСОТА, МЕТРЫ
+M	Magasság (méter)
+M	Высота (м)
+M	ВИСОТА, МЕТРЫ
 S	高程（米）
 S	標高（メートル）
 S	Ellipsoidal height, EPSG:9057, metres
@@ -218,10 +269,10 @@ S	Height above sea level in metres (NN 2016)
 S	m ü.d.M.
 S	müNHN
 S	м абс.
-S	Высота, м
+M	Высота, м
 S	высота в метрах
-S	Висота, м
-S	Υψόμετρο (m)
+M	Висота, м
+M	Υψόμετρο (m)
 S	υψόμετρο σε μέτρα
 S	海拔高度 (m)
 S	高度（公尺）
@@ -229,18 +280,18 @@ S	해발고도(미터)
 S	Độ cao (m)
 S	Yükseklik (m)
 S	Ketinggian (meter)
-S	Altitud (m s. n. m.)
-S	Altezza (m s.l.m.)
-S	hoogte in meters t.o.v. NAP
-S	Høyde (moh)
-S	höjd (m ö.h.)
-S	Wysokość [m n.p.m.]
-S	Výška [m n. m.]
+M	Altitud (m s. n. m.)
+M	Altezza (m s.l.m.)
+M	hoogte in meters t.o.v. NAP
+M	Høyde (moh)
+M	höjd (m ö.h.)
+M	Wysokość [m n.p.m.]
+M	Výška [m n. m.]
 S	tengerszint feletti magasság méterben
 S	Korkeus (m mpy)
 S	ElevationInMeters
-S	elevation_m
-S	HEIGHT_M
+M	elevation_m
+M	HEIGHT_M
 S	elevM
 S	m v2.1
 S	metres, 0.5 m resolution
@@ -259,9 +310,9 @@ S	Geländehöhe in m ü. NHN
 S	f.a.s.l.
 F	santimetre
 S	mils
-S	mil
-S	micron
-S	microns
+F	mil
+F	micron
+F	microns
 S	um
 S	µ
 F	FtAsl
@@ -271,7 +322,7 @@ F	M (feet)
 S	M FT
 S	hft
 F	feet (0.3048 m)
-S	市尺
+F	市尺
 F	公厘
 F	EPSG 9036
 S	m²
@@ -458,6 +509,74 @@ F	lábban
 F	desimeter
 F	ft MSL
 F	feet (NAVD88)
+# feet fused with a datum and its digits; other lengths of the listed languages, ESRI and CJK units
+F	ftNAVD88
+F	feetNAVD88
+F	ftNGVD29
+F	ftEGM96
+F	ftEGM2008
+F	ftCGVD28
+F	ftRH2000
+F	ftN2000
+F	ftNZVD2016
+F	ftIGN69
+F	usftNAVD88
+F	ftNAVD 88
+F	ftNAVD88 geoid
+F	elevation (ftNAVD88)
+F	polegada
+F	polegadas
+F	milha
+F	milhas
+F	jardas
+F	cale
+F	cali
+F	jardy
+F	palce
+F	palců
+F	míle
+F	hüvelyk
+F	mérföld
+F	tuuma
+F	tuumaa
+F	maili
+F	jaardi
+F	tum
+F	tomme
+F	picior
+F	picioare
+F	țoli
+F	inci
+F	yarzi
+F	ίντσα
+F	ίντσες
+F	μίλια
+F	γιάρδες
+F	milles
+F	verges
+F	iarde
+F	braza
+F	brazas
+F	brasses
+F	Faden
+F	vadem
+F	famn
+F	сажень
+F	верста
+F	аршин
+F	rod
+F	rods
+F	league
+F	leagues
+F	kft
+F	Link_Clarke
+F	Link_Benoit_1895_B
+F	Rod_US
+F	尺
+F	寸
+F	丈
+F	里
+F	間
 # -- scaled metres
 X	0.1 m
 X	[0.1 m]
@@ -577,3 +696,17 @@ X	1e-2 m
 F	χιλιόμετρα
 F	ftMSL
 F	ft (0.3048 m)
+# a power of ten, an ordinal or a factor word of another language with a metre
+X	m 1e-2
+X	m E-2
+X	100ths of a metre
+X	Meter (Faktor 0,1)
+X	units of 0.1 m
+X	0.1 m units
+# a unit word or an ordinal that is not a scale (a datum year or an epoch beside it, a century): unplaced text
+S	metres, NAVD 1988 (units)
+S	Elevation units: m, NAVD 1988
+S	m above 19th century datum
+S	height in m, epoch 2010, units
+X	in 100ths of a metre
+X	m (in 100ths)
