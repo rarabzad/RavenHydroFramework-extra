@@ -29,7 +29,7 @@ What you need
 
 Time needed
 -----------
-About 30 minutes, plus about 8 minutes for the optional 20-year run.
+About 30 minutes, plus about 7 minutes for the optional 20-year run.
 
 How to start
 ------------

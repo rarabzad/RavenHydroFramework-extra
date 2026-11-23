@@ -320,7 +320,7 @@ writes: FloPy reads every model; cells are valid and do not overlap; the grid or
 select the right cells. All 127 checks pass.
 
 \paragraph{Faulty and unusual input.} The input checks of \cmd{tests/input\_checks.py} (N1--N28, U0--U4, RN1--RN2,
-E1--E37 with E25b, E30b, E31b, E32a--E32e, E32c2, E34b, E34c, E35b and E35c, AM1), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
+E1--E44 with E25b, E30b, E31b, E32a--E32e, E32c2, E34b, E34c, E35b, E35c, E40b, E41b--E41d, E43b--E43d and E44b--E44d, AM1), on the Liard model and on smaller generated and existing models, and \cmd{tests/soilzone/test\_inputs.py} I22
 check the messages (Tables~\ref{tab:faulty}, \ref{tab:faultynum}, \ref{tab:faultyext} and~\ref{tab:faultyext2}): every error stops the run with a message that names the problem --- no crash --- and every
 tolerated case runs. \cmd{tests/edge.py} adds 36 generated-model and 17 existing-model set-ups, judged without and with
 MODFLOW; the valid existing-model preparations are checked in detail (stress periods split at the start date, restart
