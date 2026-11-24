@@ -2,6 +2,8 @@
 Raven and MODFLOW exchange water in eight ways, and in a ninth when the soil zone is coupled
 (Table~\ref{tab:uexchanges}). This chapter says what each exchange does, what controls it and what to write. Reference,
 Chapter~\ref{R-ch:c4}, gives the equations, the safeguards and worked examples with numbers.
+
+Figure~\ref{fig:uexch} shows where each exchange crosses between Raven and MODFLOW, and the table below lists them.
 \begin{table}[!htbp]\centering
 \caption{The exchanges between Raven and MODFLOW, and what switches them on.}\label{tab:uexchanges}\small
 \begin{tabularx}{\linewidth}{P{0.2\linewidth}P{0.17\linewidth}P{0.2\linewidth}Y}\toprule\hdr
@@ -138,7 +140,7 @@ instead.
 
 \section{Wells and boundaries}
 Wells pump from the aquifer (or inject into it), and head boundaries exchange water with water bodies outside the model.
-Pumped water leaves the system. Section~\ref{sec:uwells} says what to write. A well placed in a fixed-head cell has no
+Pumped water leaves the system; Figure~\ref{fig:upumping} shows a pumping test. Section~\ref{sec:uwells} says what to write. A well placed in a fixed-head cell has no
 effect, and Raven warns about it.
 
 Pumped water comes at first mostly from aquifer storage. As the cone of depression reaches rivers and seepage areas, more
@@ -206,7 +208,7 @@ one minus the field capacity $S_{\mathrm{fc}}$): otherwise the water table rises
 soil (Raven warns).
 \item \textbf{Sloping and irregular land}: give a DEM finer than the cells. Each cell samples it at
 \cmd{:SoilZoneSubgrid} $n$ points per side (5 by default, 25 points), so within a cell the low ground saturates first
-and the high ground later (Reference, Figure~\ref{R-fig:szsubgrid}). Between cells MODFLOW's heads carry the water down
+and the high ground later (Reference, Figure~\ref{R-fig:szsubgrid}; Figure~\ref{fig:uszhillslope} shows a coupled hillslope). Between cells MODFLOW's heads carry the water down
 the slope, and the saturated area spreads up from the foot of the slope and from hollows and retreats downslope as it
 dries (Reference, Figure~\ref{R-fig:szhillslope}). Keep \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (the contact depth $d_s$) at
 0.1--0.5~m. Seepage faces and saturated strips narrower than a cell need smaller cells (or \cmd{:GridRefinement} along

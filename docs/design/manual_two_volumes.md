@@ -119,7 +119,7 @@ A negative test (one label renamed and one number changed in Volume 1) gives `FA
 - Workshops 3 and 4: their closing paragraphs name the two volumes; their PDFs rebuilt (`build_tutorials.py
   --pdf-only --only t3,t4`, 13 pages each, as before).
 
-Results: `check_manual_pdf.py` PASS (56 and 178 pages); `tools_check.py` ALL PASSED (TC1, TC2, TC6 and TC8 run with the
+Results: `check_manual_pdf.py` PASS (56 and 178 pages; 60 and 178 after the figures below were added); `tools_check.py` ALL PASSED (TC1, TC2, TC6 and TC8 run with the
 test environment); `make_package.py --self-test` ALL PASSED.
 
 ## Open
@@ -132,3 +132,11 @@ test environment); `make_package.py --self-test` ALL PASSED.
   calibration, now in Volume 1.
 - Volume 1 has 56 pages, below the 60 to 80 aimed at; it holds every user-facing statement of the old introduction and
   application chapters, the plain-language chapters, and eight figures shared with Volume 2.
+
+
+## Later additions
+
+- Twelve explanatory figures of Volume 2 were added to Volume 1 (shared figure files); Volume 1 now has 60 pages.
+- The synthetic calibration caption was lengthened; the coverage script accepts a caption that begins with the old one.
+  Coverage after these changes: PASS (196 labels, 86 tables, 491 commands, 139 numbers).
+- Every Volume 1 figure is referred to in the text; the quick start says its .rvg listing shows the main commands.

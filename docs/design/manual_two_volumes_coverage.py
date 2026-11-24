@@ -102,7 +102,8 @@ def main():
     missing += len(lm)
 
     ot = tables(old); nt = set(k for _, k in tables(new))
-    tm = [(kind, k) for kind, k in ot if k not in nt and k not in newn]
+    tm = [(kind, k) for kind, k in ot if k not in nt and k not in newn
+          and not (kind == 'caption' and any(n.startswith(k[:80]) for n in nt))]  # a caption may be lengthened
     for kind, k in tm:
         print('table missing (%s): %s' % (kind, k[:100]))
     print('tables: %d of %d of the old manual are in a volume (%d by caption, %d uncaptioned by their first row)%s' % (
