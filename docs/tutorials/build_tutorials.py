@@ -1443,6 +1443,9 @@ def tut6():
             saved[f] = open(pth).read()
         m = committed_values('t6:ddsmin').get('t6:ddsmin')
         G.val('t6:ddsmin', m[0] if m else '?', volatile=True)
+        dts = 60.0 * float(m[0]) if (m and m[0].isdigit()) else None
+    # (the time of one run of the calibration, from the same Ostrich run as t6:ddsmin; t6:runsec is the run of this build)
+    G.val('t6:ddsrunsec', '%d' % max(1, round(dts / MAXITER)) if dts else '?', volatile=True)
     readme_minutes(t, r'plus about (\d+) minutes of computing', 't6:ddsmin')
     if os.path.exists(fin):
         shutil.rmtree(fin)

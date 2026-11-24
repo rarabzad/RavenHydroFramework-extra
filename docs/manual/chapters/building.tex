@@ -260,7 +260,7 @@ values is taken as no georeferencing, and a \cmd{GDAL\_NODATA} text longer than 
 set with \cmd{gdal\_edit.py -units}) is free text, so Raven's rule is closed: the raster is read as metres only when the
 whole text, normalised, is a metre form of Table~\ref{tab:bandunits}: a metre word, symbol or abbreviation, alone or followed
 by one listed vertical datum (\cmd{m MSL}, \cmd{m, AHD}, \cmd{m (NAVD88)}, \cmd{m(NAVD88)}, \cmd{m-NAVD88},
-\cmd{m NAVD88 GEOID18}, \cmd{meters (EGM2008 geoid)}, \cmd{m above sea level}, fused \cmd{mAHD}, \cmd{msnm}, \cmd{m.s.n.m.}), a metre form in brackets after a metre word (\cmd{meter (m)},
+\cmd{m NAVD88 GEOID18} (a geoid model after the datum: \cmd{geoid}, or \cmd{geoid} and the model's year, with an optional letter \cmd{a} or \cmd{b}, such as \cmd{GEOID18}, \cmd{GEOID12B} or \cmd{GEOID2022}), \cmd{meters (EGM2008 geoid)}, \cmd{m above sea level}, fused \cmd{mAHD}, \cmd{msnm}, \cmd{m.s.n.m.}), a metre form in brackets after a metre word (\cmd{meter (m)},
 \cmd{metre (EPSG:9001)}), or a metre form after a quantity, in brackets or after \cmd{in} (\cmd{elevation (m)},
 \cmd{Elevation [m]}, \cmd{height in metres}, \cmd{height above ellipsoid (m)}, \cmd{H\"ohe (m)}, \cmd{Elevation\_m}). Normalising reads full-width characters as
 ASCII and no-break and ideographic spaces as blanks, trims the blanks and reads a run of them as one, lowers the case (ASCII,
@@ -293,6 +293,10 @@ the scale as the band's scale and offset (\cmd{gdal\_edit.py -scale 0.1 -units m
 first two kinds (a recognised other length or scaled metre stops also with it). With \cmd{METRES} every run writes a
 warning that names the file's own unit text, also for a metre form or no unit (``read as metres because METRES follows the
 file name \dots; the file's own band unit is \dots''), so that a wrong statement shows.
+The table's scope is the forms it lists, not every spelling of a unit: a text that is not one of its metre forms, other
+lengths or scaled forms, whatever length, scale or metre it names, is of the third kind. It stops the run; \cmd{METRES} is then the user's explicit statement that the values
+are metres, and the run writes the warning that names the file's unit text. So no unit text is read as metres unless it is a
+metre form of the table or \cmd{METRES} follows the file name.
 \begin{table}[!htbp]\centering
 \caption{Band units: the metre forms read as metres (with their datums and quantities), and the other lengths named in the stop message.}\label{tab:bandunits}\small
 \begin{tabularx}{\linewidth}{P{0.2\linewidth}Y}\toprule\hdr

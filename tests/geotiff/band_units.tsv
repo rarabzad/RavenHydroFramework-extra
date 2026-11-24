@@ -187,6 +187,15 @@ N
 N	   
 N	　
 # -- other texts (METRES reads them as metres)
+S	m NAVD88 geoid10m
+S	m NAVD88 geoid18c
+S	m NAVD88 geoid18ft
+S	m NAVD88 GEOID12Bft
+S	m NAVD88 geoid1e3
+S	m NAVD88 geoid_feet
+S	m NAVD88 geoidft
+S	m NAVD88 GEOID12B_in_feet
+S	metres EGM96 geoid-ft
 S	m (Admiralty datum)
 S	metres above Hydrographic Datum
 S	in metres
@@ -578,6 +587,9 @@ F	丈
 F	里
 F	間
 # -- scaled metres
+X	m navd88 geoid12b/10
+X	m NAVD88 geoid/100
+X	m NAVD88 GEOID*0.1
 X	0.1 m
 X	[0.1 m]
 X	(0.1 m)

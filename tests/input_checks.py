@@ -153,7 +153,8 @@ One MODFLOW model, files outside the simulation folder, later starts and restart
       in effect at the start written as period 1 of the working copy;
   E40 the wells' period 1 rows by OPEN/CLOSE ../shared/..., a TS6 series and OBS6 observations named ../shared/... and the
       observations written to ../obs_out.csv, Raven at the model's time zero and 32 days late: GWBudget.csv and
-      Hydrographs.csv identical to the twin with the files inside the folder, the series copied in (and shifted), the
+      Hydrographs.csv identical to the twin with the files inside the folder, the series copied in (and, on the late
+      start, shifted: it is used in period 3, the first kept, and changes on days 32 to 34; its copy begins at -32), the
       observations written in the working copy (raven_out_1_obs_out.csv, named in GWModelSummary.txt) and not beside the
       user's folder; E40b the same model run by MODFLOW 6 (libmf6 6.8.1) from its own folder ends normally;
   E41 the OC head file named by its absolute path in the simulation folder (where the user's own file lies) and the budget
@@ -161,12 +162,14 @@ One MODFLOW model, files outside the simulation folder, later starts and restart
       unchanged, nothing written beside the folder, results identical to the example's; E41b and E41c the same two lines
       in an OPEN/CLOSE file of the OC OPTIONS block, outside the folder (../shared/oc_opts.txt) and inside it: the same,
       and the user's OPEN/CLOSE file unchanged; E41d a TS6 file that does not exist, Raven 32 days late: stops, naming it;
-  E42 a GWT model beside the flow model stops with Raven's transport message;
+  E42 a GWT model beside the flow model stops with Raven's transport message; E42b a CHF model joined to it by an exchange
+      stops with the one-model message;
   E43 :MF6StartDate 1985-10-01T12:00:00 with Raven starting at 00:00 that day stops (before the model's time zero), E43b
       1985-09-30 12:00:00 with daily steps stops (Raven's start not on a time step of the period), E43c 1985-10-01junk
       stops, E43d 1985-10-01 00:00:00 runs as 1985-10-01;
   E44 :MF6GridFile, E44b :SoilZone CONCEPTUAL, E44c :MF6Model and E44d :ReservoirExchange with a surplus value stop,
-      naming it.
+      naming it; E44e :MF6StartDate with a # glued to the date stops, saying that the # is part of the value and that a
+      comment starts at a # after a blank.
 A model across the antimeridian:
   AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
      longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
@@ -1029,6 +1032,8 @@ report('E39 HFB6 and CSUB6 with a PERIOD 1 block, Raven 32 days late: runs, each
        '' if ok else out.strip().split('\n')[-1][:150])
 shutil.rmtree(d, ignore_errors=True)
 # ---- paths inside the model's files resolve in Raven's working copy as MODFLOW resolves them from the simulation folder
+# (a series that changes inside the first days after a start 32 days late: its shifted copy begins at -32)
+TS40 = 'BEGIN attributes\n  NAMES  q1\n  METHODS  linear\nEND attributes\n\nBEGIN timeseries\n  0.0  -1000.0\n  32.0  -1000.0\n  34.0  -20000.0\n  1000.0  -20000.0\nEND timeseries\n'
 def outside(d, out=True):   # (period 1 of the wells by OPEN/CLOSE, a TS6 series and observations named from ../shared; the observations
                             #  written to ../obs_out.csv; with out=False the twin: the same files inside the simulation folder)
     S, rel = (os.path.join(d, 'shared'), '../shared/') if out else (os.path.join(d, 'model'), '')
@@ -1036,8 +1041,8 @@ def outside(d, out=True):   # (period 1 of the wells by OPEN/CLOSE, a TS6 series
     open(os.path.join(S, 'wel_p1.txt'), 'w').write('  3 63 76 -8.00000000E+03\n  3 46 82 -4.00000000E+03\n')
     edit(d, 'model/gwf_liard.wel', 'BEGIN period  1\n  3 63 76 -8.00000000E+03\n  3 46 82 -4.00000000E+03\n', 'BEGIN period  1\n  OPEN/CLOSE  %swel_p1.txt\n' % rel)
     edit(d, 'model/gwf_liard.wel', '  SAVE_FLOWS\n', '  SAVE_FLOWS\n  TS6  FILEIN  %swel.ts\n  OBS6  FILEIN  %swel.obs\n' % (rel, rel))
-    edit(d, 'model/gwf_liard.wel', '  3 63 76 -3.00000000E+03\n', '  3 63 76 q1\n')
-    open(os.path.join(S, 'wel.ts'), 'w').write(TS)
+    edit(d, 'model/gwf_liard.wel', 'BEGIN period  3\n  3 63 76 -3.00000000E+03\n', 'BEGIN period  3\n  3 63 76 q1\n')   # (period 3: the first a late start keeps)
+    open(os.path.join(S, 'wel.ts'), 'w').write(TS40)
     open(os.path.join(S, 'wel.obs'), 'w').write('BEGIN continuous FILEOUT %sobs_out.csv\n  w1 WEL 3 63 76\nEND continuous\n' % ('../' if out else ''))
     return d
 for lab, start in (('at the model\'s time zero', '1985-10-01'), ('32 days late (periods renumbered, the series shifted)', '1985-11-02')):
@@ -1047,6 +1052,11 @@ for lab, start in (('at the model\'s time zero', '1985-10-01'), ('32 days late (
     good = ok and okt and same(tw, d) and (os.path.join(d, 'shared', 'wel_p1.txt') in wl or start != '1985-10-01') and re.search(r'TS6\s+FILEIN\s+raven_copy_f\d+_wel\.ts', wl) is not None \
         and os.path.exists(os.path.join(d, 'out', 'mf6', 'raven_out_1_obs_out.csv')) and not os.path.exists(os.path.join(d, 'obs_out.csv')) \
         and 'raven_out_1_obs_out.csv' in summary(d)
+    if start != '1985-10-01':   # (the copied series shifted by the 32 days: its first time is -32)
+        cp = re.search(r'TS6\s+FILEIN\s+(raven_copy_f\d+_wel\.ts)', wl)
+        ct = open(os.path.join(d, 'out', 'mf6', cp.group(1))).read() if cp else ''
+        ft = re.search(r'BEGIN timeseries\n\s*(\S+)', ct)
+        good = good and 'times shifted by Raven' in ct and ft is not None and float(ft.group(1)) == -32.0
     report('E40 OPEN/CLOSE, TS6 and OBS6 named by ../ paths, %s: runs, results as the twin inside the folder, observations kept in the output folder' % lab, good,
            '' if (ok and okt) else (out if not ok else outt).strip().split('\n')[-1][:150])
     shutil.rmtree(tw, ignore_errors=True)
@@ -1103,6 +1113,15 @@ edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  gwf6  gwf_li
 stops('E42 a GWT model beside the flow model stops: Raven does not solve transport models', d,
       'holds the model gwt_liard (GWT6) beside its groundwater-flow model; Raven drives one MODFLOW 6 groundwater-flow model')
 shutil.rmtree(d, ignore_errors=True)
+# a channel-flow model (CHF6) joined to the flow model moves water: the one-model message, not the transport one (E42b)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e42b'))
+edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  gwf6  gwf_liard.nam  gwf_liard\n  chf6  chf.nam  chf1\n')
+edit(d, 'model/mfsim.nam', 'END models\n', 'END models\n\nBEGIN exchanges\n  chf6-gwf6  chf.exg  chf1  gwf_liard\nEND exchanges\n')
+ok, out = run(d, 1); ln = (re.findall(r'.*holds 2 models.*', out) or [''])[0].strip()
+report('E42b a CHF model joined to the flow model by an exchange stops with the one-model message, not the transport one', not ok
+       and 'holds 2 models (gwf_liard (GWF6), chf1 (CHF6)) and 1 exchange (chf6-gwf6 chf.exg); Raven couples one MODFLOW 6 groundwater-flow model' in ln
+       and 'transport' not in out, (ln or out.strip().split('\n')[-1])[:150])
+shutil.rmtree(d, ignore_errors=True)
 # ---- :MF6StartDate with a time of day: read, or stopped when malformed
 for lab, val, want in (('E43 :MF6StartDate 1985-10-01T12:00:00, Raven starting at 00:00 that day: stops (before the model\'s time zero)', '1985-10-01T12:00:00', 'is before the model\'s time zero'),
                        ('E43b :MF6StartDate 1985-09-30 12:00:00, Raven half a day later: stops (not on a Raven time step)', '1985-09-30 12:00:00', 'does not fall on a Raven time step'),
@@ -1122,6 +1141,12 @@ for lab, line in (('E44 :MF6GridFile with a surplus value stops', ':MF6GridFile 
     ok, out = run(d, 1); ln = (re.findall(r'.*surplus value.*', out) or [''])[0].strip()
     report(lab + ', naming it', not ok and line.split()[0] in ln and "surplus value '%s'" % line.split()[-1 if line.split()[0] != ':MF6GridFile' else 3] in ln, ln[:150])
     shutil.rmtree(d, ignore_errors=True)
+# a # glued to a value is part of it (a comment starts at a # after a blank): the surplus-value stop says so (E44e)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e44e')); edit(d, 'Liard.rvg', ':MF6StartDate      1985-10-01', ':MF6StartDate      1985-10-01# the model\'s time zero')
+ok, out = run(d, 1); ln = (re.findall(r'.*surplus value.*', out) or [''])[0].strip()
+report('E44e :MF6StartDate 1985-10-01# the model\'s time zero stops, saying that a # glued to a value is part of it', not ok
+       and "surplus value 'model's'" in ln and "a # glued to a value is part of it, as in '1985-10-01#': write a blank before # to start a comment" in ln, ln[:150])
+shutil.rmtree(d, ignore_errors=True)
 # ---- a model across the antimeridian: the same model as at longitude 0
 sys.path.insert(0, os.path.join(HERE, 'soilzone'))
 import math
