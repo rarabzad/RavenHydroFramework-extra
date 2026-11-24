@@ -1,0 +1,9 @@
+\begin{tikzpicture}[x=1cm,y=1cm,b/.style={draw,rounded corners,font=\scriptsize,align=center,minimum height=8mm,text width=23mm}]
+\node[b,fill=teal!12] (a) at (0,0) {Raven HRU\\processes};
+\node[b,fill=gray!15] (b) at (2.9,0) {recharge and\\stresses to MF6};
+\node[b,fill=violet!12] (c) at (5.8,0) {MODFLOW\\Newton solve};
+\node[b,fill=gray!15] (d) at (8.7,0) {seepage, stores,\\river terms back};
+\node[b,fill=teal!12] (e) at (11.6,0) {Raven routing\\and balance};
+\foreach \u/\v in {a/b,b/c,c/d,d/e} \draw[-{Stealth[length=2mm]},thick] (\u) -- (\v);
+\draw[->,thick,gray] (-1.2,-0.8) -- (12.8,-0.8) node[right,font=\scriptsize]{time};
+\end{tikzpicture}

@@ -53,12 +53,12 @@ objective can combine both.
 Groundwater under subbasin 52 only (545 active columns), 2 years, 7 s per run. Heads from a run with known parameters, plus
 2 cm of random noise, at four monitoring wells were the observations. The search started from values 2.5 to 10 times off.
 \begin{table}[!htbp]\centering
-\caption{Synthetic calibration: the parameters that made the ``observations'', the starting values, and the values DDS recovered.}\label{tab:synthcal}
+\caption{Synthetic calibration: the parameters that made the ``observations'', the starting values, and the values DDS recovered (the error is that of the value shown against the true value).}\label{tab:synthcal}
 \begin{tabular}{lrrrr}\toprule\hdr
 Parameter & True & Start & After 150 runs & Error\\\midrule
 Gravel $K$ [m/d] & 50 & 5 & 47.7 & $-4.6$\%\\
-Gravel $S_y$ & 0.25 & 0.10 & 0.239 & $-4.5$\%\\
-Upland-till $K$ [m/d] & 0.2 & 2.0 & 0.149 & $-25$\%\\\bottomrule
+Gravel $S_y$ & 0.25 & 0.10 & 0.239 & $-4.4$\%\\
+Upland-till $K$ [m/d] & 0.2 & 2.0 & 0.149 & $-25.5$\%\\\bottomrule
 \end{tabular}\end{table}
 Table~\ref{tab:synthcal} shows the result. The objective (the sum of RMSE over the four wells) fell from 14.4 m to 0.17 m.
 It is 0.08 m at the true values, so more runs would refine it further (Figure~\ref{fig:calib}). The upland-till

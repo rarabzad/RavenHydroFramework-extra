@@ -35,7 +35,8 @@ Linux has Raven and the library ready in its \cmd{bin/} folder.
 
 \section{The example}\label{ch:tutorial}
 Example~A is the Liard River model (65 subbasins, 1\,107 HRUs, northern British Columbia and Yukon) with an aquifer
-added under three nested subbasins (52, 48 and 43; about 13\,800 km$^2$, 85 coupled HRUs). The other 62 subbasins run
+added under three nested subbasins (52, 48 and 43; about 13\,800 km$^2$ in all). Their 85 HRUs with an aquifer profile are
+coupled (about 13\,600 km$^2$ of HRU area); the subbasins' other HRUs have no aquifer. The other 62 subbasins run
 exactly as they do without groundwater.
 
 The original Liard package was made for Raven 2.9.1. For Raven 4.x its Windows paths use \texttt{/}, and the parameter
@@ -154,7 +155,9 @@ on one processor core (35 seconds without groundwater). For a quick first try, s
 365 days instead of 7305. Raven prints the date as it goes, and the last line is \cmd{Exiting Gracefully: Successful
 Simulation}.
 
-Raven builds a grid of 3 layers $\times$ 85 $\times$ 54 cells of 2 km, with 3\,252 active columns and 178 river cells
+Raven builds a grid of 3 layers $\times$ 85 $\times$ 54 cells of 2 km, with 3\,252 active columns and 178 river cells. The
+columns have 8\,840 active cells: 2\,794 columns of the three-layer valley profile have three each, and the 458 columns of the
+one-layer upland profile have one, with their two lower cells passing water straight through (916 pass-through cells)
 (Figure~\ref{fig:ugrid}).
 \begin{figure}[!htbp]\centering
 \includegraphics[width=0.9\linewidth]{figures/fig_grid_liard.png}

@@ -97,7 +97,7 @@ Command & Meaning (default)\\\midrule\endhead
 \cmd{:RiverGeometry file \{subbasin field\}} & river lines; without a field, subbasins are assigned automatically; lines whose ID is no subbasin of the model are left out with a warning (the run stops when no line is left)\\
 \cmd{:LandSurface file [METRES]} & DEM, ESRI ASCII grid or GeoTIFF (\cmd{.tif}, \cmd{.tiff}) in lon/lat or \cmd{:InputCRS}; Section~\ref{sec:rasters} (HRU \cmd{ELEVATION}); \cmd{METRES}: Section~\ref{sec:geotiff}\\
 \cmd{:InputCRS EPSG:code | TMERC | ALBERS | LCC \dots} & projection of every geometry and raster input file; wells may then be given by \cmd{X}, \cmd{Y} (lon/lat); Section~\ref{sec:inputcrs}\\
-\cmd{:BedrockSurface file} & bedrock elevation, same formats (\cmd{DEFAULT\_BEDROCK\_DEPTH})\\
+\cmd{:BedrockSurface file [METRES]} & bedrock elevation, same formats (\cmd{DEFAULT\_BEDROCK\_DEPTH}); \cmd{METRES} as for \cmd{:LandSurface}\\
 \cmd{:GridCellSize m} & cell size (1000 m)\\
 \cmd{:MinCellCoverage f} & fraction of a cell that coupled HRUs must cover (0.25)\\
 \cmd{:GridType REGULAR|QUADTREE|HRU\_MESH|FILE} & kind of grid (\cmd{REGULAR}); Section~\ref{sec:gridtypes}\\
@@ -243,8 +243,8 @@ Column & Value\\\midrule
 \cmd{time [d]}, \cmd{date} & 3910, 1996-06-15\\
 \cmd{Raven recharge [m3/d]} & 21\,365\,037.27\\
 \cmd{MF6 recharge [m3/d]} & 21\,365\,037.27\\
-\cmd{seepage to Raven [m3/d]} & 19\,087\,056.98\\
-\cmd{storage release [m3/d]} & $-3\,925\,200.44$\\\bottomrule
+\cmd{seepage to Raven [m3/d]} & 19\,087\,047.44\\
+\cmd{storage release [m3/d]} & $-3\,925\,211.50$\\\bottomrule
 \end{tabular}
 \end{center}
 Recharge leaving Raven equals recharge entering MODFLOW; on this wet June day the aquifer stores about 3.9 million m$^3$.

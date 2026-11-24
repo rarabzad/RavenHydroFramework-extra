@@ -68,6 +68,10 @@ Of the profile parameters, \cmd{SEEPAGE\_LEAKANCE}, \cmd{SEEPAGE\_SMOOTHING\_DEP
 recharge must reach the \cmd{GROUNDWATER} store, exactly as when Raven builds the model (Chapter~\ref{uch:build}).
 
 \section{Telling Raven where the model is}
+Figure~\ref{fig:uplacing} shows an example.
+\begin{figure}[!htbp]\centering\includegraphics[width=0.95\linewidth]{figures/fig_placing.pdf}
+\caption{Placing a MODFLOW model on the map. (a) The cells of the synthetic Liard model as MODFLOW describes them, in the model's own rotated coordinates. (b) The same cells placed by Raven from the projection \cmd{EPSG:32610}, under the Raven HRUs.}\label{fig:uplacing}
+\end{figure}
 MODFLOW model files do not say where on Earth the model is. Give exactly one of these:
 \begin{itemize}
 \item \textbf{\cmd{:MF6CRS} (recommended)}: the model's map projection, usually as an EPSG code (\cmd{EPSG:32610} is UTM

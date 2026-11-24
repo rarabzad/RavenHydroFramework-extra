@@ -115,15 +115,7 @@ results as one that computed it.
 
 \section{From one HRU to its cells: a complete example}
 \begin{figure}[!htbp]\centering
-\begin{tikzpicture}[x=1.2cm,y=1.2cm]
-\foreach \x in {0,1,2,3} \draw[gray] (\x,0) -- (\x,2);
-\foreach \y in {0,1,2} \draw[gray] (0,\y) -- (3,\y);
-\fill[teal!30,opacity=0.8] (0.3,0.2) -- (2.6,0.4) -- (2.8,1.6) -- (1.2,1.85) -- (0.2,1.2) -- cycle;
-\draw[teal!60!black,thick] (0.3,0.2) -- (2.6,0.4) -- (2.8,1.6) -- (1.2,1.85) -- (0.2,1.2) -- cycle;
-\node[font=\scriptsize] at (0.5,2.18) {cell 1}; \node[font=\scriptsize] at (1.5,2.18) {cell 2}; \node[font=\scriptsize] at (2.5,2.18) {cell 3};
-\node[font=\scriptsize] at (0.5,-0.18) {cell 4}; \node[font=\scriptsize] at (1.5,-0.18) {cell 5}; \node[font=\scriptsize] at (2.5,-0.18) {cell 6};
-\node[font=\small,teal!40!black] at (1.5,1.0) {HRU $k$};
-\end{tikzpicture}
+\input{figures/tikz_hrucells}
 \caption{An HRU polygon over six grid cells. Clipping gives its area in each cell.}\label{fig:hrucells}
 \end{figure}
 \begin{example}[: an HRU through the whole chain]
@@ -432,7 +424,8 @@ compared with a file's \cmd{"crs"} member and is accepted). The equal-area proje
 (Section~\ref{ch:grid}) is not changed by \cmd{:InputCRS}: the same HRU polygons given in longitude/latitude or in UTM give
 the same grid and the same overlaps (within $10^{-9}$ of a cell area in the Liard test, Chapter~\ref{ch:verification}).
 \subsection{Choosing the cell size}
-The number of active columns is roughly the coupled area divided by $\Delta^2$: for the Liard example's 13\,000 km$^2$,
+The number of active columns is roughly the coupled area divided by $\Delta^2$: for the Liard example, whose 3\,252 active 2~km columns cover about 13\,000 km$^2$ (the area of the grid's
+active cells, a little less than the 13\,600 km$^2$ of its coupled HRUs, which the cells cover only in part along the edges),
 $\Delta=2$ km gives about 3\,300 columns, $\Delta=1$ km about 13\,000, $\Delta=500$ m about 52\,000. Run time grows roughly in
 proportion. Choose $\Delta$ so that the narrowest valleys and the spacing of wells and monitoring wells span at least two or
 three cells. The water balance is exact for any cell size (verified for 1, 2 and 4 km, Chapter~\ref{ch:verification}).
@@ -624,25 +617,7 @@ a pass-through cell.
 \end{example}
 
 \begin{figure}[!htbp]\centering
-\begin{tikzpicture}[x=1.25cm,y=1.0cm,lab/.style={font=\scriptsize,align=center,inner sep=2pt}]
-\fill[orange!25] (0,4.3) .. controls (2,4.6) and (4,4.0) .. (6,4.4) -- (6,3.2) .. controls (4,2.9) and (2,3.5) .. (0,3.2) -- cycle;
-\fill[gray!35] (0,3.2) .. controls (2,3.5) and (4,2.9) .. (6,3.2) -- (6,2.1) .. controls (4,1.8) and (2,2.4) .. (0,2.1) -- cycle;
-\fill[yellow!30] (0,2.1) .. controls (2,2.4) and (4,1.8) .. (6,2.1) -- (6,0.9) .. controls (4,0.7) and (2,1.2) .. (0,0.6) -- cycle;
-\fill[black!12] (0,0.6) .. controls (2,1.2) and (4,0.7) .. (6,0.9) -- (6,0) -- (0,0) -- cycle;
-\fill[green!15] (6,4.4) .. controls (7,4.5) and (8,4.2) .. (9,4.3) -- (9,3.3) .. controls (8,3.2) and (7,3.6) .. (6,3.4) -- cycle;
-\fill[black!12] (6,0) -- (6,3.4) .. controls (7,3.6) and (8,3.2) .. (9,3.3) -- (9,0) -- cycle;
-\draw[thick,brown!60!black] (0,4.3) .. controls (2,4.6) and (4,4.0) .. (6,4.4) .. controls (7,4.5) and (8,4.2) .. (9,4.3);
-\foreach \x in {0,1,...,9} \draw[gray!60,very thin] (\x,0) -- (\x,4.8);
-\node[lab,fill=white,inner sep=1pt] at (4.5,5.05) {land surface = model top};
-\node[lab,fill=orange!25] at (2.6,3.8) {GRAVEL -- \cmd{AQUIFER}};
-\node[lab,fill=gray!35] at (2.6,2.7) {CLAY\_TILL -- \cmd{AQUITARD}};
-\node[lab,fill=yellow!30] at (2.6,1.45) {SAND -- \cmd{CONFINED\_AQUIFER}\\ (\cmd{TO\_BEDROCK})};
-\node[lab,fill=black!12] at (3.0,0.3) {bedrock};
-\node[lab,fill=green!15] at (7.5,3.85) {UPLAND\_TILL -- \cmd{AQUIFER}};
-\node[lab,fill=black!12] at (7.5,1.9) {layers 2--3 here:\\ pass-through cells};
-\node[lab,anchor=north] at (3,-0.05) {\cmd{VALLEY\_ALLUVIUM} profile};
-\node[lab,anchor=north] at (7.5,-0.05) {\cmd{UPLAND\_TILL} profile};
-\end{tikzpicture}
+\input{figures/tikz_layers}
 \caption{Layers are stacked from the model top and clipped at bedrock; the one-layer upland profile is padded with
 pass-through cells.}\label{fig:layers}
 \end{figure}

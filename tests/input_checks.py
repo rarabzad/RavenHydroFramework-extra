@@ -163,13 +163,15 @@ One MODFLOW model, files outside the simulation folder, later starts and restart
       in an OPEN/CLOSE file of the OC OPTIONS block, outside the folder (../shared/oc_opts.txt) and inside it: the same,
       and the user's OPEN/CLOSE file unchanged; E41d a TS6 file that does not exist, Raven 32 days late: stops, naming it;
   E42 a GWT model beside the flow model stops with Raven's transport message; E42b a CHF model joined to it by an exchange
-      stops with the one-model message;
+      stops with the one-model message; E42c an OLF model beside it with no EXCHANGES rows stops with the one-model message,
+      whose reason names no exchange;
   E43 :MF6StartDate 1985-10-01T12:00:00 with Raven starting at 00:00 that day stops (before the model's time zero), E43b
       1985-09-30 12:00:00 with daily steps stops (Raven's start not on a time step of the period), E43c 1985-10-01junk
       stops, E43d 1985-10-01 00:00:00 runs as 1985-10-01;
   E44 :MF6GridFile, E44b :SoilZone CONCEPTUAL, E44c :MF6Model and E44d :ReservoirExchange with a surplus value stop,
       naming it; E44e :MF6StartDate with a # glued to the date stops, saying that the # is part of the value and that a
-      comment starts at a # after a blank.
+      comment starts at a # after a blank; E44f :MF6StartDate 1985-10-01# comment (three tokens, which the command takes)
+      stops as not a date, with the same hint.
 A model across the antimeridian:
   AM1 two HRUs whose shared edge lies on longitude 180 (the .rvh and GeoJSON longitudes within +-180, a DEM in
      longitude/latitude across 180, a specified head on the downslope edge, 3 days): the same active cells and the same
@@ -1122,6 +1124,15 @@ report('E42b a CHF model joined to the flow model by an exchange stops with the 
        and 'holds 2 models (gwf_liard (GWF6), chf1 (CHF6)) and 1 exchange (chf6-gwf6 chf.exg); Raven couples one MODFLOW 6 groundwater-flow model' in ln
        and 'transport' not in out, (ln or out.strip().split('\n')[-1])[:150])
 shutil.rmtree(d, ignore_errors=True)
+# a second model with no EXCHANGES rows: the one-model message, with a reason that names no exchange (E42c)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e42c'))
+edit(d, 'model/mfsim.nam', '  gwf6  gwf_liard.nam  gwf_liard\n', '  gwf6  gwf_liard.nam  gwf_liard\n  olf6  olf.nam  olf1\n')
+ok, out = run(d, 1); ln = (re.findall(r'.*holds 2 models.*', out) or [''])[0].strip()
+report('E42c an OLF model beside the flow model, with no exchange, stops with the one-model message, whose reason names no exchange', not ok
+       and 'holds 2 models (gwf_liard (GWF6), olf1 (OLF6)); Raven couples one MODFLOW 6 groundwater-flow model' in ln
+       and "the water of any other model would be outside Raven's balance" in ln and 'exchange would' not in ln and 'transport' not in out,
+       (ln or out.strip().split('\n')[-1])[:150])
+shutil.rmtree(d, ignore_errors=True)
 # ---- :MF6StartDate with a time of day: read, or stopped when malformed
 for lab, val, want in (('E43 :MF6StartDate 1985-10-01T12:00:00, Raven starting at 00:00 that day: stops (before the model\'s time zero)', '1985-10-01T12:00:00', 'is before the model\'s time zero'),
                        ('E43b :MF6StartDate 1985-09-30 12:00:00, Raven half a day later: stops (not on a Raven time step)', '1985-09-30 12:00:00', 'does not fall on a Raven time step'),
@@ -1146,6 +1157,13 @@ d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e44e')); edit(d, 'Liard.rvg', ':M
 ok, out = run(d, 1); ln = (re.findall(r'.*surplus value.*', out) or [''])[0].strip()
 report('E44e :MF6StartDate 1985-10-01# the model\'s time zero stops, saying that a # glued to a value is part of it', not ok
        and "surplus value 'model's'" in ln and "a # glued to a value is part of it, as in '1985-10-01#': write a blank before # to start a comment" in ln, ln[:150])
+shutil.rmtree(d, ignore_errors=True)
+# the same with one word after the glued # (three tokens, which the command takes): the date stop gives the same hint (E44f)
+d = tc.copy_case(tc.EXISTING, os.path.join(W, 'e44f')); edit(d, 'Liard.rvg', ':MF6StartDate      1985-10-01', ':MF6StartDate      1985-10-01# comment')
+ok, out = run(d, 1); ln = (re.findall(r'.*is not a date.*', out) or [''])[0].strip()
+report('E44f :MF6StartDate 1985-10-01# comment stops as not a date, saying that a # glued to a value is part of it', not ok
+       and ':MF6StartDate 1985-10-01# comment is not a date yyyy-mm-dd' in ln
+       and "a # glued to a value is part of it, as in '1985-10-01#': write a blank before # to start a comment" in ln, ln[:150])
 shutil.rmtree(d, ignore_errors=True)
 # ---- a model across the antimeridian: the same model as at longitude 0
 sys.path.insert(0, os.path.join(HERE, 'soilzone'))

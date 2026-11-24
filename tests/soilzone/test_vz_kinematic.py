@@ -28,11 +28,15 @@ K10 the room left in the top cell: one flat HRU of 200 x 200 m, aquifer SPEC_YIE
     Kv 0.1 m/d, the water table 1.6 m deep (0.6 m below the soil-zone base, the top cell's top), 90 mm/d for 4 days from a
     steady column (:SoilZoneVadoseInitialFlux 90): in step 2 the rise meets more mobile water than the room the top cell
     has left (1,208 m3 against Sy dh 3,592 m3), so the column is held back by that room, with the warning that names it
-    ("than the room left in the top cell above the water table"); all identities.
+    ("than the room left in the top cell above the water table"); the release of step 2, measured as the step's
+    "unsaturated zone to aquifer [m3]" less its "unsaturated zone inflow [m3]" (the drop of the column's storage; the
+    rest of what reaches the aquifer is the column's ordinary drainage of the step), is the room to 0.5 % (1,205 m3) and
+    below Sy dh (a column releasing its whole excess drops 3,543 m3); all identities.
 K11 a column across two aquifer classes (SAND, SPEC_YIELD 0.25, over SILT, 0.05, the boundary 1 m below the 99 m base; the
     water table 2.4 m deep, 90 mm/d): a node straddling the boundary carries the sand's mobile water below it, so the
     release meets Sy dh (4,225 m3) before the room (6,575 m3), and the warning names Sy dh ("than MODFLOW stores for the
-    rise (Sy dh)", with the note on aquifer classes), not the room; all identities.
+    rise (Sy dh)", with the note on aquifer classes), not the room; the release of step 2, measured as in K10, is Sy dh to
+    0.5 % (4,225 m3) and below the room (a column releasing its whole excess drops 4,352 m3); all identities.
 K12 a vanishing column (one flat HRU, SPEC_YIELD 0.2, the water table 1.45 m deep, 90 mm/d then none): the water table rises
     to within 5 cm of the column's base in step 1, so in step 2 the column vanishes and releases at most the room the top
     cell has left (0.2 x 0.0007 m x 40,000 m2 = 5.6 m3; Sy dh would be 3,600 m3, more than the column holds); the rest of
@@ -294,6 +298,16 @@ def k9():
         ok &= caught and n >= 5
     return ok
 
+def release2(d, want, other, lab):
+    """the release of step 2: "unsaturated zone to aquifer" less "unsaturated zone inflow" (the drop of the column's storage,
+    sz_check's column identity), against the limit that binds (want, to 0.5 %) and the one that does not (other) [m3]"""
+    b = budget(d)
+    rel = b['unsaturated zone to aquifer [m3]'][1] - b['unsaturated zone inflow [m3]'][1]
+    good = abs(rel - want) <= 0.005 * want and rel < other
+    print('  step 2 released %.1f m3 (to aquifer %.1f less inflow %.1f): %s %.0f m3 to 0.5 %%, below %.0f m3 -> %s'
+          % (rel, b['unsaturated zone to aquifer [m3]'][1], b['unsaturated zone inflow [m3]'][1], lab, want, other, 'ok' if good else 'FAIL'))
+    return good
+
 def k10():
     print('K10 a water table rising fast into a nearly full top cell: KINEMATIC held back by the room left in it, with a warning')
     q = 90.0
@@ -304,7 +318,7 @@ def k10():
     e = open(os.path.join(d, 'out', 'Raven_errors.txt'), errors='replace').read()
     warned = 'than the room left in the top cell above the water table' in e
     print('  room-limit warning: %s' % ('written (ok)' if warned else 'MISSING: FAIL'))
-    return warned
+    return release2(d, 1208.0, 3592.0, 'the room') and warned
 
 def k11():
     print('K11 a column across two aquifer classes: the release meets Sy dh before the room, and the warning names Sy dh')
@@ -322,7 +336,7 @@ def k11():
     w = [l for l in e.split('\n') if 'a rising water table met more' in l]
     good = len(w) == 1 and 'than MODFLOW stores for the rise (Sy dh)' in w[0] and 'crosses aquifer classes' in w[0] and 'room left in the top cell' not in w[0]
     print('  warning: %s -> %s' % (w[0][:300] if w else 'none', 'ok' if good else 'FAIL'))
-    return good
+    return release2(d, 4225.0, 6575.0, 'Sy dh') and good
 
 def k12():
     print('K12 a vanishing column: released at most the room, the rest back to the soil zone as rejected recharge')

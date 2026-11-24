@@ -47,6 +47,16 @@ profile of its dominant HRU) are then laid down from the top, each with its thic
 marked \cmd{TO\_BEDROCK} reaches bedrock. Where bedrock cuts a layer off completely, that layer becomes a very thin
 \emph{pass-through} cell, so water passes straight from the layer above to the layer below. A column whose bedrock lies
 less than 0.5~m below its top is inactive.
+Figure~\ref{fig:ulayers} shows both cases. With layers of different materials, each layer has its own head: under a
+clay layer the head of the gravel can stand higher than the water table of the sand above it (Figure~\ref{fig:upotsurf}).
+\begin{figure}[!htbp]\centering
+\input{figures/tikz_layers}
+\caption{How the layers are laid down. Each layer starts where the one above ends, from the model top down, and stops at bedrock. A profile with fewer layers than the grid (here the one-layer upland profile) gets thin pass-through cells below, which let water go straight through.}\label{fig:ulayers}
+\end{figure}
+\begin{figure}[!htbp]\centering
+\input{figures/tikz_potsurf}
+\caption{Two heads in one place. The upper sand has a water table; the gravel under the clay is confined and its head is higher, so water seeps up through the clay.}\label{fig:upotsurf}
+\end{figure}
 
 \begin{example}[: one column]
 Land surface 600~m, bedrock 555~m, profile \cmd{VALLEY\_ALLUVIUM} = gravel 15~m, clay till 5~m, sand \cmd{TO\_BEDROCK}.
@@ -63,6 +73,11 @@ may connect to a clay layer. Or use \cmd{:LayerConnection ELEVATION}, which conn
 
 \section{Maps}\label{sec:umaps}
 \subsection{HRU polygons}
+\begin{figure}[!htbp]\centering
+\input{figures/tikz_hrucells}
+\caption{An HRU drawn over six grid cells. Raven cuts the HRU's shape along the cell edges, so it knows how much of the HRU lies in each cell; that share decides how much of the HRU's water goes to each cell.}\label{fig:uhrucells}
+\end{figure}
+Raven overlays the HRU shapes on the grid (Figure~\ref{fig:uhrucells}).
 The HRU polygons are required (\cmd{:HRUGeometry file ID\_field}). Raven's HRUs usually come from a GIS overlay (for
 example BasinMaker): subbasins intersected with land-use, soil and terrain classes. Export that polygon layer as a GeoJSON
 file, keeping the HRU ID used in the \cmd{.rvh}:
@@ -150,7 +165,8 @@ one or two profiles and typical values (Section~\ref{ch:ownmodel}); refine only 
 \section{The grid}\label{sec:ugrids}
 \subsection{Cell size and coverage}
 \cmd{:GridCellSize} sets the cell size $\Delta$ (default 1000~m). The number of active columns is roughly the coupled area
-divided by $\Delta^2$: for the Liard example's 13\,000 km$^2$, $\Delta=2$ km gives about 3\,300 columns, $\Delta=1$ km
+divided by $\Delta^2$: for the Liard example, whose 3\,252 active 2~km columns cover about 13\,000 km$^2$ (the area of the grid's
+active cells, a little less than the 13\,600 km$^2$ of its coupled HRUs, which the cells cover only in part along the edges), $\Delta=2$ km gives about 3\,300 columns, $\Delta=1$ km
 about 13\,000, $\Delta=500$ m about 52\,000. Run time grows roughly in proportion. Choose $\Delta$ so that the narrowest
 valleys and the spacing of wells and monitoring wells span at least two or three cells. The water balance is exact for
 any cell size.

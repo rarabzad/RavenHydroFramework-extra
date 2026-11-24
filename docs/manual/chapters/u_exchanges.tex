@@ -22,6 +22,10 @@ exchange, through Raven's reservoir seepage law.}\label{fig:uexch}
 \end{figure}
 
 \section{Recharge}\label{sec:urecharge}
+Figure~\ref{fig:ulinking} shows how an HRU's water is shared among the cells under it.
+\begin{figure}[!htbp]\centering\input{figures/tikz_linking}
+\caption{Sharing an HRU's water among cells. (a) Raven computes the HRU's share in each cell from the shapes, and the shares add up to 100\%. (b) If the shares added up to only 92\%, 8\% of the water would be lost; because Raven's shares always add up to 100\%, every cubic metre arrives.}\label{fig:ulinking}
+\end{figure}
 Recharge is whatever Raven's processes put into the \cmd{GROUNDWATER} store of a coupled HRU during a step. Its volume is
 that depth of water times the HRU's area in the \cmd{.rvh} file. Raven spreads it over the cells under the HRU, in
 proportion to how much of the HRU lies in each cell, and hands it to MODFLOW the same step. Recharge that falls on
@@ -36,6 +40,10 @@ before it reaches MODFLOW. Each day the store releases the share $1-e^{-1/\tau}$
 (\cmd{:SoilZoneVadose LAG}) instead.
 
 \section{Seepage back to Raven}\label{sec:useepage}
+Figure~\ref{fig:ucurves} shows how four of the exchanges respond: a delayed recharge, the seepage near the land surface, a river, and evaporation from the water table.
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_curves.png}
+\caption{How four exchanges respond. (a) Recharge held in a delay reservoir reaches the aquifer gradually after a pulse of 1\,000~m$^3$. (b) Seepage starts as the water table nears the model top. (c) A river gains water when the aquifer head is above its stage and loses it when the head is below, at a limited rate once the water table drops below the river bed. (d) Evaporation from the water table is largest at the surface and stops at the extinction depth.}\label{fig:ucurves}
+\end{figure}
 Where the water table reaches the model top, groundwater flows out through a drain at the top of each cell. The drain
 starts to flow \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (default 0.5~m) below the top, and its strength is
 \cmd{SEEPAGE\_LEAKANCE} (default 1/d) times the cell area. It is a strong outlet, so wherever the aquifer is full the water
@@ -46,6 +54,11 @@ The seepage of a cell is returned to the HRUs above it, in proportion to their o
 processes then carry it on, for example as baseflow to the river.
 
 \section{Rivers}\label{sec:urivers}
+Figure~\ref{fig:uriver} shows a river cell.
+\begin{figure}[!htbp]\centering
+\input{figures/tikz_river}
+\caption{A river cell. The river's stage is its bed plus the channel depth Raven computes. While the water table is above the bed, water flows toward the lower of the two levels; once the water table drops below the bed, the river loses water at a rate that no longer grows as the water table falls.}\label{fig:uriver}
+\end{figure}
 Rivers exchange water with the aquifer in both directions. A \emph{gaining} river receives groundwater; a \emph{losing}
 river leaks into the aquifer. Raven places a river cell (MODFLOW's RIV package) in every cell crossed by a river line of
 \cmd{:RiverGeometry}. The exchange of a river cell is
@@ -162,6 +175,10 @@ Option & Use it when\\\midrule
 \end{table}
 
 \subsection{A water table in the soil, on sloping and irregular land}\label{sec:applysz}
+On irregular land the water table meets the soil in some parts of a cell and not in others (Figure~\ref{fig:uszsubgrid}).
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_subgrid.png}
+\caption{One 100~m cell with irregular land. Raven samples the land inside each cell at many points (circles). (a) to (d): four positions of the water table and of the water in the soil; the arrows show how much of the exchange between soil and aquifer each point carries, and only the part of the cell where the water table reaches the soil (the saturated fraction) is wet. Bottom: that fraction against the water table.}\label{fig:uszsubgrid}
+\end{figure}
 Figure~\ref{fig:uszregimes} shows every position the water table can take, and what carries the water in each.
 \begin{figure}[!htbp]\centering\input{figures/tikz_sz_regimes}
 \caption{Where the water table can be and what moves the water in each case. (a) Deep: recharge crosses an unsaturated
@@ -245,6 +262,19 @@ its peak 45\% lower, centred on day~15.6. With \cmd{LAG 2} the centre is on day~
 Nothing is lost in any of them.
 \end{example}
 
+Figures~\ref{fig:uvzkinematic} and \ref{fig:uvzlag} show how \cmd{KINEMATIC} and \cmd{LAG} delay and spread the
+recharge, and Figure~\ref{fig:uvzclasses} how \cmd{:SoilZoneVadoseClasses} groups the low and high parts of a cell.
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\textwidth]{figures/fig_vz_kinematic.png}
+\caption{\cmd{KINEMATIC}. (a) How the ground's conductivity grows as it gets wetter, compared with the curve \cmd{RICHARDS} uses. (b) Rain of 10~mm/d for 117 days over a water table 6~m down: the water reaching the water table, against the exact solution. (c) A 3-day storm over a deep water table: the recharge arrives later and spread out.}\label{fig:uvzkinematic}
+\end{figure}
+\begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_vz_lag_cascade.png}
+\caption{\cmd{LAG}. Left: water entering the top of a column comes out at the bottom spread over time; more nodes give a sharper peak. Right: the recharge from a 3-day storm reaching a water table 6~m down, without a column, with \cmd{RICHARDS} and with \cmd{LAG}.}\label{fig:uvzlag}
+\end{figure}
+\begin{figure}[!htbp]\centering
+\includegraphics[width=\linewidth]{figures/fig_vz_classes.png}
+\caption{Depth classes. (a) The 25 sample points of a hummocky cell, sorted by depth and grouped into 3 classes (colours) or 5; each class gets its own column. (b) The water entering and leaving the class columns in a test, summed over time.}\label{fig:uvzclasses}
+\end{figure}
 \paragraph{Capillary rise.} When the water table is shallow, dry soil also pulls water up from it, so plants and
 evaporation keep drawing on groundwater after the rain stops. \cmd{:SoilZoneCapillaryRise} is \cmd{ON} by default with
 \cmd{RICHARDS}, \cmd{KINEMATIC} and \cmd{LAG}, and \cmd{OFF} with \cmd{NONE}. It is computed from the soil's own retention

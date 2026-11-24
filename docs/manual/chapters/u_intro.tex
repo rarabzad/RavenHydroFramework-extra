@@ -169,6 +169,11 @@ time step.}\label{fig:arch}
 \subsection{One day of the coupled model}
 This happens every time step (one day in the examples). Reference, Section~\ref{R-ch:timestep}, gives the exact
 algorithm.
+Figure~\ref{fig:utimeline} shows the order.
+\begin{figure}[!htbp]\centering
+\input{figures/tikz_timeline}
+\caption{The order of work in one time step: Raven's processes in the HRUs; the recharge and other stresses handed to MODFLOW; MODFLOW's solve; the seepage, store and river exchanges handed back to Raven; then Raven's routing and its balance.}\label{fig:utimeline}
+\end{figure}
 \begin{enumerate}
 \item \textbf{Raven's land-surface day.} Raven calculates snowmelt, infiltration, evaporation and flow between its soil
 layers. In coupled HRUs, water that percolates past the soil ends up in \cmd{GROUNDWATER}.
