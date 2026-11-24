@@ -2118,10 +2118,10 @@ Paths are given from the workshop folder (Workshop_1_Getting_Started/).
 
 ## Differences from the Standard Version of Raven
 As the Artistic License 2.0 asks for modified versions, the differences of `bin/Raven` from Raven 4.15 (v593) are
-documented file by file in the manual of the coupling (chapter "Developer guide and limitations", "Changes to existing
-Raven files", in https://github.com/rarabzad/RavenHydroFramework-extra) and in full in the branch `mf6-coupling` of
-https://github.com/rarabzad/RavenHydroFramework. The modifications are offered to the Raven Development Team for
-inclusion in Raven under the Artistic License 2.0.
+documented file by file in the manual of the coupling (Volume 2, Reference: chapter "Developer guide and limitations",
+"Changes to existing Raven files", in https://github.com/rarabzad/RavenHydroFramework-extra) and in full in the branch
+`mf6-coupling` of https://github.com/rarabzad/RavenHydroFramework. The modifications are offered to the Raven
+Development Team for inclusion in Raven under the Artistic License 2.0.
 
 ## Third-party names
 Raven and MODFLOW are the names of their respective projects; their use here describes compatibility only.

@@ -15,7 +15,7 @@
 :GridCellSize       2000.0     # m
 :MinCellCoverage    0.25       # fraction of a cell covered by coupled HRUs to activate it
 
-# --- grid options (uncomment to try; see the manual, "Grid types") ---
+# --- grid options (uncomment to try; see the User Manual, Volume 1 of the manual, "Grid types") ---
 # :GridType QUADTREE                  # REGULAR (default) | QUADTREE | HRU_MESH | FILE
 # :GridRefinement RIVERS 500          # finer cells along the rivers [m]
 # :GridRefinement WELLS 250           # finer cells around wells and monitoring wells [m]
