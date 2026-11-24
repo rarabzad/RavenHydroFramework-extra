@@ -9,5 +9,5 @@ only observations. Other metrics or other observations move them: check the line
 your own Diagnostics.csv before running.
 
 Not run with the Ostrich executable here. The same search (identical templates, objective and bounds) was run with a
-Python DDS driver on the synthetic subbasin-52 test; the results are in the manual, chapter "Applying the coupling",
+Python DDS driver on the synthetic subbasin-52 test; the results are in the User Manual (Volume 1), chapter "Restarts, ensembles and calibration",
 section "A synthetic test".
