@@ -3,7 +3,8 @@
 Raven, the semi-distributed hydrological modelling framework, with groundwater from MODFLOW 6. Raven either builds a
 MODFLOW 6 model from its HRUs (`:GroundwaterModel MODFLOW6`) or couples an existing one (`:MF6Simulation`), and the two
 exchange recharge, seepage, river leakage, water-table evapotranspiration, wells, boundaries and reservoir seepage every
-time step. With `:SoilZone PHYSICAL` the water table rises into Raven's soil layers. The manual describes every option.
+time step. With `:SoilZone PHYSICAL` the water table rises into Raven's soil layers. The manual, in two volumes, describes
+every option.
 
 ## Contents
 
@@ -14,7 +15,8 @@ time step. With `:SoilZone PHYSICAL` the water table rises into Raven's soil lay
 | `bin/RavenMF6InstallCheck.py` | the install check (below) |
 | `bin/VERSIONS.txt` | versions, source commit and SHA-256 sums of the two programs |
 | `bin/LICENSE-Raven.txt`, `bin/NOTICE-MODFLOW6.txt` | the licences of the two programs |
-| `Raven_MF6_Manual.pdf` | the manual: building and coupling models, the exchanges, the soil zone, outputs, reference tables, verification, limitations and known issues |
+| `Raven_MF6_User_Manual.pdf` | the manual, Volume 1 (User Manual): what the coupling does, a quick start with the examples, building and coupling models, the exchanges and the soil zone in plain terms, outputs and the water balance, restarts and calibration, troubleshooting, a command summary |
+| `Raven_MF6_Reference.pdf` | the manual, Volume 2 (Reference and Verification): every rule and equation, the command, output and message tables, verification, the developer guide, limitations and known issues |
 | `examples/` | two Liard River models: `Liard_groundwater` (Raven builds the MODFLOW 6 model) and `Liard_existing_model` (Raven couples an existing MODFLOW 6 model); `examples/README.md` walks through both |
 | `workshops/` | six self-contained student workshops, one zip each (a PDF, the model files, scripts and the programs) |
 | `source/` | the source code of both repositories as archives, and their complete git history as bundles |
@@ -75,7 +77,7 @@ The build also provides the MODFLOW 6 library, chosen with `-DRAVEN_MF6=`: `SOUR
 needs a Fortran compiler, meson, ninja and git), `PREBUILT` (the official release, checked by its SHA-256), `PATH`
 (`-DRAVEN_MF6_PATH=/path/libmf6.so`) or `OFF` (Raven without the library). Without the option, `SOURCE` is taken when
 its tools and the network are there, otherwise `PREBUILT`. The minimum MODFLOW 6 version is 6.5.0; 6.8.1 is the tested version. The manual's
-chapter "Developer guide and limitations", section "Building", has the details, also for Windows and macOS.
+Volume 2, chapter "Developer guide and limitations", section "Building", has the details, also for Windows and macOS.
 
 ## Tests
 
@@ -96,8 +98,8 @@ From the package folder (offline; the same checkouts as cloning https://github.c
 
 ## Known issues
 
-The manual lists the limitations of the coupling and the known issues of Raven itself (chapter "Developer guide and
-limitations", section "Limitations and known issues"); the user guide (`docs/Raven_MF6_Groundwater_UserGuide.md` in
+The manual lists the limitations of the coupling and the known issues of Raven itself (Volume 2, chapter "Developer guide
+and limitations", section "Limitations and known issues"); the user guide (`docs/Raven_MF6_Groundwater_UserGuide.md` in
 `raven_extra_docs_tests.tar.gz`) has the same list in its section 9.
 
 ## Licences
@@ -112,8 +114,8 @@ limitations", section "Limitations and known issues"); the user guide (`docs/Rav
 | Synthetic MODFLOW 6 model (`examples/Liard_existing_model/model/`) | Rezgar Arabzadeh | Artistic License 2.0 |
 
 `NOTICE.md` in `raven_extra_docs_tests.tar.gz` gives the details. As the Artistic License 2.0 asks for modified
-versions, the differences of `bin/Raven` from Raven 4.15 (v593) are documented file by file in the manual (chapter
-"Developer guide and limitations", "Changes to existing Raven files") and in full in the branch `mf6-coupling` of
+versions, the differences of `bin/Raven` from Raven 4.15 (v593) are documented file by file in the manual (Volume 2,
+chapter "Developer guide and limitations", "Changes to existing Raven files") and in full in the branch `mf6-coupling` of
 RavenHydroFramework. The modifications are offered to the Raven Development Team for inclusion in Raven under the
 Artistic License 2.0. Raven and MODFLOW are the names of their projects; they are used here to describe compatibility
 only.

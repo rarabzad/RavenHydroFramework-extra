@@ -1,0 +1,69 @@
+\documentclass[11pt,a4paper]{report}
+\newcommand{\volumetitle}{Reference}
+\input{preamble}
+\externaldocument[U-]{user_manual}[Raven_MF6_User_Manual.pdf]   % Volume 1: \ref{U-label}
+\begin{document}
+\pagenumbering{Alph}
+\begin{titlepage}
+\centering
+\vspace*{3.5cm}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{16pt}
+{\sffamily\bfseries\fontsize{30}{38}\selectfont\color{brand}Raven--MODFLOW~6\\[4pt]Groundwater Coupling\par}
+\vspace{10pt}
+{\sffamily\bfseries\LARGE\color{brand}Volume 2: Reference and Verification\par}
+\vspace{14pt}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{24pt}
+{\large Manual chapter for the Raven Hydrological Modelling Framework\\[2pt](based on Raven 4.15)\par}
+\vfill
+{\sffamily\Large\bfseries Rezgar Arabzadeh\par}
+\vspace{4pt}
+{\large Principal Scientist, Hazen and Sawyer\par}
+\vspace{2cm}
+{\large November 2026\par}
+\vspace{1.2cm}
+{\footnotesize\color{gray!70!black}\copyright\ 2026 Rezgar Arabzadeh. This manual is licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0), \url{https://creativecommons.org/licenses/by/4.0/}.\par}
+\end{titlepage}
+\pagenumbering{roman}
+\begingroup\small\tableofcontents\endgroup
+\cleardoublepage
+\chapter*{About this volume}\addcontentsline{toc}{chapter}{About this volume}\markboth{About this volume}{}
+The manual of the Raven--MODFLOW~6 coupling has two volumes. Volume~1, the \emph{User Manual}
+(\cmd{Raven\_MF6\_User\_Manual.pdf}), is written for modellers who are new to the coupling: what it does, which option to
+use, what to write in the input files, and how to read the results. This volume, \emph{Reference and Verification}
+(\cmd{Raven\_MF6\_Reference.pdf}), holds the detail behind it: every rule, equation and safeguard, the full command and
+message tables, the tests, and the developer guide.
+
+It is meant for looking things up. Each chapter starts with a short note on what it covers and where the User Manual
+treats the same subject in plain terms. References of the form ``User Manual, Chapter~2'' point to Volume~1.
+\begin{table}[!htbp]\centering
+\caption{Where to find what in this volume.}\label{tab:refguide}
+\begin{tabularx}{\linewidth}{P{0.34\linewidth}Y}\toprule\hdr
+If you want to\dots & Read\\\midrule
+recall the groundwater ideas behind the equations & Chapter~\ref{ch:c2}\\
+know exactly how Raven builds the grid and the layers & Chapter~\ref{ch:c3}\\
+know what happens to an existing MODFLOW~6 model & Chapter~\ref{ch:existing}\\
+see the equations and safeguards of each exchange & Chapter~\ref{ch:c4}\\
+follow the water accounts, the time step and restarts & Chapter~\ref{ch:c5}\\
+look up a command or an output column & Chapter~\ref{ch:c6} and Appendix~\ref{app:tables}\\
+find a message & Sections~\ref{app:errors} and~\ref{app:warnings}\\
+see how the code was tested & Chapter~\ref{ch:c8}\\
+change the code & Chapter~\ref{ch:c9}\\\bottomrule
+\end{tabularx}
+\end{table}
+\cleardoublepage
+\pagenumbering{arabic}
+\input{chapters/concepts}
+\input{chapters/building}
+\input{chapters/existing_model}
+\input{chapters/exchanges}
+\input{chapters/accounting}
+\input{chapters/inputs_outputs}
+\input{chapters/verification}
+\input{chapters/developers}
+\appendix
+\input{chapters/appendix}
+\cleardoublepage\phantomsection\addcontentsline{toc}{chapter}{Bibliography}
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}

@@ -5,6 +5,10 @@ MODFLOW 6 groundwater-flow model from information in the usual Raven input files
 with Raven through the MODFLOW 6 shared library (`libmf6`), and exchanges water every time step.
 You never edit MODFLOW files; Raven writes them to `<output>/mf6/` so you can inspect them with FloPy or ModelMuse.
 
+The manual has two volumes (`docs/manual/`): Volume 1, the User Manual (`Raven_MF6_User_Manual.pdf`), explains the
+coupling in plain terms with the examples; Volume 2, Reference and Verification (`Raven_MF6_Reference.pdf`), holds every
+rule, equation and table. The sections of the manual named in this guide are those of Volume 2.
+
 ## 1. How it works
 
 - HRUs with a groundwater system are marked by `AQUIFER_PROFILE` in the `.rvh` file.

@@ -1,0 +1,77 @@
+\chapter{Command summary}\label{uch:commands}
+Table~\ref{tab:ucommands} lists every command of the coupling, by input file. All references are to Volume~2,
+\emph{Reference and Verification}. \emph{Explained in} gives the section (or table) that explains the command, and its
+page. \emph{Entry} gives the page of the command's full entry (syntax, default, checked range) in the command table of
+Reference, Section~\ref{R-app:commands}. Reference, Chapter~\ref{R-ch:c6}, has the same commands with the output
+files.
+\begingroup\small
+\begin{longtable}{P{0.05\linewidth}P{0.31\linewidth}P{0.29\linewidth}P{0.14\linewidth}P{0.06\linewidth}}
+\caption{The commands of the coupling, with the places in the Reference volume that explain them.}\label{tab:ucommands}\\
+\toprule\hdr File & Command & What it does & Explained in & Entry\\\midrule\endfirsthead
+\caption[]{The commands of the coupling (continued).}\\
+\toprule\hdr File & Command & What it does & Explained in & Entry\\\midrule\endhead
+\cmd{.rvi} & \cmd{:GroundwaterModel MODFLOW6} & switch the coupling on (default \cmd{NONE}) & \ref{R-ch:inputs}, p.\,\pageref{R-ch:inputs} & \pageref{R-cmd:GroundwaterModel}\\
+\cmd{.rvi} & \cmd{:rvg\_Filename file} & name of the groundwater file (default \cmd{<model>.rvg}) & \ref{R-ch:inputs}, p.\,\pageref{R-ch:inputs} & \pageref{R-cmd:rvgFilename}\\
+\cmd{.rvh} & \cmd{AQUIFER\_PROFILE} column & profile of each HRU, or \cmd{[NONE]} & \ref{R-ch:grid}, p.\,\pageref{R-ch:grid} & \pageref{R-cmd:AquiferProfileColumn}\\
+\cmd{.rvh} & \cmd{:SeepageParameters} & seepage of a reservoir (with \cmd{:ReservoirExchange}) & \ref{R-ch:reservoirs}, p.\,\pageref{R-ch:reservoirs} & \pageref{R-cmd:SeepageParameters}\\
+\cmd{.rvp} & \cmd{:AquiferClasses} & materials: conductivity, storage & \ref{R-app:class}, p.\,\pageref{R-app:class} & \pageref{R-cmd:AquiferClasses}\\
+\cmd{.rvp} & \cmd{:AquiferProfiles} & layer stacks & \ref{R-ch:layers}, p.\,\pageref{R-ch:layers} & \pageref{R-cmd:AquiferProfiles}\\
+\cmd{.rvp} & \cmd{:AquiferProfileParameters} & start depth, bedrock, seepage, riverbed, ET, delay & \ref{R-app:profile}, p.\,\pageref{R-app:profile} & \pageref{R-cmd:AquiferProfileParameters}\\
+\cmd{.rvg} & \cmd{:HRUGeometry} & HRU polygons (required) & \ref{R-ch:grid}, p.\,\pageref{R-ch:grid} & \pageref{R-cmd:HRUGeometry}\\
+\cmd{.rvg} & \cmd{:RiverGeometry} & river lines & \ref{R-ch:rivers}, p.\,\pageref{R-ch:rivers} & \pageref{R-cmd:RiverGeometry}\\
+\cmd{.rvg} & \cmd{:LandSurface} [\cmd{METRES}] & DEM & \ref{R-sec:rasters}, p.\,\pageref{R-sec:rasters} & \pageref{R-cmd:LandSurface}\\
+\cmd{.rvg} & \cmd{:BedrockSurface} [\cmd{METRES}] & bedrock elevation & \ref{R-sec:rasters}, p.\,\pageref{R-sec:rasters} & \pageref{R-cmd:BedrockSurface}\\
+\cmd{.rvg} & \cmd{:InputCRS} & projection of the input files & \ref{R-sec:inputcrs}, p.\,\pageref{R-sec:inputcrs} & \pageref{R-cmd:InputCRS}\\
+\cmd{.rvg} & \cmd{:GridCellSize} & cell size (1000 m) & \ref{R-sec:buildparams}, p.\,\pageref{R-sec:buildparams} & \pageref{R-cmd:GridCellSize}\\
+\cmd{.rvg} & \cmd{:MinCellCoverage} & coverage that activates a cell (0.25) & \ref{R-sec:buildparams}, p.\,\pageref{R-sec:buildparams} & \pageref{R-cmd:MinCellCoverage}\\
+\cmd{.rvg} & \cmd{:GridType} & \cmd{REGULAR}, \cmd{QUADTREE}, \cmd{HRU\_MESH}, \cmd{FILE} & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:GridType}\\
+\cmd{.rvg} & \cmd{:GridRotation} & rotation of the grid (degrees) & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:GridRotation}\\
+\cmd{.rvg} & \cmd{:GridRefinement} & finer cells along rivers, wells, lakes, features & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:GridRefinement}\\
+\cmd{.rvg} & \cmd{:GridFile} & imported cells (\cmd{:GridType FILE}) & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:GridFile}\\
+\cmd{.rvg} & \cmd{:QuadtreeMaxLevel} & deepest quadtree level & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:QuadtreeMaxLevel}\\
+\cmd{.rvg} & \cmd{:FlowCorrection} & XT3D (off by default) & \ref{R-sec:gridtypes}, p.\,\pageref{R-sec:gridtypes} & \pageref{R-cmd:FlowCorrection}\\
+\cmd{.rvg} & \cmd{:LayerConnection} & layers by number or by elevation & \ref{R-sec:layerconn}, p.\,\pageref{R-sec:layerconn} & \pageref{R-cmd:LayerConnection}\\
+\cmd{.rvg} & \cmd{:MF6Simulation}, \cmd{:MF6Model} & couple an existing model & \ref{R-ch:existing}, p.\,\pageref{R-ch:existing} & \pageref{R-cmd:MF6Simulation}\\
+\cmd{.rvg} & \cmd{:MF6StartDate} & date of the model's time zero & \ref{R-sec:existingtime}, p.\,\pageref{R-sec:existingtime} & \pageref{R-cmd:MF6StartDate}\\
+\cmd{.rvg} & \cmd{:MF6CRS} & projection of the existing model & \ref{R-sec:mf6crs}, p.\,\pageref{R-sec:mf6crs} & \pageref{R-cmd:MF6CRS}\\
+\cmd{.rvg} & \cmd{:MF6GridFile}, \cmd{:OverlapWeights} & other ways to link HRUs to its cells & \ref{R-sec:mf6crs}, p.\,\pageref{R-sec:mf6crs} & \pageref{R-cmd:MF6GridFile}\\
+\cmd{.rvg} & \cmd{:RavenTakesOver}, \cmd{:KeepPackages} & recharge, ET, UZF packages replaced or kept & Table~\ref{R-tab:extpkgs}, p.\,\pageref{R-tab:extpkgs} & \pageref{R-cmd:RavenTakesOver}\\
+\cmd{.rvg} & \cmd{:StreamPackage} & the model's river package to Raven's reaches & Table~\ref{R-tab:extpkgs}, p.\,\pageref{R-tab:extpkgs} & \pageref{R-cmd:StreamPackage}\\
+\cmd{.rvg} & \cmd{:SeepageToRaven} & seepage drain at the model top (\cmd{ON}) & Table~\ref{R-tab:extpkgs}, p.\,\pageref{R-tab:extpkgs} & \pageref{R-cmd:SeepageToRaven}\\
+\cmd{.rvg} & \cmd{:MF6Library} & path of the MODFLOW 6 library & \ref{R-sec:getmf6}, p.\,\pageref{R-sec:getmf6} & \pageref{R-cmd:MF6Library}\\
+\cmd{.rvg} & \cmd{:SeepageReturnTo} & Raven store that receives seepage & \ref{R-ch:seepage}, p.\,\pageref{R-ch:seepage} & \pageref{R-cmd:SeepageReturnTo}\\
+\cmd{.rvg} & \cmd{:RiverBedDepth} & riverbed depth below the DEM & \ref{R-ch:rivers}, p.\,\pageref{R-ch:rivers} & \pageref{R-cmd:RiverBedDepth}\\
+\cmd{.rvg} & \cmd{:GWInitialization} & steady-state start & \ref{R-sec:init}, p.\,\pageref{R-sec:init} & \pageref{R-cmd:GWInitialization}\\
+\cmd{.rvg} & \cmd{:SurfaceWaterExchange} & wetlands and lakes in Raven stores & \ref{R-ch:stores}, p.\,\pageref{R-ch:stores} & \pageref{R-cmd:SurfaceWaterExchange}\\
+\cmd{.rvg} & \cmd{:ReservoirExchange} & reservoirs and the aquifer & \ref{R-ch:reservoirs}, p.\,\pageref{R-ch:reservoirs} & \pageref{R-cmd:ReservoirExchange}\\
+\cmd{.rvg} & \cmd{:Wells} & pumping and injection wells & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:Wells}\\
+\cmd{.rvg} & \cmd{:ObservationWells} & monitoring wells & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:ObservationWells}\\
+\cmd{.rvg} & \cmd{:GeneralHeadBoundary} & head-dependent boundary & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:GeneralHeadBoundary}\\
+\cmd{.rvg} & \cmd{:SpecifiedHeadBoundary} & fixed-head boundary & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:SpecifiedHeadBoundary}\\
+\cmd{.rvg} & \cmd{:SolverHeadTolerance} & head tolerance (0.00001 m) & \ref{R-ch:mf6}, p.\,\pageref{R-ch:mf6} & \pageref{R-cmd:SolverHeadTolerance}\\
+\cmd{.rvg} & \cmd{:SolverMaxOuterIterations} & iteration limit (500) & \ref{R-ch:mf6}, p.\,\pageref{R-ch:mf6} & \pageref{R-cmd:SolverMaxOuterIterations}\\
+\cmd{.rvg} & \cmd{:HeadSaveFrequency} & steps between saved heads (30) & \ref{R-ch:outputs}, p.\,\pageref{R-ch:outputs} & \pageref{R-cmd:HeadSaveFrequency}\\
+\cmd{.rvg} & \cmd{:WriteNetCDFHeads} & \cmd{GWHeads.nc} & \ref{R-ch:outputs}, p.\,\pageref{R-ch:outputs} & \pageref{R-cmd:WriteNetCDFHeads}\\
+\cmd{.rvg} & \cmd{:WriteGWBudgetFile} & budget file for particle tracking & \ref{R-sec:budgetfile}, p.\,\pageref{R-sec:budgetfile} & \pageref{R-cmd:WriteGWBudgetFile}\\
+\cmd{.rvg} & \cmd{:LinkageCache} & where the linkage cache is kept & \ref{R-ch:grid}, p.\,\pageref{R-ch:grid} & \pageref{R-cmd:LinkageCache}\\
+\cmd{.rvg} & \cmd{:SoilZone} & \cmd{CONCEPTUAL} or \cmd{PHYSICAL} soil layers & \ref{R-ch:soilzone}, p.\,\pageref{R-ch:soilzone} & \pageref{R-cmd:SoilZone}\\
+\cmd{.rvg} & \cmd{:SoilZoneIteration} & interface updates and tolerances & \ref{R-sec:szinterface}, p.\,\pageref{R-sec:szinterface} & \pageref{R-cmd:SoilZoneIteration}\\
+\cmd{.rvg} & \cmd{:SoilZoneSubgrid} & DEM points per cell side (5) & \ref{R-sec:szslope}, p.\,\pageref{R-sec:szslope} & \pageref{R-cmd:SoilZoneSubgrid}\\
+\cmd{.rvg} & \cmd{:SoilZoneOutput} & HRU group of \cmd{GWSoilExchange.csv} & Table~\ref{R-tab:szcmds}, p.\,\pageref{R-tab:szcmds} & \pageref{R-cmd:SoilZoneOutput}\\
+\cmd{.rvg} & \cmd{:SoilZoneVadose} & \cmd{NONE}, \cmd{RICHARDS}, \cmd{KINEMATIC}, \cmd{LAG} & \ref{R-sec:szvadose}, p.\,\pageref{R-sec:szvadose} & \pageref{R-cmd:SoilZoneVadose}\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseClasses} & depth classes of the columns (1) & \ref{R-sec:vzclasses}, p.\,\pageref{R-sec:vzclasses} & \pageref{R-cmd:SoilZoneVadoseClasses}\\
+\cmd{.rvg} & \cmd{:SoilZoneVadoseInitialFlux} & steady start of the columns & \ref{R-sec:szvadose}, p.\,\pageref{R-sec:szvadose} & \pageref{R-cmd:SoilZoneVadoseInitialFlux}\\
+\cmd{.rvg} & \cmd{:SoilZoneCapillaryRise} & capillary rise \cmd{ON} or \cmd{OFF} & \ref{R-sec:szcaprise}, p.\,\pageref{R-sec:szcaprise} & \pageref{R-cmd:SoilZoneCapillaryRise}\\
+\cmd{.rvg} & \cmd{:SoilZoneExchangeTiming} & \cmd{LAGGED} or \cmd{AFTER} & \ref{R-sec:sztiming}, p.\,\pageref{R-sec:sztiming} & \pageref{R-cmd:SoilZoneExchangeTiming}\\
+\cmd{.rvg} & \cmd{:SoilZoneClasses} & Raven's processes per wetness class (1) & \ref{R-sec:szclasses}, p.\,\pageref{R-sec:szclasses} & \pageref{R-cmd:SoilZoneClasses}\\
+\cmd{.rvg} & \cmd{:SoilZoneAquiferClass} & existing model: soil parameters of the columns & \ref{R-sec:szexisting}, p.\,\pageref{R-sec:szexisting} & \pageref{R-cmd:SoilZoneAquiferClass}\\
+\cmd{.rvt} & \cmd{:WellFlowRate} & well rates (negative = pumping) & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:WellFlowRate}\\
+\cmd{.rvt} & \cmd{:BoundaryHead} & time-varying boundary head & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:BoundaryHead}\\
+\cmd{.rvt} & \cmd{:ObservationData GW\_HEAD} & observed heads & \ref{R-ch:wells}, p.\,\pageref{R-ch:wells} & \pageref{R-cmd:ObservationData}\\
+\cmd{.rvc} & \cmd{:InitialGWHeads} & initial heads & \ref{R-sec:init}, p.\,\pageref{R-sec:init} & \pageref{R-cmd:InitialGWHeads}\\
+\cmd{.rvc} & \cmd{:GWHeads} and other \cmd{:GW\dots} blocks & hotstart blocks written by Raven & \ref{R-sec:hotstart}, p.\,\pageref{R-sec:hotstart} & \pageref{R-cmd:Hotstart}\\\bottomrule
+\end{longtable}
+\endgroup
+Commands are case sensitive; separators may be commas or spaces, as in all Raven files. \cmd{:Transport} is not available
+with \cmd{:GroundwaterModel MODFLOW6}: the coupling exchanges water only, and a coupled run with any \cmd{:Transport}
+command stops with a message.

@@ -11,7 +11,7 @@ The commands below are for **Windows (Command Prompt)**. Linux and macOS command
 
 **With the Linux release package** (the folder made by `tools/make_package.py`, with `bin/`, `examples/` and `README.md`): Raven and the MODFLOW 6 library are ready in the package's
 `bin/`, so skip Part 1 and set `RAVEN=<package>/bin/Raven`; the example folders are the package's `examples/`, the manual
-is `Raven_MF6_Manual.pdf` beside them, and the repository files named below (the user guide in `docs/`, `tools/`) are in
+is `Raven_MF6_User_Manual.pdf` (Volume 1) and `Raven_MF6_Reference.pdf` (Volume 2) beside them, and the repository files named below (the user guide in `docs/`, `tools/`) are in
 `source/raven_extra_docs_tests.tar.gz` (it unpacks as `raven-mf6-extra/`). The package's `README.md` has the commands.
 
 ---
@@ -222,7 +222,8 @@ Expected (from a test run): recharge identity 0, `MF6 cumulative residual / gros
 limit, so its losing reaches take more than the channels hold (on 271 of the 731 days, from the first day); the part a
 channel's runoff, inflow and outflow cannot supply is carried to the next step and taken then (`river loss carried at end`
 0; Raven warns on the first ten such steps). The manual explains
-this under "Limits" in the chapter "Coupling an existing MODFLOW 6 model".
+this in Volume 1, chapter "Coupling an existing MODFLOW 6 model", and in Volume 2 under "Limits" in the chapter of the
+same name.
 
 ---
 
@@ -236,9 +237,13 @@ this under "Limits" in the chapter "Coupling an existing MODFLOW 6 model".
 | CMake warning `RAVEN_MF6: no way to get the MODFLOW 6 library ...` | No release library for this computer and no Fortran compiler, meson, ninja or git: install them (Step 1) and configure again with `-DRAVEN_MF6=SOURCE`, or give a library with `-DRAVEN_MF6=PATH -DRAVEN_MF6_PATH=...` |
 | `the MODFLOW 6 library ... is version ...; the coupling needs MODFLOW 6 6.5.0 or newer` | An old library was found first: remove `:MF6Library`/`RAVEN_MF6_LIB` naming it, and get 6.8.1 (Step 3 or 4) |
 | `ExitGracefully: ... Cannot find file` | Run from inside the example folder (Steps A1 / B1); Example B also needs `..\Liard_groundwater` |
-| Some days say `MODFLOW 6 did not converge` | They are flagged in `GWBudget.csv`; see the manual, section "How MODFLOW solves each time step" |
+| Some days say `MODFLOW 6 did not converge` | They are flagged in `GWBudget.csv`; see the manual, Volume 1, chapter "Troubleshooting", and Volume 2, section "How MODFLOW solves each time step" |
 | Anything else | `output\Raven_errors.txt` has the details |
 
-More: the user guide `docs\Raven_MF6_Groundwater_UserGuide.md` and the manual `docs\manual\main.pdf` of the repository
-(in the release package: `Raven_MF6_Manual.pdf`, and the user guide inside `source/raven_extra_docs_tests.tar.gz`), chapters
-"Building the groundwater model", "Coupling an existing MODFLOW 6 model" and "Applying the coupling".
+More: the user guide `docs\Raven_MF6_Groundwater_UserGuide.md` and the manual of the repository, Volume 1
+`docs\manual\Raven_MF6_User_Manual.pdf` and Volume 2 `docs\manual\Raven_MF6_Reference.pdf` (in the release package:
+`Raven_MF6_User_Manual.pdf` and `Raven_MF6_Reference.pdf`, and the user guide inside
+`source/raven_extra_docs_tests.tar.gz`). Volume 1 walks through Example A in the chapter "Quick start with example A",
+and covers both examples in the chapters "Building a groundwater model from Raven inputs" and "Coupling an existing
+MODFLOW 6 model"; Volume 2 has every rule, in the chapters "Building the groundwater model" and "Coupling an existing
+MODFLOW 6 model".

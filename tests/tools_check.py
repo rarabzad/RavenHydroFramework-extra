@@ -31,9 +31,10 @@ TC7 make_handover.found_note: HANDOVER.md's 1A-replace paragraph names the publi
    only when the public check found them (their IDs and subjects), and says nothing about them otherwise;
    make_handover.pull_note: HANDOVER.md describes the open pull request #1 on the code branch (edit its description or
    close it; GitHub support for its earlier head), and nothing for another branch.
-TC9 tools/check_manual_pdf.py on a two-chapter stand-in of docs/manual (a copy in the work folder): a main.pdf built
-   from its chapters passes; after a chapter is changed it fails (the changed line shown), --write replaces the PDF, and
-   then it passes again.
+TC9 tools/check_manual_pdf.py on a two-volume stand-in of docs/manual (a copy in the work folder: user_manual.tex and
+   reference.tex, each with one chapter, the first referring to a section of the second): PDFs built from the sources
+   pass, with the reference across the volumes resolved; after a chapter of the second volume is changed the check
+   fails (the changed line shown), --write replaces the PDFs, and then it passes again; a volume without its PDF fails.
 TC10 tools/make_package.py --self-test: the README wording check finds each process phrase injected into the package
    README template ("This is the final package.", "rebuilt after the review", "the corrected binary", ...) and passes the
    template with its restore section; the release-binary check fails synthetic ELF files that need GLIBC_2.38 or 2.29, a
@@ -229,29 +230,42 @@ def t7():
 
 def t9():
     import shutil as sh
-    if not (sh.which('pdflatex') and sh.which('pdftotext')):
-        tc.skip('TC9 (manual PDF check)', 'pdflatex or pdftotext not found'); return
+    if not (sh.which('pdflatex') and sh.which('bibtex') and sh.which('pdftotext')):
+        tc.skip('TC9 (manual PDF check)', 'pdflatex, bibtex or pdftotext not found'); return
     tool = os.path.join(os.path.dirname(HERE), 'tools', 'check_manual_pdf.py')
     rep = os.path.join(W, 'manual_repo'); m = os.path.join(rep, 'docs', 'manual')
     if os.path.exists(rep):
         shutil.rmtree(rep)
     os.makedirs(os.path.join(m, 'chapters'))
-    open(os.path.join(m, 'main.tex'), 'w').write('\\documentclass{report}\n\\begin{document}\n\\input{chapters/a}\n'
-                                                 '\\input{chapters/b}\n\\end{document}\n')
-    open(os.path.join(m, 'chapters', 'a.tex'), 'w').write('\\chapter{One}\nThe recharge reaches the water table.\n')
-    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\nThe balance error is 0.006 mm.\n')
+    vol = lambda other, pre, ch: ('\\documentclass{report}\n\\usepackage{xr-hyper}\n\\usepackage{hyperref}\n'
+                                  '\\externaldocument[%s-]{%s}\n\\begin{document}\n\\input{chapters/%s}\n\\end{document}\n'
+                                  % (pre, other, ch))
+    open(os.path.join(m, 'user_manual.tex'), 'w').write(vol('reference', 'R', 'a'))
+    open(os.path.join(m, 'reference.tex'), 'w').write(vol('user_manual', 'U', 'b'))
+    open(os.path.join(m, 'chapters', 'a.tex'), 'w').write('\\chapter{One}\\label{ch:one}\nThe recharge reaches the water '
+                                                       'table (Reference, Section~\\ref{R-sec:bal}).\n')
+    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\n\\section{Balance}\\label{sec:bal}\nThe balance '
+                                                       'error is 0.006 mm (User Manual, Chapter~\\ref{U-ch:one}).\n')
     chk = lambda *x: subprocess.run([sys.executable, tool, '--repo', rep] + list(x), capture_output=True, text=True)
     last = lambda r: r.stdout.strip().split('\n')[-1][:90]
-    open(os.path.join(m, 'main.pdf'), 'wb').write(b'')
-    chk('--write')                                                      # (builds the first main.pdf)
+    for name in ('Raven_MF6_User_Manual.pdf', 'Raven_MF6_Reference.pdf'):
+        open(os.path.join(m, name), 'wb').write(b'')
+    chk('--write')                                                      # (builds the first PDFs)
     r1 = chk()
-    report('TC9 check_manual_pdf: a main.pdf built from its chapters passes', r1.returncode == 0 and 'PASS' in r1.stdout, last(r1))
-    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\nThe balance error is 0.431061 mm.\n')
+    txt = subprocess.run(['pdftotext', os.path.join(m, 'Raven_MF6_User_Manual.pdf'), '-'], capture_output=True, text=True).stdout
+    report('TC9 check_manual_pdf: two volumes built from their sources pass, the reference across them resolved',
+           r1.returncode == 0 and r1.stdout.count(': PASS') == 3 and 'Section 1.1' in txt, last(r1))
+    open(os.path.join(m, 'chapters', 'b.tex'), 'w').write('\\chapter{Two}\n\\section{Balance}\\label{sec:bal}\nThe balance '
+                                                       'error is 0.431061 mm (User Manual, Chapter~\\ref{U-ch:one}).\n')
     r2 = chk()
     report('TC9 check_manual_pdf: a changed chapter fails, the changed line shown', r2.returncode == 1 and 'FAIL' in r2.stdout
-           and '+The balance error is 0.431061 mm.' in r2.stdout, last(r2))
+           and '+The balance error is 0.431061 mm (User Manual, Chapter 1).' in r2.stdout, last(r2))
     r3 = chk('--write'); r4 = chk()
     report('TC9 check_manual_pdf: --write replaces the PDF, which then passes', r3.returncode == 1 and r4.returncode == 0, last(r4))
+    os.remove(os.path.join(m, 'Raven_MF6_Reference.pdf'))
+    r5 = chk()
+    report('TC9 check_manual_pdf: a volume without its PDF fails', r5.returncode == 1 and 'has no Raven_MF6_Reference.pdf' in r5.stdout,
+           last(r5))
     shutil.rmtree(rep)
 
 

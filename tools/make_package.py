@@ -18,7 +18,8 @@ The package:
   README.md                 tools/package_README.md, its section "Restore the git history" written by package_sources.py
   bin/                      Raven, libmf6.so, RavenMF6InstallCheck.py (cmake/ of the code revision), LICENSE-Raven.txt
                             (the code revision's LICENSE), NOTICE-MODFLOW6.txt, VERSIONS.txt
-  Raven_MF6_Manual.pdf      docs/manual/main.pdf of the extra revision
+  Raven_MF6_User_Manual.pdf docs/manual/Raven_MF6_User_Manual.pdf of the extra revision (Volume 1 of the manual)
+  Raven_MF6_Reference.pdf   docs/manual/Raven_MF6_Reference.pdf of the extra revision (Volume 2)
   examples/                 examples/ of the extra revision
   workshops/                the six workshop zips (docs/tutorials/build_tutorials.py --package), whose bin/README.txt
                             names the code revision as the source commit of Raven
@@ -26,8 +27,8 @@ The package:
   SHA256SUMS.txt            the SHA-256 sum of every other file
 
 Checks (exit code 0 only when all pass):
-  - package_sources.py: the README's clone commands give both histories complete, as stated; the manual PDF is the
-    build of the manual's chapters (unless --no-manual-check) and the package's copy is that PDF;
+  - package_sources.py: the README's clone commands give both histories complete, as stated; the two manual PDFs are
+    the build of the manual's sources (unless --no-manual-check) and the package's copies are those PDFs;
   - the install check (bin/RavenMF6InstallCheck.py bin 6.8.1) passes;
   - Raven's banner date is the committer date (UTC) of the code revision, as build_release_raven.sh makes it;
   - bin/Raven is a release build, as build_release_raven.sh makes it and the README's requirements assume: read from its
@@ -300,9 +301,11 @@ def main():
                     '            sha256 %s\n'
                     'libmf6.so   MODFLOW 6 %s (the official release)\n'
                     '            sha256 %s\n' % (ver, bd, cshort, a.code_branch, sha256(a.raven), MF6_VERSION, sha256(a.mf6)))
-        # the manual and the examples of the extra revision
-        with open(os.path.join(pkg, 'Raven_MF6_Manual.pdf'), 'wb') as f:
-            f.write(git(['show', '%s:docs/manual/main.pdf' % xtip], extra, binary=True))
+        # the manual (both volumes) and the examples of the extra revision
+        import package_sources as ps
+        for name in ps.MANUAL_COPIES:
+            with open(os.path.join(pkg, name), 'wb') as f:
+                f.write(git(['show', '%s:docs/manual/%s' % (xtip, name)], extra, binary=True))
         unpack(extra, xtip, ['examples'], pkg)
         # the README template
         shutil.copyfile(os.path.join(HERE, 'package_README.md'), os.path.join(pkg, 'README.md'))
@@ -343,7 +346,7 @@ def main():
         print('workshop zips: %d, each with the package\'s programs and source commit %s' % (len(zips), cshort))
         # the README: the files it names exist; no wording about the making of the package
         text = open(os.path.join(pkg, 'README.md')).read()
-        for p in sorted(set(re.findall(r'`((?:bin|source|examples|workshops)/[^`<>* ]*|Raven_MF6_Manual\.pdf|SHA256SUMS\.txt)`', text))):
+        for p in sorted(set(re.findall(r'`((?:bin|source|examples|workshops)/[^`<>* ]*|Raven_MF6_(?:User_Manual|Reference)\.pdf|SHA256SUMS\.txt)`', text))):
             if p != 'SHA256SUMS.txt' and not os.path.exists(os.path.join(pkg, p.split(' ')[0])):
                 fails.append('README.md names %s, which the package does not hold' % p)
         fails += readme_problems(text)

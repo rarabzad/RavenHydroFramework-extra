@@ -12,6 +12,7 @@ Run (two years, about five minutes):
 
 The run works on a copy of the model in `output/mf6/`; `model/` is never modified. `GWModelSummary.txt` describes the
 coupling (model, units, how cells were linked, packages taken over and kept, HRU coverage). See the manual, chapter
-"Coupling an existing MODFLOW 6 model".
+"Coupling an existing MODFLOW 6 model" (Volume 1, `Raven_MF6_User_Manual.pdf`, in plain terms; Volume 2,
+`Raven_MF6_Reference.pdf`, every rule).
 
 The model was generated with FloPy (`tests/existing/make_ext_model.py`); FloPy is not needed to run the example.

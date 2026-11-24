@@ -10,21 +10,21 @@ the DEM at many points, so the soil saturates first at the foot of slopes and in
 cross an unsaturated zone (`:SoilZoneVadose RICHARDS`, `KINEMATIC` or `LAG`, with depth classes on hummocky ground);
 dry soil draws water up from a shallow water table by capillary rise; the exchange is lagged into Raven's step to cut the
 splitting error; Raven's processes can act on classes of an HRU's columns (`:SoilZoneClasses`); and soil over specified
-heads exchanges with them exactly (manual chapter 5, "The soil zone and the water table"; reference table of the
-`:SoilZone*` commands in chapter 7).
+heads exchanges with them exactly (manual, Volume 1, chapter 5, in plain terms; Volume 2, chapter 4, "The soil zone and
+the water table"; reference table of the `:SoilZone*` commands in Volume 2, chapter 6).
 
 The coupling's source code is part of Raven itself (RavenHydroFramework). This repository holds everything around it:
 
 | Folder | Contents |
 |---|---|
-| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual (`manual/`, LaTeX with `main.pdf`; verification in chapter 9) |
+| `docs/` | user guide (`Raven_MF6_Groundwater_UserGuide.md`), manual in two volumes (`manual/`, LaTeX: Volume 1, `Raven_MF6_User_Manual.pdf` from `user_manual.tex`; Volume 2, `Raven_MF6_Reference.pdf` from `reference.tex`, with the verification in chapter 7) |
 | `examples/` | the Liard River model with a groundwater model built by Raven, and coupled to an existing MODFLOW 6 model; step-by-step guide in `examples/README.md` |
 | `tests/` | the verification suite; `python3 tests/run_all.py` runs everything and writes one report |
 | `tools/get_mf6.py` | downloads the MODFLOW 6 library (6.8.1, the tested version) for your computer, for a Raven built without it |
 | `tools/plot_soilzone.py` | plots the soil-zone exchange of a `:SoilZone PHYSICAL` run (`GWSoilExchange.csv`, `GWBudget.csv`), with specified heads too |
 | `tools/package_sources.py` | writes the `source/` folder of a release package (source archives and the complete git history of both repositories as bundles on the branches of the public repositories, `mf6-coupling` and `main`; a shallow Raven clone is completed from the upstream Raven repository first; `COMMITS.txt`) and runs the clone commands of the package README's "Restore the git history" section as written, checking that each bundle clones with its whole history, branch, tip and commit count as the README states; it also runs `tools/check_manual_pdf.py` on the packaged revision |
-| `tools/make_package.py` | makes the Linux release package in one command (Raven and the MODFLOW 6 library in `bin/` with the install check, the manual, the examples, the six workshop zips, `source/` from `tools/package_sources.py`, the README from `tools/package_README.md`, `SHA256SUMS.txt`) and checks it, also that `bin/Raven` is the release build of `docs/tutorials/build_release_raven.sh` (at most GLIBC_2.28, its own C++ runtime); `--self-test` checks its checks |
-| `tools/check_manual_pdf.py` | builds the manual from `docs/manual` in a scratch folder and checks that `docs/manual/main.pdf` is that build (same text and pages); `--write` replaces a PDF that is not |
+| `tools/make_package.py` | makes the Linux release package in one command (Raven and the MODFLOW 6 library in `bin/` with the install check, the two volumes of the manual, the examples, the six workshop zips, `source/` from `tools/package_sources.py`, the README from `tools/package_README.md`, `SHA256SUMS.txt`) and checks it, also that `bin/Raven` is the release build of `docs/tutorials/build_release_raven.sh` (at most GLIBC_2.28, its own C++ runtime); `--self-test` checks its checks |
+| `tools/check_manual_pdf.py` | builds both volumes of the manual from `docs/manual` in a scratch folder and checks that `docs/manual/Raven_MF6_User_Manual.pdf` and `docs/manual/Raven_MF6_Reference.pdf` are that build (same text and pages); `--write` replaces a PDF that is not |
 | `tools/make_handover.py` | writes the kit for publishing the two repositories (bundles, source archives, `HANDOVER.md` with the steps to push them to GitHub and check them) and verifies it |
 | `examples/Liard_groundwater/tools_audit.py` | checks every balance identity of a run from its first step (the recharge delay store at the start from `GWModelSummary.txt`), including the soil-zone identities (rejected recharge, applied exchange, shortfall, interface convergence) |
 
@@ -53,7 +53,7 @@ Intel Macs MODFLOW releases no library: there, install the source tools (`-DRAVE
 either the configure warns and builds Raven alone. `cmake --install build` and `cpack` give one folder (package) with
 Raven, the library and the Fortran runtime it needs (on Linux, a library built elsewhere is given the run path `$ORIGIN`
 with `patchelf` when that is installed, so that it loads the runtime beside it); a build without the library installs
-Raven alone. Details: manual, chapter 10, "Building".
+Raven alone. Details: manual, Volume 2, chapter 8, "Building".
 
 For a Raven built without the library (GNU make, Visual Studio solution, `-DRAVEN_MF6=OFF`):
 `python tools/get_mf6.py` puts MODFLOW 6.8.1 into `../RavenHydroFramework/lib/mf6`, where Raven finds it (Linux x86_64,

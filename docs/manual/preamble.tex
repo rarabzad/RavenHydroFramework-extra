@@ -1,4 +1,6 @@
-\documentclass[11pt,a4paper]{report}
+% Shared preamble of the two volumes of the manual: user_manual.tex (Volume 1, User Manual) and reference.tex
+% (Volume 2, Reference and Verification). Each volume loads the class (report, 11pt, a4paper) and
+% defines \volumetitle before reading this file.
 \usepackage[T1]{fontenc}
 \usepackage{mathpazo}
 \usepackage[scaled=0.92]{helvet}
@@ -37,11 +39,12 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small\sffamily\color{gray}\leftmark}
-\fancyhead[R]{\small\sffamily\color{gray}Raven--MODFLOW~6 groundwater coupling}
+\fancyhead[R]{\small\sffamily\color{gray}Raven--MODFLOW~6 coupling: \volumetitle}
 \fancyfoot[C]{\small\sffamily\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\chaptermark}[1]{\markboth{\thechapter\quad #1}{}}
 \fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\sffamily\thepage}\renewcommand{\headrulewidth}{0pt}}
+\usepackage{xr-hyper}   % references into the other volume (\externaldocument)
 \usepackage[colorlinks=true,linkcolor=brand,citecolor=brand,urlcolor=brand]{hyperref}
 \emergencystretch=6em
 \setcounter{secnumdepth}{3}
@@ -71,44 +74,6 @@
 \newtcolorbox{plain}{colback=teal!4,colframe=teal!55!black,title=In plain words}
 \newtcolorbox{example}[1][]{colback=orange!4,colframe=orange!70!black,title=Worked example#1}
 \newtcolorbox{watch}{colback=red!3,colframe=red!55!black,title=Watch out}
+\newtcolorbox{inpractice}{colback=green!4,colframe=green!45!black,title=In practice}
+\newtcolorbox{whattowrite}{colback=brandlight!40,colframe=brand,title=What to write}
 \newtcolorbox{refcard}[1]{colback=brandlight!40,colframe=brand,title={Reference card: #1},breakable,enhanced jigsaw,before skip=10pt,after skip=10pt}
-\begin{document}
-\pagenumbering{Alph}
-\begin{titlepage}
-\centering
-\vspace*{3.5cm}
-{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{16pt}
-{\sffamily\bfseries\fontsize{30}{38}\selectfont\color{brand}Raven--MODFLOW~6\\[4pt]Groundwater Coupling\par}
-\vspace{14pt}
-{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{24pt}
-{\large Manual chapter for the Raven Hydrological Modelling Framework\\[2pt](based on Raven 4.15)\par}
-\vfill
-{\sffamily\Large\bfseries Rezgar Arabzadeh\par}
-\vspace{4pt}
-{\large Principal Scientist, Hazen and Sawyer\par}
-\vspace{2cm}
-{\large November 2026\par}
-\vspace{1.2cm}
-{\footnotesize\color{gray!70!black}\copyright\ 2026 Rezgar Arabzadeh. This manual is licensed under the Creative Commons Attribution 4.0
-International License (CC BY 4.0), \url{https://creativecommons.org/licenses/by/4.0/}.\par}
-\end{titlepage}
-\pagenumbering{roman}
-\begingroup\small\tableofcontents\endgroup
-\cleardoublepage
-\pagenumbering{arabic}
-\input{chapters/intro}
-\input{chapters/concepts}
-\input{chapters/building}
-\input{chapters/existing_model}
-\input{chapters/exchanges}
-\input{chapters/accounting}
-\input{chapters/inputs_outputs}
-\input{chapters/applying}
-\input{chapters/verification}
-\input{chapters/developers}
-\appendix
-\input{chapters/appendix}
-\cleardoublepage\phantomsection\addcontentsline{toc}{chapter}{Bibliography}
-\bibliographystyle{plain}
-\bibliography{refs}
-\end{document}

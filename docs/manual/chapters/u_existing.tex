@@ -1,0 +1,190 @@
+\chapter{Coupling an existing MODFLOW~6 model}\label{uch:existing}
+Many users already have a calibrated MODFLOW~6 model and want to connect it to a Raven model. In this mode Raven does
+not build a groundwater model. It takes your model as it is: the grid, the layers, the conductivities, storage, wells,
+boundaries, stress periods and solver settings. This chapter says what to write, what is supported and what is
+refused. Reference, Chapter~\ref{R-ch:existing}, gives every rule. Workshop~4 couples a model in feet, on its own grid.
+
+\begin{plain}
+You give Raven your MODFLOW~6 model and tell it three things: where the model lies on the map, on what calendar date the
+model's time starts, and which of the model's packages Raven should replace --- usually recharge and evaporation, which
+Raven then supplies. Raven copies the model, makes a few changes to the copy, and runs the copy together with the Raven
+model, one day at a time. Your own files are never changed.
+\end{plain}
+
+\section{What Raven changes, in a copy}
+Raven links its HRUs to the model's \emph{top active layer} --- the highest layer that holds water at each location ---
+and exchanges water there. Only three things change, and only in a working copy in \cmd{output/mf6/}:
+\begin{enumerate}
+\item the stress periods are split into Raven time steps;
+\item the packages that Raven takes over (usually recharge and evapotranspiration) are switched off;
+\item Raven's packages are added: \cmd{RCH\_RAVEN} (recharge from Raven) and \cmd{DRN\_RAVEN} (seepage back to Raven),
+and, when the \cmd{.rvp} and \cmd{.rvg} files ask for them, \cmd{EVT\_RAVEN} (water-table evaporation), \cmd{SWX\_RAVEN}
+(wetlands and lakes in Raven stores) and \cmd{RES\_RAVEN} (reservoir seepage).
+\end{enumerate}
+Raven copies the whole folder that holds the simulation file, so keep the model in a folder of its own. Old results
+(\cmd{.hds}, \cmd{.cbc}, \cmd{.lst}, \cmd{.grb}, \cmd{.bud}, \cmd{.cbb}) are not copied.
+\begin{figure}[!htbp]\centering\input{figures/tikz_workcopy}
+\caption{Raven runs a working copy of the model. The copy differs from the original in three ways only; the original folder is never changed.}\label{fig:uworkcopy}
+\end{figure}
+
+\section{Example B}
+\cmd{examples/Liard\_existing\_model/} holds a MODFLOW~6 model of the Liard coupled area, built independently of Raven:
+a regular grid of 1.5~km cells rotated 15\textdegree{} in UTM zone 10N, four layers with spatially varying conductivity,
+a one-day steady-state period followed by 24 monthly periods, two wells with seasonal pumping, 239 river cells carrying
+their subbasin ID in an auxiliary variable, a head boundary at the outlet, and its own recharge and ET packages. This
+\cmd{.rvg} file is all it takes:
+\begin{whattowrite}
+\small
+\begin{lstlisting}
+:HRUGeometry       Liard_HRUs_standin.geojson  HRU_ID
+:MF6Simulation     model/mfsim.nam
+:MF6CRS            EPSG:32610                  # the model's coordinates are UTM zone 10N
+:MF6StartDate      1985-10-01                  # the calendar date of the model's time zero
+:RavenTakesOver    RCH_MODEL EVT_MODEL         # Raven supplies recharge; the model's ET is replaced
+:StreamPackage     RIV_STREAMS AUX SUBBASIN    # river cells carry their Raven subbasin ID
+:SeepageToRaven    ON
+\end{lstlisting}
+\end{whattowrite}
+The other Raven files are those of example~A; forcing and observations are read from \cmd{../Liard\_groundwater}, so keep
+both folders side by side. Run it as example~A, from inside its folder. The two-year run takes about five minutes.
+
+HRUs with an \cmd{AQUIFER\_PROFILE} in the \cmd{.rvh} file are coupled, as when Raven builds the model. The layers and
+their properties come from the model's own files, so a profile needs no layers and no \cmd{:AquiferClasses} are needed.
+Give each profile as \cmd{name, 0}; it then only marks the coupled HRUs and carries the exchange settings:
+\begin{lstlisting}
+:AquiferProfiles
+  VALLEY_ALLUVIUM, 0                 # no layers: the model's own are used
+  UPLAND_TILL,     0
+:EndAquiferProfiles
+:AquiferProfileParameters
+  :Attributes,     SEEPAGE_LEAKANCE
+  :Units,          1/d
+  VALLEY_ALLUVIUM, 1.0
+  UPLAND_TILL,     1.0
+:EndAquiferProfileParameters
+\end{lstlisting}
+Of the profile parameters, \cmd{SEEPAGE\_LEAKANCE}, \cmd{SEEPAGE\_SMOOTHING\_DEPTH}, \cmd{RECHARGE\_DELAY} and
+\cmd{EXTINCTION\_DEPTH} are used; the others are not. Layers listed in a profile are ignored, with a warning. Raven's
+recharge must reach the \cmd{GROUNDWATER} store, exactly as when Raven builds the model (Chapter~\ref{uch:build}).
+
+\section{Telling Raven where the model is}
+MODFLOW model files do not say where on Earth the model is. Give exactly one of these:
+\begin{itemize}
+\item \textbf{\cmd{:MF6CRS} (recommended)}: the model's map projection, usually as an EPSG code (\cmd{EPSG:32610} is UTM
+zone 10 North), or a Transverse Mercator, Albers or Lambert projection by its parameters. Raven reads the cell outlines
+from the model and places them on the map. No external software is needed.
+\item \textbf{\cmd{:MF6GridFile}}: a GeoJSON file of the top-layer cells, numbered from 1 in the model's order, as GIS
+software exports it. Raven checks that the polygons are the model's cells.
+\item \textbf{\cmd{:OverlapWeights}}: a table of HRU, cell and the share of the cell the HRU covers, prepared outside Raven.
+No HRU polygons are needed, but monitoring wells cannot be located.
+\end{itemize}
+Each coupled HRU is then linked to the top active cell of every column it overlaps. \cmd{GWModelSummary.txt} reports how
+much of the coupled HRUs' area lies on active model cells (99.74\% in example~B).
+
+\section{Time}
+MODFLOW models divide time into stress periods. Raven keeps the model's stress periods and their dates, and splits each
+period into Raven time steps, so the model's own changes --- a well pumping harder in summer, a boundary level changing
+--- still happen on their dates.
+\begin{itemize}
+\item \cmd{:MF6StartDate} is the calendar date on which the model's time starts (with its time of day when that is not
+midnight). It is required.
+\item Each stress period must hold a whole number of Raven time steps, and Raven's run may not go past the end of the
+model. Otherwise the run stops with a message. Steady-state periods stay steady-state.
+\item A steady-state model (one period, no storage) is stretched over Raven's run: every Raven step is a steady-state
+solution with that step's recharge, and the storage column of \cmd{GWBudget.csv} stays zero. Raven may then start on any
+date from \cmd{:MF6StartDate} on.
+\end{itemize}
+
+\section{Units}
+Length units (metres, feet, centimetres) are read from the model's discretization package, and time units (seconds to
+years) from its time discretization. Heads, flows, rates, conductances and coordinates are converted at the interface.
+Raven's outputs are always in metres and days.
+
+\section{The model's packages}
+\begin{itemize}
+\item \textbf{Recharge, evapotranspiration and UZF packages} must each be named in \cmd{:RavenTakesOver} (removed; Raven
+supplies recharge) or in \cmd{:KeepPackages} (they stay). An undeclared one stops the run, so recharge is never counted
+twice.
+\item \textbf{The stream package} (\cmd{:StreamPackage}): a RIV, DRN or GHB package whose flows go to Raven's reaches,
+either to the subbasin in an auxiliary variable (\cmd{AUX}, default \cmd{SUBBASIN}) or to the subbasin of the cell's
+dominant HRU (\cmd{DOMINANT\_HRU}).
+\item \textbf{Seepage} (\cmd{:SeepageToRaven ON}): \cmd{DRN\_RAVEN} at the top of the top active cell of coupled columns
+returns groundwater that reaches the surface to Raven.
+\item \textbf{Everything else is kept unchanged}: wells, head boundaries, drains, lakes, streamflow routing, the water
+mover (movers to or from a package Raven takes over are removed), skeletal storage and compaction. Their flows enter
+the balance check (\cmd{GWBudget.csv}, column \emph{other model packages}).
+\item \textbf{The model's solver} (\cmd{.ims}) and output control are kept. The first coupled step is often the hardest
+--- a steady-state period solved from the model's starting heads with Raven's recharge --- so allow at least 500 outer
+iterations (\cmd{OUTER\_MAXIMUM}).
+\end{itemize}
+Reference, Table~\ref{R-tab:extpkgs}, gives the treatment of every package.
+
+\section{What is supported, and what is refused}\label{sec:uextrefused}
+Raven refuses a model it cannot couple safely, with a message that names the problem and the fix. The main cases are in
+Table~\ref{tab:uextrefused}; Reference, Section~\ref{R-sec:extlimits} and the safeguards before it, list them all.
+\begin{table}[!htbp]\centering
+\caption{Existing models: what is supported and what is refused.}\label{tab:uextrefused}
+\begin{tabularx}{\linewidth}{P{0.38\linewidth}Y}\toprule\hdr
+Model feature & Why it is refused, or how it is handled\\\midrule
+DIS and DISV grids & supported\\
+DISU grids & not supported\\
+more than 5 million cells per layer & refused: the limit of the grids Raven builds\\
+more than one model, or exchanges & refused: Raven couples one groundwater-flow model and books only its water\\
+transport, energy or particle-tracking models (\cmd{GWT6}, \cmd{GWE6}, \cmd{PRT6}) & refused: run them separately, from the heads and budget files of the Raven run\\
+more than one solution & refused: Raven drives the one model's solution\\
+adaptive time stepping (\cmd{ATS6}) & refused: Raven needs fixed time steps\\
+an undeclared recharge, ET or UZF package & refused, so that recharge is never counted twice\\
+\cmd{EXTINCTION\_DEPTH} in a profile while the model keeps an EVT or UZF package & refused\\
+a stream package that sends water through the mover & refused: Raven would take the same water from the aquifer twice\\
+options of the generated mode in the \cmd{.rvg} (\cmd{:GridCellSize}, \cmd{:Wells}, \cmd{:LandSurface}, \dots) & refused\\
+a Raven calendar other than Gregorian & refused: the dates of the two models are compared day by day\\
+a Raven start before \cmd{:MF6StartDate} & refused\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Starting later, and restarts}\label{sec:uextrestart}
+Raven may start later than the model's time zero: when a run is continued from \cmd{solution.rvc}, or begins part-way
+through the model. Raven then drops the stress periods already simulated from the working copy, shortens the period that
+holds Raven's start, and renumbers the periods; the new first period takes the inputs that were in force on Raven's start
+date. Times of time series (\cmd{TS6}) are shifted to match. Figure~\ref{fig:uperiods} shows an example.
+\begin{figure}[!htbp]\centering\input{figures/tikz_periods}
+\caption{Top: a model with a one-day steady period followed by periods of 31, 30, 31 and 31 days, and Raven's days. Bottom: after a restart 40 days into the model, the time already simulated is dropped, period~3 keeps its last 22 days, and the periods are renumbered; each keeps its own well rates and boundary levels.}\label{fig:uperiods}
+\end{figure}
+
+Some packages cannot follow such a start, because their settings build on one another. A later start stops when the
+model has time-array series (\cmd{TAS6}), time-varying conductivity or storage (\cmd{TVK6}, \cmd{TVS6}), or array-based or
+advanced packages (SFR, LAK, MAW, UZF) with several period entries before Raven's start. Raven must then start at
+\cmd{:MF6StartDate}.
+
+A restart carries only the heads. So a restarted run reproduces a continuous one only when the model keeps no package
+with a state of its own. In MODFLOW~6.8.1 those are LAK (lake stages), MAW (well heads), UZF (unsaturated-zone water
+content), CSUB (stresses) and SFR with the \cmd{STORAGE} option. A restart (\cmd{:GWHeads}) of a model that keeps any of
+them stops, naming it. Then remove \cmd{:GWHeads} from the \cmd{.rvc} file, so that every package starts from its input,
+or simulate the whole period in one run. Reference, Section~\ref{R-sec:existingtime}, gives the rules.
+
+\section{Rivers in an existing model}
+The model's stream package keeps its own stage and conductance. Unlike the river cells Raven builds, it has no supply
+limit, so a losing reach can take more than its channel holds. The part the channel cannot supply is carried to the next
+step and taken then, and it is exactly accounted (\emph{river loss carried to next step} in \cmd{GWBudget.csv}).
+
+Example~B does this for months: \cmd{river loss carried max} of the audit tool is about $1.06\times10^{8}$~m$^3$, on 271
+of the 731 days from the first day, and the carry is repaid by the end of the run (\cmd{river loss carried at end} 0).
+Raven warns on the first ten such steps.
+
+\section{Outputs, and checking the calibration}
+All the outputs of Chapter~\ref{uch:outputs} are written. \cmd{GWModelSummary.txt} also describes the coupling:
+\begin{lstlisting}
+existing model        : GWF_LIARD in model/mfsim.nam (DIS, 4 layers x 11466 cells per layer; metres, days)
+cells linked by       : cell outlines from MODFLOW, Transverse Mercator (...)
+packages taken over   : RCH_MODEL EVT_MODEL
+packages in balance   : GHB_OUTLET WEL_PUMPS
+stream package        : RIV_STREAMS (subbasin from auxiliary SUBBASIN)
+HRU coverage          : 99.74% of the coupled HRUs' polygon area lies on active model cells
+\end{lstlisting}
+In \cmd{GWHRUState.csv} the water-table depth is measured from the top of the model's top active cell, which stands for
+the land surface. The model keeps its own output control: for MODFLOW's budget file, add \cmd{BUDGET FILEOUT} and
+\cmd{SAVE BUDGET} to its OC file.
+
+Replacing a calibrated recharge package with Raven's recharge changes the model's water budget. Compare the coupled heads
+and budget with a run of the original model before using the results. Large differences mean that Raven's recharge, or
+the recharge the model was calibrated with, needs attention.

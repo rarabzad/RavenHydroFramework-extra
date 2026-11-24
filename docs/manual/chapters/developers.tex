@@ -1,4 +1,8 @@
 \chapter{Developer guide and limitations}\label{ch:c9}\label{ch:dev}
+\noindent\emph{About this chapter.} Users do not need this chapter to run the coupling: the User Manual,
+Section~\ref{U-sec:uinstall}, says how to build Raven and get the MODFLOW~6 library. This chapter is for those who build
+from source in other ways, or change the code.
+
 This chapter is for those who maintain or extend the code.
 
 \begin{plain}
@@ -117,7 +121,7 @@ lives in a separate repository.
 \item \textbf{RavenHydroFramework} (\cmd{src/}): the coupling's source files and the small changes to existing Raven files
       (Section~\ref{sec:coreflix}). The branch \cmd{mf6-coupling} of
       \url{https://github.com/rarabzad/RavenHydroFramework} holds them all.
-\item \textbf{RavenHydroFramework-extra}: this manual, the user guide, the Liard examples, the tests
+\item \textbf{RavenHydroFramework-extra}: this manual (both volumes), the user guide, the Liard examples, the tests
       (\cmd{tests/run\_all.py}) and \cmd{tools/get\_mf6.py}, at\\ \url{https://github.com/rarabzad/RavenHydroFramework-extra}
       (branch \cmd{main}).
 \end{itemize}
@@ -129,9 +133,10 @@ git clone https://github.com/rarabzad/RavenHydroFramework-extra.git
 Without network access, the release package's \cmd{source/} folder holds both repositories with their whole history as
 git bundles (\cmd{tools/package\_sources.py}); the two \cmd{git clone} commands of its README (section ``Restore the git
 history'') make the same two checkouts. \cmd{tools/make\_handover.py} writes the kit from which the two repositories are
-published, with the steps to push and check them (\cmd{HANDOVER.md}). \cmd{tools/check\_manual\_pdf.py} builds this manual
-from \cmd{docs/manual} in a scratch folder and checks that \cmd{docs/manual/main.pdf} is that build (the same text and
-pages; \cmd{--write} replaces a PDF that is not); \cmd{package\_sources.py} runs it on the revision it packages.
+published, with the steps to push and check them (\cmd{HANDOVER.md}). \cmd{tools/check\_manual\_pdf.py} builds the two
+volumes of this manual (\cmd{user\_manual.tex} and \cmd{reference.tex}) from \cmd{docs/manual} in a scratch folder and checks
+that \cmd{docs/manual/Raven\_MF6\_User\_Manual.pdf} and \cmd{docs/manual/Raven\_MF6\_Reference.pdf} are that build (the same
+text and pages; \cmd{--write} replaces a PDF that is not); \cmd{package\_sources.py} runs it on the revision it packages.
 
 \section{Building}\label{sec:building}
 Raven is built with CMake (\cmd{cmake -S . -B build}, \cmd{cmake --build build --config Release}; with a

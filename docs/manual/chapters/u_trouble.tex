@@ -1,0 +1,61 @@
+\chapter{Troubleshooting}\label{uch:trouble}
+Raven checks the inputs at start-up and stops with a message that names the problem, in \cmd{Raven\_errors.txt}. This
+chapter covers the most common messages and symptoms. Reference, Sections~\ref{R-app:errors} and~\ref{R-app:warnings},
+list every message.
+
+\section{Messages and symptoms}\label{ch:trouble}
+\begin{longtable}{P{0.36\linewidth}P{0.588\linewidth}}
+\caption{Messages and symptoms, with their causes and remedies.}\label{tab:utrouble}\\
+\toprule\hdr
+Message or symptom & Cause and remedy\\\midrule\endfirsthead
+\caption[]{Messages and symptoms, with their causes and remedies (continued).}\\
+\toprule\hdr
+Message or symptom & Cause and remedy\\\midrule\endhead
+``cannot load MODFLOW 6 library'' & run \cmd{python tools/get\_mf6.py} of RavenHydroFramework-extra, or set \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB} to the full path of \cmd{libmf6}; the message lists the places searched\\
+``the MODFLOW 6 library \dots\ is version \dots; the coupling needs MODFLOW 6 6.5.0 or newer'' & an old library was found first: remove the \cmd{:MF6Library} or \cmd{RAVEN\_MF6\_LIB} naming it, and get 6.8.1 (Section~\ref{sec:uinstall})\\
+``MODFLOW 6 stopped the run during \dots'' & MODFLOW found an input error inside its library; the message (also in \cmd{Raven\_errors.txt}) quotes the error report of \cmd{<output>/mf6/mfsim.lst}\\
+``Cannot find file'' & run Raven from inside the model's folder; example~B also needs \cmd{../Liard\_groundwater}\\
+``GeoJSON file \dots\ is in EPSG:\emph{n}'' / ``\dots\ outside the longitude/latitude range'' & a projected input file: give \cmd{:InputCRS} (Section~\ref{sec:uinputcrs})\\
+a raster's band unit is not metres & convert the values, or write \cmd{METRES} after the file name when they are metres (Section~\ref{sec:umetres})\\
+``layer \dots\ starts dry'' (warning) & the initial heads leave a whole layer dry; start from \cmd{:GWInitialization STEADY\_STATE}, a smaller \cmd{INITIAL\_HEAD\_DEPTH} or \cmd{:InitialGWHeads}\\
+``HRU \dots\ has an AQUIFER\_PROFILE but no polygon'' & HRU IDs in the GeoJSON do not match the \cmd{.rvh}; check the ID field name. When a reason is given (the polygon has no area), fix the HRU's outline\\
+``HRU \dots\ references unknown AQUIFER\_PROFILE'' & define the profile in the \cmd{.rvp}\\
+``does not overlap any active groundwater cell'' & the HRU is too small for the grid or sits where bedrock is at the surface; reduce \cmd{:GridCellSize} or \cmd{:MinCellCoverage}, or check the bedrock map\\
+``polygon area \dots\ differs from .rvh AREA'' & information only; volumes are always consistent\\
+``no process moves water into GROUNDWATER'' & route recharge to \cmd{GROUNDWATER} (Step~3 of Chapter~\ref{uch:quick})\\
+``process \dots\ removes water from GROUNDWATER'' & a Raven process drains \cmd{GROUNDWATER} in a coupled HRU; restrict it with \cmd{:-->Conditional}\\
+``process \dots\ sends water to GROUNDWATER in HRU \dots\ which has no AQUIFER\_PROFILE'' & that water would leave the model; restrict the process\\
+``MODFLOW 6 did not converge'' & start from a steady state or realistic heads; raise \cmd{:SolverMax\allowbreak OuterIterations}; increase \cmd{SEEPAGE\_SMOOTHING\_DEPTH}; check for extreme parameter contrasts\\
+Well rate is zero (``no :WellFlowRate time series'') & the \cmd{:WellFlowRate} block is missing, or its ID does not match an ID in \cmd{:Wells}\\
+``well \dots\ is outside the active groundwater model'' & move the well or enlarge the coupled area\\
+``reservoir \dots\ has no :SeepageParameters'' / ``no coupled lake HRU'' & add \cmd{:SeepageParameters}; give the lake HRU an \cmd{AQUIFER\_PROFILE}\\
+``running more time steps than the MODFLOW 6 simulation holds'' & \cmd{:Duration} or \cmd{:TimeStep} is inconsistent; rerun\\
+existing model: a recharge, ET or UZF package not declared & name it in \cmd{:RavenTakesOver} or \cmd{:KeepPackages} (Chapter~\ref{uch:existing})\\
+Water table far above the land surface & \cmd{SEEPAGE\_LEAKANCE} too small, or $K$ too low for the recharge\\
+Aquifer steadily emptying for years & initial heads too high; use a steady-state start or a longer spin-up\\\bottomrule
+\end{longtable}
+
+\section{Steps that do not converge}
+MODFLOW solves each step by repeated improvement (Newton's method). A step has converged when the heads stop changing
+within the head tolerance. When a step needs many iterations, Raven relaxes the tolerance for the rest of that step. A
+step that still does not converge is flagged in \cmd{GWBudget.csv} (\emph{converged} 0) and the run goes on; the
+exchange on that step is limited. The audit tool counts them (\emph{unconverged steps}); the table above gives the
+remedies. Reference, Section~\ref{R-ch:mf6}, explains how MODFLOW solves each step.
+
+\section{Frequently asked questions}
+\paragraph{Do I need MODFLOW experience?} No. Raven writes and runs the MODFLOW model. It helps to know the ideas of
+Section~\ref{sec:newraven} (with equations in Reference, Chapter~\ref{R-ch:c2}); the generated files can be inspected by
+anyone who knows MODFLOW.
+\paragraph{How fine should the grid be?} Fine enough that valleys and well spacings span two or three cells
+(Section~\ref{sec:ugrids}). Coarser grids run faster.
+\paragraph{How do I restart a long run?} Use \cmd{solution.rvc} of the finished run as the \cmd{.rvc} of the next, with
+\cmd{:StartDate} set to the end of the first run. A coupled run continued this way carries on exactly
+(Section~\ref{sec:urestart}); a run without groundwater continues from Raven's 5-decimal states.
+\paragraph{Can I see the head everywhere, not only at wells?} Yes: \cmd{mf6/gwf.hds} (MODFLOW binary, readable with FloPy)
+every \cmd{:HeadSaveFrequency} steps, or \cmd{GWHeads.nc} with \cmd{:WriteNetCDFHeads}.
+\paragraph{Can I use it in an ensemble or with Ostrich?} Yes; each ensemble member rebuilds and restarts MODFLOW, and
+aquifer parameters are ordinary \cmd{.rvp} values (Chapter~\ref{uch:restarts}).
+\paragraph{What if MODFLOW stops the program?} Read \cmd{<output>/mf6/mfsim.lst}; it names the file and value MODFLOW
+rejected.
+\paragraph{Where else can I look?} \cmd{Raven\_errors.txt} has the details of every message. The user guide
+\cmd{docs/Raven\_MF6\_Groundwater\_UserGuide.md} and \cmd{examples/README.md} cover installation problems.

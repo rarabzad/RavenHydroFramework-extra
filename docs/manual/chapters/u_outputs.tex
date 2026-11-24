@@ -1,0 +1,125 @@
+\chapter{Running, outputs and the water balance}\label{uch:outputs}
+This chapter says how to run a coupled model, what Raven writes, and how to check that the water balance of a run is
+right. Reference, Section~\ref{R-ch:outputs}, lists every output column, and Reference, Chapter~\ref{R-ch:c5}, the
+accounts behind them.
+
+\section{Running}
+A coupled model runs like any Raven model:
+\begin{lstlisting}
+Raven Liard -o output/
+\end{lstlisting}
+Raven reads all input files, builds (or copies) the MODFLOW~6 model in \cmd{output/mf6/}, and then runs both models one
+time step at a time. A successful run ends with \cmd{Exiting Gracefully: Successful Simulation}. Errors and warnings
+are in \cmd{output/Raven\_errors.txt}.
+
+Raven finds the MODFLOW~6 library by itself when it lies next to the Raven program or in \cmd{lib/mf6/} of the Raven
+checkout. Otherwise name it with \cmd{:MF6Library path} in the \cmd{.rvg} file, or with the environment variable
+\cmd{RAVEN\_MF6\_LIB}.
+
+\section{The output files}
+All rows are stamped with the date at the \emph{end} of the step, the moment the values refer to.
+\begin{table}[!htbp]\centering
+\caption{The groundwater outputs, beside Raven's usual files.}\label{tab:uoutputs}
+\begin{tabularx}{\linewidth}{P{0.27\linewidth}Y}\toprule\hdr
+File & What it holds\\\midrule
+\cmd{GWModelSummary.txt} & the grid built (layers, cells, active cells, river cells), the MODFLOW library and its version, how each HRU is linked, run totals\\
+\cmd{GWBudget.csv} & every step: recharge from Raven, seepage back to Raven, river exchange, storage change, MODFLOW's balance error, and every other exchange\\
+\cmd{GWHRUState.csv} & every step: the water table and the depth to water under each coupled HRU\\
+\cmd{GWHeads.csv} & the head at each monitoring well ($-1.2345$ when the screened cell is dry)\\
+\cmd{GWConnectivity.csv} & the number of separate wet areas of the aquifer, and the wet share of each profile\\
+\cmd{GWSoilExchange.csv} & with \cmd{:SoilZone PHYSICAL}: the soil zone of each HRU, every step\\
+\cmd{GWHeads.nc} & with \cmd{:WriteNetCDFHeads}: the head in every cell (Raven built with NetCDF)\\
+\cmd{Hydrographs.csv}, \cmd{Diagnostics.csv} & streamflow and fit statistics, as in any Raven run; \cmd{Diagnostics.csv} also scores the heads (\cmd{GW\_HEAD})\\
+\cmd{WatershedStorage.csv} & Raven's balance; it includes all exchanged water\\
+\cmd{solution.rvc} & the end state, with the groundwater blocks, for a restart (Chapter~\ref{uch:restarts})\\
+\cmd{mf6/} & the MODFLOW~6 model Raven wrote or copied, its list files and the heads \cmd{gwf.hds}; it can be opened in ModelMuse or FloPy\\
+\cmd{mf6/grid\_cells.geojson} & every cell as a longitude/latitude polygon, ready to be joined with heads in QGIS\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Reading GWModelSummary.txt}
+Read it after the first run of a new model. Check that:
+\begin{itemize}
+\item the grid and the number of active cells are what you expect;
+\item every coupled HRU is linked, and its linked share is close to 1;
+\item the polygon area of each HRU is close to its \cmd{.rvh} area;
+\item with an existing model, the units, the packages taken over and kept, and the HRU coverage are right
+(Chapter~\ref{uch:existing}).
+\end{itemize}
+
+\section{Reading GWBudget.csv}
+\cmd{GWBudget.csv} has one row per step. Its columns are the aquifer's water account for that step, in m$^3$/d:
+recharge in, seepage and river discharge out, river leakage in, and so on. \emph{Storage release} closes the account:
+water released from the aquifer (negative: water stored).
+\begin{table}[!htbp]\centering
+\caption{The main columns of \cmd{GWBudget.csv}. Reference, Section~\ref{R-app:outputs}, lists them all.}\label{tab:ubudget}
+\begin{tabularx}{\linewidth}{P{0.4\linewidth}Y}\toprule\hdr
+Column & Meaning\\\midrule
+time, date & model time [d] and date at the end of the step\\
+Raven recharge, MF6 recharge & recharge leaving Raven, and entering MODFLOW\\
+seepage to Raven, returned to Raven & drain discharge at the model top, and the volume added to Raven's stores\\
+river leakage to aquifer, aquifer discharge to rivers & the river exchange, each direction\\
+river loss carried to next step & a river loss the reach could not supply in the step (normally 0)\\
+storage release & water released from aquifer storage (negative: stored)\\
+MF6 balance error [m$^3$/d], [\%] & MODFLOW's balance error, and relative to the gross flow\\
+outer iterations, converged & iterations used; 1 converged, 2 accepted at the relaxed tolerance, 0 not converged\\
+water-table ET; wells specified, actual; GHB, CHD & the other exchanges (boundaries positive into the aquifer)\\
+other model packages & with an existing model: net flow of the model's own packages\\
+soil zone to aquifer, aquifer to soil zone, \dots & with \cmd{:SoilZone PHYSICAL}: the soil-zone exchange and its interface\\\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{example}[: 15 June 1996 in the Liard run]
+Recharge from Raven 21.4 million m$^3$/d and river leakage 3.0 million flowed in; seepage to Raven 19.1 million and
+discharge to rivers 1.3 million flowed out. The aquifer stored the difference, 3.9 million m$^3$ (storage release
+$-3\,925\,212$~m$^3$/d): a water-table rise of about 1~mm on average. Inflows minus outflows plus release is
+0.00003~m$^3$/d, a relative error of about $10^{-10}$. Reference, Section~\ref{R-ch:balance}, shows Raven's side of the
+same day.
+\end{example}
+
+\subsection{What a good run looks like}
+\begin{enumerate}
+\item \emph{MF6 balance error [\%]} stays well below 0.1\% every step. Larger values point to a step that did not
+converge, or a head tolerance that is too loose (\cmd{:SolverHead\allowbreak Tolerance}, default 0.00001~m).
+\item \emph{Raven recharge} and \emph{MF6 recharge} are equal, unless a recharge delay or fixed-head cells are used, or
+recharge is rejected on saturated ground (\cmd{:SoilZone PHYSICAL}).
+\item \emph{returned to Raven} equals \emph{seepage to Raven}.
+\item \emph{converged} is 1 on every step (2: accepted at a relaxed tolerance; 0: not converged). Steps that did not
+converge are flagged; see Chapter~\ref{uch:trouble}.
+\item \emph{river loss carried to next step} is 0, except for a reach whose flow stopped within the step, a reservoir gain
+MODFLOW did not supply (taken from the reach), or an existing model's stream package (Chapter~\ref{uch:existing}). The
+carry is taken from the river the next step, and Raven warns.
+\item With \cmd{:SoilZone PHYSICAL}: \emph{soil-zone shortfall} is zero and \emph{interface converged} is 1 on (nearly)
+every step.
+\item Raven's \cmd{WatershedStorage.csv} balance error stays at the first step's value (Raven's own, the same without
+groundwater), apart from Raven's own known errors (Reference, Section~\ref{R-ch:limits}).
+\end{enumerate}
+Reference, Section~\ref{R-ch:balance}, gives the rules behind each item.
+
+\section{The audit tool}\label{sec:uaudit}
+\cmd{tools\_audit.py} checks all of these automatically. It lies in \cmd{examples/Liard\_groundwater/} and needs Python~3
+with pandas:
+\begin{lstlisting}
+python tools_audit.py output
+python ../Liard_groundwater/tools_audit.py output      # from example B's folder
+\end{lstlisting}
+Lines to look at:
+\begin{itemize}
+\item \cmd{recharge: (Raven - MF6 - dStore - toCHD)/Raven} should be 0;
+\item \cmd{MF6 cumulative residual / gross flow} about $10^{-10}$ or smaller;
+\item \cmd{unconverged steps} 0;
+\item \cmd{ERROR lines} 0.
+\end{itemize}
+For example~B, a test run gave: recharge identity 0, \cmd{MF6 cumulative residual / gross flow} about $-1.9\times10^{-11}$,
+\cmd{unconverged steps} 0, river bookkeeping about $-5\times10^{-12}$, \cmd{ERROR lines} 0 and \cmd{max outer iterations}
+245 (the first step). With \cmd{:SoilZone PHYSICAL} the tool also closes every soil-zone identity.
+
+\section{Heads everywhere, and particle tracking}
+\begin{itemize}
+\item \cmd{mf6/gwf.hds} (MODFLOW binary, readable with FloPy) holds the head in every cell every \cmd{:HeadSaveFrequency}
+steps (default 30). \cmd{GWHeads.nc} holds them with \cmd{:WriteNetCDFHeads}.
+\item With \cmd{:WriteGWBudgetFile} a generated model also saves MODFLOW's cell-by-cell flows (\cmd{mf6/gwf.cbc}) and the
+porosity (\cmd{mf6/gwf.porosity}). \cmd{tools/make\_prt.py} then builds and runs a MODFLOW~6 particle-tracking model (PRT)
+on the coupled flows, forward or backward from the wells (capture zones, travel times). PRT needs \cmd{:HeadSaveFrequency 1}.
+Reference, Section~\ref{R-sec:budgetfile}, and Workshop~5 give the details.
+\end{itemize}

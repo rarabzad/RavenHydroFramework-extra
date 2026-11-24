@@ -1,0 +1,51 @@
+\chapter{Glossary}\label{app:uglossary}
+The words below are used in both volumes of the manual.
+\begin{longtable}{P{0.24\linewidth}P{0.708\linewidth}}
+\caption{Glossary.}\label{tab:uglossary}\\
+\toprule\hdr
+Term & Meaning\\\midrule\endfirsthead
+\caption[]{Glossary (continued).}\\
+\toprule\hdr
+Term & Meaning\\\midrule\endhead
+Active cell & A cell that MODFLOW calculates. Cells outside the aquifer, or switched off in the model, are inactive.\\
+API, library & MODFLOW~6 comes as a program library (\cmd{libmf6}) that Raven loads and controls step by step, instead of running it as a separate program.\\
+Aquiclude & A layer that, for practical purposes, does not let water through.\\
+Aquifer & A soil or rock layer that holds and passes on useful amounts of groundwater (gravel, sand).\\
+Aquitard & A layer that lets water through only slowly (clay, till); water leaks through it.\\
+Auxiliary variable & An extra column of numbers attached to each entry of a MODFLOW package --- here, for example, the Raven subbasin that a river cell belongs to.\\
+Bedrock & The base of the groundwater system in this model; below it no flow is simulated.\\
+Cell & One box of the MODFLOW grid. A \emph{column} is the stack of cells at one map location.\\
+Conductance & How easily water passes a connection, in m$^2$/d; flow = conductance $\times$ difference in water level.\\
+Confined / unconfined & An unconfined aquifer has a free water table; a confined one is completely full and under pressure.\\
+Converged & MODFLOW solves each day by repeated improvement; a day has \emph{converged} when the answer stops changing within a small tolerance.\\
+Coupled HRU & An HRU that has groundwater underneath it in the model and so exchanges water with MODFLOW.\\
+DIS, DISV, DISU & MODFLOW's three ways of describing a grid: rows and columns; layers of any-shaped cells; fully free cells.\\
+EPSG code & A standard number for a map projection, e.g.\ EPSG:32610 is UTM zone 10 North. Used with \cmd{:MF6CRS} and \cmd{:InputCRS}.\\
+Existing-model mode & Using the coupling with a MODFLOW~6 model you already have (Chapter~\ref{uch:existing}).\\
+Grid & The set of cells MODFLOW calculates in: squares of one size by default, or other shapes (Section~\ref{sec:ugrids}).\\
+Head ($h$) & The level to which water rises in a well, in metres above sea level. Water flows from high to low head.\\
+Hotstart, restart & Starting a run from the saved end state (\cmd{solution.rvc}) of an earlier run, so a long run can be split or continued.\\
+HRU & Hydrologic Response Unit: Raven's basic land unit, an area that behaves alike.\\
+Hydraulic conductivity ($K$) & How easily water moves through a material, in m/d.\\
+Leakance & How easily water passes a thin layer (a riverbed, the ground surface), per square metre, in 1/d.\\
+Linkage, overlap & How much of each HRU lies in each grid cell. It decides where each HRU's water goes.\\
+Newton method & The way MODFLOW solves its equations here; it copes well with cells drying out and filling up again.\\
+Overlap weight & The share of a cell covered by an HRU (0 to 1); a table of them can replace the map of cells (\cmd{:OverlapWeights}).\\
+Package & One component of a MODFLOW model, in its own file: wells (WEL), rivers (RIV), recharge (RCH) and so on.\\
+Pass-through cell & A very thin cell where a layer is missing; water passes straight through it from the layer above to the layer below.\\
+Profile & A stack of aquifer layers assigned to HRUs (used when Raven builds the model).\\
+Projection & The rule that turns positions on the round Earth into flat map coordinates in metres; MODFLOW models use one, usually without saying which.\\
+Quadtree, mesh & Grids with cells of different sizes: a quadtree cuts squares into four where detail is wanted; a mesh (here) has cells shaped to follow HRU boundaries.\\
+Recharge & Water that reaches the water table from above.\\
+Seepage & Groundwater flowing out at the land surface where the water table reaches it.\\
+Specific storage ($S_s$) & Water released per m$^3$ of aquifer per metre of head fall when the aquifer stays full [1/m].\\
+Specific yield ($S_y$) & Water released per m$^2$ of water table per metre of fall when the aquifer drains [--].\\
+Stage & Water level in a river, lake or reservoir [m].\\
+Steady state & A calculation as if conditions never changed --- the long-term balance. Often used for the first period of a model.\\
+Stress period & A stretch of time in a MODFLOW model (often a month) during which inputs such as pumping rates stay the same.\\
+Time step & One step of the calculation; in the coupling, one Raven time step (usually a day).\\
+Transmissivity ($T$) & $K$ times saturated thickness, in m$^2$/d.\\
+Water table & The top of the saturated zone in an unconfined aquifer.\\
+Working copy & The copy of an existing MODFLOW model that Raven runs, in \cmd{output/mf6/}; your own files are never changed.\\
+XT3D & An optional, more exact way for MODFLOW to calculate flow between cells of odd shapes; slower and off by default.\\\bottomrule
+\end{longtable}

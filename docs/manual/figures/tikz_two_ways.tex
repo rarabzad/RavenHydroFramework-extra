@@ -10,12 +10,12 @@
   arr/.style={-{Stealth[length=2.4mm]},line width=0.9pt},
   lab/.style={font=\sffamily\bfseries\small,inner sep=2pt}]
 \node[q] (q) at (0,0) {Do you already have a MODFLOW~6 groundwater model?};
-\node[yesA,anchor=north] (y) at (-39mm,-11mm) {\textbf{Raven connects to your model}\\(Chapter~\ref{ch:existing})\\[3pt]Your model is used as it is. Raven links its HRUs to the model's top layer.};
-\node[noA,anchor=north] (n) at (39mm,-11mm) {\textbf{Raven builds a groundwater model}\\(Chapter~\ref{ch:c3})\\[3pt]From your HRUs and a short description of the soil and rock layers under them.};
+\node[yesA,anchor=north] (y) at (-39mm,-11mm) {\textbf{Raven connects to your model}\\(Chapter~\ref{uch:existing})\\[3pt]Your model is used as it is. Raven links its HRUs to the model's top layer.};
+\node[noA,anchor=north] (n) at (39mm,-11mm) {\textbf{Raven builds a groundwater model}\\(Chapter~\ref{uch:build})\\[3pt]From your HRUs and a short description of the soil and rock layers under them.};
 \node[yesB,anchor=north] (y2) at ([yshift=-5mm]y.south) {Tell Raven where the model is on the map: its projection (\texttt{:MF6CRS EPSG:\dots}), a file of cell outlines, or a table of overlap weights.};
 \node[noB,anchor=north] (n2) at ([yshift=-5mm]n.south) {Choose a grid, or keep the default: regular, rotated, quadtree, cells that follow HRU boundaries, or your own cells.};
 \path let \p1=(y2.south), \p2=(n2.south) in coordinate (m) at (0,{min(\y1,\y2)-7mm});
-\node[fin,anchor=north] (e) at (m) {Then, every day of the run, Raven sends recharge down and MODFLOW sends seepage and river water back up. Both keep exact water accounts (Chapters~\ref{ch:c4} and~\ref{ch:c5}).};
+\node[fin,anchor=north] (e) at (m) {Then, every day of the run, Raven sends recharge down and MODFLOW sends seepage and river water back up. Both keep exact water accounts (Chapters~\ref{uch:exchanges} and~\ref{uch:outputs}).};
 \draw[arr,teal!70!black] (q.west) -| node[lab,pos=0.35,above,text=teal!70!black]{Yes} (y.north);
 \draw[arr,orange!80!black] (q.east) -| node[lab,pos=0.35,above,text=orange!80!black]{No} (n.north);
 \draw[arr,teal!70!black] (y.south) -- (y2.north);

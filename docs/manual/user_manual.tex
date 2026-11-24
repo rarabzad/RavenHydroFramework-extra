@@ -1,0 +1,45 @@
+\documentclass[11pt,a4paper]{report}
+\newcommand{\volumetitle}{User Manual}
+\input{preamble}
+\externaldocument[R-]{reference}[Raven_MF6_Reference.pdf]   % Volume 2: \ref{R-label}
+\begin{document}
+\pagenumbering{Alph}
+\begin{titlepage}
+\centering
+\vspace*{3.5cm}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{16pt}
+{\sffamily\bfseries\fontsize{30}{38}\selectfont\color{brand}Raven--MODFLOW~6\\[4pt]Groundwater Coupling\par}
+\vspace{10pt}
+{\sffamily\bfseries\LARGE\color{brand}Volume 1: User Manual\par}
+\vspace{14pt}
+{\color{brand}\rule{\linewidth}{1.2pt}}\par\vspace{24pt}
+{\large Manual chapter for the Raven Hydrological Modelling Framework\\[2pt](based on Raven 4.15)\par}
+\vfill
+{\sffamily\Large\bfseries Rezgar Arabzadeh\par}
+\vspace{4pt}
+{\large Principal Scientist, Hazen and Sawyer\par}
+\vspace{2cm}
+{\large November 2026\par}
+\vspace{1.2cm}
+{\footnotesize\color{gray!70!black}\copyright\ 2026 Rezgar Arabzadeh. This manual is licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0), \url{https://creativecommons.org/licenses/by/4.0/}.\par}
+\end{titlepage}
+\pagenumbering{roman}
+\begingroup\small\tableofcontents\endgroup
+\cleardoublepage
+\pagenumbering{arabic}
+\input{chapters/u_intro}
+\input{chapters/u_quickstart}
+\input{chapters/u_build}
+\input{chapters/u_existing}
+\input{chapters/u_exchanges}
+\input{chapters/u_outputs}
+\input{chapters/u_restarts}
+\input{chapters/u_trouble}
+\input{chapters/u_commands}
+\appendix
+\input{chapters/u_glossary}
+\cleardoublepage\phantomsection\addcontentsline{toc}{chapter}{Bibliography}
+\bibliographystyle{plain}
+\bibliography{refs}
+\end{document}
