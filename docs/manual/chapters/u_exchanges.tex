@@ -208,9 +208,9 @@ one minus the field capacity $S_{\mathrm{fc}}$): otherwise the water table rises
 soil (Raven warns).
 \item \textbf{Sloping and irregular land}: give a DEM finer than the cells. Each cell samples it at
 \cmd{:SoilZoneSubgrid} $n$ points per side (5 by default, 25 points), so within a cell the low ground saturates first
-and the high ground later (Reference, Figure~\ref{R-fig:szsubgrid}; Figure~\ref{fig:uszhillslope} shows a coupled hillslope). Between cells MODFLOW's heads carry the water down
+and the high ground later (Reference, Figure~\ref{R-fig:szsubgrid}). Between cells MODFLOW's heads carry the water down
 the slope, and the saturated area spreads up from the foot of the slope and from hollows and retreats downslope as it
-dries (Reference, Figure~\ref{R-fig:szhillslope}). Keep \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (the contact depth $d_s$) at
+dries (Figure~\ref{fig:uszhillslope}). Keep \cmd{SEEPAGE\_SMOOTHING\_DEPTH} (the contact depth $d_s$) at
 0.1--0.5~m. Seepage faces and saturated strips narrower than a cell need smaller cells (or \cmd{:GridRefinement} along
 valleys); within a cell the soil water stands at one level.
 \begin{figure}[!htbp]\centering\includegraphics[width=\linewidth]{figures/fig_sz_hillslope.png}
